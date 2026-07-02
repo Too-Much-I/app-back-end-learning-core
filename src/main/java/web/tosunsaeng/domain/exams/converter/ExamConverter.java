@@ -20,13 +20,17 @@ public class ExamConverter {
                 .build();
     }
 
-    public static ExamResponseDTO.QuestionDTO toQuestionDTO(Question question) {
+    // ExamConverter.java
+    public static ExamResponseDTO.QuestionDTO toQuestionDTO(Question q) {
         return ExamResponseDTO.QuestionDTO.builder()
-                .part(question.getPart())
-                .questionId(question.getQuestionId())
-                .text(question.getText())
-                .prepTimeSec(question.getPrepTimeSec())
-                .speakTimeSec(question.getSpeakTimeSec())
+                .part(q.getPartNumber())
+                .questionNumber(q.getQuestionNumber())
+                .text(q.getReferenceText() != null ? q.getReferenceText() : q.getQuestion())
+                .audioUrl(q.getAudioUrl())
+                .imageUrl(q.getImageUrl())
+                .tableContext(q.getTableContext())
+                .prepTimeSec(q.getPrepTimeSec())
+                .speakTimeSec(q.getSpeakTimeSec())
                 .build();
     }
 

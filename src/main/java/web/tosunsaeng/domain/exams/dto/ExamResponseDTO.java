@@ -1,22 +1,22 @@
 package web.tosunsaeng.domain.exams.dto;
 
+import com.fasterxml.jackson.annotation.JsonInclude;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
+import web.tosunsaeng.domain.exams.domain.entity.Question;
 import web.tosunsaeng.domain.exams.domain.enums.ExamStatus;
 
 import java.util.List;
 
 public class ExamResponseDTO {
 
-    @Builder
-    @Getter
-    @NoArgsConstructor
-    @AllArgsConstructor
+    @Getter @Builder @NoArgsConstructor @AllArgsConstructor
     public static class CreateSessionResult {
         private String examId;
+        private String title;
         private List<QuestionDTO> questions;
     }
 
@@ -25,13 +25,26 @@ public class ExamResponseDTO {
     @Setter
     @NoArgsConstructor
     @AllArgsConstructor
+    @JsonInclude(JsonInclude.Include.NON_NULL)
     public static class QuestionDTO {
-        private String part;
-        private String questionId;
+        private Integer part;
+        private Integer questionNumber;
+
+        // 텍스트 기반 문제 (Part 1, 3, 5 등)
         private String text;
+
+        // 오디오 파일 (Part 1 등에서 문제 읽어줄 때 사용)
+        private String audioUrl;
+
+        // 이미지 문제 (Part 2)
+        private String imageUrl;
+
+        // 표 문제 (Part 4)
+        private Question.TableContext tableContext;
+
+        // 시간 정보
         private Integer prepTimeSec;
         private Integer speakTimeSec;
-        private String audioUrl;
     }
 
     @Builder

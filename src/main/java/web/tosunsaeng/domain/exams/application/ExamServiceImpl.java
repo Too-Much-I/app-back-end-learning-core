@@ -111,7 +111,7 @@ public class ExamServiceImpl implements ExamService {
         List<ExamResponseDTO.QuestionDTO> questionDTOs = questions.stream()
                 .map(question -> {
                     ExamResponseDTO.QuestionDTO dto = ExamConverter.toQuestionDTO(question);
-                    String audioUrl = getQuestionAudioUrl(targetPaperId, dto.getQuestionId());
+                    String audioUrl = getQuestionAudioUrl(targetPaperId, String.valueOf(dto.getQuestionNumber()));
                     dto.setAudioUrl(audioUrl);
                     return dto;
                 })
