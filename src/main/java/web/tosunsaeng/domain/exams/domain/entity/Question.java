@@ -16,7 +16,7 @@ public class Question {
     @Id
     private String id;
     private String examPaperId; // 추가! (예: "paper_001", "paper_002")
-    private Integer part;
+    private String part;
     private String questionId;
     private String text;
     private Integer prepTimeSec;

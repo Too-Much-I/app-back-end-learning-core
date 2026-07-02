@@ -12,7 +12,6 @@ import java.util.stream.Collectors;
 
 public class ExamConverter {
 
-    // 1. 최종 세션 생성 응답 DTO 변환
     public static ExamResponseDTO.CreateSessionResult toCreateSessionResult(String examId, List<ExamResponseDTO.QuestionDTO> questions) {
         return ExamResponseDTO.CreateSessionResult.builder()
                 .examId(examId)
@@ -20,14 +19,14 @@ public class ExamConverter {
                 .build();
     }
 
-    // 2. 문제 정보 DTO 변환 (현재는 PoC용 데이터를 받지만, 추후 매개변수를 Question Entity로 변경)
-    public static ExamResponseDTO.QuestionDTO toQuestionDTO(Integer part, String questionId, String text, Integer prepTimeSec, Integer speakTimeSec) {
+    public static ExamResponseDTO.QuestionDTO toQuestionDTO(Question question) {
         return ExamResponseDTO.QuestionDTO.builder()
-                .part(part)
-                .questionId(questionId)
-                .text(text)
-                .prepTimeSec(prepTimeSec)
-                .speakTimeSec(speakTimeSec)
+                .part(question.getPart())
+                .questionId(question.getQuestionId())
+                .text(question.getText())
+                .prepTimeSec(question.getPrepTimeSec())
+                .speakTimeSec(question.getSpeakTimeSec())
+                // audioUrl은 Service 레이어에서 세팅
                 .build();
     }
 
@@ -53,42 +52,11 @@ public class ExamConverter {
                 .build();
     }
 
-    public static ExamResponseDTO.ScoreResult toScoreResult(String examId, String estimatedScore,
-                                                            ExamResponseDTO.MetricsDTO metrics,
-                                                            List<ExamResponseDTO.PartResultDTO> partResults) {
-        return ExamResponseDTO.ScoreResult.builder()
-                .examId(examId)
-                .estimatedScore(estimatedScore)
-                .metrics(metrics)
-                .partResults(partResults)
-                .build();
-    }
-
-    // Entity -> DTO 변환 추가 (질문)
-    public static ExamResponseDTO.QuestionDTO toQuestionDTO(Question question) {
-        return ExamResponseDTO.QuestionDTO.builder()
-                .part(question.getPart())
-                .questionId(question.getQuestionId())
-                .text(question.getText())
-                .prepTimeSec(question.getPrepTimeSec())
-                .speakTimeSec(question.getSpeakTimeSec())
-                .build();
-    }
-
-    // Entity -> DTO 변환 추가 (결과)
     public static ExamResponseDTO.ScoreResult toScoreResult(ExamResult result) {
         if (result == null) return null;
 
-        // 1. Metrics가 null이면 0으로 구성된 DTO 생성
-        // Metrics가 null일 경우 대비
         ExamResult.Metrics metrics = (result.getMetrics() != null) ? result.getMetrics() :
-                ExamResult.Metrics.builder()
-                        .pronunciation("0")
-                        .fluency("0")
-                        .grammar("0")
-                        .vocabulary("0")
-                        .topicRelevance("0")
-                        .build();
+                ExamResult.Metrics.builder().pronunciation("0").fluency("0").grammar("0").vocabulary("0").topicRelevance("0").build();
 
         ExamResponseDTO.MetricsDTO metricsDTO = ExamResponseDTO.MetricsDTO.builder()
                 .pronunciation(metrics.getPronunciation())
@@ -98,12 +66,13 @@ public class ExamConverter {
                 .topicRelevance(metrics.getTopicRelevance())
                 .build();
 
-        // 2. PartResults가 null이면 빈 리스트 처리
         List<ExamResponseDTO.PartResultDTO> partResultDTOs = Optional.ofNullable(result.getPartResults())
-                .orElse(Collections.emptyList()) // import java.util.Collections; 필요
+                .orElse(Collections.emptyList())
                 .stream()
                 .map(part -> ExamResponseDTO.PartResultDTO.builder()
                         .part(part.getPart())
+                        .questionId(part.getQuestionId())
+                        // audioUrl은 Service 레이어에서 세팅
                         .sttText(part.getSttText())
                         .deductionReason(part.getDeductionReason())
                         .etsRubric(part.getEtsRubric())
@@ -113,38 +82,41 @@ public class ExamConverter {
 
         return ExamResponseDTO.ScoreResult.builder()
                 .examId(result.getExamId())
-                .estimatedScore(result.getEstimatedScore())
+                .totalScore(result.getTotalScore())
                 .metrics(metricsDTO)
                 .partResults(partResultDTOs)
                 .build();
     }
 
-    // ExamConverter.java
     public static ExamResult toExamResult(ExamRequestDTO.AiResultReq req) {
-        // Metrics 변환
-        ExamResult.Metrics metrics = ExamResult.Metrics.builder()
-                .pronunciation(req.getMetrics().getPronunciation())
-                .fluency(req.getMetrics().getFluency())
-                .grammar(req.getMetrics().getGrammar())
-                .vocabulary(req.getMetrics().getVocabulary())
-                .topicRelevance(req.getMetrics().getTopicRelevance())
-                .build();
+        ExamResult.Metrics metrics = null;
+        if(req.getMetrics() != null) {
+            metrics = ExamResult.Metrics.builder()
+                    .pronunciation(req.getMetrics().getPronunciation())
+                    .fluency(req.getMetrics().getFluency())
+                    .grammar(req.getMetrics().getGrammar())
+                    .vocabulary(req.getMetrics().getVocabulary())
+                    .topicRelevance(req.getMetrics().getTopicRelevance())
+                    .build();
+        }
 
-        // PartResults 변환
-        List<ExamResult.PartResult> partResults = req.getPartResults().stream()
-                .map(part -> ExamResult.PartResult.builder()
-                        .part(part.getPart())
-                        .sttText(part.getSttText())
-                        .deductionReason(part.getDeductionReason())
-                        .etsRubric(part.getEtsRubric())
-                        .feedback(part.getFeedback())
-                        .build())
-                .collect(Collectors.toList());
+        List<ExamResult.PartResult> partResults = null;
+        if (req.getPartResults() != null) {
+            partResults = req.getPartResults().stream()
+                    .map(part -> ExamResult.PartResult.builder()
+                            .part(part.getPart())
+                            .questionId(part.getQuestionId())
+                            .sttText(part.getSttText())
+                            .deductionReason(part.getDeductionReason())
+                            .etsRubric(part.getEtsRubric())
+                            .feedback(part.getFeedback())
+                            .build())
+                    .collect(Collectors.toList());
+        }
 
-        // 최종 ExamResult 빌드
         return ExamResult.builder()
                 .examId(req.getExamId())
-                .estimatedScore(String.valueOf(req.getTotalScore()))
+                .totalScore(req.getTotalScore())
                 .feedback(req.getFeedback())
                 .metrics(metrics)
                 .partResults(partResults)

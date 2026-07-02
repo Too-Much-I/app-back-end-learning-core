@@ -4,6 +4,7 @@ import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
+import lombok.Setter;
 
 import java.util.List;
 
@@ -20,14 +21,16 @@ public class ExamResponseDTO {
 
     @Builder
     @Getter
+    @Setter // Service에서 audioUrl 할당을 위해 추가
     @NoArgsConstructor
     @AllArgsConstructor
     public static class QuestionDTO {
-        private Integer part;
+        private String part;
         private String questionId;
         private String text;
         private Integer prepTimeSec;
         private Integer speakTimeSec;
+        private String audioUrl; // 프론트엔드 문제 음성(TTS) 재생용 URL
     }
 
     @Builder
@@ -64,7 +67,7 @@ public class ExamResponseDTO {
     @AllArgsConstructor
     public static class ScoreResult {
         private String examId;
-        private String estimatedScore;
+        private Integer totalScore; // 명칭 통일
         private MetricsDTO metrics;
         private List<PartResultDTO> partResults;
     }
@@ -83,10 +86,13 @@ public class ExamResponseDTO {
 
     @Builder
     @Getter
+    @Setter // Service에서 audioUrl 할당을 위해 추가
     @NoArgsConstructor
     @AllArgsConstructor
     public static class PartResultDTO {
         private String part;
+        private String questionId;
+        private String audioUrl; // 프론트엔드 사용자 녹음 파일 재생용 URL
         private String sttText;
         private String deductionReason;
         private String etsRubric;
