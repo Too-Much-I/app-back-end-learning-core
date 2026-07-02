@@ -15,7 +15,6 @@ import web.tosunsaeng.domain.exams.dto.ExamResponseDTO;
 import web.tosunsaeng.domain.exams.exception.ExamsException;
 import web.tosunsaeng.global.error.code.status.ErrorStatus;
 
-import java.net.URL;
 import java.time.Duration;
 import java.util.List;
 import java.util.UUID;
