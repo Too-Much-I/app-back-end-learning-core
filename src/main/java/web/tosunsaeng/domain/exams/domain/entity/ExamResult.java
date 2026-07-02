@@ -19,6 +19,7 @@ public class ExamResult {
     private String id;
     private String examId; // Redis 세션과 동일한 식별자
     private String estimatedScore;
+    private String feedback;
     private Metrics metrics;
     private List<PartResult> partResults;
 
@@ -33,7 +34,7 @@ public class ExamResult {
 
     @Getter @Builder @NoArgsConstructor @AllArgsConstructor
     public static class PartResult {
-        private Integer part;
+        private String part;
         private String sttText;
         private String deductionReason;
         private String etsRubric;

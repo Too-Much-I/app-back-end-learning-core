@@ -2,6 +2,7 @@ package web.tosunsaeng.domain.exams.converter;
 
 import web.tosunsaeng.domain.exams.domain.entity.ExamResult;
 import web.tosunsaeng.domain.exams.domain.entity.Question;
+import web.tosunsaeng.domain.exams.dto.ExamRequestDTO;
 import web.tosunsaeng.domain.exams.dto.ExamResponseDTO;
 
 import java.util.Collections;
@@ -115,6 +116,38 @@ public class ExamConverter {
                 .estimatedScore(result.getEstimatedScore())
                 .metrics(metricsDTO)
                 .partResults(partResultDTOs)
+                .build();
+    }
+
+    // ExamConverter.java
+    public static ExamResult toExamResult(ExamRequestDTO.AiResultReq req) {
+        // Metrics 변환
+        ExamResult.Metrics metrics = ExamResult.Metrics.builder()
+                .pronunciation(req.getMetrics().getPronunciation())
+                .fluency(req.getMetrics().getFluency())
+                .grammar(req.getMetrics().getGrammar())
+                .vocabulary(req.getMetrics().getVocabulary())
+                .topicRelevance(req.getMetrics().getTopicRelevance())
+                .build();
+
+        // PartResults 변환
+        List<ExamResult.PartResult> partResults = req.getPartResults().stream()
+                .map(part -> ExamResult.PartResult.builder()
+                        .part(part.getPart())
+                        .sttText(part.getSttText())
+                        .deductionReason(part.getDeductionReason())
+                        .etsRubric(part.getEtsRubric())
+                        .feedback(part.getFeedback())
+                        .build())
+                .collect(Collectors.toList());
+
+        // 최종 ExamResult 빌드
+        return ExamResult.builder()
+                .examId(req.getExamId())
+                .estimatedScore(String.valueOf(req.getTotalScore()))
+                .feedback(req.getFeedback())
+                .metrics(metrics)
+                .partResults(partResults)
                 .build();
     }
 }

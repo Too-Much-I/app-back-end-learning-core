@@ -13,4 +13,6 @@ public interface ExamService {
     ExamResponseDTO.StatusResult getExamStatus(String examId);
 
     ExamResponseDTO.ScoreResult getExamResults(String examId);
+
+    void updateExamResult(ExamRequestDTO.AiResultReq req);
 }

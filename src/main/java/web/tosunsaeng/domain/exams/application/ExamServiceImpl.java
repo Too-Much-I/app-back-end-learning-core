@@ -14,6 +14,10 @@ import web.tosunsaeng.domain.exams.dto.ExamRequestDTO;
 import web.tosunsaeng.domain.exams.dto.ExamResponseDTO;
 import web.tosunsaeng.domain.exams.exception.ExamsException;
 import web.tosunsaeng.global.error.code.status.ErrorStatus;
+import org.springframework.web.client.RestTemplate;
+import org.springframework.http.*;
+import org.springframework.util.LinkedMultiValueMap;
+import org.springframework.util.MultiValueMap;
 
 import java.time.Duration;
 import java.util.List;
@@ -28,6 +32,8 @@ public class ExamServiceImpl implements ExamService {
 
     private final RedisTemplate<String, Object> redisTemplate;
     private final software.amazon.awssdk.services.s3.presigner.S3Presigner s3Presigner;
+    private final RestTemplate restTemplate;
+    private final String AI_SERVER_URL = "http://172.16.202.101:8000/evaluation";
 
     // MongoDB Repository 주입
     private final QuestionRepository questionRepository;
@@ -93,12 +99,35 @@ public class ExamServiceImpl implements ExamService {
 
     @Override
     public ExamResponseDTO.SubmitResult submitAudio(String examId, String questionId, ExamRequestDTO.SubmitAudioReq req) {
-        // 프론트엔드가 업로드를 마쳤다고 알림 -> 상태를 PROCESSING으로 변경
+        // 1. 상태 변경
         String redisKey = "exam:status:" + examId;
         redisTemplate.opsForValue().set(redisKey, "PROCESSING", 1, TimeUnit.HOURS);
 
-        // TODO: (고도화 시) 여기서 SQS 큐에 메시지를 보내 AI 에이전트를 비동기로 호출합니다.
-        log.info("채점 요청 접수 완료 - Session: {}, Question: {}, FileKey: {}", examId, questionId, req.getFileKey());
+        // 2. AI 에이전트로 전송할 데이터 구성
+        MultiValueMap<String, String> body = new LinkedMultiValueMap<>();
+        body.add("user_id", "test");
+        body.add("mock_exam_id", examId);
+        body.add("part_number", "1");
+        body.add("question_number", questionId);
+        body.add("file_key", req.getFileKey());
+
+        HttpHeaders headers = new HttpHeaders();
+        headers.setContentType(MediaType.MULTIPART_FORM_DATA);
+        HttpEntity<MultiValueMap<String, String>> entity = new HttpEntity<>(body, headers);
+
+        // 3. 동기 호출 시도
+        try {
+            ResponseEntity<String> response = restTemplate.postForEntity(AI_SERVER_URL, entity, String.class);
+            log.info("AI 에이전트 채점 요청 성공: {}", response.getBody());
+        } catch (Exception e) {
+            log.error("AI 에이전트 연동 실패: {}", e.getMessage());
+
+            // 상태를 FAILED로 즉시 변경
+            redisTemplate.opsForValue().set(redisKey, "FAILED", 1, TimeUnit.HOURS);
+
+            // [중요] 여기서 예외를 던져야 클라이언트가 실패를 알 수 있음
+            throw new ExamsException(ErrorStatus._AI_SERVER_CONNECTION_ERROR);
+        }
 
         return ExamConverter.toSubmitResult("PROCESSING");
     }
@@ -122,5 +151,20 @@ public class ExamServiceImpl implements ExamService {
                 .orElseThrow(() -> new ExamsException(ErrorStatus._EXAM_NOT_FOUND));
 
         return ExamConverter.toScoreResult(result);
+    }
+
+    @Override
+    public void updateExamResult(ExamRequestDTO.AiResultReq req) {
+        // 1. Redis 상태 변경
+        String redisKey = "exam:status:" + req.getExamId();
+        redisTemplate.opsForValue().set(redisKey, "COMPLETED", 1, TimeUnit.HOURS);
+
+        // 2. Converter를 사용하여 DTO를 Entity로 변환 (필드 매핑 포함)
+        ExamResult result = ExamConverter.toExamResult(req);
+
+        // 3. MongoDB 저장
+        examResultRepository.save(result);
+
+        log.info("채점 완료 및 결과 저장 성공: {}", req.getExamId());
     }
 }

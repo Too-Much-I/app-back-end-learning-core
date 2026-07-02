@@ -86,7 +86,7 @@ public class ExamResponseDTO {
     @NoArgsConstructor
     @AllArgsConstructor
     public static class PartResultDTO {
-        private Integer part;
+        private String part;
         private String sttText;
         private String deductionReason;
         private String etsRubric;

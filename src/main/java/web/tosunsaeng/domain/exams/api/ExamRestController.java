@@ -54,4 +54,11 @@ public class ExamRestController {
             @PathVariable("examId") String examId) {
         return BaseResponse.onSuccess(SuccessStatus.OK, examService.getExamResults(examId));
     }
+
+    @Operation(summary = "AI 채점 완료 콜백 API", description = "채점이 완료된 후, AI 에이전트가 백엔드로 알립니다.")
+    @PostMapping("/api/v1/exams/callback")
+    public BaseResponse<Void> receiveAiResult(@RequestBody ExamRequestDTO.AiResultReq req) {
+        examService.updateExamResult(req);
+        return BaseResponse.onSuccess(SuccessStatus.OK, null);
+    }
 }
