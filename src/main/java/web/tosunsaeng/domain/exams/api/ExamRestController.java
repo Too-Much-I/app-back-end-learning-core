@@ -39,8 +39,7 @@ public class ExamRestController {
     @PostMapping(value = "/{examId}/questions/{questionId}/submit", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     public BaseResponse<ExamResponseDTO.SubmitResult> submitAudio(
             @PathVariable("examId") String examId,
-            @PathVariable("questionId") Integer questionNumber,
-            @RequestPart("audio_file") MultipartFile audioFile) { // 실제 파일 수신
+            @PathVariable("questionId") Integer questionNumber) {
         return BaseResponse.onSuccess(SuccessStatus.OK, examService.submitAudio(examId, questionNumber));
     }
 

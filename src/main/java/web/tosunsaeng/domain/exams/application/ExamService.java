@@ -1,6 +1,5 @@
 package web.tosunsaeng.domain.exams.application;
 
-import org.springframework.web.multipart.MultipartFile;
 import web.tosunsaeng.domain.exams.dto.ExamRequestDTO;
 import web.tosunsaeng.domain.exams.dto.ExamResponseDTO;
 
