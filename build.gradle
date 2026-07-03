@@ -18,23 +18,22 @@ repositories {
 }
 
 dependencies {
-	// Spring Boot 4.1.0 핵심
+	// Spring Boot 핵심 라이브러리
 	implementation 'org.springframework.boot:spring-boot-starter-web'
 	implementation 'org.springframework.boot:spring-boot-starter-security'
 	implementation 'org.springframework.boot:spring-boot-starter-validation'
 
-	// 데이터베이스 & 캐시 (MongoDB, Redis)
+	// 데이터베이스 & 캐시
 	implementation 'org.springframework.boot:spring-boot-starter-data-mongodb'
 	implementation 'org.springframework.boot:spring-boot-starter-data-redis'
 
-	// AWS 연동 (S3 Presigned URL용)
+	// AWS SDK
 	implementation 'software.amazon.awssdk:s3:2.29.52'
-	implementation 'software.amazon.awssdk:s3-presigner:2.29.52'
 
-	// Swagger (API 문서 자동화)
+	// Swagger
 	implementation 'org.springdoc:springdoc-openapi-starter-webmvc-ui:2.8.4'
 
-	// JWT (SecurityConfig의 JwtTokenProvider 등을 위한 라이브러리)
+	// JWT
 	implementation 'io.jsonwebtoken:jjwt-api:0.12.5'
 	runtimeOnly 'io.jsonwebtoken:jjwt-impl:0.12.5'
 	runtimeOnly 'io.jsonwebtoken:jjwt-jackson:0.12.5'
