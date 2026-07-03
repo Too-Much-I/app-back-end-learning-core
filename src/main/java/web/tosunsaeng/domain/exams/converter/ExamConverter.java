@@ -6,13 +6,11 @@ import web.tosunsaeng.domain.exams.domain.enums.ExamStatus;
 import web.tosunsaeng.domain.exams.dto.ExamRequestDTO;
 import web.tosunsaeng.domain.exams.dto.ExamResponseDTO;
 
-import java.util.Collections;
 import java.util.List;
-import java.util.Optional;
-import java.util.stream.Collectors;
 
 public class ExamConverter {
 
+    // --- 1. 세션 생성 및 기본 문제 매핑 (기존 유지 코드) ---
     public static ExamResponseDTO.CreateSessionResult toCreateSessionResult(String examId, String title, List<ExamResponseDTO.QuestionDTO> questions) {
         return ExamResponseDTO.CreateSessionResult.builder()
                 .examId(examId)
@@ -56,73 +54,69 @@ public class ExamConverter {
                 .build();
     }
 
-    public static ExamResponseDTO.ScoreResult toScoreResult(ExamResult result) {
-        if (result == null) return null;
+    // --- 2. 💡 추가된 신규 매핑 로직 (컴파일 에러 해결 및 API 분리 대응) ---
 
-        ExamResult.Metrics metrics = (result.getMetrics() != null) ? result.getMetrics() :
-                ExamResult.Metrics.builder().pronunciation("0").fluency("0").grammar("0").vocabulary("0").topicRelevance("0").build();
-
-        ExamResponseDTO.MetricsDTO metricsDTO = ExamResponseDTO.MetricsDTO.builder()
-                .pronunciation(metrics.getPronunciation())
-                .fluency(metrics.getFluency())
-                .grammar(metrics.getGrammar())
-                .vocabulary(metrics.getVocabulary())
-                .topicRelevance(metrics.getTopicRelevance())
-                .build();
-
-        List<ExamResponseDTO.PartResultDTO> partResultDTOs = Optional.ofNullable(result.getPartResults())
-                .orElse(Collections.emptyList())
-                .stream()
-                .map(part -> ExamResponseDTO.PartResultDTO.builder()
-                        .part(part.getPart()) // Integer 매핑
-                        .questionId(part.getQuestionId())
-                        .sttText(part.getSttText())
-                        .deductionReason(part.getDeductionReason())
-                        .etsRubric(part.getEtsRubric())
-                        .feedback(part.getFeedback())
-                        .build())
-                .collect(Collectors.toList());
-
-        return ExamResponseDTO.ScoreResult.builder()
-                .examId(result.getExamId())
-                .totalScore(result.getTotalScore())
-                .metrics(metricsDTO)
-                .partResults(partResultDTOs)
-                .build();
-    }
-
+    // AI 결과(Req)를 MongoDB 엔티티(Entity) 문서 구조로 변환
     public static ExamResult toExamResult(ExamRequestDTO.AiResultReq req) {
-        ExamResult.Metrics metrics = null;
-        if (req.getMetrics() != null) {
-            metrics = ExamResult.Metrics.builder()
-                    .pronunciation(req.getMetrics().getPronunciation())
-                    .fluency(req.getMetrics().getFluency())
-                    .grammar(req.getMetrics().getGrammar())
-                    .vocabulary(req.getMetrics().getVocabulary())
-                    .topicRelevance(req.getMetrics().getTopicRelevance())
-                    .build();
-        }
-
-        List<ExamResult.PartResult> partResults = null;
-        if (req.getPartResults() != null) {
-            partResults = req.getPartResults().stream()
-                    .map(part -> ExamResult.PartResult.builder()
-                            .part(part.getPart()) // Integer 매핑
-                            .questionId(part.getQuestionId())
-                            .sttText(part.getSttText())
-                            .deductionReason(part.getDeductionReason())
-                            .etsRubric(part.getEtsRubric())
-                            .feedback(part.getFeedback())
-                            .build())
-                    .collect(Collectors.toList());
-        }
+        if (req == null) return null;
 
         return ExamResult.builder()
                 .examId(req.getExamId())
+                // 요약용 데이터 매핑 (문항 데이터일 때는 알아서 null로 채워짐)
                 .totalScore(req.getTotalScore())
-                .feedback(req.getFeedback())
-                .metrics(metrics)
-                .partResults(partResults)
+                .levelEstimate(req.getLevelEstimate())
+                .summary(req.getSummary())
+                .overallFeedback(req.getOverallFeedback())
+                .partFeedback(req.getPartFeedback())
+                .strengths(req.getStrengths())
+                .weaknesses(req.getWeaknesses())
+                .recommendedPractice(req.getRecommendedPractice())
+
+                // 개별 문항용 데이터 매핑 (요약 데이터일 때는 알아서 null로 채워짐)
+                .partNumber(req.getPartNumber())
+                .questionNumber(req.getQuestionNumber())
+                .score(req.getScore())
+                .maxScore(req.getMaxScore())
+                .transcript(req.getTranscript())
+                .feedback(toItemFeedbackEntity(req.getFeedback()))
+                .build();
+    }
+
+    // 엔티티의 하위 피드백 객체 매핑
+    private static ExamResult.ItemFeedback toItemFeedbackEntity(ExamRequestDTO.ItemFeedbackDTO dto) {
+        if (dto == null) return null;
+
+        return ExamResult.ItemFeedback.builder()
+                .summary(dto.getSummary())
+                .level(dto.getLevel())
+                .pronunciationFluencyScore(dto.getPronunciationFluencyScore())
+                .contentRelevanceScore(dto.getContentRelevanceScore())
+                .strengths(dto.getStrengths())
+                .weaknesses(dto.getWeaknesses())
+                .pronunciation(dto.getPronunciation())
+                .fluency(dto.getFluency())
+                .content(dto.getContent())
+                .grammarVocabulary(dto.getGrammarVocabulary())
+                .actionItems(dto.getActionItems())
+                .build();
+    }
+
+    // 💡 ExamServiceImpl의 12개 조각 병합 과정 중 개별 피드백 DTO를 채워주기 위한 메서드
+    public static ExamResponseDTO.ItemFeedbackDTO toItemFeedbackDTO(ExamResult.ItemFeedback entity) {
+        if (entity == null) return null;
+
+        return ExamResponseDTO.ItemFeedbackDTO.builder()
+                .summary(entity.getSummary())
+                .level(entity.getLevel())
+                .pronunciationFluencyScore(entity.getPronunciationFluencyScore())
+                .contentRelevanceScore(entity.getContentRelevanceScore())
+                .strengths(entity.getStrengths())
+                .weaknesses(entity.getWeaknesses())
+                .pronunciation(entity.getPronunciation())
+                .fluency(entity.getFluency())
+                .content(entity.getContent())
+                .grammarVocabulary(entity.getGrammarVocabulary())
+                .actionItems(entity.getActionItems())
                 .build();
     }
 }

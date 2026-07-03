@@ -51,17 +51,29 @@ public class ExamRestController {
         return BaseResponse.onSuccess(SuccessStatus.OK, examService.getExamStatus(examId));
     }
 
-    @Operation(summary = "AI 채점 결과 조회 API", description = "채점이 완료된 후, 예상 점수와 파트별 피드백을 가져옵니다.")
-    @GetMapping("/{examId}/results")
-    public BaseResponse<ExamResponseDTO.ScoreResult> getExamResults(
-            @PathVariable("examId") String examId) {
-        return BaseResponse.onSuccess(SuccessStatus.OK, examService.getExamResults(examId));
+    @Operation(summary = "[프론트엔드] 전체 요약 피드백 조회 API", description = "모의고사의 총점 및 요약 피드백만 빠르게 가져옵니다.")
+    @GetMapping("/{examId}/summary")
+    public BaseResponse<ExamResponseDTO.SummaryResult> getExamSummary(@PathVariable("examId") String examId) {
+        return BaseResponse.onSuccess(SuccessStatus.OK, examService.getExamSummary(examId));
     }
 
-    @Operation(summary = "AI 채점 완료 콜백 API", description = "채점이 완료된 후, AI 에이전트가 백엔드로 알립니다.")
-    @PostMapping("/api/v1/exams/callback")
+    @Operation(summary = "[프론트엔드] 문항별 세부 피드백 조회 API", description = "모의고사의 개별 문제들(1~11번)에 대한 피드백 리스트를 가져옵니다.")
+    @GetMapping("/{examId}/questions")
+    public BaseResponse<ExamResponseDTO.QuestionResultList> getExamQuestions(@PathVariable("examId") String examId) {
+        return BaseResponse.onSuccess(SuccessStatus.OK, examService.getExamQuestions(examId));
+    }
+
+    @Operation(summary = "[AI 서버용] 채점 피드백 콜백 API", description = "AI가 분석한 결과를 부분적으로 저장합니다.")
+    @PostMapping("/callback/feedback")
     public BaseResponse<Void> receiveAiResult(@RequestBody ExamRequestDTO.AiResultReq req) {
         examService.updateExamResult(req);
+        return BaseResponse.onSuccess(SuccessStatus.OK, null);
+    }
+
+    @Operation(summary = "[AI 서버용] SpeechAce 결과 콜백 API", description = "AI가 호출한 스피치에이스 JSON을 저장합니다.")
+    @PostMapping("/callback/speechace")
+    public BaseResponse<Void> receiveSpeechAceResult(@RequestBody ExamRequestDTO.SpeechAceReq req) {
+        examService.saveSpeechAceResult(req);
         return BaseResponse.onSuccess(SuccessStatus.OK, null);
     }
 }

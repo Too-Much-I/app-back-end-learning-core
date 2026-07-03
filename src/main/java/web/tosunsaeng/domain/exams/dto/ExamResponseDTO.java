@@ -10,6 +10,7 @@ import web.tosunsaeng.domain.exams.domain.entity.Question;
 import web.tosunsaeng.domain.exams.domain.enums.ExamStatus;
 
 import java.util.List;
+import java.util.Map;
 
 public class ExamResponseDTO {
 
@@ -75,41 +76,53 @@ public class ExamResponseDTO {
         private Integer progressPercent;
     }
 
-    @Builder
-    @Getter
-    @NoArgsConstructor
-    @AllArgsConstructor
-    public static class ScoreResult {
+    @Builder @Getter @NoArgsConstructor @AllArgsConstructor
+    public static class SummaryResult {
         private String examId;
         private Integer totalScore;
-        private MetricsDTO metrics;
-        private List<PartResultDTO> partResults;
+        private String levelEstimate;
+        private String summary;
+        private String overallFeedback;
+        private Map<String, String> partFeedback;
+        private List<String> strengths;
+        private List<String> weaknesses;
+        private List<String> recommendedPractice;
     }
 
-    @Builder
-    @Getter
-    @NoArgsConstructor
-    @AllArgsConstructor
-    public static class MetricsDTO {
+    // 💡 2-2. 개별 문항 리스트 전용 응답 DTO
+    @Builder @Getter @NoArgsConstructor @AllArgsConstructor
+    public static class QuestionResultList {
+        private String examId;
+        private List<PartResultDTO> questions;
+    }
+
+    @Builder @Getter @Setter @NoArgsConstructor @AllArgsConstructor
+    @JsonInclude(JsonInclude.Include.NON_NULL)
+    public static class PartResultDTO {
+        private Integer partNumber;
+        private Integer questionNumber;
+        private String audioUrl;
+        private Integer score;
+        private Integer maxScore;
+        private String transcript;
+        private ItemFeedbackDTO feedback;
+
+        // 프론트에 SpeechAce 원본을 내려줄 필드 추가
+        private Map<String, Object> speechAceData;
+    }
+
+    @Builder @Getter @NoArgsConstructor @AllArgsConstructor
+    public static class ItemFeedbackDTO {
+        private String summary;
+        private String level;
+        private Double pronunciationFluencyScore;
+        private Double contentRelevanceScore;
+        private List<String> strengths;
+        private List<String> weaknesses;
         private String pronunciation;
         private String fluency;
-        private String grammar;
-        private String vocabulary;
-        private String topicRelevance;
-    }
-
-    @Builder
-    @Getter
-    @Setter
-    @NoArgsConstructor
-    @AllArgsConstructor
-    public static class PartResultDTO {
-        private Integer part;
-        private String questionId;
-        private String audioUrl;
-        private String sttText;
-        private String deductionReason;
-        private String etsRubric;
-        private String feedback;
+        private String content;
+        private String grammarVocabulary;
+        private List<String> actionItems;
     }
 }

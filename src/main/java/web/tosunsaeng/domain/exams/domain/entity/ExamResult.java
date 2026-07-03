@@ -8,6 +8,7 @@ import org.springframework.data.annotation.Id;
 import org.springframework.data.mongodb.core.mapping.Document;
 
 import java.util.List;
+import java.util.Map;
 
 @Document(collection = "exam_results")
 @Getter
@@ -17,28 +18,40 @@ import java.util.List;
 public class ExamResult {
     @Id
     private String id;
-    private String examId; // Redis 세션과 동일한 식별자
-    private Integer totalScore; // 명칭 및 타입 통일
-    private String feedback;
-    private Metrics metrics;
-    private List<PartResult> partResults;
+    private String examId;
+
+    // 요약 데이터 (문항 데이터일 때는 null)
+    private Integer totalScore;
+    private String levelEstimate;
+    private String summary;
+    private String overallFeedback;
+    private Map<String, String> partFeedback;
+    private List<String> strengths;
+    private List<String> weaknesses;
+    private List<String> recommendedPractice;
+
+    // 문항 데이터 (요약 데이터일 때는 null)
+    private Integer partNumber;
+    private Integer questionNumber;
+    private Integer score;
+    private Integer maxScore;
+    private String transcript;
+    private ItemFeedback feedback;
+
+    private Map<String, Object> speechAceData;
 
     @Getter @Builder @NoArgsConstructor @AllArgsConstructor
-    public static class Metrics {
+    public static class ItemFeedback {
+        private String summary;
+        private String level;
+        private Double pronunciationFluencyScore;
+        private Double contentRelevanceScore;
+        private List<String> strengths;
+        private List<String> weaknesses;
         private String pronunciation;
         private String fluency;
-        private String grammar;
-        private String vocabulary;
-        private String topicRelevance;
-    }
-
-    @Getter @Builder @NoArgsConstructor @AllArgsConstructor
-    public static class PartResult {
-        private Integer part;
-        private String questionId; // 음성 파일 매칭을 위한 고유 식별자
-        private String sttText;
-        private String deductionReason;
-        private String etsRubric;
-        private String feedback;
+        private String content;
+        private String grammarVocabulary;
+        private List<String> actionItems;
     }
 }

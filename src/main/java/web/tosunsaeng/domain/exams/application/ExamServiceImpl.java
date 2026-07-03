@@ -12,7 +12,6 @@ import web.tosunsaeng.domain.exams.domain.entity.MockExam;
 import web.tosunsaeng.domain.exams.domain.enums.ExamStatus;
 import web.tosunsaeng.domain.exams.domain.repository.ExamResultRepository;
 import web.tosunsaeng.domain.exams.domain.repository.MockExamRepository;
-import web.tosunsaeng.domain.exams.domain.repository.QuestionRepository;
 import web.tosunsaeng.domain.exams.dto.ExamRequestDTO;
 import web.tosunsaeng.domain.exams.dto.ExamResponseDTO;
 import web.tosunsaeng.domain.exams.exception.ExamsException;
@@ -68,8 +67,9 @@ public class ExamServiceImpl implements ExamService {
         return generatePresignedGetUrl(fileKey, 60);
     }
 
-    private String getDownloadUrl(String examId, String questionId) {
-        String fileKey = String.format("temp/%s/%s.wav", examId, questionId);
+    // 💡 버그 수정: getPresignedUrl의 "temp/%s/q_%d.wav" 파일 포맷과 정확히 일치시킴
+    private String getDownloadUrl(String examId, Integer questionNumber) {
+        String fileKey = String.format("temp/%s/q_%d.wav", examId, questionNumber);
         return generatePresignedGetUrl(fileKey, 5);
     }
 
@@ -89,26 +89,20 @@ public class ExamServiceImpl implements ExamService {
         String examId = "ex_" + UUID.randomUUID().toString().replace("-", "").substring(0, 10);
         String redisKey = "exam:status:" + examId;
 
-        // 1. 상태를 PENDING으로 저장
         redisTemplate.opsForValue().set(redisKey, ExamStatus.PENDING.name(), 1, TimeUnit.HOURS);
         log.info("새로운 모의고사 세션 생성 완료: {}", examId);
 
-        // 2. 전체 모의고사 데이터 조회 (mock_exam_001)
-        // 몽고DB에 저장된 전체 JSON 구조를 불러옵니다.
         MockExam mockExam = mockExamRepository.findByMockExamId("mock_exam_001")
                 .orElseThrow(() -> new ExamsException(ErrorStatus._EXAM_PAPER_NOT_FOUND));
 
-        // 3. 문제 리스트를 DTO로 변환
         List<ExamResponseDTO.QuestionDTO> questionDTOs = mockExam.getQuestions().stream()
                 .map(q -> {
                     ExamResponseDTO.QuestionDTO dto = ExamConverter.toQuestionDTO(q);
-                    // S3 URL 매핑 (Integer questionNumber 사용)
                     dto.setAudioUrl(getQuestionAudioUrl(mockExam.getMockExamId(), q.getQuestionNumber()));
                     return dto;
                 })
                 .collect(Collectors.toList());
 
-        // 4. 결과 반환
         return ExamConverter.toCreateSessionResult(examId, mockExam.getTitle(), questionDTOs);
     }
 
@@ -173,34 +167,97 @@ public class ExamServiceImpl implements ExamService {
         return ExamConverter.toStatusResult(examId, currentStatus, 60);
     }
 
-    @Override
-    public ExamResponseDTO.ScoreResult getExamResults(String examId) {
-        ExamResult result = examResultRepository.findByExamId(examId)
-                .orElseThrow(() -> new ExamsException(ErrorStatus._EXAM_NOT_FOUND));
-
-        ExamResponseDTO.ScoreResult scoreResult = ExamConverter.toScoreResult(result);
-
-        if (scoreResult.getPartResults() != null) {
-            scoreResult.getPartResults().forEach(partDto -> {
-                if (partDto.getQuestionId() != null) {
-                    String audioUrl = getDownloadUrl(examId, partDto.getQuestionId());
-                    partDto.setAudioUrl(audioUrl);
-                }
-            });
-        }
-
-        return scoreResult;
-    }
-
+    // 💡 1. AI 피드백 콜백 수신 및 저장 로직 구현 (누락 복구 완료)
     @Override
     public void updateExamResult(ExamRequestDTO.AiResultReq req) {
         String redisKey = "exam:status:" + req.getExamId();
-        // (수정) Enum 사용
-        redisTemplate.opsForValue().set(redisKey, ExamStatus.COMPLETED.name(), 1, TimeUnit.HOURS);
 
+        // 총점이 포함된 전체 요약본 JSON이 온 경우 세션을 최종 완료 처리
+        if (req.getTotalScore() != null) {
+            redisTemplate.opsForValue().set(redisKey, ExamStatus.COMPLETED.name(), 1, TimeUnit.HOURS);
+        }
+
+        // 유연한 NoSQL 구조를 활용해 피드백 조각을 무조건 신규 Document로 Insert
         ExamResult result = ExamConverter.toExamResult(req);
         examResultRepository.save(result);
 
-        log.info("채점 완료 및 결과 저장 성공: {}", req.getExamId());
+        log.info("AI 피드백 조각 저장 완료: examId={}, isSummary={}", req.getExamId(), req.getTotalScore() != null);
+    }
+
+    @Override
+    public ExamResponseDTO.SummaryResult getExamSummary(String examId) {
+        List<ExamResult> results = examResultRepository.findByExamId(examId);
+
+        // 요약 문서만 필터링
+        ExamResult summaryDoc = results.stream()
+                .filter(r -> r.getTotalScore() != null)
+                .findFirst()
+                .orElseThrow(() -> new ExamsException(ErrorStatus._EXAM_NOT_FOUND));
+
+        return ExamResponseDTO.SummaryResult.builder()
+                .examId(summaryDoc.getExamId())
+                .totalScore(summaryDoc.getTotalScore())
+                .levelEstimate(summaryDoc.getLevelEstimate())
+                .summary(summaryDoc.getSummary())
+                .overallFeedback(summaryDoc.getOverallFeedback())
+                .partFeedback(summaryDoc.getPartFeedback())
+                .strengths(summaryDoc.getStrengths())
+                .weaknesses(summaryDoc.getWeaknesses())
+                .recommendedPractice(summaryDoc.getRecommendedPractice())
+                .build();
+    }
+
+    @Override
+    public ExamResponseDTO.QuestionResultList getExamQuestions(String examId) {
+        List<ExamResult> results = examResultRepository.findByExamId(examId);
+
+        // Map을 사용하여 문제 조각들을 문항 번호(1~11번) 기준으로 결합
+        java.util.Map<Integer, ExamResponseDTO.PartResultDTO> mergedQuestions = new java.util.HashMap<>();
+
+        for (ExamResult doc : results) {
+            Integer qNum = doc.getQuestionNumber();
+            if (qNum == null) continue; // 요약본 도큐먼트는 생략
+
+            mergedQuestions.putIfAbsent(qNum, ExamResponseDTO.PartResultDTO.builder()
+                    .partNumber(doc.getPartNumber() != null ? doc.getPartNumber() : getPartNumber(qNum))
+                    .questionNumber(qNum)
+                    .audioUrl(getDownloadUrl(examId, qNum)) // 💡 파일명 버그 핫픽스 적용
+                    .build());
+
+            ExamResponseDTO.PartResultDTO targetDto = mergedQuestions.get(qNum);
+
+            // 1. AI 피드백 파트 매핑
+            if (doc.getFeedback() != null) {
+                targetDto.setScore(doc.getScore());
+                targetDto.setMaxScore(doc.getMaxScore());
+                targetDto.setTranscript(doc.getTranscript());
+                targetDto.setFeedback(ExamConverter.toItemFeedbackDTO(doc.getFeedback()));
+            }
+
+            // 2. 스피치에이스 파트 매핑
+            if (doc.getSpeechAceData() != null) {
+                targetDto.setSpeechAceData(doc.getSpeechAceData());
+            }
+        }
+
+        List<ExamResponseDTO.PartResultDTO> finalQuestionList = new java.util.ArrayList<>(mergedQuestions.values());
+        finalQuestionList.sort(java.util.Comparator.comparing(ExamResponseDTO.PartResultDTO::getQuestionNumber));
+
+        return ExamResponseDTO.QuestionResultList.builder()
+                .examId(examId)
+                .questions(finalQuestionList)
+                .build();
+    }
+
+    @Override
+    public void saveSpeechAceResult(ExamRequestDTO.SpeechAceReq req) {
+        ExamResult result = ExamResult.builder()
+                .examId(req.getExamId())
+                .questionNumber(req.getQuestionNumber())
+                .speechAceData(req.getSpeechAceData())
+                .build();
+
+        examResultRepository.save(result);
+        log.info("SpeechAce 조각 저장 완료: examId={}, questionNum={}", req.getExamId(), req.getQuestionNumber());
     }
 }

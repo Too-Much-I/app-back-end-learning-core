@@ -13,7 +13,11 @@ public interface ExamService {
 
     ExamResponseDTO.StatusResult getExamStatus(String examId);
 
-    ExamResponseDTO.ScoreResult getExamResults(String examId);
-
     void updateExamResult(ExamRequestDTO.AiResultReq req);
+
+    ExamResponseDTO.QuestionResultList getExamQuestions(String examId);
+
+    void saveSpeechAceResult(ExamRequestDTO.SpeechAceReq req);
+
+    ExamResponseDTO.SummaryResult getExamSummary(String examId);
 }
