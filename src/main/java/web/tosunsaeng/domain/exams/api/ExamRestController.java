@@ -3,7 +3,6 @@ package web.tosunsaeng.domain.exams.api;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
-import org.springframework.http.MediaType;
 import org.springframework.web.bind.annotation.*;
 import web.tosunsaeng.domain.exams.application.ExamService;
 import web.tosunsaeng.domain.exams.dto.ExamRequestDTO;
