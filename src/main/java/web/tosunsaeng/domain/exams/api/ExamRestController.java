@@ -35,7 +35,7 @@ public class ExamRestController {
 
     // [수정됨] JSON 대신 MultipartFile을 직접 입력받도록 변경
     @Operation(summary = "업로드 완료 알림 및 채점 요청 API (임시: 파일 직접 전송)", description = "S3 우회용으로 실제 음성 파일을 전송하여 AI 채점을 시작합니다.")
-    @PostMapping(value = "/{examId}/questions/{questionNumber}/submit", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    @PostMapping(value = "/{examId}/questions/{questionNumber}/submit")
     public BaseResponse<ExamResponseDTO.SubmitResult> submitAudio(
             @PathVariable("examId") String examId,
             @PathVariable("questionNumber") Integer questionNumber) {
