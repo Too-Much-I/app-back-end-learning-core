@@ -33,8 +33,8 @@ public class ExamResult {
     // 문항 데이터 (요약 데이터일 때는 null)
     private Integer partNumber;
     private Integer questionNumber;
-    private Integer score;
-    private Integer maxScore;
+    private Double score;
+    private Double maxScore;
     private String transcript;
     private ItemFeedback feedback;
 

@@ -33,8 +33,8 @@ public class ExamRequestDTO {
         // 문항 데이터
         @JsonProperty("part_number") private Integer partNumber;
         @JsonProperty("question_number") private Integer questionNumber;
-        private Integer score;
-        @JsonProperty("max_score") private Integer maxScore;
+        private Double score;
+        @JsonProperty("max_score") private Double maxScore;
         private String transcript;
         private ItemFeedbackDTO feedback;
     }

@@ -23,10 +23,14 @@ public class ExamConverter {
         return ExamResponseDTO.QuestionDTO.builder()
                 .part(q.getPartNumber())
                 .questionNumber(q.getQuestionNumber())
-                .text(q.getReferenceText() != null ? q.getReferenceText() : q.getQuestion())
-                .audioUrl(q.getAudioUrl())
+                .text(q.getQuestion()) // 원본 문제 질문 텍스트
+
+                // 💡 몽고디비 엔티티에서 데이터를 꺼내와 새로 추가한 DTO 필드에 매핑합니다.
+                .referenceText(q.getReferenceText())
                 .imageUrl(q.getImageUrl())
                 .tableContext(q.getTableContext())
+
+                .audioUrl(q.getAudioUrl())
                 .prepTimeSec(q.getPrepTimeSec())
                 .speakTimeSec(q.getSpeakTimeSec())
                 .build();
@@ -136,4 +140,6 @@ public class ExamConverter {
                 .partScores(partScores) // 파트별 점수 맵핑
                 .build();
     }
+
+
 }

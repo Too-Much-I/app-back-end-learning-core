@@ -36,7 +36,7 @@ public class ExamServiceImpl implements ExamService {
     private final RestTemplate restTemplate;
 
     // AI 서버 주소
-    private final String AI_SERVER_URL = "https://slighting-silent-dormitory.ngrok-free.dev/evaluations";
+    private final String AI_SERVER_URL = "http://ai-server:8000/evaluations";
 
     private final ExamResultRepository examResultRepository;
     private final MockExamRepository mockExamRepository;
@@ -235,7 +235,7 @@ public class ExamServiceImpl implements ExamService {
                             int partNum = r.getPartNumber() != null ? r.getPartNumber() : getPartNumber(r.getQuestionNumber());
                             return "part" + partNum;
                         },
-                        java.util.stream.Collectors.averagingInt(ExamResult::getScore)
+                        java.util.stream.Collectors.averagingDouble(ExamResult::getScore)
                 ));
 
         // 3. 소수점 첫째 자리까지만 반올림

@@ -33,6 +33,7 @@ public class ExamResponseDTO {
 
         // 텍스트 기반 문제 (Part 1, 3, 5 등)
         private String text;
+        private String referenceText;
 
         // 오디오 파일 (Part 1 등에서 문제 읽어줄 때 사용)
         private String audioUrl;
@@ -103,8 +104,8 @@ public class ExamResponseDTO {
         private Integer partNumber;
         private Integer questionNumber;
         private String audioUrl;
-        private Integer score;
-        private Integer maxScore;
+        private Double score;
+        private Double maxScore;
         private String transcript;
         private ItemFeedbackDTO feedback;
 
