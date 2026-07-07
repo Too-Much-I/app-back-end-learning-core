@@ -3,12 +3,10 @@ package web.tosunsaeng.domain.exams.domain.entity;
 import com.fasterxml.jackson.annotation.JsonInclude;
 import lombok.*;
 import org.springframework.data.annotation.Id;
-import org.springframework.data.mongodb.core.mapping.Document;
 import org.springframework.data.mongodb.core.mapping.Field;
 
 import java.util.List;
 
-@Document(collection = "questions")
 @Getter
 @Builder
 @NoArgsConstructor
@@ -28,9 +26,16 @@ public class Question {
     private Integer questionNumber;
 
     private String audioUrl;
+
+    @Field("image_url")
     private String imageUrl;
+
+    @Field("reference_text")
     private String referenceText;
+
     private String question;
+
+    @Field("table_context")
     private TableContext tableContext;
 
     private Integer prepTimeSec;
@@ -54,6 +59,7 @@ public class Question {
     @AllArgsConstructor
     public static class TableItem {
         private String time;
+        @Field("session_title")
         private String sessionTitle;
         private String speaker;
         private String note;
