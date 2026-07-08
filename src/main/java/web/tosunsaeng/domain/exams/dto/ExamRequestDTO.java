@@ -62,4 +62,104 @@ public class ExamRequestDTO {
         @JsonProperty("grammar_vocabulary") private String grammarVocabulary;
         @JsonProperty("action_items") private List<String> actionItems;
     }
+
+    @Getter
+    @NoArgsConstructor
+    public static class AzureCallbackDTO {
+
+        private String examId;
+        private Integer questionNumber;
+
+        @JsonProperty("spoken_word_sequence")
+        private List<SpokenWordDTO> spokenWordSequence;
+
+        @JsonProperty("repeated_word_events")
+        private List<RepeatedWordEventDTO> repeatedWordEvents;
+
+        @JsonProperty("error_counts")
+        private ErrorCountsDTO errorCounts;
+
+        private LegendDTO legend;
+    }
+
+    @Getter
+    @NoArgsConstructor
+    public static class SpokenWordDTO {
+        private Integer index;
+        private String word;
+
+        @JsonProperty("normalized_word")
+        private String normalizedWord;
+
+        @JsonProperty("error_type")
+        private String errorType;
+
+        @JsonProperty("accuracy_score")
+        private Double accuracyScore;
+
+        @JsonProperty("start_seconds")
+        private Double startSeconds;
+
+        @JsonProperty("duration_seconds")
+        private Double durationSeconds;
+    }
+
+    @Getter
+    @NoArgsConstructor
+    public static class RepeatedWordEventDTO {
+        private String word;
+
+        @JsonProperty("normalized_word")
+        private String normalizedWord;
+
+        @JsonProperty("first_index")
+        private Integer firstIndex;
+
+        @JsonProperty("second_index")
+        private Integer secondIndex;
+
+        @JsonProperty("intervening_words")
+        private List<String> interveningWords;
+
+        @JsonProperty("first_accuracy_score")
+        private Double firstAccuracyScore;
+
+        @JsonProperty("second_accuracy_score")
+        private Double secondAccuracyScore;
+
+        @JsonProperty("first_error_type")
+        private String firstErrorType;
+
+        @JsonProperty("second_error_type")
+        private String secondErrorType;
+
+        @JsonProperty("start_seconds")
+        private Double startSeconds;
+
+        @JsonProperty("second_start_seconds")
+        private Double secondStartSeconds;
+    }
+
+    @Getter
+    @NoArgsConstructor
+    public static class ErrorCountsDTO {
+        private Integer mispronunciation;
+        private Integer omission;
+        private Integer insertion;
+
+        @JsonProperty("unnecessary_pause")
+        private Integer unnecessaryPause;
+    }
+
+    @Getter
+    @NoArgsConstructor
+    public static class LegendDTO {
+        private String correct;
+        private String mispronunciation;
+        private String omission;
+        private String insertion;
+
+        @JsonProperty("unnecessary_pause")
+        private String unnecessaryPause;
+    }
 }

@@ -19,4 +19,6 @@ public interface ExamService {
     void saveSpeechAceResult(ExamRequestDTO.SpeechAceReq req);
 
     ExamResponseDTO.SummaryResult getExamSummary(String examId);
+
+    void processAzureCallback(ExamRequestDTO.AzureCallbackDTO request);
 }

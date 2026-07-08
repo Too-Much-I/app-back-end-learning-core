@@ -1,5 +1,6 @@
 package web.tosunsaeng.domain.exams.converter;
 
+import web.tosunsaeng.domain.exams.domain.entity.AzureResult;
 import web.tosunsaeng.domain.exams.domain.entity.ExamResult;
 import web.tosunsaeng.domain.exams.domain.entity.Question;
 import web.tosunsaeng.domain.exams.domain.enums.ExamStatus;
@@ -141,5 +142,69 @@ public class ExamConverter {
                 .build();
     }
 
+    public static AzureResult toAzureResultEntity(ExamRequestDTO.AzureCallbackDTO request) {
+        return AzureResult.builder()
+                .examId(request.getExamId())
+                .questionNumber(request.getQuestionNumber())
 
+                // 1. SpokenWordSequence 변환
+                .spokenWordSequence(
+                        request.getSpokenWordSequence() != null ?
+                                request.getSpokenWordSequence().stream().map(dto ->
+                                        AzureResult.SpokenWord.builder()
+                                                .index(dto.getIndex())
+                                                .word(dto.getWord())
+                                                .normalizedWord(dto.getNormalizedWord())
+                                                .errorType(dto.getErrorType())
+                                                .accuracyScore(dto.getAccuracyScore())
+                                                .startSeconds(dto.getStartSeconds())
+                                                .durationSeconds(dto.getDurationSeconds())
+                                                .build()
+                                ).toList() : null
+                )
+
+                // 2. RepeatedWordEvents 변환
+                .repeatedWordEvents(
+                        request.getRepeatedWordEvents() != null ?
+                                request.getRepeatedWordEvents().stream().map(dto ->
+                                        AzureResult.RepeatedWordEvent.builder()
+                                                .word(dto.getWord())
+                                                .normalizedWord(dto.getNormalizedWord())
+                                                .firstIndex(dto.getFirstIndex())
+                                                .secondIndex(dto.getSecondIndex())
+                                                .interveningWords(dto.getInterveningWords())
+                                                .firstAccuracyScore(dto.getFirstAccuracyScore())
+                                                .secondAccuracyScore(dto.getSecondAccuracyScore())
+                                                .firstErrorType(dto.getFirstErrorType())
+                                                .secondErrorType(dto.getSecondErrorType())
+                                                .startSeconds(dto.getStartSeconds())
+                                                .secondStartSeconds(dto.getSecondStartSeconds())
+                                                .build()
+                                ).toList() : null
+                )
+
+                // 3. ErrorCounts 변환
+                .errorCounts(
+                        request.getErrorCounts() != null ?
+                                AzureResult.ErrorCounts.builder()
+                                        .mispronunciation(request.getErrorCounts().getMispronunciation())
+                                        .omission(request.getErrorCounts().getOmission())
+                                        .insertion(request.getErrorCounts().getInsertion())
+                                        .unnecessaryPause(request.getErrorCounts().getUnnecessaryPause())
+                                        .build() : null
+                )
+
+                // 4. Legend 변환
+                .legend(
+                        request.getLegend() != null ?
+                                AzureResult.Legend.builder()
+                                        .correct(request.getLegend().getCorrect())
+                                        .mispronunciation(request.getLegend().getMispronunciation())
+                                        .omission(request.getLegend().getOmission())
+                                        .insertion(request.getLegend().getInsertion())
+                                        .unnecessaryPause(request.getLegend().getUnnecessaryPause())
+                                        .build() : null
+                )
+                .build();
+    }
 }

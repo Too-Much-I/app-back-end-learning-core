@@ -5,11 +5,14 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 import web.tosunsaeng.domain.exams.converter.ExamConverter;
+import web.tosunsaeng.domain.exams.domain.entity.AzureResult;
 import web.tosunsaeng.domain.exams.domain.entity.ExamResult;
 import web.tosunsaeng.domain.exams.domain.entity.MockExam;
 import web.tosunsaeng.domain.exams.domain.entity.SpeechAceResult;
 import web.tosunsaeng.domain.exams.domain.enums.ExamStatus;
+import web.tosunsaeng.domain.exams.domain.repository.AzureResultRepository;
 import web.tosunsaeng.domain.exams.domain.repository.ExamResultRepository;
 import web.tosunsaeng.domain.exams.domain.repository.MockExamRepository;
 import web.tosunsaeng.domain.exams.domain.repository.SpeechAceResultRepository;
@@ -43,6 +46,7 @@ public class ExamServiceImpl implements ExamService {
     private final ExamResultRepository examResultRepository;
     private final MockExamRepository mockExamRepository;
     private final SpeechAceResultRepository speechAceResultRepository;
+    private final AzureResultRepository azureResultRepository;
 
     @Value("${spring.cloud.aws.s3.bucket}")
     private String bucketName;
@@ -315,5 +319,20 @@ public class ExamServiceImpl implements ExamService {
         } catch (Exception e) {
             log.error("AI 서버 전체 요약 피드백 요청 실패: examId={}", examId, e);
         }
+    }
+
+    @Override
+    @Transactional
+    public void processAzureCallback(ExamRequestDTO.AzureCallbackDTO request) {
+        log.info("Azure AI 서버로부터 콜백 데이터를 수신했습니다.");
+
+        // 1. DTO를 MongoDB Entity로 변환
+        AzureResult entity = ExamConverter.toAzureResultEntity(request);
+
+        // 2. 새로운 컬렉션에 통째로 저장
+        azureResultRepository.save(entity);
+
+        log.info("🔥 Azure 평가 결과 DB (azure_results) 저장 완료: examId={}, questionNumber={}",
+                request.getExamId(), request.getQuestionNumber());
     }
 }
