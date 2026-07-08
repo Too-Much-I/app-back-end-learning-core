@@ -141,7 +141,7 @@ public class ExamServiceImpl implements ExamService {
         try {
             // 1. S3에서 업로드된 오디오 파일을 백엔드 메모리로 다운로드 (Presigned URL 활용)
             String downloadUrl = getDownloadUrl(examId, questionNumber);
-            byte[] audioBytes = restTemplate.getForObject(downloadUrl, byte[].class);
+            byte[] audioBytes = restTemplate.getForObject(java.net.URI.create(downloadUrl), byte[].class);
 
             if (audioBytes == null) {
                 throw new RuntimeException("S3에서 오디오 파일을 읽어오지 못했습니다.");
