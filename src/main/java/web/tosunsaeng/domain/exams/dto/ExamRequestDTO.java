@@ -63,13 +63,31 @@ public class ExamRequestDTO {
         @JsonProperty("action_items") private List<String> actionItems;
     }
 
-    @Getter
-    @NoArgsConstructor
+    @Getter @NoArgsConstructor
     public static class AzureCallbackDTO {
+        private MetadataDTO metadata;
 
-        private String examId;
+        @JsonProperty("azure_speech_result")
+        private AzureSpeechResultDTO azureSpeechResult;
+    }
+
+    @Getter @NoArgsConstructor
+    public static class MetadataDTO {
+        @JsonProperty("user_id")
+        private String userId; // examId 역할
+
+        @JsonProperty("mock_exam_id")
+        private String mockExamId;
+
+        @JsonProperty("part_number")
+        private Integer partNumber;
+
+        @JsonProperty("question_number")
         private Integer questionNumber;
+    }
 
+    @Getter @NoArgsConstructor
+    public static class AzureSpeechResultDTO {
         @JsonProperty("spoken_word_sequence")
         private List<SpokenWordDTO> spokenWordSequence;
 

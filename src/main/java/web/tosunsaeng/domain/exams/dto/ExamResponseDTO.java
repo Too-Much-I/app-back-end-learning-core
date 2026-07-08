@@ -1,6 +1,7 @@
 package web.tosunsaeng.domain.exams.dto;
 
 import com.fasterxml.jackson.annotation.JsonInclude;
+import com.fasterxml.jackson.annotation.JsonProperty;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Getter;
@@ -108,7 +109,7 @@ public class ExamResponseDTO {
         private Double maxScore;
         private String transcript;
         private ItemFeedbackDTO feedback;
-
+        private AzureFeedbackDTO azureFeedback;
     }
 
     @Builder @Getter @NoArgsConstructor @AllArgsConstructor
@@ -124,5 +125,62 @@ public class ExamResponseDTO {
         private String content;
         private String grammarVocabulary;
         private List<String> actionItems;
+    }
+
+    @Getter @Builder
+    public static class AzureFeedbackDTO {
+        @JsonProperty("spoken_word_sequence")
+        private List<AzureSpokenWordDTO> spokenWordSequence;
+
+        @JsonProperty("repeated_word_events")
+        private List<AzureRepeatedWordEventDTO> repeatedWordEvents;
+
+        @JsonProperty("error_counts")
+        private AzureErrorCountsDTO errorCounts;
+
+        private AzureLegendDTO legend;
+    }
+
+    @Getter @Builder
+    public static class AzureSpokenWordDTO {
+        private Integer index;
+        private String word;
+        @JsonProperty("normalized_word") private String normalizedWord;
+        @JsonProperty("error_type") private String errorType;
+        @JsonProperty("accuracy_score") private Double accuracyScore;
+        @JsonProperty("start_seconds") private Double startSeconds;
+        @JsonProperty("duration_seconds") private Double durationSeconds;
+    }
+
+    @Getter @Builder
+    public static class AzureRepeatedWordEventDTO {
+        private String word;
+        @JsonProperty("normalized_word") private String normalizedWord;
+        @JsonProperty("first_index") private Integer firstIndex;
+        @JsonProperty("second_index") private Integer secondIndex;
+        @JsonProperty("intervening_words") private List<String> interveningWords;
+        @JsonProperty("first_accuracy_score") private Double firstAccuracyScore;
+        @JsonProperty("second_accuracy_score") private Double secondAccuracyScore;
+        @JsonProperty("first_error_type") private String firstErrorType;
+        @JsonProperty("second_error_type") private String secondErrorType;
+        @JsonProperty("start_seconds") private Double startSeconds;
+        @JsonProperty("second_start_seconds") private Double secondStartSeconds;
+    }
+
+    @Getter @Builder
+    public static class AzureErrorCountsDTO {
+        private Integer mispronunciation;
+        private Integer omission;
+        private Integer insertion;
+        @JsonProperty("unnecessary_pause") private Integer unnecessaryPause;
+    }
+
+    @Getter @Builder
+    public static class AzureLegendDTO {
+        private String correct;
+        private String mispronunciation;
+        private String omission;
+        private String insertion;
+        @JsonProperty("unnecessary_pause") private String unnecessaryPause;
     }
 }

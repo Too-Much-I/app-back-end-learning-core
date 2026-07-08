@@ -264,6 +264,10 @@ public class ExamServiceImpl implements ExamService {
                 .findFirst()
                 .orElse(null);
 
+        // 💡 1-1. AzureResult 컬렉션에서 해당 문항의 평가 결과 가져오기
+        AzureResult azureResult = azureResultRepository.findByExamIdAndQuestionNumber(examId, questionNumber)
+                .orElse(null);
+
         // 2. 기본 응답 뼈대 생성
         ExamResponseDTO.PartResultDTO partDto = ExamResponseDTO.PartResultDTO.builder()
                 .partNumber(targetDoc != null && targetDoc.getPartNumber() != null ? targetDoc.getPartNumber() : getPartNumber(questionNumber))
@@ -271,12 +275,17 @@ public class ExamServiceImpl implements ExamService {
                 .audioUrl(getDownloadUrl(examId, questionNumber))
                 .build();
 
-        // 3. AI 피드백 데이터 매핑 (SpeechAce 데이터는 프론트용 DTO에 없으므로 담지 않음)
+        // 3. AI 피드백 데이터 및 Azure 데이터 매핑
         if (targetDoc != null) {
             partDto.setScore(targetDoc.getScore());
             partDto.setMaxScore(targetDoc.getMaxScore());
             partDto.setTranscript(targetDoc.getTranscript());
             partDto.setFeedback(ExamConverter.toItemFeedbackDTO(targetDoc.getFeedback()));
+        }
+
+        // 💡 3-1. Azure 데이터를 Response DTO에 담기
+        if (azureResult != null) {
+            partDto.setAzureFeedback(ExamConverter.toAzureFeedbackDTO(azureResult));
         }
 
         // 4. 단건 결과 반환
@@ -324,15 +333,14 @@ public class ExamServiceImpl implements ExamService {
     @Override
     @Transactional
     public void processAzureCallback(ExamRequestDTO.AzureCallbackDTO request) {
-        log.info("Azure AI 서버로부터 콜백 데이터를 수신했습니다.");
 
-        // 1. DTO를 MongoDB Entity로 변환
+        String examId = request.getMetadata().getUserId();
+        Integer questionNumber = request.getMetadata().getQuestionNumber();
+
+        log.info("Azure AI 서버로부터 콜백 데이터를 수신했습니다: examId={}, questionNumber={}", examId, questionNumber);
+
+        // Entity 변환 후 몽고 DB에 저장
         AzureResult entity = ExamConverter.toAzureResultEntity(request);
-
-        // 2. 새로운 컬렉션에 통째로 저장
         azureResultRepository.save(entity);
-
-        log.info("🔥 Azure 평가 결과 DB (azure_results) 저장 완료: examId={}, questionNumber={}",
-                request.getExamId(), request.getQuestionNumber());
     }
 }
