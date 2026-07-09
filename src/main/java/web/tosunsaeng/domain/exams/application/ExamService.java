@@ -3,6 +3,8 @@ package web.tosunsaeng.domain.exams.application;
 import web.tosunsaeng.domain.exams.dto.ExamRequestDTO;
 import web.tosunsaeng.domain.exams.dto.ExamResponseDTO;
 
+import java.util.Map;
+
 public interface ExamService {
     ExamResponseDTO.CreateSessionResult createExamSession();
 
@@ -20,5 +22,5 @@ public interface ExamService {
 
     ExamResponseDTO.SummaryResult getExamSummary(String examId);
 
-    void processAzureCallback(ExamRequestDTO.AzureCallbackDTO request);
+    void processAzureCallback(Map<String, Object> rawPayload);
 }

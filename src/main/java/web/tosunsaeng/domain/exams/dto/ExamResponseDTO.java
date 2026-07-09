@@ -1,12 +1,11 @@
 package web.tosunsaeng.domain.exams.dto;
 
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.annotation.JsonProperty;
-import lombok.AllArgsConstructor;
-import lombok.Builder;
-import lombok.Getter;
-import lombok.NoArgsConstructor;
-import lombok.Setter;
+import com.fasterxml.jackson.databind.PropertyNamingStrategies;
+import com.fasterxml.jackson.databind.annotation.JsonNaming;
+import lombok.*;
 import web.tosunsaeng.domain.exams.domain.entity.Question;
 import web.tosunsaeng.domain.exams.domain.enums.ExamStatus;
 
@@ -127,60 +126,66 @@ public class ExamResponseDTO {
         private List<String> actionItems;
     }
 
-    @Getter @Builder
+    @Data
+    @Builder @NoArgsConstructor @AllArgsConstructor
+    @JsonIgnoreProperties(ignoreUnknown = true)
+    @JsonNaming(PropertyNamingStrategies.SnakeCaseStrategy.class)
     public static class AzureFeedbackDTO {
-        @JsonProperty("spoken_word_sequence")
         private List<AzureSpokenWordDTO> spokenWordSequence;
-
-        @JsonProperty("repeated_word_events")
         private List<AzureRepeatedWordEventDTO> repeatedWordEvents;
-
-        @JsonProperty("error_counts")
         private AzureErrorCountsDTO errorCounts;
-
         private AzureLegendDTO legend;
     }
 
-    @Getter @Builder
+    @Data @Builder @NoArgsConstructor @AllArgsConstructor
+    @JsonIgnoreProperties(ignoreUnknown = true)
+    @JsonNaming(PropertyNamingStrategies.SnakeCaseStrategy.class)
     public static class AzureSpokenWordDTO {
         private Integer index;
         private String word;
-        @JsonProperty("normalized_word") private String normalizedWord;
-        @JsonProperty("error_type") private String errorType;
-        @JsonProperty("accuracy_score") private Double accuracyScore;
-        @JsonProperty("start_seconds") private Double startSeconds;
-        @JsonProperty("duration_seconds") private Double durationSeconds;
+        private String normalizedWord;
+        private String errorType;
+        private Double accuracyScore;
+        private Double startSeconds;
+        private Double durationSeconds;
     }
 
-    @Getter @Builder
+    @Data @Builder @NoArgsConstructor @AllArgsConstructor
+    @JsonIgnoreProperties(ignoreUnknown = true)
+    @JsonNaming(PropertyNamingStrategies.SnakeCaseStrategy.class)
     public static class AzureRepeatedWordEventDTO {
         private String word;
-        @JsonProperty("normalized_word") private String normalizedWord;
-        @JsonProperty("first_index") private Integer firstIndex;
-        @JsonProperty("second_index") private Integer secondIndex;
-        @JsonProperty("intervening_words") private List<String> interveningWords;
-        @JsonProperty("first_accuracy_score") private Double firstAccuracyScore;
-        @JsonProperty("second_accuracy_score") private Double secondAccuracyScore;
-        @JsonProperty("first_error_type") private String firstErrorType;
-        @JsonProperty("second_error_type") private String secondErrorType;
-        @JsonProperty("start_seconds") private Double startSeconds;
-        @JsonProperty("second_start_seconds") private Double secondStartSeconds;
+        private String normalizedWord;
+        private Integer firstIndex;
+        private Integer secondIndex;
+        private List<String> interveningWords;
+        private Double firstAccuracyScore;
+        private Double secondAccuracyScore;
+        private String firstErrorType;
+        private String secondErrorType;
+        private Double startSeconds;
+        private Double secondStartSeconds;
     }
 
-    @Getter @Builder
+    @Data @Builder @NoArgsConstructor @AllArgsConstructor
+    @JsonIgnoreProperties(ignoreUnknown = true)
+    @JsonNaming(PropertyNamingStrategies.SnakeCaseStrategy.class)
     public static class AzureErrorCountsDTO {
         private Integer mispronunciation;
         private Integer omission;
         private Integer insertion;
-        @JsonProperty("unnecessary_pause") private Integer unnecessaryPause;
+        private Integer unnecessaryPause;
     }
 
-    @Getter @Builder
+    @Data
+    @Builder @NoArgsConstructor @AllArgsConstructor
+    @JsonIgnoreProperties(ignoreUnknown = true)
+    @JsonNaming(PropertyNamingStrategies.SnakeCaseStrategy.class)
     public static class AzureLegendDTO {
         private String correct;
         private String mispronunciation;
         private String omission;
         private String insertion;
-        @JsonProperty("unnecessary_pause") private String unnecessaryPause;
+        private String unnecessaryPause;
     }
 }

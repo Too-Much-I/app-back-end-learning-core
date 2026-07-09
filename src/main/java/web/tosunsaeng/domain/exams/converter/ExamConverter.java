@@ -1,5 +1,7 @@
 package web.tosunsaeng.domain.exams.converter;
 
+import com.fasterxml.jackson.databind.DeserializationFeature;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import web.tosunsaeng.domain.exams.domain.entity.AzureResult;
 import web.tosunsaeng.domain.exams.domain.entity.ExamResult;
 import web.tosunsaeng.domain.exams.domain.entity.Question;
@@ -8,6 +10,7 @@ import web.tosunsaeng.domain.exams.dto.ExamRequestDTO;
 import web.tosunsaeng.domain.exams.dto.ExamResponseDTO;
 
 import java.util.List;
+import java.util.Map;
 
 public class ExamConverter {
 
@@ -142,144 +145,18 @@ public class ExamConverter {
                 .build();
     }
 
-    public static AzureResult toAzureResultEntity(ExamRequestDTO.AzureCallbackDTO request) {
-        if (request == null) return null;
-
-        // 1. 메타데이터에서 식별자 추출
-        String examId = request.getMetadata().getUserId();
-        Integer questionNumber = request.getMetadata().getQuestionNumber();
-
-        // 2. 실제 평가 결과 데이터
-        ExamRequestDTO.AzureSpeechResultDTO speech = request.getAzureSpeechResult();
-        if (speech == null) return null;
-
-        return AzureResult.builder()
-                .examId(examId)
-                .questionNumber(questionNumber)
-
-                // SpokenWordSequence 매핑
-                .spokenWordSequence(
-                        speech.getSpokenWordSequence() != null ?
-                                speech.getSpokenWordSequence().stream().map(dto ->
-                                        AzureResult.SpokenWord.builder()
-                                                .index(dto.getIndex())
-                                                .word(dto.getWord())
-                                                .normalizedWord(dto.getNormalizedWord())
-                                                .errorType(dto.getErrorType())
-                                                .accuracyScore(dto.getAccuracyScore())
-                                                .startSeconds(dto.getStartSeconds())
-                                                .durationSeconds(dto.getDurationSeconds())
-                                                .build()
-                                ).toList() : null
-                )
-
-                // RepeatedWordEvents 매핑
-                .repeatedWordEvents(
-                        speech.getRepeatedWordEvents() != null ?
-                                speech.getRepeatedWordEvents().stream().map(dto ->
-                                        AzureResult.RepeatedWordEvent.builder()
-                                                .word(dto.getWord())
-                                                .normalizedWord(dto.getNormalizedWord())
-                                                .firstIndex(dto.getFirstIndex())
-                                                .secondIndex(dto.getSecondIndex())
-                                                .interveningWords(dto.getInterveningWords())
-                                                .firstAccuracyScore(dto.getFirstAccuracyScore())
-                                                .secondAccuracyScore(dto.getSecondAccuracyScore())
-                                                .firstErrorType(dto.getFirstErrorType())
-                                                .secondErrorType(dto.getSecondErrorType())
-                                                .startSeconds(dto.getStartSeconds())
-                                                .secondStartSeconds(dto.getSecondStartSeconds())
-                                                .build()
-                                ).toList() : null
-                )
-
-                // ErrorCounts 매핑
-                .errorCounts(
-                        speech.getErrorCounts() != null ?
-                                AzureResult.ErrorCounts.builder()
-                                        .mispronunciation(speech.getErrorCounts().getMispronunciation())
-                                        .omission(speech.getErrorCounts().getOmission())
-                                        .insertion(speech.getErrorCounts().getInsertion())
-                                        .unnecessaryPause(speech.getErrorCounts().getUnnecessaryPause())
-                                        .build() : null
-                )
-
-                // Legend 매핑
-                .legend(
-                        speech.getLegend() != null ?
-                                AzureResult.Legend.builder()
-                                        .correct(speech.getLegend().getCorrect())
-                                        .mispronunciation(speech.getLegend().getMispronunciation())
-                                        .omission(speech.getLegend().getOmission())
-                                        .insertion(speech.getLegend().getInsertion())
-                                        .unnecessaryPause(speech.getLegend().getUnnecessaryPause())
-                                        .build() : null
-                )
-                .build();
-    }
+    private static final ObjectMapper objectMapper = new ObjectMapper()
+            .configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false);
 
     public static ExamResponseDTO.AzureFeedbackDTO toAzureFeedbackDTO(AzureResult entity) {
-        if (entity == null) return null;
+        if (entity == null || entity.getRawData() == null) return null;
 
-        return ExamResponseDTO.AzureFeedbackDTO.builder()
-                // 1. SpokenWordSequence 매핑 (프론트용 snake_case 구조)
-                .spokenWordSequence(
-                        entity.getSpokenWordSequence() != null ?
-                                entity.getSpokenWordSequence().stream().map(w ->
-                                        ExamResponseDTO.AzureSpokenWordDTO.builder()
-                                                .index(w.getIndex())
-                                                .word(w.getWord())
-                                                .normalizedWord(w.getNormalizedWord())
-                                                .errorType(w.getErrorType())
-                                                .accuracyScore(w.getAccuracyScore())
-                                                .startSeconds(w.getStartSeconds())
-                                                .durationSeconds(w.getDurationSeconds())
-                                                .build()
-                                ).toList() : null
-                )
+        Map<String, Object> rawData = entity.getRawData();
+        Object speechResultObj = rawData.get("azure_speech_result");
 
-                // 2. RepeatedWordEvents 매핑
-                .repeatedWordEvents(
-                        entity.getRepeatedWordEvents() != null ?
-                                entity.getRepeatedWordEvents().stream().map(r ->
-                                        ExamResponseDTO.AzureRepeatedWordEventDTO.builder()
-                                                .word(r.getWord())
-                                                .normalizedWord(r.getNormalizedWord())
-                                                .firstIndex(r.getFirstIndex())
-                                                .secondIndex(r.getSecondIndex())
-                                                .interveningWords(r.getInterveningWords())
-                                                .firstAccuracyScore(r.getFirstAccuracyScore())
-                                                .secondAccuracyScore(r.getSecondAccuracyScore())
-                                                .firstErrorType(r.getFirstErrorType())
-                                                .secondErrorType(r.getSecondErrorType())
-                                                .startSeconds(r.getStartSeconds())
-                                                .secondStartSeconds(r.getSecondStartSeconds())
-                                                .build()
-                                ).toList() : null
-                )
+        if (speechResultObj == null) return null;
 
-                // 3. ErrorCounts 매핑
-                .errorCounts(
-                        entity.getErrorCounts() != null ?
-                                ExamResponseDTO.AzureErrorCountsDTO.builder()
-                                        .mispronunciation(entity.getErrorCounts().getMispronunciation())
-                                        .omission(entity.getErrorCounts().getOmission())
-                                        .insertion(entity.getErrorCounts().getInsertion())
-                                        .unnecessaryPause(entity.getErrorCounts().getUnnecessaryPause())
-                                        .build() : null
-                )
-
-                // 4. Legend 매핑
-                .legend(
-                        entity.getLegend() != null ?
-                                ExamResponseDTO.AzureLegendDTO.builder()
-                                        .correct(entity.getLegend().getCorrect())
-                                        .mispronunciation(entity.getLegend().getMispronunciation())
-                                        .omission(entity.getLegend().getOmission())
-                                        .insertion(entity.getLegend().getInsertion())
-                                        .unnecessaryPause(entity.getLegend().getUnnecessaryPause())
-                                        .build() : null
-                )
-                .build();
+        // 💡 ObjectMapper가 원본 Map에서 AzureFeedbackDTO에 정의된 필드들만 깔끔하게 빼와서 자동 매핑해 줍니다!
+        return objectMapper.convertValue(speechResultObj, ExamResponseDTO.AzureFeedbackDTO.class);
     }
 }

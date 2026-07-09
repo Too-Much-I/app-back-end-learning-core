@@ -10,6 +10,8 @@ import web.tosunsaeng.domain.exams.dto.ExamResponseDTO;
 import web.tosunsaeng.global.common.response.BaseResponse;
 import web.tosunsaeng.global.error.code.status.SuccessStatus;
 
+import java.util.Map;
+
 @Tag(name = "Exam API", description = "모의고사 세션 및 채점 관련 API")
 @RestController
 @RequiredArgsConstructor
@@ -76,10 +78,10 @@ public class ExamRestController {
         return BaseResponse.onSuccess(SuccessStatus.OK, null);
     }
 
-    @Operation(summary = "[AI 서버용] azure 결과 콜백 API", description = "AI가 호출한 azure JSON을 저장합니다.")
+    @Operation(summary = "[AI 서버용] azure 결과 콜백 API", description = "AI가 호출한 azure 원본 JSON을 통째로 저장합니다.")
     @PostMapping("/callback/azure")
-    public BaseResponse<String> azureCallback(@RequestBody ExamRequestDTO.AzureCallbackDTO request) {
-        examService.processAzureCallback(request);
-        return BaseResponse.onSuccess(SuccessStatus.OK, "Azure 콜백 데이터가 성공적으로 처리되었습니다.");
+    public BaseResponse<String> azureCallback(@RequestBody Map<String, Object> rawPayload) {
+        examService.processAzureCallback(rawPayload);
+        return BaseResponse.onSuccess(SuccessStatus.OK, "Azure 콜백 데이터 원본이 성공적으로 저장되었습니다.");
     }
 }

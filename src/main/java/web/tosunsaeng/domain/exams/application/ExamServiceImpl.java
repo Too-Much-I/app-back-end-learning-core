@@ -27,6 +27,7 @@ import org.springframework.util.MultiValueMap;
 
 import java.time.Duration;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
@@ -332,15 +333,21 @@ public class ExamServiceImpl implements ExamService {
 
     @Override
     @Transactional
-    public void processAzureCallback(ExamRequestDTO.AzureCallbackDTO request) {
+    public void processAzureCallback(Map<String, Object> rawPayload) {
+        // 1. 원본 데이터 안의 metadata에서 식별자(examId, questionNumber) 추출
+        Map<String, Object> metadata = (Map<String, Object>) rawPayload.get("metadata");
+        String examId = (String) metadata.get("user_id");
+        Integer questionNumber = (Integer) metadata.get("question_number");
 
-        String examId = request.getMetadata().getUserId();
-        Integer questionNumber = request.getMetadata().getQuestionNumber();
+        log.info("🔥 Azure AI 서버 콜백 수신 (원본 통째로 저장): examId={}, questionNumber={}", examId, questionNumber);
 
-        log.info("Azure AI 서버로부터 콜백 데이터를 수신했습니다: examId={}, questionNumber={}", examId, questionNumber);
+        // 2. Entity에 원본 데이터 그대로 넣어서 저장
+        AzureResult entity = AzureResult.builder()
+                .examId(examId)
+                .questionNumber(questionNumber)
+                .rawData(rawPayload)
+                .build();
 
-        // Entity 변환 후 몽고 DB에 저장
-        AzureResult entity = ExamConverter.toAzureResultEntity(request);
         azureResultRepository.save(entity);
     }
 }
