@@ -209,14 +209,15 @@ public class ExamServiceImpl implements ExamService {
             redisTemplate.opsForValue().set(redisKey, ExamStatus.COMPLETED.name(), 1, TimeUnit.HOURS);
         }
 
-        // 유연한 NoSQL 구조를 활용해 피드백 조각을 무조건 신규 Document로 Insert
+        // Converter가 내부에서 spokenWordSequence와 correctionItems를
+        // 모두 함께 파싱하여 MongoDB Entity 객체로 온전하게 매핑해줍니다.
         ExamResult result = ExamConverter.toExamResult(req);
         examResultRepository.save(result);
 
-        log.info("AI 피드백 조각 저장 완료: examId={}, isSummary={}", req.getExamId(), req.getTotalScore() != null);
+        log.info("AI 피드백 조각 저장 완료: examId={}, isSummary={}, qNum={}",
+                req.getExamId(), req.getTotalScore() != null, req.getQuestionNumber());
 
         // 11번 문제 채점 결과가 저장된 직후에 전체 피드백 생성을 AI 서버에 요청!
-        // 콜백 응답이 지연되지 않도록 비동기 스레드(runAsync)로 띄워서 전송합니다.
         if (req.getQuestionNumber() != null && req.getQuestionNumber() == 11) {
             java.util.concurrent.CompletableFuture.runAsync(() -> {
                 requestOverallSummary(req.getExamId(), req.getMockExamId());
@@ -257,7 +258,6 @@ public class ExamServiceImpl implements ExamService {
     public ExamResponseDTO.QuestionResult getExamQuestion(String examId, Integer questionNumber) {
         List<ExamResult> results = examResultRepository.findByExamId(examId);
 
-        // 1. 해당 문제 번호 + AI 피드백이 들어있는 문서만 필터링 (SpeechAce 전용 문서는 무시됨)
         ExamResult targetDoc = results.stream()
                 .filter(r -> r.getQuestionNumber() != null
                         && r.getQuestionNumber().equals(questionNumber)
@@ -265,31 +265,29 @@ public class ExamServiceImpl implements ExamService {
                 .findFirst()
                 .orElse(null);
 
-        // 💡 1-1. AzureResult 컬렉션에서 해당 문항의 평가 결과 가져오기
         AzureResult azureResult = azureResultRepository.findByExamIdAndQuestionNumber(examId, questionNumber)
                 .orElse(null);
 
-        // 2. 기본 응답 뼈대 생성
         ExamResponseDTO.PartResultDTO partDto = ExamResponseDTO.PartResultDTO.builder()
                 .partNumber(targetDoc != null && targetDoc.getPartNumber() != null ? targetDoc.getPartNumber() : getPartNumber(questionNumber))
                 .questionNumber(questionNumber)
                 .audioUrl(getDownloadUrl(examId, questionNumber))
                 .build();
 
-        // 3. AI 피드백 데이터 및 Azure 데이터 매핑
         if (targetDoc != null) {
             partDto.setScore(targetDoc.getScore());
             partDto.setMaxScore(targetDoc.getMaxScore());
             partDto.setTranscript(targetDoc.getTranscript());
             partDto.setFeedback(ExamConverter.toItemFeedbackDTO(targetDoc.getFeedback()));
+
+            // 맵핑된 SpokenWordSequence 리스트를 반환 결과에 셋팅!
+            partDto.setSpokenWordSequence(ExamConverter.toSpokenWordDTOList(targetDoc.getSpokenWordSequence()));
         }
 
-        // 💡 3-1. Azure 데이터를 Response DTO에 담기
         if (azureResult != null) {
             partDto.setAzureFeedback(ExamConverter.toAzureFeedbackDTO(azureResult));
         }
 
-        // 4. 단건 결과 반환
         return ExamResponseDTO.QuestionResult.builder()
                 .examId(examId)
                 .question(partDto)

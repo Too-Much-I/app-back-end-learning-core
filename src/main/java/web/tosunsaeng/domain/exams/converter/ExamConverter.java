@@ -5,16 +5,16 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import web.tosunsaeng.domain.exams.domain.entity.AzureResult;
 import web.tosunsaeng.domain.exams.domain.entity.ExamResult;
 import web.tosunsaeng.domain.exams.domain.entity.Question;
-import web.tosunsaeng.domain.exams.domain.enums.ExamStatus;
 import web.tosunsaeng.domain.exams.dto.ExamRequestDTO;
 import web.tosunsaeng.domain.exams.dto.ExamResponseDTO;
+import web.tosunsaeng.domain.exams.domain.enums.ExamStatus;
 
 import java.util.List;
 import java.util.Map;
+import java.util.stream.Collectors;
 
 public class ExamConverter {
 
-    // --- 1. 세션 생성 및 기본 문제 매핑 (기존 유지 코드) ---
     public static ExamResponseDTO.CreateSessionResult toCreateSessionResult(String examId, String title, List<ExamResponseDTO.QuestionDTO> questions) {
         return ExamResponseDTO.CreateSessionResult.builder()
                 .examId(examId)
@@ -27,13 +27,10 @@ public class ExamConverter {
         return ExamResponseDTO.QuestionDTO.builder()
                 .part(q.getPartNumber())
                 .questionNumber(q.getQuestionNumber())
-                .text(q.getQuestion()) // 원본 문제 질문 텍스트
-
-                // 💡 몽고디비 엔티티에서 데이터를 꺼내와 새로 추가한 DTO 필드에 매핑합니다.
+                .text(q.getQuestion())
                 .referenceText(q.getReferenceText())
                 .imageUrl(q.getImageUrl())
                 .tableContext(q.getTableContext())
-
                 .audioUrl(q.getAudioUrl())
                 .prepTimeSec(q.getPrepTimeSec())
                 .speakTimeSec(q.getSpeakTimeSec())
@@ -62,15 +59,12 @@ public class ExamConverter {
                 .build();
     }
 
-    // --- 2. 💡 추가된 신규 매핑 로직 (컴파일 에러 해결 및 API 분리 대응) ---
-
-    // AI 결과(Req)를 MongoDB 엔티티(Entity) 문서 구조로 변환
+    // --- Req -> Entity 변환 ---
     public static ExamResult toExamResult(ExamRequestDTO.AiResultReq req) {
         if (req == null) return null;
 
         return ExamResult.builder()
                 .examId(req.getExamId())
-                // 요약용 데이터 매핑 (문항 데이터일 때는 알아서 null로 채워짐)
                 .totalScore(req.getTotalScore())
                 .levelEstimate(req.getLevelEstimate())
                 .summary(req.getSummary())
@@ -79,18 +73,16 @@ public class ExamConverter {
                 .strengths(req.getStrengths())
                 .weaknesses(req.getWeaknesses())
                 .recommendedPractice(req.getRecommendedPractice())
-
-                // 개별 문항용 데이터 매핑 (요약 데이터일 때는 알아서 null로 채워짐)
                 .partNumber(req.getPartNumber())
                 .questionNumber(req.getQuestionNumber())
                 .score(req.getScore())
                 .maxScore(req.getMaxScore())
                 .transcript(req.getTranscript())
                 .feedback(toItemFeedbackEntity(req.getFeedback()))
+                .spokenWordSequence(toSpokenWordEntityList(req.getSpokenWordSequence())) // 🌟 맵핑 추가
                 .build();
     }
 
-    // 엔티티의 하위 피드백 객체 매핑
     private static ExamResult.ItemFeedback toItemFeedbackEntity(ExamRequestDTO.ItemFeedbackDTO dto) {
         if (dto == null) return null;
 
@@ -106,10 +98,44 @@ public class ExamConverter {
                 .content(dto.getContent())
                 .grammarVocabulary(dto.getGrammarVocabulary())
                 .actionItems(dto.getActionItems())
+                // 새로 추가된 필드들 매핑
+                .correctionItems(toCorrectionItemEntityList(dto.getCorrectionItems()))
+                .offTopicItems(dto.getOffTopicItems())
+                .correctedAnswer(dto.getCorrectedAnswer())
+                .recommendedAnswer(dto.getRecommendedAnswer())
+                .nextStrategy(dto.getNextStrategy())
                 .build();
     }
 
-    // ExamServiceImpl의 12개 조각 병합 과정 중 개별 피드백 DTO를 채워주기 위한 메서드
+    // Entity <-> Req DTO 변환 헬퍼 메서드들
+    private static List<ExamResult.SpokenWord> toSpokenWordEntityList(List<ExamRequestDTO.SpokenWordDTO> dtos) {
+        if (dtos == null) return null;
+        return dtos.stream().map(dto -> ExamResult.SpokenWord.builder()
+                .index(dto.getIndex())
+                .segmentIndex(dto.getSegmentIndex())
+                .wordIndex(dto.getWordIndex())
+                .word(dto.getWord())
+                .offset(dto.getOffset())
+                .duration(dto.getDuration())
+                .accuracyScore(dto.getAccuracyScore())
+                .pronunciationScore(dto.getPronunciationScore())
+                .errorType(dto.getErrorType())
+                .build()).collect(Collectors.toList());
+    }
+
+    private static List<ExamResult.CorrectionItem> toCorrectionItemEntityList(List<ExamRequestDTO.CorrectionItemDTO> dtos) {
+        if (dtos == null) return null;
+        return dtos.stream().map(dto -> ExamResult.CorrectionItem.builder()
+                .type(dto.getType())
+                .original(dto.getOriginal())
+                .issue(dto.getIssue())
+                .explanation(dto.getExplanation())
+                .suggested(dto.getSuggested())
+                .severity(dto.getSeverity())
+                .build()).collect(Collectors.toList());
+    }
+
+    // --- Entity -> Res DTO 변환 ---
     public static ExamResponseDTO.ItemFeedbackDTO toItemFeedbackDTO(ExamResult.ItemFeedback entity) {
         if (entity == null) return null;
 
@@ -125,12 +151,45 @@ public class ExamConverter {
                 .content(entity.getContent())
                 .grammarVocabulary(entity.getGrammarVocabulary())
                 .actionItems(entity.getActionItems())
+                // 새로 추가된 필드들 매핑
+                .correctionItems(toCorrectionItemDTOList(entity.getCorrectionItems()))
+                .offTopicItems(entity.getOffTopicItems())
+                .correctedAnswer(entity.getCorrectedAnswer())
+                .recommendedAnswer(entity.getRecommendedAnswer())
+                .nextStrategy(entity.getNextStrategy())
                 .build();
     }
 
-    public static ExamResponseDTO.SummaryResult toSummaryResult(ExamResult summaryDoc, java.util.Map<String, Double> partScores) {
-        if (summaryDoc == null) return null;
+    // Entity -> Res DTO 변환 헬퍼 메서드들
+    public static List<ExamResponseDTO.SpokenWordDTO> toSpokenWordDTOList(List<ExamResult.SpokenWord> entities) {
+        if (entities == null) return null;
+        return entities.stream().map(entity -> ExamResponseDTO.SpokenWordDTO.builder()
+                .index(entity.getIndex())
+                .segmentIndex(entity.getSegmentIndex())
+                .wordIndex(entity.getWordIndex())
+                .word(entity.getWord())
+                .offset(entity.getOffset())
+                .duration(entity.getDuration())
+                .accuracyScore(entity.getAccuracyScore())
+                .pronunciationScore(entity.getPronunciationScore())
+                .errorType(entity.getErrorType())
+                .build()).collect(Collectors.toList());
+    }
 
+    private static List<ExamResponseDTO.CorrectionItemDTO> toCorrectionItemDTOList(List<ExamResult.CorrectionItem> entities) {
+        if (entities == null) return null;
+        return entities.stream().map(entity -> ExamResponseDTO.CorrectionItemDTO.builder()
+                .type(entity.getType())
+                .original(entity.getOriginal())
+                .issue(entity.getIssue())
+                .explanation(entity.getExplanation())
+                .suggested(entity.getSuggested())
+                .severity(entity.getSeverity())
+                .build()).collect(Collectors.toList());
+    }
+
+    public static ExamResponseDTO.SummaryResult toSummaryResult(ExamResult summaryDoc, Map<String, Double> partScores) {
+        if (summaryDoc == null) return null;
         return ExamResponseDTO.SummaryResult.builder()
                 .examId(summaryDoc.getExamId())
                 .totalScore(summaryDoc.getTotalScore())
@@ -141,7 +200,7 @@ public class ExamConverter {
                 .strengths(summaryDoc.getStrengths())
                 .weaknesses(summaryDoc.getWeaknesses())
                 .recommendedPractice(summaryDoc.getRecommendedPractice())
-                .partScores(partScores) // 파트별 점수 맵핑
+                .partScores(partScores)
                 .build();
     }
 
@@ -150,13 +209,8 @@ public class ExamConverter {
 
     public static ExamResponseDTO.AzureFeedbackDTO toAzureFeedbackDTO(AzureResult entity) {
         if (entity == null || entity.getRawData() == null) return null;
-
-        Map<String, Object> rawData = entity.getRawData();
-        Object speechResultObj = rawData.get("azure_speech_result");
-
+        Object speechResultObj = entity.getRawData().get("azure_speech_result");
         if (speechResultObj == null) return null;
-
-        // 💡 ObjectMapper가 원본 Map에서 AzureFeedbackDTO에 정의된 필드들만 깔끔하게 빼와서 자동 매핑해 줍니다!
         return objectMapper.convertValue(speechResultObj, ExamResponseDTO.AzureFeedbackDTO.class);
     }
 }

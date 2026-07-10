@@ -37,9 +37,11 @@ public class ExamRequestDTO {
         @JsonProperty("max_score") private Double maxScore;
         private String transcript;
         private ItemFeedbackDTO feedback;
+
+        // 새로 추가된 최상단 필드 (파트 1 전용)
+        @JsonProperty("spoken_word_sequence") private List<SpokenWordDTO> spokenWordSequence;
     }
 
-    // SpeechAce 결과를 통째로 받기 위한 전용 DTO
     @Getter @NoArgsConstructor @JsonIgnoreProperties(ignoreUnknown = true)
     public static class SpeechAceReq {
         @JsonProperty("user_id") private String examId;
@@ -60,5 +62,37 @@ public class ExamRequestDTO {
         private String content;
         @JsonProperty("grammar_vocabulary") private String grammarVocabulary;
         @JsonProperty("action_items") private List<String> actionItems;
+
+        // 새로 추가된 피드백 필드들
+        @JsonProperty("correction_items") private List<CorrectionItemDTO> correctionItems;
+        @JsonProperty("off_topic_items") private List<String> offTopicItems;
+        @JsonProperty("corrected_answer") private String correctedAnswer;
+        @JsonProperty("recommended_answer") private String recommendedAnswer;
+        @JsonProperty("next_strategy") private String nextStrategy;
+    }
+
+    // 교정 항목 DTO
+    @Getter @NoArgsConstructor @JsonIgnoreProperties(ignoreUnknown = true)
+    public static class CorrectionItemDTO {
+        private String type;
+        private String original;
+        private String issue;
+        private String explanation;
+        private String suggested;
+        private String severity;
+    }
+
+    // 단어별 발음 시퀀스 DTO
+    @Getter @NoArgsConstructor @JsonIgnoreProperties(ignoreUnknown = true)
+    public static class SpokenWordDTO {
+        private Integer index;
+        @JsonProperty("segment_index") private Integer segmentIndex;
+        @JsonProperty("word_index") private Integer wordIndex;
+        private String word;
+        private Long offset;
+        private Long duration;
+        @JsonProperty("accuracy_score") private Double accuracyScore;
+        @JsonProperty("pronunciation_score") private Double pronunciationScore;
+        @JsonProperty("error_type") private String errorType;
     }
 }

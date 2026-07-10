@@ -20,59 +20,36 @@ public class ExamResponseDTO {
         private List<QuestionDTO> questions;
     }
 
-    @Builder
-    @Getter
-    @Setter
-    @NoArgsConstructor
-    @AllArgsConstructor
+    @Builder @Getter @Setter @NoArgsConstructor @AllArgsConstructor
     @JsonInclude(JsonInclude.Include.NON_NULL)
     public static class QuestionDTO {
         private Integer part;
         private Integer questionNumber;
-
-        // 텍스트 기반 문제 (Part 1, 3, 5 등)
         private String text;
         private String referenceText;
-
-        // 오디오 파일 (Part 1 등에서 문제 읽어줄 때 사용)
         private String audioUrl;
-
-        // 이미지 문제 (Part 2)
         private String imageUrl;
-
-        // 표 문제 (Part 4)
         private Question.TableContext tableContext;
-
-        // 시간 정보
         private Integer prepTimeSec;
         private Integer speakTimeSec;
     }
 
-    @Builder
-    @Getter
-    @NoArgsConstructor
-    @AllArgsConstructor
+    @Builder @Getter @NoArgsConstructor @AllArgsConstructor
     public static class UploadUrlResult {
         private String uploadUrl;
         private String fileKey;
         private Integer expiresIn;
     }
 
-    @Builder
-    @Getter
-    @NoArgsConstructor
-    @AllArgsConstructor
+    @Builder @Getter @NoArgsConstructor @AllArgsConstructor
     public static class SubmitResult {
-        private ExamStatus status; // (수정) String -> ExamStatus 통일
+        private ExamStatus status;
     }
 
-    @Builder
-    @Getter
-    @NoArgsConstructor
-    @AllArgsConstructor
+    @Builder @Getter @NoArgsConstructor @AllArgsConstructor
     public static class StatusResult {
         private String examId;
-        private ExamStatus overallStatus; // (수정) String -> ExamStatus 통일
+        private ExamStatus overallStatus;
         private Integer progressPercent;
     }
 
@@ -90,7 +67,6 @@ public class ExamResponseDTO {
         private Map<String, Double> partScores;
     }
 
-    // 💡 2-2. 개별 문항 리스트 전용 응답 DTO
     @Builder @Getter @NoArgsConstructor @AllArgsConstructor
     public static class QuestionResult {
         private String examId;
@@ -108,6 +84,8 @@ public class ExamResponseDTO {
         private String transcript;
         private ItemFeedbackDTO feedback;
         private AzureFeedbackDTO azureFeedback;
+        // 파트 1을 위한 발음 시퀀스
+        private List<SpokenWordDTO> spokenWordSequence;
     }
 
     @Builder @Getter @NoArgsConstructor @AllArgsConstructor
@@ -123,10 +101,39 @@ public class ExamResponseDTO {
         private String content;
         private String grammarVocabulary;
         private List<String> actionItems;
+        // 추가된 피드백 필드
+        private List<CorrectionItemDTO> correctionItems;
+        private List<String> offTopicItems;
+        private String correctedAnswer;
+        private String recommendedAnswer;
+        private String nextStrategy;
     }
 
-    @Data
-    @Builder @NoArgsConstructor @AllArgsConstructor
+    // 추가된 교정 및 단어 클래스
+    @Getter @Builder @NoArgsConstructor @AllArgsConstructor
+    public static class CorrectionItemDTO {
+        private String type;
+        private String original;
+        private String issue;
+        private String explanation;
+        private String suggested;
+        private String severity;
+    }
+
+    @Getter @Builder @NoArgsConstructor @AllArgsConstructor
+    public static class SpokenWordDTO {
+        private Integer index;
+        private Integer segmentIndex;
+        private Integer wordIndex;
+        private String word;
+        private Long offset;
+        private Long duration;
+        private Double accuracyScore;
+        private Double pronunciationScore;
+        private String errorType;
+    }
+
+    @Data @Builder @NoArgsConstructor @AllArgsConstructor
     @JsonIgnoreProperties(ignoreUnknown = true)
     @JsonNaming(PropertyNamingStrategies.SnakeCaseStrategy.class)
     public static class AzureFeedbackDTO {
@@ -176,8 +183,7 @@ public class ExamResponseDTO {
         private Integer unnecessaryPause;
     }
 
-    @Data
-    @Builder @NoArgsConstructor @AllArgsConstructor
+    @Data @Builder @NoArgsConstructor @AllArgsConstructor
     @JsonIgnoreProperties(ignoreUnknown = true)
     @JsonNaming(PropertyNamingStrategies.SnakeCaseStrategy.class)
     public static class AzureLegendDTO {
