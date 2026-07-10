@@ -21,8 +21,15 @@ public class SecurityConfig {
         http
                 .cors(cors -> cors.configurationSource(request -> {
                     CorsConfiguration corsConfiguration = new CorsConfiguration();
-                    // 프론트엔드 로컬 테스트 포트 허용 (필요에 따라 수정)
-                    corsConfiguration.setAllowedOrigins(List.of("http://localhost:5173", "http://localhost:3000"));
+
+                    // 🌟 로컬 테스트 주소와 운영 서버의 정식 도메인 주소(www 포함)를 모두 안전하게 허용합니다.
+                    corsConfiguration.setAllowedOrigins(List.of(
+                            "http://localhost:5173",
+                            "http://localhost:3000",
+                            "https://to-teacher.com",
+                            "https://www.to-teacher.com"
+                    ));
+
                     corsConfiguration.setAllowedMethods(List.of("GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"));
                     corsConfiguration.setAllowedHeaders(List.of("*"));
                     corsConfiguration.setAllowCredentials(true);
@@ -31,7 +38,7 @@ public class SecurityConfig {
                 }))
                 .csrf(csrf -> csrf.disable())
                 .sessionManagement(sm -> sm.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
-                // TODO: 로컬 테스트용 시큐리티 비활성화 (배포 시 다시 .authenticated() 복구)
+                // 로컬 및 PoC 자유 테스트를 위해 전체 허용 설정 유지
                 .authorizeHttpRequests(auth -> auth
                         .anyRequest().permitAll()
                 )
