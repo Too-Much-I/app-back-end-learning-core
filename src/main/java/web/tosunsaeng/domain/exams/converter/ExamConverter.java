@@ -29,6 +29,7 @@ public class ExamConverter {
                 .questionNumber(q.getQuestionNumber())
                 .text(q.getQuestion())
                 .referenceText(q.getReferenceText())
+                .partIntroText(q.getPartIntroText())
                 .imageUrl(q.getImageUrl())
                 .tableContext(q.getTableContext())
                 .audioUrl(q.getAudioUrl())

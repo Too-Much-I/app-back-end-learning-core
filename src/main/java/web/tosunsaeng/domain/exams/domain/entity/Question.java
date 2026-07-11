@@ -34,6 +34,9 @@ public class Question {
     @Field("reference_text")
     private String referenceText;
 
+    @Field("part_intro_text")
+    private String partIntroText;
+
     private String question;
 
     @Field("table_context")

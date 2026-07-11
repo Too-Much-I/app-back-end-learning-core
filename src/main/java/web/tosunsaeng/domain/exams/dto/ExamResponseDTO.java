@@ -27,6 +27,7 @@ public class ExamResponseDTO {
         private Integer questionNumber;
         private String text;
         private String referenceText;
+        private String partIntroText;
         private String audioUrl;
         private String guideAudioUrl;
         private String imageUrl;
