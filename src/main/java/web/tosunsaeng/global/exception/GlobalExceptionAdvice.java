@@ -8,6 +8,7 @@ import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.HttpStatusCode;
 import org.springframework.http.ResponseEntity;
+import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.MissingServletRequestParameterException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
@@ -173,5 +174,11 @@ public class GlobalExceptionAdvice extends ResponseEntityExceptionHandler {
 
         return super.handleExceptionInternal(
                 e, body, headers, errorStatus.getHttpStatus(), request);
+    }
+
+    @ExceptionHandler(HttpMessageNotReadableException.class)
+    public ResponseEntity<String> handleHttpMessageNotReadableException(HttpMessageNotReadableException ex) {
+        log.error("🚨 JSON 파싱 실패! AI 서버가 보낸 데이터 타입이 DTO와 맞지 않습니다. 원인: {}", ex.getMessage());
+        return ResponseEntity.badRequest().body("Invalid JSON format");
     }
 }
