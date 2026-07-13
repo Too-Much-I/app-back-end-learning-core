@@ -244,7 +244,7 @@ public class ExamServiceImpl implements ExamService {
                 .findFirst()
                 .orElseThrow(() -> new ExamsException(ErrorStatus._EXAM_NOT_FOUND));
 
-        // 2. 각 파트별 평균 점수 계산 (Java Stream API 활용)
+        // 2. 각 파트별 점수 총합 계산 (averagingDouble ➡️ summingDouble로 변경! 🌟)
         java.util.Map<String, Double> partScores = results.stream()
                 .filter(r -> r.getQuestionNumber() != null && r.getScore() != null)
                 .collect(java.util.stream.Collectors.groupingBy(
@@ -252,13 +252,13 @@ public class ExamServiceImpl implements ExamService {
                             int partNum = r.getPartNumber() != null ? r.getPartNumber() : getPartNumber(r.getQuestionNumber());
                             return "part" + partNum;
                         },
-                        java.util.stream.Collectors.averagingDouble(ExamResult::getScore)
+                        java.util.stream.Collectors.summingDouble(ExamResult::getScore) // 🔥 파트별 합산 점수를 구합니다.
                 ));
 
-        // 3. 소수점 첫째 자리까지만 반올림
-        partScores.replaceAll((part, avg) -> Math.round(avg * 10.0) / 10.0);
+        // 3. 소수점 첫째 자리까지만 깔끔하게 반올림
+        partScores.replaceAll((part, sum) -> Math.round(sum * 10.0) / 10.0);
 
-        // 💡 4. 컨버터를 사용하여 최종 객체 반환 (코드가 훨씬 간결해집니다)
+        // 4. 컨버터를 사용하여 최종 객체 반환
         return ExamConverter.toSummaryResult(summaryDoc, partScores);
     }
 
