@@ -105,7 +105,7 @@ public class ExamServiceImpl implements ExamService {
         redisTemplate.opsForValue().set(redisKey, ExamStatus.PENDING.name(), 1, TimeUnit.HOURS);
         log.info("새로운 모의고사 세션 생성 완료: {}", examId);
 
-        MockExam mockExam = mockExamRepository.findByMockExamId("mock_exam_001")
+        MockExam mockExam = mockExamRepository.findByMockExamId("mock_exam_003")
                 .orElseThrow(() -> new ExamsException(ErrorStatus._EXAM_PAPER_NOT_FOUND));
 
         List<ExamResponseDTO.QuestionDTO> questionDTOs = mockExam.getQuestions().stream()
@@ -172,7 +172,7 @@ public class ExamServiceImpl implements ExamService {
             // 3. AI 서버로 보낼 폼 데이터 구성 (JSON -> MULTIPART_FORM_DATA 방식으로 복구)
             MultiValueMap<String, Object> body = new LinkedMultiValueMap<>();
             body.add("user_id", examId);
-            body.add("mock_exam_id", "mock_001");
+            body.add("mock_exam_id", "mock_003");
             body.add("part_number", getPartNumber(questionNumber));
             body.add("question_number", questionNumber);
             body.add("audio_file", audioResource); // 실제 파일 바이트 첨부!
@@ -322,7 +322,7 @@ public class ExamServiceImpl implements ExamService {
 
             java.util.Map<String, Object> body = new java.util.HashMap<>();
             body.put("user_id", examId);
-            body.put("mock_exam_id", mockExamId != null ? mockExamId : "mock_001");
+            body.put("mock_exam_id", mockExamId != null ? mockExamId : "mock_003");
 
             // AI 서버가 일반 채점과 요약 요청을 구분할 수 있도록 0번을 명시적으로 전송
             body.put("question_number", 0);
