@@ -26,4 +26,6 @@ public interface ExamService {
     void processAzureCallback(Map<String, Object> rawPayload);
 
     ExamResponseDTO.CreateSessionResult createTrialSession();
+
+    ExamResponseDTO.QuestionPollResult getQuestionProcessingStatus(String examId, Integer questionNumber, Integer retryCount);
 }

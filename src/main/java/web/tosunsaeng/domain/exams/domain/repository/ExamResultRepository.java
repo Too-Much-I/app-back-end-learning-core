@@ -6,4 +6,5 @@ import java.util.List;
 
 public interface ExamResultRepository extends MongoRepository<ExamResult, String> {
     List<ExamResult> findByExamId(String examId);
+    boolean existsByExamIdAndQuestionNumberAndRetryCount(String examId, Integer questionNumber, Integer retryCount);
 }

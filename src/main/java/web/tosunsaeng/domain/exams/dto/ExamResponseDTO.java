@@ -197,4 +197,12 @@ public class ExamResponseDTO {
         private String insertion;
         private String unnecessaryPause;
     }
+
+    @Builder @Getter @NoArgsConstructor @AllArgsConstructor
+    public static class QuestionPollResult {
+        private String examId;
+        private Integer questionNumber;
+        private Integer retryCount;
+        private ExamStatus status; // PENDING, PROCESSING, COMPLETED, FAILED
+    }
 }

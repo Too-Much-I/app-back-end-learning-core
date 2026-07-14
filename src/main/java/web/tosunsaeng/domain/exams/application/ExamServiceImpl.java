@@ -386,4 +386,21 @@ public class ExamServiceImpl implements ExamService {
 
         return ExamConverter.toCreateSessionResult(examId, mockExam.getTitle() + " (맛보기)", trialQuestion);
     }
+
+    @Override
+    @Transactional(readOnly = true)
+    public ExamResponseDTO.QuestionPollResult getQuestionProcessingStatus(String examId, Integer questionNumber, Integer retryCount) {
+        // 몽고디비 실물 안착 여부 탐색
+        boolean isSaved = examResultRepository.existsByExamIdAndQuestionNumberAndRetryCount(examId, questionNumber, retryCount);
+
+        // 있으면 COMPLETED, 없으면 AI 연산 중(PROCESSING)으로 간주
+        ExamStatus questionStatus = isSaved ? ExamStatus.COMPLETED : ExamStatus.PROCESSING;
+
+        return ExamResponseDTO.QuestionPollResult.builder()
+                .examId(examId)
+                .questionNumber(questionNumber)
+                .retryCount(retryCount)
+                .status(questionStatus)
+                .build();
+    }
 }

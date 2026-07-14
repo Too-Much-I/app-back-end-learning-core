@@ -100,4 +100,15 @@ public class ExamRestController {
     public BaseResponse<ExamResponseDTO.CreateSessionResult> createTrialSession() {
         return BaseResponse.onSuccess(SuccessStatus.OK, examService.createTrialSession());
     }
+
+    @Operation(summary = "문항별 재시도 채점 진행 상태 조회 (폴링) API", description = "특정 문항의 콕 집은 회차(retryCount) 채점이 완료되었는지 폴링합니다.")
+    @GetMapping("/{examId}/questions/status")
+    public BaseResponse<ExamResponseDTO.QuestionPollResult> getQuestionStatus(
+            @PathVariable("examId") String examId,
+            @RequestParam("questionNumber") Integer questionNumber,
+            @RequestParam(value = "retryCount", defaultValue = "0") Integer retryCount
+    ) {
+        ExamResponseDTO.QuestionPollResult result = examService.getQuestionProcessingStatus(examId, questionNumber, retryCount);
+        return BaseResponse.onSuccess(SuccessStatus.OK, result);
+    }
 }
