@@ -33,6 +33,7 @@ public class ExamRequestDTO {
         // 문항 데이터
         @JsonProperty("part_number") private Integer partNumber;
         @JsonProperty("question_number") private Integer questionNumber;
+        @JsonProperty("retry_count") private Integer retryCount;
         private Double score;
         @JsonProperty("max_score") private Double maxScore;
         private String transcript;

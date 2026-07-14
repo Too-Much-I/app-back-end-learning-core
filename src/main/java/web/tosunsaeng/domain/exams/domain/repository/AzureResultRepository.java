@@ -6,5 +6,4 @@ import web.tosunsaeng.domain.exams.domain.entity.AzureResult;
 import java.util.Optional;
 
 public interface AzureResultRepository extends MongoRepository<AzureResult, String> {
-    Optional<AzureResult> findByExamIdAndQuestionNumber(String examId, Integer questionNumber);
-}
+    Optional<AzureResult> findByExamIdAndQuestionNumberAndRetryCount(String examId, Integer questionNumber, Integer retryCount);}

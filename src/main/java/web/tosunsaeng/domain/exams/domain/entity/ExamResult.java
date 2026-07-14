@@ -19,6 +19,8 @@ public class ExamResult {
     @Id
     private String id;
     private String examId;
+    private String mockExamId;
+    private Integer retryCount;
 
     // 요약 데이터
     private Integer totalScore;

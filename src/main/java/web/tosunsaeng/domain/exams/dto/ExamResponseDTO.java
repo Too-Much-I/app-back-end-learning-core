@@ -80,14 +80,16 @@ public class ExamResponseDTO {
     public static class PartResultDTO {
         private Integer partNumber;
         private Integer questionNumber;
+        private Integer retryCount;
+        private Integer totalRetryCount;
         private String audioUrl;
         private Double score;
         private Double maxScore;
         private String transcript;
         private ItemFeedbackDTO feedback;
         private AzureFeedbackDTO azureFeedback;
-        // 파트 1을 위한 발음 시퀀스
         private List<SpokenWordDTO> spokenWordSequence;
+        private QuestionDTO questionInfo;
     }
 
     @Builder @Getter @NoArgsConstructor @AllArgsConstructor

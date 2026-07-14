@@ -67,6 +67,13 @@ public class ExamConverter {
 
         return ExamResult.builder()
                 .examId(req.getExamId())
+                .mockExamId(req.getMockExamId())
+                .partNumber(req.getPartNumber())
+                .questionNumber(req.getQuestionNumber())
+                .retryCount(req.getRetryCount() != null ? req.getRetryCount() : 0) // 🌟 재시도 회차 누적 저장의 핵심!
+                .score(req.getScore())
+                .maxScore(req.getMaxScore())
+                .transcript(req.getTranscript())
                 .totalScore(req.getTotalScore())
                 .levelEstimate(req.getLevelEstimate())
                 .summary(req.getSummary())
@@ -75,13 +82,9 @@ public class ExamConverter {
                 .strengths(req.getStrengths())
                 .weaknesses(req.getWeaknesses())
                 .recommendedPractice(req.getRecommendedPractice())
-                .partNumber(req.getPartNumber())
-                .questionNumber(req.getQuestionNumber())
-                .score(req.getScore())
-                .maxScore(req.getMaxScore())
-                .transcript(req.getTranscript())
-                .feedback(toItemFeedbackEntity(req.getFeedback()))
-                .spokenWordSequence(toSpokenWordEntityList(req.getSpokenWordSequence())) // 🌟 맵핑 추가
+                // 기존 성환님 프로젝트 내부의 임베디드 매핑 메서드 명칭에 맞춰 연결되어 있습니다.
+                .feedback(req.getFeedback() != null ? toItemFeedbackEntity(req.getFeedback()) : null)
+                .spokenWordSequence(req.getSpokenWordSequence() != null ? toSpokenWordEntityList(req.getSpokenWordSequence()) : null)
                 .build();
     }
 
@@ -214,5 +217,46 @@ public class ExamConverter {
         Object speechResultObj = entity.getRawData().get("azure_speech_result");
         if (speechResultObj == null) return null;
         return objectMapper.convertValue(speechResultObj, ExamResponseDTO.AzureFeedbackDTO.class);
+    }
+
+    public static ExamResponseDTO.QuestionResult toQuestionResult(
+            String examId,
+            Integer questionNumber,
+            Integer retryCount,
+            Integer totalRetryCount,
+            Question rawQuestion,
+            ExamResult targetDoc,
+            AzureResult matchingAzure,
+            String downloadUrl,
+            Integer calculatedPartNumber
+    ) {
+        // 🌟 1. 기존에 이미 만들어져 있는 변환 메서드를 그대로 재활용하여 문제 정보 DTO 생성!
+        ExamResponseDTO.QuestionDTO questionInfoDto = ExamConverter.toQuestionDTO(rawQuestion);
+
+        // 2. 내부 중첩 구조인 PartResultDTO 빌드
+        ExamResponseDTO.PartResultDTO partDto = ExamResponseDTO.PartResultDTO.builder()
+                .questionInfo(questionInfoDto) // 🌟 재활용한 DTO 통째로 주입! 표 정보까지 한 방에 해결
+                .partNumber(targetDoc != null && targetDoc.getPartNumber() != null ? targetDoc.getPartNumber() : calculatedPartNumber)
+                .questionNumber(questionNumber)
+                .retryCount(retryCount)
+                .totalRetryCount(totalRetryCount)
+                .audioUrl(downloadUrl)
+
+                // AI 채점 피드백 데이터 조건부 주입
+                .score(targetDoc != null ? targetDoc.getScore() : null)
+                .maxScore(targetDoc != null ? targetDoc.getMaxScore() : null)
+                .transcript(targetDoc != null ? targetDoc.getTranscript() : null)
+                .feedback(targetDoc != null ? toItemFeedbackDTO(targetDoc.getFeedback()) : null)
+                .spokenWordSequence(targetDoc != null ? toSpokenWordDTOList(targetDoc.getSpokenWordSequence()) : null)
+
+                // Azure AI 데이터 조건부 주입
+                .azureFeedback(matchingAzure != null ? toAzureFeedbackDTO(matchingAzure) : null)
+                .build();
+
+        // 3. 최종 계층인 QuestionResult로 감싸서 반환
+        return ExamResponseDTO.QuestionResult.builder()
+                .examId(examId)
+                .question(partDto)
+                .build();
     }
 }

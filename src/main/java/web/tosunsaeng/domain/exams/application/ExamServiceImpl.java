@@ -7,10 +7,7 @@ import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import web.tosunsaeng.domain.exams.converter.ExamConverter;
-import web.tosunsaeng.domain.exams.domain.entity.AzureResult;
-import web.tosunsaeng.domain.exams.domain.entity.ExamResult;
-import web.tosunsaeng.domain.exams.domain.entity.MockExam;
-import web.tosunsaeng.domain.exams.domain.entity.SpeechAceResult;
+import web.tosunsaeng.domain.exams.domain.entity.*;
 import web.tosunsaeng.domain.exams.domain.enums.ExamStatus;
 import web.tosunsaeng.domain.exams.domain.repository.AzureResultRepository;
 import web.tosunsaeng.domain.exams.domain.repository.ExamResultRepository;
@@ -79,9 +76,9 @@ public class ExamServiceImpl implements ExamService {
         return generatePresignedGetUrl(fileKey, 60);
     }
 
-    // 💡 버그 수정: getPresignedUrl의 "temp/%s/q_%d.wav" 파일 포맷과 정확히 일치시킴
-    private String getDownloadUrl(String examId, Integer questionNumber) {
-        String fileKey = String.format("temp/%s/q_%d.wav", examId, questionNumber);
+    // 🌟 [수정] 업로드된 오디오 파일 경로가 재시도별로 유니크하도록 _r{retryCount} 추가 완
+    private String getDownloadUrl(String examId, Integer questionNumber, Integer retryCount) {
+        String fileKey = String.format("temp/%s/q_%d_r%d.wav", examId, questionNumber, retryCount);
         return generatePresignedGetUrl(fileKey, 5);
     }
 
@@ -105,6 +102,7 @@ public class ExamServiceImpl implements ExamService {
         redisTemplate.opsForValue().set(redisKey, ExamStatus.PENDING.name(), 1, TimeUnit.HOURS);
         log.info("새로운 모의고사 세션 생성 완료: {}", examId);
 
+        // 🌟 mock_exam_003 족보 싱크 일치
         MockExam mockExam = mockExamRepository.findByMockExamId("mock_exam_003")
                 .orElseThrow(() -> new ExamsException(ErrorStatus._EXAM_PAPER_NOT_FOUND));
 
@@ -122,9 +120,10 @@ public class ExamServiceImpl implements ExamService {
         return ExamConverter.toCreateSessionResult(examId, mockExam.getTitle(), questionDTOs);
     }
 
+    // 🌟 [수정] 오디오 파일 업로드용 Presigned URL 발급 시 retryCount 수용하도록 파라미터 확장
     @Override
-    public ExamResponseDTO.UploadUrlResult getPresignedUrl(String examId, Integer questionNumber) {
-        String fileKey = String.format("temp/%s/q_%d.wav", examId, questionNumber);
+    public ExamResponseDTO.UploadUrlResult getPresignedUrl(String examId, Integer questionNumber, Integer retryCount) {
+        String fileKey = String.format("temp/%s/q_%d_r%d.wav", examId, questionNumber, retryCount);
 
         software.amazon.awssdk.services.s3.model.PutObjectRequest objectRequest =
                 software.amazon.awssdk.services.s3.model.PutObjectRequest.builder()
@@ -146,49 +145,45 @@ public class ExamServiceImpl implements ExamService {
         return ExamConverter.toUploadUrlResult(url, fileKey, 60);
     }
 
+    // 🌟 [수정] 오디오 파일 제출 시 retryCount를 멀티파트 폼 데이터에 정상 주입
     @Override
-    public ExamResponseDTO.SubmitResult submitAudio(String examId, Integer questionNumber) {
+    public ExamResponseDTO.SubmitResult submitAudio(String examId, Integer questionNumber, Integer retryCount) {
         String redisKey = "exam:status:" + examId;
         redisTemplate.opsForValue().set(redisKey, ExamStatus.PROCESSING.name(), 1, TimeUnit.HOURS);
 
         try {
-            // 1. S3에서 업로드된 오디오 파일을 백엔드 메모리로 다운로드 (Presigned URL 활용)
-            String downloadUrl = getDownloadUrl(examId, questionNumber);
+            String downloadUrl = getDownloadUrl(examId, questionNumber, retryCount);
             byte[] audioBytes = restTemplate.getForObject(java.net.URI.create(downloadUrl), byte[].class);
 
             if (audioBytes == null) {
                 throw new RuntimeException("S3에서 오디오 파일을 읽어오지 못했습니다.");
             }
 
-            // 2. 다운받은 바이트 배열을 전송용 파일 리소스(Resource)로 래핑
-            // (주의: 멀티파트 전송 시 파일명이 없으면 거절당할 수 있으므로 getFilename()을 강제 오버라이딩 합니다)
             org.springframework.core.io.ByteArrayResource audioResource = new org.springframework.core.io.ByteArrayResource(audioBytes) {
                 @Override
                 public String getFilename() {
-                    return "q_" + questionNumber + ".webm";
+                    return "q_" + questionNumber + "_r" + retryCount + ".webm";
                 }
             };
 
-            // 3. AI 서버로 보낼 폼 데이터 구성 (JSON -> MULTIPART_FORM_DATA 방식으로 복구)
             MultiValueMap<String, Object> body = new LinkedMultiValueMap<>();
             body.add("user_id", examId);
-            body.add("mock_exam_id", "mock_003");
+            body.add("mock_exam_id", "mock_exam_003"); // 🌟 mock_exam_003 족보 매칭 완료
             body.add("part_number", getPartNumber(questionNumber));
             body.add("question_number", questionNumber);
-            body.add("audio_file", audioResource); // 실제 파일 바이트 첨부!
+            body.add("retry_count", retryCount);       // 🔥 AI 서버로 현재 몇 회차 채점 시도인지 전송!
+            body.add("audio_file", audioResource);
 
-            // 4. 헤더 설정
             HttpHeaders headers = new HttpHeaders();
             headers.setContentType(MediaType.MULTIPART_FORM_DATA);
 
             HttpEntity<MultiValueMap<String, Object>> entity = new HttpEntity<>(body, headers);
 
-            // 5. AI 서버로 전송
             restTemplate.postForEntity(AI_SERVER_URL, entity, String.class);
-            log.info("AI 서버에 채점 요청 전송 완료 (S3에서 다운받아 직접 전송): examId={}, qNum={}", examId, questionNumber);
+            log.info("AI 서버에 채점 요청 전송 완료: examId={}, qNum={}, retryCount={}", examId, questionNumber, retryCount);
 
         } catch (Exception e) {
-            log.error("AI 서버 채점 요청 실패 (S3 파일 읽기 또는 AI 서버 전송 에러)", e);
+            log.error("AI 서버 채점 요청 실패", e);
             redisTemplate.opsForValue().set(redisKey, ExamStatus.FAILED.name(), 1, TimeUnit.HOURS);
             throw new ExamsException(ErrorStatus._AI_SERVER_CONNECTION_ERROR);
         }
@@ -207,44 +202,50 @@ public class ExamServiceImpl implements ExamService {
         return ExamConverter.toStatusResult(examId, currentStatus, 60);
     }
 
-    // 💡 1. AI 피드백 콜백 수신 및 저장 로직 구현 (누락 복구 완료)
     @Override
     public void updateExamResult(ExamRequestDTO.AiResultReq req) {
         String redisKey = "exam:status:" + req.getExamId();
 
-        // 총점이 포함된 전체 요약본 JSON이 온 경우 세션을 최종 완료 처리
+        // 1. [기존 유지] AI 서버가 최종 종합 성적표(totalScore가 포함된 JSON)를 보내주면 정규 세션 종료 처리
         if (req.getTotalScore() != null) {
             redisTemplate.opsForValue().set(redisKey, ExamStatus.COMPLETED.name(), 1, TimeUnit.HOURS);
         }
 
-        // Converter가 내부에서 spokenWordSequence와 correctionItems를
-        // 모두 함께 파싱하여 MongoDB Entity 객체로 온전하게 매핑해줍니다.
+        // 2. [기존 유지] AI 피드백 조각 몽고디비에 유니크하게 누적 적재 (retryCount 반영됨)
         ExamResult result = ExamConverter.toExamResult(req);
         examResultRepository.save(result);
 
-        log.info("AI 피드백 조각 저장 완료: examId={}, isSummary={}, qNum={}",
-                req.getExamId(), req.getTotalScore() != null, req.getQuestionNumber());
+        log.info("AI 피드백 조각 저장 완료: examId={}, qNum={}, retryCount={}",
+                req.getExamId(), req.getQuestionNumber(), req.getRetryCount());
 
-        // 11번 문제 채점 결과가 저장된 직후에 전체 피드백 생성을 AI 서버에 요청!
-        if (req.getQuestionNumber() != null && req.getQuestionNumber() == 11) {
-            java.util.concurrent.CompletableFuture.runAsync(() -> {
-                requestOverallSummary(req.getExamId(), req.getMockExamId());
-            });
+        // 🌟 3. 맛보기 세션 vs 정규 세션 종료 및 요약 트리거 분기 처리
+        if (req.getQuestionNumber() != null) {
+            String examId = req.getExamId();
+
+            // [시나리오 A] 정규 모의고사(ex_)인 경우: 11번 문항이 끝났을 때 AI 서버에 최종 리포트 요약 생성을 비동기로 찌름
+            if (examId.startsWith("ex_") && req.getQuestionNumber() == 11) {
+                java.util.concurrent.CompletableFuture.runAsync(() -> {
+                    requestOverallSummary(examId, req.getMockExamId());
+                });
+            }
+            // [시나리오 B] 맛보기 체험(trial_)인 경우: 1번 문항 피드백이 들어오는 순간 즉시 세션을 COMPLETED 처리하고 리턴
+            else if (examId.startsWith("trial_") && req.getQuestionNumber() == 1) {
+                redisTemplate.opsForValue().set(redisKey, ExamStatus.COMPLETED.name(), 1, TimeUnit.HOURS);
+                log.info("🏁 맛보기(Trial) 세션 최종 채점 완료 및 종료: examId={}", examId);
+            }
         }
     }
 
     @Override
     public ExamResponseDTO.SummaryResult getExamSummary(String examId) {
-        // DB에서 해당 모의고사의 모든 결과 조각(요약 + 문제들)을 가져옴
         List<ExamResult> results = examResultRepository.findByExamId(examId);
 
-        // 1. 요약 문서 필터링
         ExamResult summaryDoc = results.stream()
                 .filter(r -> r.getTotalScore() != null)
                 .findFirst()
                 .orElseThrow(() -> new ExamsException(ErrorStatus._EXAM_NOT_FOUND));
 
-        // 2. 각 파트별 점수 총합 계산 (averagingDouble ➡️ summingDouble로 변경! 🌟)
+        // 파트별 '총합(Sum)' 계산 체계 유지
         java.util.Map<String, Double> partScores = results.stream()
                 .filter(r -> r.getQuestionNumber() != null && r.getScore() != null)
                 .collect(java.util.stream.Collectors.groupingBy(
@@ -252,54 +253,61 @@ public class ExamServiceImpl implements ExamService {
                             int partNum = r.getPartNumber() != null ? r.getPartNumber() : getPartNumber(r.getQuestionNumber());
                             return "part" + partNum;
                         },
-                        java.util.stream.Collectors.summingDouble(ExamResult::getScore) // 🔥 파트별 합산 점수를 구합니다.
+                        java.util.stream.Collectors.summingDouble(ExamResult::getScore)
                 ));
 
-        // 3. 소수점 첫째 자리까지만 깔끔하게 반올림
         partScores.replaceAll((part, sum) -> Math.round(sum * 10.0) / 10.0);
 
-        // 4. 컨버터를 사용하여 최종 객체 반환
         return ExamConverter.toSummaryResult(summaryDoc, partScores);
     }
 
+    // 🌟 [수정 및 전면 리팩토링 🔥] 성환님 DTO 스펙에 맞춘 중첩 구조(QuestionResult ➡️ PartResultDTO) 단건 핀포인트 조회
     @Override
-    public ExamResponseDTO.QuestionResult getExamQuestion(String examId, Integer questionNumber) {
-        List<ExamResult> results = examResultRepository.findByExamId(examId);
+    public ExamResponseDTO.QuestionResult getExamQuestion(String examId, Integer questionNumber, Integer retryCount) {
+        // 1. DB(MongoDB)에서 해당 시험 세션의 결과 조각 로드
+        List<ExamResult> examResults = examResultRepository.findByExamId(examId);
 
-        ExamResult targetDoc = results.stream()
+        // 2. AzureResult는 레포지토리 정밀 쿼리로 단건 직접 조회
+        AzureResult matchingAzure = azureResultRepository
+                .findByExamIdAndQuestionNumberAndRetryCount(examId, questionNumber, retryCount)
+                .orElse(null);
+
+        Integer totalRetryCount = examResults.stream()
+                .filter(r -> r.getQuestionNumber() != null && r.getQuestionNumber().equals(questionNumber))
+                .map(r -> r.getRetryCount() != null ? r.getRetryCount() : 0)
+                .max(Integer::compare)
+                .map(max -> max + 1) // 🌟 최댓값이 0이면 최초 도전을 포함해 총 '1회'가 되도록 +1 보정!
+                .orElse(1);
+
+        // 3. 문항 번호와 요청된 [retryCount] 회차가 동시에 일치하는 데이터 필터링
+        ExamResult targetDoc = examResults.stream()
                 .filter(r -> r.getQuestionNumber() != null
                         && r.getQuestionNumber().equals(questionNumber)
-                        && r.getFeedback() != null)
+                        && (r.getRetryCount() != null ? r.getRetryCount() : 0) == retryCount)
                 .findFirst()
                 .orElse(null);
 
-        AzureResult azureResult = azureResultRepository.findByExamIdAndQuestionNumber(examId, questionNumber)
-                .orElse(null);
+        // 4. mock_exam_003에서 원본 문제 공통 정보 조회
+        MockExam mockExam = mockExamRepository.findByMockExamId("mock_exam_003")
+                .orElseThrow(() -> new ExamsException(ErrorStatus._EXAM_PAPER_NOT_FOUND));
 
-        ExamResponseDTO.PartResultDTO partDto = ExamResponseDTO.PartResultDTO.builder()
-                .partNumber(targetDoc != null && targetDoc.getPartNumber() != null ? targetDoc.getPartNumber() : getPartNumber(questionNumber))
-                .questionNumber(questionNumber)
-                .audioUrl(getDownloadUrl(examId, questionNumber))
-                .build();
+        Question rawQuestion = mockExam.getQuestions().stream()
+                .filter(q -> q.getQuestionNumber() != null && q.getQuestionNumber().equals(questionNumber))
+                .findFirst()
+                .orElseThrow(() -> new ExamsException(ErrorStatus._QUESTION_NOT_FOUND));
 
-        if (targetDoc != null) {
-            partDto.setScore(targetDoc.getScore());
-            partDto.setMaxScore(targetDoc.getMaxScore());
-            partDto.setTranscript(targetDoc.getTranscript());
-            partDto.setFeedback(ExamConverter.toItemFeedbackDTO(targetDoc.getFeedback()));
-
-            // 맵핑된 SpokenWordSequence 리스트를 반환 결과에 셋팅!
-            partDto.setSpokenWordSequence(ExamConverter.toSpokenWordDTOList(targetDoc.getSpokenWordSequence()));
-        }
-
-        if (azureResult != null) {
-            partDto.setAzureFeedback(ExamConverter.toAzureFeedbackDTO(azureResult));
-        }
-
-        return ExamResponseDTO.QuestionResult.builder()
-                .examId(examId)
-                .question(partDto)
-                .build();
+        // 🌟 5. 지저분한 빌더 패턴 조립을 '안 쓰이고 있던' ExamConverter에 통째로 위임!
+        return ExamConverter.toQuestionResult(
+                examId,
+                questionNumber,
+                retryCount,
+                totalRetryCount,
+                rawQuestion,
+                targetDoc,
+                matchingAzure,
+                getDownloadUrl(examId, questionNumber, retryCount),
+                getPartNumber(questionNumber)
+        );
     }
 
     @Override
@@ -311,7 +319,6 @@ public class ExamServiceImpl implements ExamService {
                 .build();
 
         speechAceResultRepository.save(result);
-
         log.info("SpeechAce 전용 컬렉션 저장 완료: examId={}, questionNum={}", req.getExamId(), req.getQuestionNumber());
     }
 
@@ -322,9 +329,8 @@ public class ExamServiceImpl implements ExamService {
 
             java.util.Map<String, Object> body = new java.util.HashMap<>();
             body.put("user_id", examId);
-            body.put("mock_exam_id", mockExamId != null ? mockExamId : "mock_003");
+            body.put("mock_exam_id", mockExamId != null ? mockExamId : "mock_exam_003"); // 🌟 mock_exam_003 싱크 완
 
-            // AI 서버가 일반 채점과 요약 요청을 구분할 수 있도록 0번을 명시적으로 전송
             body.put("question_number", 0);
             body.put("part_number", 0);
 
@@ -337,23 +343,47 @@ public class ExamServiceImpl implements ExamService {
         }
     }
 
+    // 🌟 [수정] Azure 콜백 수신 메서드도 retry_count 세팅 누락 없도록 가로채기 보완 완료
     @Override
     @Transactional
     public void processAzureCallback(Map<String, Object> rawPayload) {
-        // 1. 원본 데이터 안의 metadata에서 식별자(examId, questionNumber) 추출
         Map<String, Object> metadata = (Map<String, Object>) rawPayload.get("metadata");
         String examId = (String) metadata.get("user_id");
         Integer questionNumber = (Integer) metadata.get("question_number");
+        Integer retryCount = metadata.get("retry_count") != null ? (Integer) metadata.get("retry_count") : 0;
 
-        log.info("🔥 Azure AI 서버 콜백 수신 (원본 통째로 저장): examId={}, questionNumber={}", examId, questionNumber);
+        log.info("🔥 Azure AI 서버 콜백 수신 (원본 통째로 저장): examId={}, questionNumber={}, retryCount={}", examId, questionNumber, retryCount);
 
-        // 2. Entity에 원본 데이터 그대로 넣어서 저장
         AzureResult entity = AzureResult.builder()
                 .examId(examId)
                 .questionNumber(questionNumber)
+                .retryCount(retryCount) // 🌟 매핑 주입
                 .rawData(rawPayload)
                 .build();
 
         azureResultRepository.save(entity);
+    }
+
+    // 인터페이스(ExamService)에도 꼭 메서드 시그니처를 추가해 주세요!
+    @Override
+    public ExamResponseDTO.CreateSessionResult createTrialSession() {
+        // 🌟 1. 맛보기 전용 세션 ID 접두사 부여
+        String examId = "trial_" + UUID.randomUUID().toString().replace("-", "").substring(0, 10);
+        String redisKey = "exam:status:" + examId;
+
+        redisTemplate.opsForValue().set(redisKey, ExamStatus.PENDING.name(), 1, TimeUnit.HOURS);
+        log.info("새로운 맛보기(Trial) 세션 생성 완료: {}", examId);
+
+        MockExam mockExam = mockExamRepository.findByMockExamId("mock_exam_003")
+                .orElseThrow(() -> new ExamsException(ErrorStatus._EXAM_PAPER_NOT_FOUND));
+
+        // 🌟 2. 1번 문제 딱 하나만 필터링해서 DTO로 변환
+        List<ExamResponseDTO.QuestionDTO> trialQuestion = mockExam.getQuestions().stream()
+                .filter(q -> q.getQuestionNumber() != null && q.getQuestionNumber() == 1) // 1번만 추출
+                .map(ExamConverter::toQuestionDTO)
+                .peek(dto -> dto.setAudioUrl(getQuestionAudioUrl(mockExam.getMockExamId(), dto.getQuestionNumber())))
+                .collect(Collectors.toList());
+
+        return ExamConverter.toCreateSessionResult(examId, mockExam.getTitle() + " (맛보기)", trialQuestion);
     }
 }

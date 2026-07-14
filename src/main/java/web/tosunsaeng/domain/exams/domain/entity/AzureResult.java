@@ -23,6 +23,9 @@ public class AzureResult {
     @Field("question_number")
     private Integer questionNumber;
 
+    @Field("retry_count")
+    private Integer retryCount;
+
     @Field("raw_data")
     private Map<String, Object> rawData;
 }
