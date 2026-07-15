@@ -444,15 +444,26 @@ public class ExamServiceImpl implements ExamService {
             throw new ExamsException(ErrorStatus._EXAM_ALREADY_COMPLETED);
         }
 
-        // 시험 중간 이탈 시의 레디스 상태 잠금 및 추가 제출 무효화 격리
-        redisTemplate.opsForValue().set(redisKey, ExamStatus.COMPLETED.name(), 1, TimeUnit.HOURS);
-        log.info("유저 명시적 요청에 의한 시험 세션 중도 종료 처리 완료: examId={}", examId);
+        // COMPLETED가 아니라 PROCESSING으로 설정하여 프론트가 폴링을 돌며 기다리게 합니다.
+        redisTemplate.opsForValue().set(redisKey, ExamStatus.PROCESSING.name(), 1, TimeUnit.HOURS);
+        log.info("유저 명시적 요청에 의한 시험 세션 중도 종료 처리 시작 (채점 대기): examId={}", examId);
 
-        // 11번 완주 시점과 동일하게 CompletableFuture 풀을 통해 AI 비동기 요약 연산 트리거 호출
+        // AI 비동기 요약 연산 트리거 호출
         java.util.concurrent.CompletableFuture.runAsync(() -> {
-            requestOverallSummary(examId, "mock_exam_003");
+            try {
+                requestOverallSummary(examId, "mock_exam_003");
+
+                // AI 요약 연산 및 몽고디비 적재가 완벽히 끝난 이 시점에 COMPLETED로 전환합니다.
+                redisTemplate.opsForValue().set(redisKey, ExamStatus.COMPLETED.name(), 1, TimeUnit.HOURS);
+                log.info("비동기 AI 요약 연산 완료 및 세션 COMPLETED 전환: examId={}", examId);
+
+            } catch (Exception e) {
+                log.error("비동기 AI 채점 처리 중 오류 발생: examId={}", examId, e);
+                redisTemplate.opsForValue().set(redisKey, ExamStatus.FAILED.name(), 1, TimeUnit.HOURS);
+            }
         });
 
-        return ExamConverter.toSubmitResult(ExamStatus.COMPLETED);
+        // 프론트엔드에는 일단 PROCESSING 상태를 리턴하여 로딩 진입을 유도합니다.
+        return ExamConverter.toSubmitResult(ExamStatus.PROCESSING);
     }
 }
