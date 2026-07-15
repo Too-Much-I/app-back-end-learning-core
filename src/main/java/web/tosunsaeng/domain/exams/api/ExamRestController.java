@@ -116,7 +116,7 @@ public class ExamRestController {
     @PostMapping("/{examId}/terminate")
     public BaseResponse<ExamResponseDTO.SubmitResult> terminateExam(
             @PathVariable String examId,
-            @RequestParam(value = "QuestionNumber", required = false, defaultValue = "0") Integer questionNumber
+            @RequestParam(value = "questionNumber", required = false, defaultValue = "0") Integer questionNumber
     ) {
         ExamResponseDTO.SubmitResult result = examService.terminateAndRequestAiFeedback(examId, questionNumber);
         return BaseResponse.onSuccess(SuccessStatus.OK, result);
