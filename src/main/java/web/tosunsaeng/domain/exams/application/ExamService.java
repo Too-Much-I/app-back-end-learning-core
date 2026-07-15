@@ -29,5 +29,5 @@ public interface ExamService {
 
     ExamResponseDTO.QuestionPollResult getQuestionProcessingStatus(String examId, Integer questionNumber, Integer retryCount);
 
-    ExamResponseDTO.SubmitResult terminateAndRequestAiFeedback(String examId);
+    ExamResponseDTO.SubmitResult terminateAndRequestAiFeedback(String examId, Integer questionNumber);
 }

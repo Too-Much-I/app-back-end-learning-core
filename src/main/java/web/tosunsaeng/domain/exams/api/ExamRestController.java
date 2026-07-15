@@ -112,11 +112,13 @@ public class ExamRestController {
         return BaseResponse.onSuccess(SuccessStatus.OK, result);
     }
 
+    @Operation(summary = "모의고사 중단 API", description = "사용자가 임의의 위치에서 모의고사를 중단합니다.")
     @PostMapping("/{examId}/terminate")
     public BaseResponse<ExamResponseDTO.SubmitResult> terminateExam(
-            @PathVariable String examId
+            @PathVariable String examId,
+            @RequestParam(value = "lastQuestionNumber", required = false, defaultValue = "0") Integer questionNumber
     ) {
-        ExamResponseDTO.SubmitResult result = examService.terminateAndRequestAiFeedback(examId);
+        ExamResponseDTO.SubmitResult result = examService.terminateAndRequestAiFeedback(examId, questionNumber);
         return BaseResponse.onSuccess(SuccessStatus.OK, result);
     }
 }

@@ -431,9 +431,10 @@ public class ExamServiceImpl implements ExamService {
 
     // 사용자가 시험 화면에서 강제 종료 혹은 중단을 명시적으로 선택했을 때, 추가 오디오 제출을 완전 잠금 조치하고 AI 서버 종합 피드백 요약을 즉시 호출합니다.
     @Override
-    public ExamResponseDTO.SubmitResult terminateAndRequestAiFeedback(String examId) {
+    public ExamResponseDTO.SubmitResult terminateAndRequestAiFeedback(String examId, Integer questionNumber) {
         String redisKey = "exam:status:" + examId;
 
+        // 1. 기존 가드: 시험 세션 상태 확인
         String statusStr = (String) redisTemplate.opsForValue().get(redisKey);
         if (statusStr == null) {
             throw new ExamsException(ErrorStatus._EXAM_NOT_FOUND);
@@ -444,15 +445,47 @@ public class ExamServiceImpl implements ExamService {
             throw new ExamsException(ErrorStatus._EXAM_ALREADY_COMPLETED);
         }
 
-        // 일단 PROCESSING 상태로 락을 걸어 프론트엔드가 대기하도록 만듭니다.
+        // 2. 일단 PROCESSING 상태로 락을 걸어 프론트엔드가 대기하도록 만듭니다.
         redisTemplate.opsForValue().set(redisKey, ExamStatus.PROCESSING.name(), 1, TimeUnit.HOURS);
-        log.info("유저 명시적 요청에 의한 시험 세션 중도 종료 처리 시작 (채점 대기): examId={}", examId);
+        log.info("유저 명시적 요청에 의한 시험 세션 중도 종료 처리 시작 (채점 대기): examId={}, 마지막 문제 번호={}", examId, questionNumber);
 
-        // AI 비동기 요약 연산 트리거 요청
+        // 3. AI 비동기 요약 연산 및 마지막 문항 추적 가드 트리거
         java.util.concurrent.CompletableFuture.runAsync(() -> {
             try {
+                // 해당 번호의 개별 문항 피드백이 MongoDB에 들어올 때까지 대기합니다.
+                if (questionNumber != null && questionNumber > 0) {
+                    int poolCount = 0;
+                    boolean isLastQuestionSaved = false;
+
+                    log.info("▶ [중단 가드] 마지막 제출 문항(qNum={})이 몽고DB에 적재될 때까지 대기를 시작합니다.", questionNumber);
+
+                    while (poolCount < 20) { // 최대 20초 대기
+                        List<ExamResult> currentResults = examResultRepository.findByExamId(examId);
+
+                        isLastQuestionSaved = currentResults.stream()
+                                .anyMatch(result -> result.getQuestionNumber() != null
+                                        && result.getQuestionNumber().equals(questionNumber));
+
+                        if (isLastQuestionSaved) {
+                            log.info("✔ [중단 가드 해제] 마지막 문항(qNum={}) 채점 데이터 확인 완료.", questionNumber);
+                            break;
+                        }
+
+                        TimeUnit.SECONDS.sleep(1);
+                        poolCount++;
+                    }
+
+                    if (!isLastQuestionSaved) {
+                        log.warn("⚠️ [중단 가드 타임아웃] 20초 대기 초과. 현재까지 쌓인 데이터로 종합 요약을 진행합니다.");
+                    }
+                } else {
+                    log.info("▶ [중단 가드 패스] 유효한 이전 풀이 문항 번호가 없어 즉시 요약을 요청합니다.");
+                }
+
+                // 4. 마지막 문항 저장 확인 후 종합 피드백 트리거
                 requestOverallSummary(examId, "mock_exam_003");
                 log.info("AI 서버 종합 요약 피드백 생성 트리거 요청 완료: examId={}", examId);
+
             } catch (Exception e) {
                 log.error("비동기 AI 채점 요청 중 오류 발생: examId={}", examId, e);
                 redisTemplate.opsForValue().set(redisKey, ExamStatus.FAILED.name(), 1, TimeUnit.HOURS);
