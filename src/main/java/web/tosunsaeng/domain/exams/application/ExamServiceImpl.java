@@ -158,6 +158,12 @@ public class ExamServiceImpl implements ExamService {
     @Override
     public ExamResponseDTO.SubmitResult submitAudio(String examId, Integer questionNumber, Integer retryCount) {
         String redisKey = "exam:status:" + examId;
+
+        Object currentStatusObj = redisTemplate.opsForValue().get(redisKey);
+        if (currentStatusObj != null && ExamStatus.PROCESSING.name().equals(currentStatusObj.toString())) {
+            throw new ExamsException(ErrorStatus._AI_SERVER_PROCESSING_NOW);
+        }
+
         // 상태를 연산 중(PROCESSING)으로 변경하여 클라이언트의 폴링 진입을 유도합니다.
         redisTemplate.opsForValue().set(redisKey, ExamStatus.PROCESSING.name(), 1, TimeUnit.HOURS);
 

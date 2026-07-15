@@ -17,12 +17,13 @@ public enum ErrorStatus implements BaseErrorCode {
     // Member
     _MEMBER_NOT_FOUND(HttpStatus.FORBIDDEN, "MEMBER_4000", "없는 유저 입니다."),
 
-    // Exams (새로 추가!)
+    // Exams
     _EXAM_NOT_FOUND(HttpStatus.NOT_FOUND, "EXAM_4004", "해당 모의고사 세션을 찾을 수 없습니다."),
     _EXAM_PAPER_NOT_FOUND(HttpStatus.NOT_FOUND, "EXAM_4005", "해당 문제지를 찾을 수 없습니다."),
     _AI_SERVER_CONNECTION_ERROR(HttpStatus.INTERNAL_SERVER_ERROR, "EXAM_4001", "AI 채점 서버와 통신할 수 없습니다. 잠시 후 다시 시도해주세요."),
     _QUESTION_NOT_FOUND(HttpStatus.NOT_FOUND, "EXAM_4002", "해당 문제를 찾을 수 없습니다."),
-    _EXAM_ALREADY_COMPLETED(HttpStatus.ALREADY_REPORTED, "EXAM_4003", "이미 채점이 완료된 시험 세션입니다.");
+    _EXAM_ALREADY_COMPLETED(HttpStatus.ALREADY_REPORTED, "EXAM_4003", "이미 채점이 완료된 시험 세션입니다."),
+    _AI_SERVER_PROCESSING_NOW(HttpStatus.BAD_REQUEST, "EXAM_4006", "현재 채점이 진행 중입니다. 잠시 후 다시 시도해 주세요.");
 
     private final HttpStatus httpStatus;
     private final String code;
