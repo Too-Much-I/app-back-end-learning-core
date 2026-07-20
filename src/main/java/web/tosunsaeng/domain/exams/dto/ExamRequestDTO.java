@@ -57,6 +57,10 @@ public class ExamRequestDTO {
         private String level;
         @JsonProperty("pronunciation_fluency_score") private Double pronunciationFluencyScore;
         @JsonProperty("content_relevance_score") private Double contentRelevanceScore;
+        @JsonProperty("fluency_score") private Double fluencyScore;
+        @JsonProperty("completeness_score") private Double completenessScore;
+        @JsonProperty("prosody_score") private Double prosodyScore;
+        @JsonProperty("pronunciation_score") private Double pronunciationScore;
         private List<String> strengths;
         private List<String> weaknesses;
         private String pronunciation;

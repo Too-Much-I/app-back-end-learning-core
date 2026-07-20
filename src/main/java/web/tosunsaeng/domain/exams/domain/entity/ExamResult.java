@@ -49,6 +49,10 @@ public class ExamResult {
         private String level;
         private Double pronunciationFluencyScore;
         private Double contentRelevanceScore;
+        private Double fluencyScore;
+        private Double completenessScore;
+        private Double prosodyScore;
+        private Double pronunciationScore;
         private List<String> strengths;
         private List<String> weaknesses;
         private String pronunciation;
