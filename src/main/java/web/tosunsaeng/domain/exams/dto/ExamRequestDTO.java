@@ -60,7 +60,7 @@ public class ExamRequestDTO {
         @JsonProperty("fluency_score") private Double fluencyScore;
         @JsonProperty("completeness_score") private Double completenessScore;
         @JsonProperty("prosody_score") private Double prosodyScore;
-        @JsonProperty("pronunciation_score") private Double pronunciationScore;
+        @JsonProperty("accuracy_score") private Double accuracyScore;
         private List<String> strengths;
         private List<String> weaknesses;
         private String pronunciation;

@@ -52,7 +52,7 @@ public class ExamResult {
         private Double fluencyScore;
         private Double completenessScore;
         private Double prosodyScore;
-        private Double pronunciationScore;
+        private Double accuracyScore;
         private List<String> strengths;
         private List<String> weaknesses;
         private String pronunciation;

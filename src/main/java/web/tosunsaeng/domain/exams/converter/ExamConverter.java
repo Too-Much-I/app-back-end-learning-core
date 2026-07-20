@@ -9,6 +9,8 @@ import web.tosunsaeng.domain.exams.dto.ExamRequestDTO;
 import web.tosunsaeng.domain.exams.dto.ExamResponseDTO;
 import web.tosunsaeng.domain.exams.domain.enums.ExamStatus;
 
+import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
@@ -99,7 +101,7 @@ public class ExamConverter {
                 .fluencyScore(dto.getFluencyScore())
                 .completenessScore(dto.getCompletenessScore())
                 .prosodyScore(dto.getProsodyScore())
-                .pronunciationScore(dto.getPronunciationScore())
+                .accuracyScore(dto.getAccuracyScore())
                 .strengths(dto.getStrengths())
                 .weaknesses(dto.getWeaknesses())
                 .pronunciation(dto.getPronunciation())
@@ -148,15 +150,27 @@ public class ExamConverter {
     public static ExamResponseDTO.ItemFeedbackDTO toItemFeedbackDTO(ExamResult.ItemFeedback entity) {
         if (entity == null) return null;
 
+        List<Map<String, Double>> detailedScoreList = new ArrayList<>();
+
+        if (entity.getAccuracyScore() != null) {
+            detailedScoreList.add(Collections.singletonMap("accuracy_score", entity.getAccuracyScore()));
+        }
+        if (entity.getFluencyScore() != null) {
+            detailedScoreList.add(Collections.singletonMap("fluency_score", entity.getFluencyScore()));
+        }
+        if (entity.getCompletenessScore() != null) {
+            detailedScoreList.add(Collections.singletonMap("completeness_score", entity.getCompletenessScore()));
+        }
+        if (entity.getProsodyScore() != null) {
+            detailedScoreList.add(Collections.singletonMap("prosody_score", entity.getProsodyScore()));
+        }
+
         return ExamResponseDTO.ItemFeedbackDTO.builder()
                 .summary(entity.getSummary())
                 .level(entity.getLevel())
                 .pronunciationFluencyScore(entity.getPronunciationFluencyScore())
                 .contentRelevanceScore(entity.getContentRelevanceScore())
-                .fluencyScore(entity.getFluencyScore())
-                .completenessScore(entity.getCompletenessScore())
-                .prosodyScore(entity.getProsodyScore())
-                .pronunciationScore(entity.getPronunciationScore())
+                .detailedScores(detailedScoreList)
                 .strengths(entity.getStrengths())
                 .weaknesses(entity.getWeaknesses())
                 .pronunciation(entity.getPronunciation())
