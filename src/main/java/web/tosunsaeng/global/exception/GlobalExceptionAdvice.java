@@ -1,5 +1,6 @@
 package web.tosunsaeng.global.exception;
 
+import io.sentry.Sentry;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.ConstraintViolationException;
 import lombok.extern.slf4j.Slf4j;
@@ -108,6 +109,8 @@ public class GlobalExceptionAdvice extends ResponseEntityExceptionHandler {
     @ExceptionHandler
     public ResponseEntity<Object> exception(Exception e, WebRequest request) {
         e.printStackTrace();
+
+        Sentry.captureException(e);
 
         // 🌟 여기에 넣어두면 부모 클래스 메서드 상관없이 파싱 에러를 100% 낚아챕니다!
         if (e instanceof HttpMessageNotReadableException) {

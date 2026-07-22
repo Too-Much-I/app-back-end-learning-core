@@ -39,3 +39,17 @@ server:
       max: 20       # 최대 톰캣 스레드 수 제한 (프리티어 메모리 폭발 방지)
       min-spare: 4  # 최소 대기 스레드 수
     max-connections: 100 # 동시에 허용할 최대 커넥션 수
+
+sentry:
+  dsn: https://b3d789637d5044a200ef914f12499938@o4511776045400064.ingest.us.sentry.io/4511776050839552
+  send-default-pii: true
+
+  # 에러 로그 중 ERROR 레벨 이상만 Sentry 이벤트로 발송
+  logging:
+    minimum-event-level: error
+
+  # APM 성능 트랜잭션 수집 비율 (1.0 = 100%, 테스트할 때 1.0으로 하고 추후 운영 시 0.1~0.2 조정)
+  traces-sample-rate: 1.0
+
+  # 환경 구분 (dev, local, prod 등)
+  environment: ${spring.profiles.active:local}
