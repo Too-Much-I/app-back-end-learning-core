@@ -337,6 +337,8 @@ class FeedbackCallbackServiceTest {
     @Test
     @SuppressWarnings({"rawtypes", "unchecked"})
     void multipartAiRequestKeepsExamIdAsExternalUserId() throws Exception {
+        when(examSessionRepository.findById(EXAM_ID)).thenReturn(Optional.of(examSession()));
+        when(currentUserProvider.getCurrentUserId()).thenReturn(USER_ID);
         when(redisTemplate.opsForValue()).thenReturn(valueOperations);
         when(s3Presigner.presignGetObject(any(GetObjectPresignRequest.class)))
                 .thenReturn(presignedGetObjectRequest);
@@ -362,7 +364,8 @@ class FeedbackCallbackServiceTest {
                 () -> assertEquals(2, body.getFirst("retry_count")),
                 () -> assertInstanceOf(ByteArrayResource.class, body.getFirst("audio_file"))
         );
-        verifyNoInteractions(currentUserProvider, examSessionRepository);
+        verify(examSessionRepository).findById(EXAM_ID);
+        verify(currentUserProvider).getCurrentUserId();
     }
 
     @Test
