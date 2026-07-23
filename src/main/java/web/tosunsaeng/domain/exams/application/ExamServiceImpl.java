@@ -397,8 +397,9 @@ public class ExamServiceImpl implements ExamService {
     // 유저 유입 전환율 향상을 목적으로 1번 문항 단건만 전개하여 가볍게 연산하는 익스프레스 세션을 빌드합니다.
     @Override
     public ExamResponseDTO.CreateSessionResult createTrialSession() {
-        String examId = "trial_" + UUID.randomUUID().toString().replace("-", "").substring(0, 10);
-        String redisKey = "exam:status:" + examId;
+        String uuidPart = UUID.randomUUID().toString().replace("-", "").substring(0, 10);
+        String timePart = LocalDateTime.now().format(DateTimeFormatter.ofPattern("MMdd_HHmm"));
+        String examId = "trial_" + uuidPart + "_" + timePart;        String redisKey = "exam:status:" + examId;
 
         redisTemplate.opsForValue().set(redisKey, ExamStatus.PENDING.name(), 1, TimeUnit.HOURS);
         log.info("맛보기(Trial) 모의고사 전용 임시 세션 생성 완료: {}", examId);
