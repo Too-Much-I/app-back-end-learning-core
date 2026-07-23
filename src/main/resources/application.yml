@@ -27,6 +27,8 @@ spring:
       max-request-size: 10MB
 
 app:
+  auth:
+    legacy-user-id: ${LEGACY_USER_ID:00000000-0000-0000-0000-000000000001}
   redis:
     key-prefix: ${REDIS_KEY_PREFIX:learning-core}
   s3:

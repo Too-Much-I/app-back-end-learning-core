@@ -11,11 +11,13 @@ import web.tosunsaeng.domain.exams.domain.entity.*;
 import web.tosunsaeng.domain.exams.domain.enums.ExamStatus;
 import web.tosunsaeng.domain.exams.domain.repository.AzureResultRepository;
 import web.tosunsaeng.domain.exams.domain.repository.ExamResultRepository;
+import web.tosunsaeng.domain.exams.domain.repository.ExamSessionRepository;
 import web.tosunsaeng.domain.exams.domain.repository.MockExamRepository;
 import web.tosunsaeng.domain.exams.domain.repository.SpeechAceResultRepository;
 import web.tosunsaeng.domain.exams.dto.ExamRequestDTO;
 import web.tosunsaeng.domain.exams.dto.ExamResponseDTO;
 import web.tosunsaeng.domain.exams.exception.ExamsException;
+import web.tosunsaeng.global.auth.CurrentUserProvider;
 import web.tosunsaeng.global.error.code.status.ErrorStatus;
 import org.springframework.web.client.RestTemplate;
 import org.springframework.http.*;
@@ -43,9 +45,11 @@ public class ExamServiceImpl implements ExamService {
     private final String AI_SERVER_URL = "http://ai-server:8000/evaluations";
 
     private final ExamResultRepository examResultRepository;
+    private final ExamSessionRepository examSessionRepository;
     private final MockExamRepository mockExamRepository;
     private final SpeechAceResultRepository speechAceResultRepository;
     private final AzureResultRepository azureResultRepository;
+    private final CurrentUserProvider currentUserProvider;
 
     @Value("${spring.cloud.aws.s3.bucket}")
     private String bucketName;
@@ -130,7 +134,18 @@ public class ExamServiceImpl implements ExamService {
                 })
                 .collect(Collectors.toList());
 
-        return ExamConverter.toCreateSessionResult(examId, mockExam.getTitle(), questionDTOs);
+        ExamResponseDTO.CreateSessionResult result =
+                ExamConverter.toCreateSessionResult(examId, mockExam.getTitle(), questionDTOs);
+
+        String userId = currentUserProvider.getCurrentUserId();
+        ExamSession examSession = ExamSession.builder()
+                .examId(examId)
+                .userId(userId)
+                .createdAt(LocalDateTime.now())
+                .build();
+        examSessionRepository.save(examSession);
+
+        return result;
     }
 
     // 사용자가 가상으로 녹음 오디오 파일을 업로드할 수 있는 임시 S3 PutObject용 Presigned URL을 발급합니다.
