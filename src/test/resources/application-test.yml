@@ -1,0 +1,28 @@
+spring:
+  data:
+    mongodb:
+      uri: mongodb://localhost:27017/tosunsaeng-learning-core-test
+      database: tosunsaeng-learning-core-test
+
+    redis:
+      host: localhost
+      port: 6379
+
+  cloud:
+    aws:
+      credentials:
+        access-key: test-access-key
+        secret-key: test-secret-key
+      region:
+        static: ap-northeast-2
+      s3:
+        bucket: test-learning-core-bucket
+
+jwt:
+  secret: test-jwt-secret-key-for-learning-core-01234567890123456789
+
+sentry:
+  dsn: ""
+  send-default-pii: false
+  traces-sample-rate: 0.0
+  environment: test
