@@ -237,7 +237,10 @@ public class ExamServiceImpl implements ExamService {
     // AI 서버 연산 완료 후 백엔드 웹훅 콜백을 통해 인입된 분석 스코어와 텍스트 피드백 데이터를 처리합니다.
     @Override
     public void updateExamResult(ExamRequestDTO.AiResultReq req) {
-        String redisKey = "exam:status:" + req.getExamId();
+        String examId = req.getExamId();
+        ExamSession examSession = examSessionRepository.findById(examId)
+                .orElseThrow(() -> new ExamsException(ErrorStatus._EXAM_NOT_FOUND));
+        String redisKey = "exam:status:" + examId;
 
         // AI 서버로부터 전체 최종 점수가 포함된 총합 데이터 수신 시 정규 세션 종료 처리
         if (req.getTotalScore() != null) {
@@ -245,15 +248,13 @@ public class ExamServiceImpl implements ExamService {
         }
 
         // 수신된 개별 피드백 단건 조각을 MongoDB 레포지토리에 저장
-        ExamResult result = ExamConverter.toExamResult(req);
+        ExamResult result = ExamConverter.toExamResult(req, examSession.getUserId());
         examResultRepository.save(result);
 
         log.info("AI 피드백 영구 데이터 적재 완료: examId={}, qNum={}, retryCount={}",
                 req.getExamId(), req.getQuestionNumber(), req.getRetryCount());
 
         if (req.getQuestionNumber() != null) {
-            String examId = req.getExamId();
-
             // 시나리오 A: 정규 시험 세션의 경우 마지막 11번 문항 콜백 수신 완료 후 전체 성적서 요약을 비동기 트리거
             if (examId.startsWith("ex_") && req.getQuestionNumber() == 11) {
                 java.util.concurrent.CompletableFuture.runAsync(() -> {
