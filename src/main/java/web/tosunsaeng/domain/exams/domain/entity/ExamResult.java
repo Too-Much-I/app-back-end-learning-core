@@ -19,6 +19,7 @@ public class ExamResult {
     @Id
     private String id;
     private String examId;
+    private String userId;
     private String mockExamId;
     private Integer retryCount;
 
