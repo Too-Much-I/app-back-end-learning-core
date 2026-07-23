@@ -23,6 +23,8 @@ import org.springframework.util.LinkedMultiValueMap;
 import org.springframework.util.MultiValueMap;
 
 import java.time.Duration;
+import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -103,7 +105,9 @@ public class ExamServiceImpl implements ExamService {
     // 새로운 정규 모의고사 세션을 생성하고 초기 시험 지문 및 S3 오디오 스트리밍 주소를 조립합니다.
     @Override
     public ExamResponseDTO.CreateSessionResult createExamSession() {
-        String examId = "ex_" + UUID.randomUUID().toString().replace("-", "").substring(0, 10);
+        String uuidPart = UUID.randomUUID().toString().replace("-", "").substring(0, 10);
+        String timePart = LocalDateTime.now().format(DateTimeFormatter.ofPattern("MMdd_HHmm"));
+        String examId = "ex_" + uuidPart + "_" + timePart;
         String redisKey = "exam:status:" + examId;
 
         // Redis에 진행 상태를 대기(PENDING)로 등록하고 1시간 만료 시간을 부여합니다.
