@@ -29,6 +29,7 @@ import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
@@ -91,6 +92,22 @@ public class ExamServiceImpl implements ExamService {
         return generatePresignedGetUrl(fileKey, 5);
     }
 
+    private ExamSession resolveSession(String examId) {
+        return examSessionRepository.findById(examId)
+                .orElseThrow(() -> new ExamsException(ErrorStatus._EXAM_NOT_FOUND));
+    }
+
+    private ExamSession requireOwnedSession(String examId) {
+        ExamSession examSession = resolveSession(examId);
+        String currentUserId = currentUserProvider.getCurrentUserId();
+
+        if (!Objects.equals(examSession.getUserId(), currentUserId)) {
+            throw new ExamsException(ErrorStatus._FORBIDDEN);
+        }
+
+        return examSession;
+    }
+
     // --- 2. 유틸리티 메서드: 토익스피킹 파트 판별 ---
 
     // 문항 번호를 토대로 토익스피킹 파트(Part) 번호를 계산합니다.
@@ -151,6 +168,8 @@ public class ExamServiceImpl implements ExamService {
     // 사용자가 가상으로 녹음 오디오 파일을 업로드할 수 있는 임시 S3 PutObject용 Presigned URL을 발급합니다.
     @Override
     public ExamResponseDTO.UploadUrlResult getPresignedUrl(String examId, Integer questionNumber, Integer retryCount) {
+        requireOwnedSession(examId);
+
         String fileKey = String.format("temp/%s/q_%d_r%d.wav", examId, questionNumber, retryCount);
 
         software.amazon.awssdk.services.s3.model.PutObjectRequest objectRequest =
@@ -176,6 +195,8 @@ public class ExamServiceImpl implements ExamService {
     // 사용자의 특정 문항 녹음 파일을 S3에서 바이트 배열로 읽어와 AI 채점 파이썬 서버로 멀티파트 요청을 토스합니다.
     @Override
     public ExamResponseDTO.SubmitResult submitAudio(String examId, Integer questionNumber, Integer retryCount) {
+        requireOwnedSession(examId);
+
         String redisKey = "exam:status:" + examId;
 
         // 상태를 연산 중(PROCESSING)으로 변경하여 클라이언트의 폴링 진입을 유도합니다.
@@ -225,6 +246,8 @@ public class ExamServiceImpl implements ExamService {
     // 클라이언트가 결과 요약 팝업이나 대시보드 렌더링 시점에 호출하는 세션 전체 진행 상태를 빠른 메모리(Redis)에서 획득합니다.
     @Override
     public ExamResponseDTO.StatusResult getExamStatus(String examId) {
+        requireOwnedSession(examId);
+
         String redisKey = "exam:status:" + examId;
         String statusStr = (String) redisTemplate.opsForValue().get(redisKey);
 
@@ -237,7 +260,9 @@ public class ExamServiceImpl implements ExamService {
     // AI 서버 연산 완료 후 백엔드 웹훅 콜백을 통해 인입된 분석 스코어와 텍스트 피드백 데이터를 처리합니다.
     @Override
     public void updateExamResult(ExamRequestDTO.AiResultReq req) {
-        String redisKey = "exam:status:" + req.getExamId();
+        String examId = req.getExamId();
+        ExamSession examSession = resolveSession(examId);
+        String redisKey = "exam:status:" + examId;
 
         // AI 서버로부터 전체 최종 점수가 포함된 총합 데이터 수신 시 정규 세션 종료 처리
         if (req.getTotalScore() != null) {
@@ -245,15 +270,13 @@ public class ExamServiceImpl implements ExamService {
         }
 
         // 수신된 개별 피드백 단건 조각을 MongoDB 레포지토리에 저장
-        ExamResult result = ExamConverter.toExamResult(req);
+        ExamResult result = ExamConverter.toExamResult(req, examSession.getUserId());
         examResultRepository.save(result);
 
         log.info("AI 피드백 영구 데이터 적재 완료: examId={}, qNum={}, retryCount={}",
                 req.getExamId(), req.getQuestionNumber(), req.getRetryCount());
 
         if (req.getQuestionNumber() != null) {
-            String examId = req.getExamId();
-
             // 시나리오 A: 정규 시험 세션의 경우 마지막 11번 문항 콜백 수신 완료 후 전체 성적서 요약을 비동기 트리거
             if (examId.startsWith("ex_") && req.getQuestionNumber() == 11) {
                 java.util.concurrent.CompletableFuture.runAsync(() -> {
@@ -266,6 +289,8 @@ public class ExamServiceImpl implements ExamService {
     // 특정 시험 세션의 AI 총합 진단 레코드와 파트별 획득 점수의 누적 가산 합산 값을 연산하여 성적표 리포트를 반환합니다.
     @Override
     public ExamResponseDTO.SummaryResult getExamSummary(String examId) {
+        requireOwnedSession(examId);
+
         List<ExamResult> results = examResultRepository.findByExamId(examId);
 
         // 총점과 총평이 동시 적재된 종합 요약 문서(question_number=0)를 분리합니다.
@@ -300,6 +325,8 @@ public class ExamServiceImpl implements ExamService {
     // 유저가 채점 결과를 문항 단위로 핀포인트 조회할 때, 문제 원본(MongoDB)과 AI 결과 조각, Azure 발음 분석 세션을 결합합니다.
     @Override
     public ExamResponseDTO.QuestionResult getExamQuestion(String examId, Integer questionNumber, Integer retryCount) {
+        requireOwnedSession(examId);
+
         List<ExamResult> examResults = examResultRepository.findByExamId(examId);
 
         // Azure 연산 결과 레포지토리에서 문항 식별 및 특정 회차 타겟 레코드를 로드합니다.
@@ -408,6 +435,8 @@ public class ExamServiceImpl implements ExamService {
     @Override
     @Transactional(readOnly = true)
     public ExamResponseDTO.QuestionPollResult getQuestionProcessingStatus(String examId, Integer questionNumber, Integer retryCount) {
+        requireOwnedSession(examId);
+
         boolean isSaved = examResultRepository.existsByExamIdAndQuestionNumberAndRetryCount(examId, questionNumber, retryCount);
 
         // MongoDB 피드백 엔티티 적재 완료 여부를 기준으로 문항별 채점 상태 분기 판별
