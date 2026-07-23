@@ -64,11 +64,12 @@ public class ExamConverter {
     }
 
     // --- Req -> Entity 변환 ---
-    public static ExamResult toExamResult(ExamRequestDTO.AiResultReq req) {
+    public static ExamResult toExamResult(ExamRequestDTO.AiResultReq req, String userId) {
         if (req == null) return null;
 
         return ExamResult.builder()
                 .examId(req.getExamId())
+                .userId(userId)
                 .mockExamId(req.getMockExamId())
                 .partNumber(req.getPartNumber())
                 .questionNumber(req.getQuestionNumber())
