@@ -260,11 +260,6 @@ public class ExamServiceImpl implements ExamService {
                     requestOverallSummary(examId, req.getMockExamId());
                 });
             }
-            // 시나리오 B: 맛보기 시험 세션의 경우 1번 문항 단건 분석 결과 수신 즉시 완료 처리 후 복귀
-            else if (examId.startsWith("trial_") && req.getQuestionNumber() == 1) {
-                redisTemplate.opsForValue().set(redisKey, ExamStatus.COMPLETED.name(), 1, TimeUnit.HOURS);
-                log.info("맛보기(Trial) 세션 최종 종료 완료: examId={}", examId);
-            }
         }
     }
 
@@ -409,29 +404,6 @@ public class ExamServiceImpl implements ExamService {
         azureResultRepository.save(entity);
     }
 
-    // 유저 유입 전환율 향상을 목적으로 1번 문항 단건만 전개하여 가볍게 연산하는 익스프레스 세션을 빌드합니다.
-    @Override
-    public ExamResponseDTO.CreateSessionResult createTrialSession() {
-        String uuidPart = UUID.randomUUID().toString().replace("-", "").substring(0, 10);
-        String timePart = LocalDateTime.now().format(DateTimeFormatter.ofPattern("MMdd_HHmm"));
-        String examId = "trial_" + uuidPart + "_" + timePart;        String redisKey = "exam:status:" + examId;
-
-        redisTemplate.opsForValue().set(redisKey, ExamStatus.PENDING.name(), 1, TimeUnit.HOURS);
-        log.info("맛보기(Trial) 모의고사 전용 임시 세션 생성 완료: {}", examId);
-
-        MockExam mockExam = mockExamRepository.findByMockExamId("mock_exam_003")
-                .orElseThrow(() -> new ExamsException(ErrorStatus._EXAM_PAPER_NOT_FOUND));
-
-        // 맛보기 세션 운영 기준에 의거하여 1번 문항 데이터만 핀포인트 추출하여 DTO 매핑
-        List<ExamResponseDTO.QuestionDTO> trialQuestion = mockExam.getQuestions().stream()
-                .filter(q -> q.getQuestionNumber() != null && q.getQuestionNumber() == 1)
-                .map(ExamConverter::toQuestionDTO)
-                .peek(dto -> dto.setAudioUrl(getQuestionAudioUrl(mockExam.getMockExamId(), dto.getQuestionNumber())))
-                .collect(Collectors.toList());
-
-        return ExamConverter.toCreateSessionResult(examId, mockExam.getTitle() + " (맛보기)", trialQuestion);
-    }
-
     // 프론트엔드가 개별 문항 녹음본을 제출한 후, 해당 단건 채점 분석 결과가 MongoDB에 도착했는지 추적하기 위한 폴링 엔드포인트용 조회 메서드입니다.
     @Override
     @Transactional(readOnly = true)
@@ -447,70 +419,5 @@ public class ExamServiceImpl implements ExamService {
                 .retryCount(retryCount)
                 .status(questionStatus)
                 .build();
-    }
-
-    // 사용자가 시험 화면에서 강제 종료 혹은 중단을 명시적으로 선택했을 때, 추가 오디오 제출을 완전 잠금 조치하고 AI 서버 종합 피드백 요약을 즉시 호출합니다.
-    @Override
-    public ExamResponseDTO.SubmitResult terminateAndRequestAiFeedback(String examId, Integer lastQuestionNumber) {
-        String redisKey = "exam:status:" + examId;
-
-        String statusStr = (String) redisTemplate.opsForValue().get(redisKey);
-        if (statusStr == null) {
-            throw new ExamsException(ErrorStatus._EXAM_NOT_FOUND);
-        }
-
-        ExamStatus currentStatus = ExamStatus.valueOf(statusStr);
-        if (currentStatus == ExamStatus.COMPLETED) {
-            throw new ExamsException(ErrorStatus._EXAM_ALREADY_COMPLETED);
-        }
-
-        // 일단 PROCESSING 상태로 락을 걸어 프론트엔드가 대기하도록 만듭니다.
-        redisTemplate.opsForValue().set(redisKey, ExamStatus.PROCESSING.name(), 1, TimeUnit.HOURS);
-        log.info("[중단 요청 수신] 유저 요청에 의한 시험 세션 중도 종료 처리 시작: examId={}, 전달된 마지막 문제 번호={}", examId, lastQuestionNumber);
-
-        // AI 비동기 요약 연산 트리거 요청
-        java.util.concurrent.CompletableFuture.runAsync(() -> {
-            try {
-                // lastQuestionNumber가 0 이하이거나 null이면 가드를 서지 않습니다.
-                if (lastQuestionNumber != null && lastQuestionNumber > 0) {
-                    int poolCount = 0;
-                    boolean isLastQuestionSaved = false;
-
-                    log.info("▶ [중단 가드 작동] 마지막 제출 문항(qNum={})이 몽고DB에 적재될 때까지 대기 루프를 시작합니다.", lastQuestionNumber);
-
-                    while (poolCount < 60) { // 비동기 지연을 고려해 최대 30초 대기하도록 조금 늘려줍니다.
-                        List<ExamResult> currentResults = examResultRepository.findByExamId(examId);
-
-                        isLastQuestionSaved = currentResults.stream()
-                                .anyMatch(result -> result.getQuestionNumber() != null
-                                        && result.getQuestionNumber().equals(lastQuestionNumber));
-
-                        if (isLastQuestionSaved) {
-                            log.info("✔ [중단 가드 해제] 마지막 문항(qNum={}) 채점 데이터 몽고DB 확인 완료. 대기를 종료합니다.", lastQuestionNumber);
-                            break;
-                        }
-
-                        TimeUnit.SECONDS.sleep(1);
-                        poolCount++;
-                    }
-
-                    if (!isLastQuestionSaved) {
-                        log.warn("⚠️ [중단 가드 타임아웃] 60초 대기 초과. 마지막 문항(qNum={})이 누락되었을 수 있으나 종합 요약을 진행합니다.", lastQuestionNumber);
-                    }
-                } else {
-                    log.warn("▶ [중단 가드 패스] 전달된 문항 번호가 유효하지 않거나 0입니다(lastQuestionNumber={}). 대기 없이 요약을 즉시 요청합니다.", lastQuestionNumber);
-                }
-
-                // [주의] 이 메서드가 혹시 비동기 블록 바깥이나 다른 곳에서 중복으로 호출되고 있지 않은지 꼭 체크해 주세요.
-                requestOverallSummary(examId, "mock_exam_003");
-                log.info("★ [AI 서버 요청 완료] 종합 요약 피드백 생성 트리거 요청 성공: examId={}", examId);
-
-            } catch (Exception e) {
-                log.error("비동기 AI 채점 요청 중 오류 발생: examId={}", examId, e);
-                redisTemplate.opsForValue().set(redisKey, ExamStatus.FAILED.name(), 1, TimeUnit.HOURS);
-            }
-        });
-
-        return ExamConverter.toSubmitResult(ExamStatus.PROCESSING);
     }
 }
