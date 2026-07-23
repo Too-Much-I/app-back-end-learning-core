@@ -95,12 +95,6 @@ public class ExamRestController {
         return BaseResponse.onSuccess(SuccessStatus.OK, "Azure 콜백 데이터 원본이 성공적으로 저장되었습니다.");
     }
 
-    @Operation(summary = "맛보기(Trial) 세션 생성 API", description = "1번 문제만 풀어볼 수 있는 맛보기 세션을 발급합니다.")
-    @PostMapping("/trial")
-    public BaseResponse<ExamResponseDTO.CreateSessionResult> createTrialSession() {
-        return BaseResponse.onSuccess(SuccessStatus.OK, examService.createTrialSession());
-    }
-
     @Operation(summary = "문항별 재시도 채점 진행 상태 조회 (폴링) API", description = "특정 문항의 콕 집은 회차(retryCount) 채점이 완료되었는지 폴링합니다.")
     @GetMapping("/{examId}/questions/status")
     public BaseResponse<ExamResponseDTO.QuestionPollResult> getQuestionStatus(
@@ -109,16 +103,6 @@ public class ExamRestController {
             @RequestParam(value = "retryCount", defaultValue = "0") Integer retryCount
     ) {
         ExamResponseDTO.QuestionPollResult result = examService.getQuestionProcessingStatus(examId, questionNumber, retryCount);
-        return BaseResponse.onSuccess(SuccessStatus.OK, result);
-    }
-
-    @Operation(summary = "모의고사 중단 API", description = "사용자가 임의의 위치에서 모의고사를 중단합니다.")
-    @PostMapping("/{examId}/terminate")
-    public BaseResponse<ExamResponseDTO.SubmitResult> terminateExam(
-            @PathVariable String examId,
-            @RequestParam(value = "questionNumber", required = false, defaultValue = "0") Integer questionNumber
-    ) {
-        ExamResponseDTO.SubmitResult result = examService.terminateAndRequestAiFeedback(examId, questionNumber);
         return BaseResponse.onSuccess(SuccessStatus.OK, result);
     }
 }
