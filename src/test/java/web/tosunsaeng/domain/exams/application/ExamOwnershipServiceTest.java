@@ -239,7 +239,7 @@ class ExamOwnershipServiceTest {
                 .score(5.0)
                 .build();
         when(examResultRepository.findByExamId(EXAM_ID)).thenReturn(List.of(questionResult));
-        when(azureResultRepository.findByExamIdAndQuestionNumberAndRetryCount(EXAM_ID, 1, 0))
+        when(azureResultRepository.findFirstByExamIdAndQuestionNumberAndRetryCountOrderByIdDesc(EXAM_ID, 1, 0))
                 .thenReturn(Optional.empty());
         when(mockExamRepository.findByMockExamId("mock_exam_003"))
                 .thenReturn(Optional.of(mockExam()));
@@ -258,7 +258,7 @@ class ExamOwnershipServiceTest {
         );
         verify(examResultRepository).findByExamId(EXAM_ID);
         verify(azureResultRepository)
-                .findByExamIdAndQuestionNumberAndRetryCount(EXAM_ID, 1, 0);
+                .findFirstByExamIdAndQuestionNumberAndRetryCountOrderByIdDesc(EXAM_ID, 1, 0);
         verify(mockExamRepository).findByMockExamId("mock_exam_003");
         verify(s3Presigner).presignGetObject(any(GetObjectPresignRequest.class));
     }
