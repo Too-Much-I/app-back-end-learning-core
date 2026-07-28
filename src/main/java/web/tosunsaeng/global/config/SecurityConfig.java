@@ -1,9 +1,10 @@
 package web.tosunsaeng.global.config;
 
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.context.annotation.Import;
+import org.springframework.context.annotation.Profile;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configurers.AbstractHttpConfigurer;
 import org.springframework.security.config.http.SessionCreationPolicy;
@@ -15,6 +16,9 @@ import org.springframework.security.oauth2.core.DelegatingOAuth2TokenValidator;
 import org.springframework.security.oauth2.core.OAuth2TokenValidator;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.web.cors.CorsConfiguration;
+import web.tosunsaeng.global.config.auth.AuthConfiguration;
+import web.tosunsaeng.global.config.auth.AuthProperties;
+import web.tosunsaeng.global.config.auth.AuthStartupValidator;
 import web.tosunsaeng.global.config.security.JwtAudienceValidator;
 import web.tosunsaeng.global.config.security.JwtSubjectValidator;
 import web.tosunsaeng.global.config.security.SecurityErrorResponseHandler;
@@ -22,6 +26,7 @@ import web.tosunsaeng.global.config.security.SecurityErrorResponseHandler;
 import java.util.List;
 
 @Configuration
+@Import(AuthConfiguration.class)
 public class SecurityConfig {
 
     private static final String[] PUBLIC_ENDPOINTS = {
@@ -34,9 +39,13 @@ public class SecurityConfig {
             "/actuator/health/**"
     };
 
+    // Legacy is intentionally available only for local compatibility and automated tests.
     @Bean
+    @Profile({"local", "test"})
     @ConditionalOnProperty(prefix = "app.auth", name = "mode", havingValue = "legacy", matchIfMissing = true)
-    public SecurityFilterChain legacySecurityFilterChain(HttpSecurity http) throws Exception {
+    public SecurityFilterChain legacySecurityFilterChain(
+            HttpSecurity http,
+            AuthStartupValidator authStartupValidator) throws Exception {
         configureCommonSecurity(http);
         http.authorizeHttpRequests(auth -> auth.anyRequest().permitAll());
         return http.build();
@@ -67,18 +76,18 @@ public class SecurityConfig {
     @Bean
     @ConditionalOnProperty(prefix = "app.auth", name = "mode", havingValue = "jwt")
     public JwtDecoder jwtDecoder(
-            @Value("${app.auth.identity.jwk-set-uri}") String jwkSetUri,
-            @Value("${app.auth.identity.issuer}") String issuer,
-            @Value("${app.auth.identity.audience}") String audience) {
-        NimbusJwtDecoder decoder = NimbusJwtDecoder.withJwkSetUri(jwkSetUri)
+            AuthProperties authProperties,
+            AuthStartupValidator authStartupValidator) {
+        AuthProperties.Identity identity = authProperties.getIdentity();
+        NimbusJwtDecoder decoder = NimbusJwtDecoder.withJwkSetUri(identity.getJwkSetUri())
                 .jwsAlgorithm(SignatureAlgorithm.RS256)
                 .build();
 
         OAuth2TokenValidator<org.springframework.security.oauth2.jwt.Jwt> issuerAndTimestampValidator =
-                JwtValidators.createDefaultWithIssuer(issuer);
+                JwtValidators.createDefaultWithIssuer(identity.getIssuer());
         decoder.setJwtValidator(new DelegatingOAuth2TokenValidator<>(
                 issuerAndTimestampValidator,
-                new JwtAudienceValidator(audience),
+                new JwtAudienceValidator(identity.getAudience()),
                 new JwtSubjectValidator()
         ));
         return decoder;

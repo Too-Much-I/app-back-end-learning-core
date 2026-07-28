@@ -55,9 +55,10 @@ Python AI의 기존 `user_id`는 인증 사용자 식별자가 아니라 시험 
 
 ## 인증 모드와 로그아웃
 
-- `legacy` 모드는 기존 웹 POC 호환과 제한된 개발 단계 전용이다.
-- 운영 앱 환경에서는 `legacy` 모드를 금지하고 Learning Core를 JWT 모드로 실행한다.
+- `legacy` 모드는 고정 개발 UUID를 사용하는 기존 웹 POC 호환 흐름이며 `local`과 `test` profile에서만 허용한다.
+- `staging`과 `prod`는 `APP_AUTH_MODE=jwt`와 환경별 issuer·JWKS URL·audience를 필수로 검증한다. Legacy 모드, 누락된 설정과 localhost Identity URL은 시작 단계에서 거부한다.
+- Startup 설정 검증은 JWKS endpoint에 네트워크 요청을 보내지 않는다.
+- 과거 공유 HMAC Filter·Provider와 JJWT 의존성은 제거됐고 `JWT_SECRET_KEY`는 더 이상 사용하지 않는다. JWT 인증은 Identity JWKS 기반 OAuth2 Resource Server만 담당한다.
 - 단일 `logout`은 전달된 Refresh Session을 폐기한다.
 - `logout-all`은 검증된 JWT `sub` 사용자의 활성 Refresh Session을 모두 폐기한다.
 - 현재 로그아웃은 Access Token 즉시 무효화를 보장하지 않는다. 이미 발급된 Access Token은 `exp`까지 유효할 수 있다.
-

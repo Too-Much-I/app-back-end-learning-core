@@ -223,6 +223,15 @@ AI Callback에서는 examId로 ExamSession을 조회하여 실제 userId를 찾�
 - S3 Key 구조 전면 변경
 - 관련 없는 대규모 리팩터링
 
+## TMI-14 명시적 예외
+
+- Jira TMI-14에 한하여 “JWT 인증 강제 제외” 규칙의 제한적 예외를 허용한다.
+- 이 예외는 staging/prod Startup 검증, Legacy 차단, 인증 모드 설정 검증 및 미사용 HMAC 코드 정리에만 적용한다.
+- 기존 JWT 보호 API와 공개 API 범위는 변경하지 않는다.
+- local/test Legacy 모드는 유지한다.
+- 외부 API와 AI 계약은 변경하지 않는다.
+- TMI-14 완료 후에도 다른 작업에는 이 예외가 자동 적용되지 않는다.
+
 # Redis 및 S3 규칙
 
 기존 Redis 상태 및 Lock 흐름을 임의로 변경하지 않는다.

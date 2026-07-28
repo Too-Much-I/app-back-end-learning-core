@@ -26,6 +26,8 @@ import org.springframework.context.annotation.Import;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.data.redis.core.ValueOperations;
 import org.springframework.http.MediaType;
+import org.springframework.security.oauth2.jwt.JwtDecoder;
+import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
@@ -63,6 +65,7 @@ import java.time.LocalDateTime;
 import java.util.Date;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.stream.Stream;
 
@@ -203,7 +206,13 @@ class JwtSecurityIntegrationTest {
     @Test
     void jwtModeRegistersOnlyJwtCurrentUserProvider() {
         assertInstanceOf(JwtCurrentUserProvider.class, currentUserProvider);
+        assertEquals(1, applicationContext.getBeansOfType(CurrentUserProvider.class).size());
         assertTrue(applicationContext.getBeansOfType(LegacyCurrentUserProvider.class).isEmpty());
+        assertEquals(Set.of("jwtDecoder"), applicationContext.getBeansOfType(JwtDecoder.class).keySet());
+        assertEquals(
+                Set.of("jwtSecurityFilterChain"),
+                applicationContext.getBeansOfType(SecurityFilterChain.class).keySet()
+        );
     }
 
     @Test
