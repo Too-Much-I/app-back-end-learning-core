@@ -1,49 +1,109 @@
 package web.tosunsaeng.global.config;
 
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
+import org.springframework.security.config.annotation.web.configurers.AbstractHttpConfigurer;
 import org.springframework.security.config.http.SessionCreationPolicy;
+import org.springframework.security.oauth2.jose.jws.SignatureAlgorithm;
+import org.springframework.security.oauth2.jwt.JwtDecoder;
+import org.springframework.security.oauth2.jwt.JwtValidators;
+import org.springframework.security.oauth2.jwt.NimbusJwtDecoder;
+import org.springframework.security.oauth2.core.DelegatingOAuth2TokenValidator;
+import org.springframework.security.oauth2.core.OAuth2TokenValidator;
 import org.springframework.security.web.SecurityFilterChain;
-import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
 import org.springframework.web.cors.CorsConfiguration;
+import web.tosunsaeng.global.config.security.JwtAudienceValidator;
+import web.tosunsaeng.global.config.security.JwtSubjectValidator;
+import web.tosunsaeng.global.config.security.SecurityErrorResponseHandler;
 
 import java.util.List;
-
-import web.tosunsaeng.global.config.security.JwtAuthenticationFilter;
-import web.tosunsaeng.global.config.security.JwtTokenProvider;
 
 @Configuration
 public class SecurityConfig {
 
+    private static final String[] PUBLIC_ENDPOINTS = {
+            "/api/v1/exams/callback/**",
+            "/swagger-ui/**",
+            "/swagger-ui.html",
+            "/v3/api-docs",
+            "/v3/api-docs/**",
+            "/actuator/health",
+            "/actuator/health/**"
+    };
+
     @Bean
-    public SecurityFilterChain filterChain(HttpSecurity http, JwtTokenProvider jwtTokenProvider) throws Exception {
+    @ConditionalOnProperty(prefix = "app.auth", name = "mode", havingValue = "legacy", matchIfMissing = true)
+    public SecurityFilterChain legacySecurityFilterChain(HttpSecurity http) throws Exception {
+        configureCommonSecurity(http);
+        http.authorizeHttpRequests(auth -> auth.anyRequest().permitAll());
+        return http.build();
+    }
+
+    @Bean
+    @ConditionalOnProperty(prefix = "app.auth", name = "mode", havingValue = "jwt")
+    public SecurityFilterChain jwtSecurityFilterChain(
+            HttpSecurity http,
+            JwtDecoder jwtDecoder,
+            SecurityErrorResponseHandler errorHandler) throws Exception {
+        configureCommonSecurity(http);
+        http
+                .authorizeHttpRequests(auth -> auth
+                        .requestMatchers(PUBLIC_ENDPOINTS).permitAll()
+                        .anyRequest().authenticated())
+                .exceptionHandling(exceptions -> exceptions
+                        .authenticationEntryPoint(errorHandler)
+                        .accessDeniedHandler(errorHandler))
+                .oauth2ResourceServer(resourceServer -> resourceServer
+                        .authenticationEntryPoint(errorHandler)
+                        .accessDeniedHandler(errorHandler)
+                        .jwt(jwt -> jwt.decoder(jwtDecoder)));
+
+        return http.build();
+    }
+
+    @Bean
+    @ConditionalOnProperty(prefix = "app.auth", name = "mode", havingValue = "jwt")
+    public JwtDecoder jwtDecoder(
+            @Value("${app.auth.identity.jwk-set-uri}") String jwkSetUri,
+            @Value("${app.auth.identity.issuer}") String issuer,
+            @Value("${app.auth.identity.audience}") String audience) {
+        NimbusJwtDecoder decoder = NimbusJwtDecoder.withJwkSetUri(jwkSetUri)
+                .jwsAlgorithm(SignatureAlgorithm.RS256)
+                .build();
+
+        OAuth2TokenValidator<org.springframework.security.oauth2.jwt.Jwt> issuerAndTimestampValidator =
+                JwtValidators.createDefaultWithIssuer(issuer);
+        decoder.setJwtValidator(new DelegatingOAuth2TokenValidator<>(
+                issuerAndTimestampValidator,
+                new JwtAudienceValidator(audience),
+                new JwtSubjectValidator()
+        ));
+        return decoder;
+    }
+
+    private void configureCommonSecurity(HttpSecurity http) throws Exception {
         http
                 .cors(cors -> cors.configurationSource(request -> {
                     CorsConfiguration corsConfiguration = new CorsConfiguration();
-
-                    // 🌟 로컬 테스트 주소와 운영 서버의 정식 도메인 주소(www 포함)를 모두 안전하게 허용합니다.
                     corsConfiguration.setAllowedOrigins(List.of(
                             "http://localhost:5173",
                             "http://localhost:3000",
                             "https://to-teacher.com",
                             "https://www.to-teacher.com"
                     ));
-
                     corsConfiguration.setAllowedMethods(List.of("GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"));
                     corsConfiguration.setAllowedHeaders(List.of("*"));
                     corsConfiguration.setAllowCredentials(true);
                     corsConfiguration.setExposedHeaders(List.of("Authorization"));
                     return corsConfiguration;
                 }))
-                .csrf(csrf -> csrf.disable())
-                .sessionManagement(sm -> sm.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
-                // 로컬 및 PoC 자유 테스트를 위해 전체 허용 설정 유지
-                .authorizeHttpRequests(auth -> auth
-                        .anyRequest().permitAll()
-                )
-                .addFilterBefore(new JwtAuthenticationFilter(jwtTokenProvider), UsernamePasswordAuthenticationFilter.class);
-
-        return http.build();
+                .csrf(AbstractHttpConfigurer::disable)
+                .httpBasic(AbstractHttpConfigurer::disable)
+                .formLogin(AbstractHttpConfigurer::disable)
+                .logout(AbstractHttpConfigurer::disable)
+                .sessionManagement(sm -> sm.sessionCreationPolicy(SessionCreationPolicy.STATELESS));
     }
 }
