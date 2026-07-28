@@ -12,6 +12,7 @@ import web.tosunsaeng.domain.exams.domain.enums.ExamStatus;
 import web.tosunsaeng.domain.exams.domain.repository.AzureResultRepository;
 import web.tosunsaeng.domain.exams.domain.repository.ExamResultRepository;
 import web.tosunsaeng.domain.exams.domain.repository.ExamSessionRepository;
+import web.tosunsaeng.domain.exams.domain.repository.ExamSummaryRepository;
 import web.tosunsaeng.domain.exams.domain.repository.MockExamRepository;
 import web.tosunsaeng.domain.exams.domain.repository.SpeechAceResultRepository;
 import web.tosunsaeng.domain.exams.dto.ExamRequestDTO;
@@ -27,6 +28,7 @@ import org.springframework.util.MultiValueMap;
 import java.time.Duration;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -46,6 +48,7 @@ public class ExamServiceImpl implements ExamService {
     private final String AI_SERVER_URL = "http://ai-server:8000/evaluations";
 
     private final ExamResultRepository examResultRepository;
+    private final ExamSummaryRepository examSummaryRepository;
     private final ExamSessionRepository examSessionRepository;
     private final MockExamRepository mockExamRepository;
     private final SpeechAceResultRepository speechAceResultRepository;
@@ -267,9 +270,15 @@ public class ExamServiceImpl implements ExamService {
         // AI 서버로부터 전체 최종 점수가 포함된 총합 데이터 수신 시 정규 세션 종료 처리
         if (req.getTotalScore() != null) {
             redisTemplate.opsForValue().set(redisKey, ExamStatus.COMPLETED.name(), 1, TimeUnit.HOURS);
+
+            ExamSummary summary = ExamConverter.toExamSummary(req, examSession.getUserId());
+            examSummaryRepository.save(summary);
+
+            log.info("AI 종합 피드백 영구 데이터 적재 완료: examId={}", examId);
+            return;
         }
 
-        // 수신된 개별 피드백 단건 조각을 MongoDB 레포지토리에 저장
+        // 수신된 문항별 피드백 단건 조각을 전용 MongoDB 컬렉션에 저장
         ExamResult result = ExamConverter.toExamResult(req, examSession.getUserId());
         examResultRepository.save(result);
 
@@ -293,12 +302,6 @@ public class ExamServiceImpl implements ExamService {
 
         List<ExamResult> results = examResultRepository.findByExamId(examId);
 
-        // 총점과 총평이 동시 적재된 종합 요약 문서(question_number=0)를 분리합니다.
-        ExamResult summaryDoc = results.stream()
-                .filter(r -> r.getTotalScore() != null)
-                .findFirst()
-                .orElseThrow(() -> new ExamsException(ErrorStatus._EXAM_NOT_FOUND));
-
         // 파트별 세부 획득 점수의 누적 총합 연산
         java.util.Map<String, Double> partScores = results.stream()
                 .filter(r -> r.getQuestionNumber() != null && r.getScore() != null)
@@ -319,7 +322,16 @@ public class ExamServiceImpl implements ExamService {
                 .filter(r -> r.getRetryCount() != null && r.getRetryCount() == 0)
                 .count();
 
-        return ExamConverter.toSummaryResult(summaryDoc, partScores, (int) totalSolvedQuestions);
+        // 신규 종합 피드백 컬렉션의 최신 문서를 우선 사용합니다.
+        // 분리 배포 전에 exam_results에 저장된 기존 종합 문서는 최신순으로 fallback합니다.
+        return examSummaryRepository.findFirstByExamIdOrderByIdDesc(examId)
+                .map(summary -> ExamConverter.toSummaryResult(summary, partScores, (int) totalSolvedQuestions))
+                .orElseGet(() -> {
+                    ExamResult legacySummary = examResultRepository
+                            .findFirstByExamIdAndTotalScoreIsNotNullOrderByIdDesc(examId)
+                            .orElseThrow(() -> new ExamsException(ErrorStatus._EXAM_NOT_FOUND));
+                    return ExamConverter.toSummaryResult(legacySummary, partScores, (int) totalSolvedQuestions);
+                });
     }
 
     // 유저가 채점 결과를 문항 단위로 핀포인트 조회할 때, 문제 원본(MongoDB)과 AI 결과 조각, Azure 발음 분석 세션을 결합합니다.
@@ -342,12 +354,17 @@ public class ExamServiceImpl implements ExamService {
                 .map(max -> max + 1)
                 .orElse(1);
 
-        // 현재 클라이언트가 요청한 특정 회차(retryCount)에 매칭되는 AI 채점 도큐먼트를 수색합니다.
-        ExamResult targetDoc = examResults.stream()
-                .filter(r -> r.getQuestionNumber() != null
-                        && r.getQuestionNumber().equals(questionNumber)
-                        && (r.getRetryCount() != null ? r.getRetryCount() : 0) == retryCount)
-                .findFirst()
+        // 현재 클라이언트가 요청한 회차 안에서 가장 최근에 저장된 AI 채점 도큐먼트를 조회합니다.
+        // 기존 null retryCount 문서는 0회차로 해석하던 호환성을 유지합니다.
+        List<Integer> compatibleRetryCounts = retryCount == 0
+                ? Arrays.asList(0, null)
+                : List.of(retryCount);
+        ExamResult targetDoc = examResultRepository
+                .findFirstByExamIdAndQuestionNumberAndRetryCountInOrderByIdDesc(
+                        examId,
+                        questionNumber,
+                        compatibleRetryCounts
+                )
                 .orElse(null);
 
         MockExam mockExam = mockExamRepository.findByMockExamId("mock_exam_003")

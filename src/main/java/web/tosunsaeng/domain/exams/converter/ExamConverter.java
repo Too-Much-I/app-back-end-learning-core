@@ -4,6 +4,7 @@ import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import web.tosunsaeng.domain.exams.domain.entity.AzureResult;
 import web.tosunsaeng.domain.exams.domain.entity.ExamResult;
+import web.tosunsaeng.domain.exams.domain.entity.ExamSummary;
 import web.tosunsaeng.domain.exams.domain.entity.Question;
 import web.tosunsaeng.domain.exams.dto.ExamRequestDTO;
 import web.tosunsaeng.domain.exams.dto.ExamResponseDTO;
@@ -88,6 +89,24 @@ public class ExamConverter {
                 // 기존 성환님 프로젝트 내부의 임베디드 매핑 메서드 명칭에 맞춰 연결되어 있습니다.
                 .feedback(req.getFeedback() != null ? toItemFeedbackEntity(req.getFeedback()) : null)
                 .spokenWordSequence(req.getSpokenWordSequence() != null ? toSpokenWordEntityList(req.getSpokenWordSequence()) : null)
+                .build();
+    }
+
+    public static ExamSummary toExamSummary(ExamRequestDTO.AiResultReq req, String userId) {
+        if (req == null) return null;
+
+        return ExamSummary.builder()
+                .examId(req.getExamId())
+                .userId(userId)
+                .mockExamId(req.getMockExamId())
+                .totalScore(req.getTotalScore())
+                .levelEstimate(req.getLevelEstimate())
+                .summary(req.getSummary())
+                .overallFeedback(req.getOverallFeedback())
+                .partFeedback(req.getPartFeedback())
+                .strengths(req.getStrengths())
+                .weaknesses(req.getWeaknesses())
+                .recommendedPractice(req.getRecommendedPractice())
                 .build();
     }
 
@@ -217,6 +236,23 @@ public class ExamConverter {
     }
 
     public static ExamResponseDTO.SummaryResult toSummaryResult(ExamResult summaryDoc, Map<String, Double> partScores, int totalSolvedQuestions) {
+        if (summaryDoc == null) return null;
+        return ExamResponseDTO.SummaryResult.builder()
+                .examId(summaryDoc.getExamId())
+                .totalScore(summaryDoc.getTotalScore())
+                .levelEstimate(summaryDoc.getLevelEstimate())
+                .totalSolvedQuestions(totalSolvedQuestions)
+                .summary(summaryDoc.getSummary())
+                .overallFeedback(summaryDoc.getOverallFeedback())
+                .partFeedback(summaryDoc.getPartFeedback())
+                .strengths(summaryDoc.getStrengths())
+                .weaknesses(summaryDoc.getWeaknesses())
+                .recommendedPractice(summaryDoc.getRecommendedPractice())
+                .partScores(partScores)
+                .build();
+    }
+
+    public static ExamResponseDTO.SummaryResult toSummaryResult(ExamSummary summaryDoc, Map<String, Double> partScores, int totalSolvedQuestions) {
         if (summaryDoc == null) return null;
         return ExamResponseDTO.SummaryResult.builder()
                 .examId(summaryDoc.getExamId())

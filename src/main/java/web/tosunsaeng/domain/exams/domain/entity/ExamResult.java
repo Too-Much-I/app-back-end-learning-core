@@ -23,7 +23,7 @@ public class ExamResult {
     private String mockExamId;
     private Integer retryCount;
 
-    // 요약 데이터
+    // exam_summaries 분리 전에 저장된 종합 피드백 조회 호환용 필드
     private Integer totalScore;
     private String levelEstimate;
     private String summary;

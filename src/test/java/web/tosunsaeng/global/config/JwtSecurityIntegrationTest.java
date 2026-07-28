@@ -44,6 +44,7 @@ import web.tosunsaeng.domain.exams.domain.enums.ExamStatus;
 import web.tosunsaeng.domain.exams.domain.repository.AzureResultRepository;
 import web.tosunsaeng.domain.exams.domain.repository.ExamResultRepository;
 import web.tosunsaeng.domain.exams.domain.repository.ExamSessionRepository;
+import web.tosunsaeng.domain.exams.domain.repository.ExamSummaryRepository;
 import web.tosunsaeng.domain.exams.domain.repository.MockExamRepository;
 import web.tosunsaeng.domain.exams.domain.repository.QuestionRepository;
 import web.tosunsaeng.domain.exams.domain.repository.SpeechAceResultRepository;
@@ -125,6 +126,9 @@ class JwtSecurityIntegrationTest {
 
     @MockitoBean
     private ExamResultRepository examResultRepository;
+
+    @MockitoBean
+    private ExamSummaryRepository examSummaryRepository;
 
     @MockitoBean
     private ExamSessionRepository examSessionRepository;
