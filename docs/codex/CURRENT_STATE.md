@@ -6,11 +6,23 @@
 
 ## Current branch
 
-- `fix/TMI-10-latest-feedback`
-- 종합·문항 피드백 최신 조회 변경분은 이 로컬 브랜치의 working tree에 있다.
-- 저장소 `AGENTS.md` 규칙에 따라 Codex는 Git commit과 push를 수행하지 않았으므로 원격 GitHub 브랜치는 아직 생성되지 않았다.
+- `test/TMI-11-auth-e2e`
+- HEAD는 `origin/main`과 동일한 `bc15c50`이며 PR #9의 최신 피드백 조회·종합 피드백 저장소 분리 변경이 merge되어 있다.
+- 현재 working tree에는 기존 Jira 기록 변경과 TMI-11 E2E 스크립트·README·JWT 계약 문서 변경이 있다. Codex는 commit과 push를 수행하지 않았다.
 
 ## Current Jira issue
+
+- [`TMI-11`](https://to-teacher.atlassian.net/browse/TMI-11) — [Integration] Identity·Learning Core E2E 인증 테스트 및 JWT 계약 확정
+- 이슈 유형: `작업` (ID `10003`)
+- Jira 상태: `해야 할 일` (상태 ID `10000`, resolution 없음)
+- 우선순위: `High` (ID `2`)
+- 담당자: 미지정
+- 생성 시각: `2026-07-28T12:30:27.701+0900`
+- Identity 회원가입·로그인부터 Learning Core 시험 소유권, 실패 Token, Refresh Token Rotation·로그아웃, 공개 AI Callback, Python AI `user_id = examId` 계약까지 실제 두 서버 E2E로 검증하는 작업이다.
+- Atlassian MCP로 이슈 설명과 완료 조건을 재조회해 이번 구현 기준으로 사용했다. Jira 댓글·필드·상태는 변경하지 않았다.
+- 로컬 구현과 정적 검증, 두 저장소 전체 테스트는 완료했다. 실제 Identity 8081과 Learning Core 8080이 실행 중이지 않아 두 서버 E2E 실행과 직접 `ExamSession.userId` 확인은 대기 중이다.
+
+## Related completed Jira issue
 
 - `TMI-10` — [Learning Core] Identity JWKS 기반 JWT 인증 연동
 - Jira 상태: `완료` (상태 ID `10003`, resolution `완료` ID `10000`)
@@ -39,6 +51,12 @@
 - AI 문항 피드백을 요청한 `examId + questionNumber + retryCount` 범위의 최신 `_id` 문서로 조회하도록 보완
 - 종합 피드백을 문항별 `exam_results`와 분리된 `exam_summaries` 컬렉션에 저장하도록 보완
 - 종합 피드백 조회 시 `exam_summaries`의 최신 `_id` 문서를 우선하고, 분리 전 `exam_results`의 최신 종합 문서를 fallback하도록 보완
+- PR #9로 최신 피드백 조회·종합 피드백 저장소 분리 변경을 `main`에 merge
+- Identity·Learning Core E2E 인증 통합 테스트 후속 Jira Payload 초안과 지원 필드 검증 완료
+- Jira `TMI-11` 생성과 제목·설명·유형·상태·우선순위 재조회 검증 완료
+- `scripts/e2e/auth-integration-test.sh`에 실제 두 서버용 JWT 인증 E2E 자동화 추가
+- `scripts/e2e/README.md`에 실행 전제, 환경변수, 정리 정책, 수동 DB 검증과 운영 실행 금지 안내 추가
+- `docs/contracts/identity-learning-jwt.md`에 RS256·`kid`·Claim·JWKS·사용자 식별·AI·로그아웃 계약 확정
 
 ## Authentication modes
 
@@ -71,6 +89,15 @@
 - 시험 생성, 상태·종합·문항 결과 조회, 업로드 URL, 음성 제출, 문항 Polling 등 기존 사용자용 시험 API가 포함된다.
 - `examId`를 받는 사용자용 API의 기존 `ExamSession.userId == CurrentUserProvider.getCurrentUserId()` 소유권 검증을 유지한다.
 
+## TMI-11 E2E automation
+
+- `IDENTITY_BASE_URL` 기본값은 `http://localhost:8081`, `LEARNING_CORE_BASE_URL` 기본값은 `http://localhost:8080`이다.
+- 스크립트는 Identity health·JWKS, 두 사용자 회원가입/로그인, JWT Claim, Learning Core 401/403·시험 소유권, 잘못된 Token, Refresh Rotation·재사용 탐지, 단일·전체 로그아웃, 공개 Feedback Callback을 단계별 검증한다.
+- Access/Refresh Token과 Token 또는 URL을 포함할 수 있는 전체 응답은 출력하지 않고, 실패 시 단계·HTTP 상태·최상위 안전 필드만 출력한다.
+- 임시 파일은 제한된 권한의 임시 디렉터리에 두고 `trap`으로 삭제한다.
+- 만료·잘못된 issuer·잘못된 audience Token은 공개 API로 안전하게 생성하지 않고 기존 `JwtSecurityIntegrationTest` 검증을 사용한다.
+- 사용자·시험 삭제 API가 없으므로 계정과 시험 문서는 자동 삭제하지 않는다. 기본 모드에서는 남은 Refresh Session만 로그아웃하며 직접 DB 검증은 수동 항목이다.
+
 ## Latest feedback lookup assessment
 
 - Azure 문항 피드백은 `examId + questionNumber + retryCount` 조건에 `OrderByIdDesc`를 적용해 해당 회차의 최신 문서를 조회한다.
@@ -83,6 +110,8 @@
 ## Important contracts
 
 - JWT `sub`는 실제 `userId`다.
+- Access Token은 RS256이며 Header의 `kid`가 Identity JWKS Public Key를 선택한다.
+- JWT issuer는 환경별 Identity 설정값이고 `scope`는 공백 구분 문자열이다.
 - JWT audience는 `tosunsaeng-learning-core`다.
 - Python AI 요청의 `user_id`는 계속 `examId`다.
 - AI Callback의 `user_id`도 `examId`로 해석한다.
@@ -91,6 +120,8 @@
 - 기존 API URL·Method·Parameter·DTO·`BaseResponse`·`retryCount` 계약을 유지한다.
 - 기존 Redis Key·TTL, S3 Presigned URL·Object Key, 음성 제출·Polling 흐름을 유지한다.
 - 종합 피드백 저장소 분리는 MongoDB 연결·database 설정을 추가하지 않고 컬렉션만 `exam_summaries`로 분리했다.
+- 운영 앱에서는 Legacy 모드를 금지한다.
+- `logout`과 `logout-all`은 Refresh Session을 폐기하지만 기존 Access Token의 즉시 무효화를 보장하지 않는다.
 
 ## Test status
 
@@ -108,6 +139,14 @@
 - 같은 문항·retryCount의 구·신규 `ExamResult`가 함께 있을 때 최신 결과를 응답하는 테스트와 0회차 null 호환 조회 검증 성공
 - 종합 Callback이 `ExamSummary`만 저장하고 `ExamResult`에는 저장하지 않는지, `ExamSession.userId` 매핑과 Redis 완료 상태가 유지되는지 검증 성공
 - 최신 `exam_summaries` 조회와 새 컬렉션이 비어 있을 때 최신 legacy `exam_results` 종합 문서 fallback 검증 성공
+- Atlassian MCP에서 TMI 프로젝트, `작업` 유형, 설명 필드와 `High` 우선순위 지원 여부를 읽기 전용으로 확인했다. 애플리케이션 코드를 변경하지 않아 이번 초안 작업에서는 Gradle 테스트를 다시 실행하지 않았다.
+- Atlassian MCP로 `TMI-11`을 생성한 뒤 제목·설명·프로젝트·이슈 유형·상태·우선순위를 재조회해 승인된 Payload 반영을 확인했다. 애플리케이션 코드는 변경하지 않았다.
+- Stop Hook 보완 기록의 필수 marker 단일 존재와 `git diff --check`를 검증했다.
+- TMI-11 정적 검증: `bash -n scripts/e2e/auth-integration-test.sh`, JWKS/Claim jq filter 샘플, 비대화형 비밀번호 누락 오류, `git diff --check` 성공
+- ShellCheck는 로컬에 설치돼 있지 않아 자동 설치하거나 실행하지 않았다.
+- Learning Core `./gradlew clean test` 성공: 56개, 실패·오류·건너뜀 0개. 기존 `ExamServiceImpl` unchecked 경고만 남았다.
+- Identity 저장소 `./gradlew clean test` 성공: 138개, 실패·오류·건너뜀 0개. Identity 소스와 추적 파일은 변경하지 않았다.
+- 기본 8081/8080 포트 모두 연결되지 않아 실제 E2E 스크립트는 실행하지 않았다.
 
 ## Existing HMAC code
 
@@ -128,13 +167,19 @@
 - 기존 `exam_results`의 종합 문서는 삭제·이관하지 않고 읽기 fallback으로 유지한다.
 - 물리적으로 별도 MongoDB database나 클러스터를 요구한다면 별도 연결 설정과 운영 값이 추가로 필요하다. 현재 구현은 같은 database 내 컬렉션 분리다.
 - 데이터가 커지면 `exam_summaries`의 `examId + _id` 조회용 복합 인덱스를 운영 환경에서 검토해야 한다.
+- TMI-11 스크립트 구현은 완료했지만 실제 Identity 8081과 JWT 모드 Learning Core 8080이 기동되지 않아 실서버 E2E 결과는 아직 없다.
+- Jira 완료 조건의 `ExamSession.userId == JWT sub` 직접 DB 비교는 MongoDB 자격증명을 스크립트에 넣지 않기 위해 수동 검증으로 남겼다. 소유권 200/403 시나리오는 API 경계에서 간접 검증한다.
+- AI Callback은 사용자 JWT 없이 공개 상태이며 서비스 간 인증은 아직 없다.
+- 사용자·시험 삭제 API가 없어 로컬 E2E 계정과 시험 문서는 테스트 DB에 남으며 운영자 정리가 필요하다.
 
 ## Next
 
-- 실제 Identity를 로컬에서 기동해 발급 Access Token으로 Learning Core E2E를 수행한다.
+- Identity를 8081, Learning Core를 JWT 모드 8080으로 기동한 뒤 `scripts/e2e/auth-integration-test.sh`를 실행한다.
+- 실제 E2E 성공 후 출력된 수동 확인 식별자로 `exam_sessions.userId`와 JWT `sub`를 폐기 가능한 로컬 DB에서 비교한다.
 - 배포 환경에서 `APP_AUTH_MODE=jwt` 전환 전 issuer·JWKS·audience와 네트워크 접근성을 확인한다.
 - HMAC 코드·`JWT_SECRET_KEY` 설정·JJWT 의존성의 제거 여부를 별도 이슈에서 결정한다.
 - Jira `TMI-10`은 완료됐으므로 후속 위험은 별도 Jira 이슈로 추적한다.
 - 물리적으로 다른 MongoDB database가 필요한지 확인하고, 필요하면 별도 MongoTemplate·자격증명·배포 환경변수 범위를 정의한다.
 - 운영 데이터 규모에 따라 `exam_summaries` 조회 인덱스와 legacy 종합 문서 이관·보존 정책을 결정한다.
-- 사용자가 변경분을 검토한 뒤 `fix/TMI-10-latest-feedback`을 commit하고 `origin`에 push한다.
+- 실제 E2E와 수동 DB 검증이 끝나면 준비된 완료 댓글 초안을 검토하고, Jira 댓글·상태 변경은 사용자 승인 후 별도로 수행한다.
+- 사용자가 변경분을 검토한 뒤 commit과 push를 수행한다.
