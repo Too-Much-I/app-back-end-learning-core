@@ -28,7 +28,12 @@ spring:
 
 app:
   auth:
+    mode: ${APP_AUTH_MODE:legacy}
     legacy-user-id: ${LEGACY_USER_ID:00000000-0000-0000-0000-000000000001}
+    identity:
+      issuer: ${IDENTITY_ISSUER:http://localhost:8081}
+      jwk-set-uri: ${IDENTITY_JWK_SET_URI:http://localhost:8081/.well-known/jwks.json}
+      audience: ${IDENTITY_AUDIENCE:tosunsaeng-learning-core}
   redis:
     key-prefix: ${REDIS_KEY_PREFIX:learning-core}
   s3:
