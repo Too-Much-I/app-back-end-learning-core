@@ -7,6 +7,7 @@ import com.fasterxml.jackson.databind.annotation.JsonNaming;
 import lombok.*;
 import web.tosunsaeng.domain.exams.domain.entity.Question;
 import web.tosunsaeng.domain.exams.domain.enums.ExamStatus;
+import web.tosunsaeng.domain.exams.domain.enums.SummaryAction;
 
 import java.util.List;
 import java.util.Map;
@@ -53,6 +54,16 @@ public class ExamResponseDTO {
         private String examId;
         private ExamStatus overallStatus;
         private Integer progressPercent;
+    }
+
+    @Builder @Getter @NoArgsConstructor @AllArgsConstructor
+    public static class GradingRetryResult {
+        private String examId;
+        private ExamStatus overallStatus;
+        private List<Integer> retriedQuestionNumbers;
+        private List<Integer> waitingQuestionNumbers;
+        private List<Integer> missingSubmissionQuestionNumbers;
+        private SummaryAction summaryAction;
     }
 
     @Builder @Getter @NoArgsConstructor @AllArgsConstructor

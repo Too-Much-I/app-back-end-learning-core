@@ -19,4 +19,10 @@ public interface ExamResultRepository extends MongoRepository<ExamResult, String
     Optional<ExamResult> findFirstByExamIdAndTotalScoreIsNotNullOrderByIdDesc(String examId);
 
     boolean existsByExamIdAndQuestionNumberAndRetryCount(String examId, Integer questionNumber, Integer retryCount);
+
+    boolean existsByExamIdAndQuestionNumberAndRetryCountIn(
+            String examId,
+            Integer questionNumber,
+            Collection<Integer> retryCounts
+    );
 }

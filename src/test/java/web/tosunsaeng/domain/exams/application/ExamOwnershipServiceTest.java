@@ -109,6 +109,9 @@ class ExamOwnershipServiceTest {
     @Mock
     private CurrentUserProvider currentUserProvider;
 
+    @Mock
+    private ExamGradingService gradingService;
+
     private final ObjectMapper objectMapper = new ObjectMapper();
     private ExamServiceImpl examService;
 
@@ -117,7 +120,7 @@ class ExamOwnershipServiceTest {
         examService = new ExamServiceImpl(
                 redisTemplate,
                 s3Presigner,
-                restTemplate,
+                gradingService,
                 examResultRepository,
                 examSummaryRepository,
                 examSessionRepository,
@@ -151,46 +154,20 @@ class ExamOwnershipServiceTest {
     }
 
     @Test
-    @SuppressWarnings({"rawtypes", "unchecked"})
     void ownerCanSubmitAudioAndAiUserIdRemainsExamId() throws Exception {
         stubOwnedSession();
-        when(redisTemplate.opsForValue()).thenReturn(valueOperations);
-        when(s3Presigner.presignGetObject(any(GetObjectPresignRequest.class)))
-                .thenReturn(presignedGetObjectRequest);
-        when(presignedGetObjectRequest.url())
-                .thenReturn(URI.create("https://example.com/submitted-audio.wav").toURL());
-        when(restTemplate.getForObject(any(URI.class), eq(byte[].class)))
-                .thenReturn(new byte[]{1, 2, 3});
+        when(gradingService.submitQuestion(EXAM_ID, 4, 2)).thenReturn(ExamStatus.PROCESSING);
 
         ExamResponseDTO.SubmitResult result = examService.submitAudio(EXAM_ID, 4, 2);
 
         assertEquals(ExamStatus.PROCESSING, result.getStatus());
-        verify(valueOperations).set(
-                "exam:status:" + EXAM_ID,
-                ExamStatus.PROCESSING.name(),
-                1,
-                TimeUnit.HOURS
-        );
-
-        ArgumentCaptor<HttpEntity> requestCaptor = ArgumentCaptor.forClass(HttpEntity.class);
-        verify(restTemplate).postForEntity(eq(AI_SERVER_URL), requestCaptor.capture(), eq(String.class));
-        MultiValueMap<String, Object> body = (MultiValueMap<String, Object>)
-                assertInstanceOf(MultiValueMap.class, requestCaptor.getValue().getBody());
-        assertAll(
-                () -> assertEquals(EXAM_ID, body.getFirst("user_id")),
-                () -> assertNotEquals(OWNER_USER_ID, body.getFirst("user_id")),
-                () -> assertEquals("mock_exam_003", body.getFirst("mock_exam_id")),
-                () -> assertEquals(2, body.getFirst("part_number")),
-                () -> assertEquals(4, body.getFirst("question_number")),
-                () -> assertEquals(2, body.getFirst("retry_count"))
-        );
+        verify(gradingService).submitQuestion(EXAM_ID, 4, 2);
     }
 
     @Test
     void ownerCanReadExamStatusAfterOwnershipCheck() {
         stubOwnedSession();
-        when(redisTemplate.opsForValue()).thenReturn(valueOperations);
-        when(valueOperations.get("exam:status:" + EXAM_ID)).thenReturn(ExamStatus.PROCESSING.name());
+        when(gradingService.calculateAndCacheOverallStatus(EXAM_ID)).thenReturn(ExamStatus.PROCESSING);
 
         ExamResponseDTO.StatusResult result = examService.getExamStatus(EXAM_ID);
 
@@ -199,7 +176,7 @@ class ExamOwnershipServiceTest {
                 () -> assertEquals(ExamStatus.PROCESSING, result.getOverallStatus()),
                 () -> assertEquals(60, result.getProgressPercent())
         );
-        verify(valueOperations).get("exam:status:" + EXAM_ID);
+        verify(gradingService).calculateAndCacheOverallStatus(EXAM_ID);
     }
 
     @Test
@@ -387,8 +364,7 @@ class ExamOwnershipServiceTest {
     @Test
     void ownerCanPollQuestionStatusAfterOwnershipCheck() {
         stubOwnedSession();
-        when(examResultRepository.existsByExamIdAndQuestionNumberAndRetryCount(EXAM_ID, 1, 0))
-                .thenReturn(true);
+        when(gradingService.getQuestionStatus(EXAM_ID, 1, 0)).thenReturn(ExamStatus.COMPLETED);
 
         ExamResponseDTO.QuestionPollResult result =
                 examService.getQuestionProcessingStatus(EXAM_ID, 1, 0);
@@ -399,8 +375,7 @@ class ExamOwnershipServiceTest {
                 () -> assertEquals(0, result.getRetryCount()),
                 () -> assertEquals(ExamStatus.COMPLETED, result.getStatus())
         );
-        verify(examResultRepository)
-                .existsByExamIdAndQuestionNumberAndRetryCount(EXAM_ID, 1, 0);
+        verify(gradingService).getQuestionStatus(EXAM_ID, 1, 0);
     }
 
     @ParameterizedTest
@@ -422,7 +397,8 @@ class ExamOwnershipServiceTest {
                 examSummaryRepository,
                 azureResultRepository,
                 speechAceResultRepository,
-                mockExamRepository
+                mockExamRepository,
+                gradingService
         );
     }
 
@@ -447,7 +423,8 @@ class ExamOwnershipServiceTest {
                 examSummaryRepository,
                 azureResultRepository,
                 speechAceResultRepository,
-                mockExamRepository
+                mockExamRepository,
+                gradingService
         );
     }
 
@@ -471,7 +448,7 @@ class ExamOwnershipServiceTest {
         ArgumentCaptor<ExamResult> resultCaptor = ArgumentCaptor.forClass(ExamResult.class);
         InOrder order = inOrder(examSessionRepository, examResultRepository);
         order.verify(examSessionRepository).findById(EXAM_ID);
-        order.verify(examResultRepository).save(resultCaptor.capture());
+        order.verify(examResultRepository).insert(resultCaptor.capture());
         assertAll(
                 () -> assertEquals(EXAM_ID, resultCaptor.getValue().getExamId()),
                 () -> assertEquals(OWNER_USER_ID, resultCaptor.getValue().getUserId()),
@@ -480,6 +457,8 @@ class ExamOwnershipServiceTest {
                         resultCaptor.getValue().getUserId()
                 )
         );
+        verify(gradingService).completeQuestion(EXAM_ID, 1, 0);
+        verify(gradingService).tryDispatchOverallSummary(EXAM_ID);
         verifyNoInteractions(
                 examSummaryRepository,
                 currentUserProvider,
@@ -531,7 +510,7 @@ class ExamOwnershipServiceTest {
         examService.saveSpeechAceResult(request);
 
         ArgumentCaptor<SpeechAceResult> resultCaptor = ArgumentCaptor.forClass(SpeechAceResult.class);
-        verify(speechAceResultRepository).save(resultCaptor.capture());
+        verify(speechAceResultRepository).insert(resultCaptor.capture());
         assertAll(
                 () -> assertEquals(EXAM_ID, resultCaptor.getValue().getExamId()),
                 () -> assertEquals(1, resultCaptor.getValue().getQuestionNumber()),
@@ -554,35 +533,12 @@ class ExamOwnershipServiceTest {
         examService.processAzureCallback(rawPayload);
 
         ArgumentCaptor<AzureResult> resultCaptor = ArgumentCaptor.forClass(AzureResult.class);
-        verify(azureResultRepository).save(resultCaptor.capture());
+        verify(azureResultRepository).insert(resultCaptor.capture());
         assertAll(
                 () -> assertEquals(EXAM_ID, resultCaptor.getValue().getExamId()),
                 () -> assertEquals(1, resultCaptor.getValue().getQuestionNumber()),
                 () -> assertEquals(0, resultCaptor.getValue().getRetryCount()),
                 () -> assertSame(rawPayload, resultCaptor.getValue().getRawData())
-        );
-        verifyNoInteractions(currentUserProvider, examSessionRepository);
-    }
-
-    @Test
-    @SuppressWarnings("rawtypes")
-    void overallSummaryAiRequestKeepsExamIdAsExternalUserId() {
-        ReflectionTestUtils.invokeMethod(
-                examService,
-                "requestOverallSummary",
-                EXAM_ID,
-                null
-        );
-
-        ArgumentCaptor<HttpEntity> requestCaptor = ArgumentCaptor.forClass(HttpEntity.class);
-        verify(restTemplate).postForEntity(eq(AI_SERVER_URL), requestCaptor.capture(), eq(String.class));
-        Map<?, ?> body = assertInstanceOf(Map.class, requestCaptor.getValue().getBody());
-        assertAll(
-                () -> assertEquals(EXAM_ID, body.get("user_id")),
-                () -> assertNotEquals(OWNER_USER_ID, body.get("user_id")),
-                () -> assertEquals("mock_exam_003", body.get("mock_exam_id")),
-                () -> assertEquals(0, body.get("question_number")),
-                () -> assertEquals(0, body.get("part_number"))
         );
         verifyNoInteractions(currentUserProvider, examSessionRepository);
     }
@@ -618,6 +574,7 @@ class ExamOwnershipServiceTest {
         switch (api) {
             case UPLOAD_URL -> examService.getPresignedUrl(EXAM_ID, 1, 0);
             case SUBMIT_AUDIO -> examService.submitAudio(EXAM_ID, 1, 0);
+            case RETRY_GRADING -> examService.retryGrading(EXAM_ID);
             case EXAM_STATUS -> examService.getExamStatus(EXAM_ID);
             case EXAM_SUMMARY -> examService.getExamSummary(EXAM_ID);
             case QUESTION_RESULT -> examService.getExamQuestion(EXAM_ID, 1, 0);
@@ -628,6 +585,7 @@ class ExamOwnershipServiceTest {
     private enum UserExamApi {
         UPLOAD_URL,
         SUBMIT_AUDIO,
+        RETRY_GRADING,
         EXAM_STATUS,
         EXAM_SUMMARY,
         QUESTION_RESULT,

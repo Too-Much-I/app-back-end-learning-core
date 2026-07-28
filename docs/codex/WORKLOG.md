@@ -384,3 +384,158 @@
 - Jira 처리: Jira 설명과 완료 조건은 읽기 전용으로만 조회했다. Jira 댓글·필드·상태는 변경하지 않았으며 이슈는 계속 `진행 중`이다. 완료 댓글은 최종 보고에 초안으로만 제공한다.
 - 남아 있는 위험 요소: Startup Validator는 설정과 URI 형식만 검사하므로 실제 staging/prod Identity·JWKS 도달성, JWKS rotation·캐시와 두 서버 E2E는 배포 전 별도 검증이 필요하다. AI Callback 서비스 간 인증은 기존 위험으로 남아 있다.
 - 다음 작업 전에 확인할 사항: 실제 배포 환경에서 JWT 설정과 나머지 인프라 값을 안전하게 주입해 staging/prod smoke test를 수행한다. 사용자가 변경분과 Jira 댓글 초안을 검토한 뒤 Jira 댓글·상태 변경, Git commit·push를 직접 수행한다.
+
+## 2026-07-28 — Jira TMI-14 완료 전환
+
+<!-- codex-turn:019fa736-396b-70a3-b326-85c66986b732 -->
+
+- 날짜: `2026-07-28`
+- 브랜치: `refactor/TMI-14-jwt-production-hardening`
+- Jira: TMI-14
+- 작업 목표: 사용자가 확인한 PR 병합과 테스트 성공을 근거로 TMI-14만 방금 확인한 `완료` 상태로 전환하고 다른 필드와 다른 Jira 이슈는 변경하지 않는다.
+- 전환 전 확인: Atlassian MCP 직접 조회에서 TMI-14의 상태가 `진행 중`(상태 ID `10001`)이고 `완료` 전환 ID `41`이 사용 가능함을 확인했다.
+- 변경한 동작: TMI-14에 전환 ID `41`만 전송했다. 전환 요청에 `fields`, `update`, 댓글을 포함하지 않았고 다른 Jira 이슈를 수정하지 않았다.
+- 전환 결과: 후속 상세 조회에서 TMI-14가 `완료`(상태 ID `10003`, 상태 범주 `완료`)로 변경됐고 resolution이 `완료`(ID `10000`)로 설정됐음을 확인했다. resolution은 완료 워크플로가 자동으로 설정했으며 별도 필드 변경으로 지정하지 않았다.
+- Jira 댓글: 등록하지 않았다.
+- 변경 파일: `docs/codex/WORKLOG.md`, `docs/codex/CURRENT_STATE.md`. 애플리케이션 코드와 설정은 변경하지 않았다.
+- 유지한 외부 계약: 기존 공개 API URL·HTTP Method·Parameter·Request/Response DTO·`BaseResponse`, `retryCount`, Redis Key·TTL, S3 Object Key, Python AI와 Callback의 `user_id = examId`, 실제 `userId` 비노출과 시험 소유권 계약을 변경하지 않았다.
+- 검증 결과: 사용자가 TMI-14 PR 병합과 테스트 성공을 확인했다. 이번 Jira 전환 작업에는 애플리케이션 코드 변경이 없어 Gradle 테스트를 다시 실행하지 않았다.
+- 남아 있는 위험 요소: Startup Validator는 설정 형식만 검사하므로 실제 staging/prod Identity·JWKS 도달성, JWKS rotation·캐시와 배포 smoke test는 별도 확인이 필요하다. AI Callback 서비스 간 인증은 기존 위험으로 남아 있다.
+- 다음 작업 전에 확인할 사항: 실제 배포 환경에 JWT와 인프라 설정을 안전하게 주입해 staging/prod smoke test를 수행한다. Jira 재전환이나 댓글 등록은 사용자가 명시적으로 요청하는 경우에만 수행하며 Git commit과 push는 사용자가 수행한다.
+
+## 2026-07-28 — Learning Core 채점 복구·멱등성 Jira Payload 초안
+
+<!-- codex-turn:019fa75f-57d9-7ec3-a711-6590a15eae35 -->
+
+- 날짜: `2026-07-28`
+- 브랜치: `refactor/TMI-14-jwt-production-hardening`
+- Jira 이슈 키: 없음. 사용자 요청에 따라 초안만 작성했고 이슈를 생성하지 않았다.
+- 작업 목표: TMI 프로젝트에 생성할 `[Learning Core] 시험 단위 재채점 및 AI 채점·Callback 멱등성 보장` 작업 이슈의 최종 Payload 초안을 작성하고 실제 지원 필드를 검증한다.
+- 사전 확인: 저장소의 `AGENTS.md`와 `docs/codex/CURRENT_STATE.md` 전체를 먼저 읽고 외부 API·`retryCount`·Redis/S3·Python AI `user_id = examId`·사용자 소유권 계약을 초안 기준에 반영했다.
+- Atlassian MCP 확인: TMI 프로젝트(ID `10000`)에 대한 생성 권한, `작업` 유형(ID `10003`), 설명 필드와 `High` 우선순위(ID `2`) 지원을 읽기 전용으로 확인했다. 동일 제목 후보는 조회되지 않았다.
+- 초안 결과: 배경, 유지·신규 외부 API, retryCount 0 시험 복구 규칙, 문항 채점 Job, 전체 요약 Job, 네 종류 Callback의 논리 키 멱등성, 기존 ExamStatus와 Redis 역할, 안정적인 AI `Idempotency-Key`, 완료 조건과 범위 제외를 구조화했다.
+- 실제 전송 예정 필드: `projectKey=TMI`, `issueTypeName=작업`, 제목, Markdown 설명, `additional_fields.priority.id=2`만 도메인 필드로 전송한다. 담당자·라벨·상위 항목·스프린트·상태 전환은 포함하지 않는다.
+- Jira 변경 여부: `createJiraIssue`, 수정, 댓글, 전환 API를 호출하지 않았으며 Jira 데이터는 변경되지 않았다.
+- 변경 파일: `docs/codex/WORKLOG.md`, `docs/codex/CURRENT_STATE.md`. 애플리케이션 코드와 설정은 변경하지 않았다.
+- 유지한 외부 계약: 기존 submit·전체 상태 API, Request/Response DTO·`BaseResponse`, 기존 `retryCount`, Redis Key·S3 Key, 음성 제출·Polling, Python AI 요청과 Callback의 `user_id = examId`, 실제 `userId` 비노출과 시험 소유권 검증을 변경하지 않았다. 신규 시험 단위 retry API는 Payload 초안에만 포함했다.
+- 실행한 검증과 결과: Atlassian MCP 메타데이터와 동일 제목 후보 조회, `git diff --check`, 전용 marker의 정확히 한 번 존재 확인이 모두 성공했다. 문서 변경만 있어 `./gradlew clean test`는 실행하지 않았다.
+- 남아 있는 위험 요소: `PENDING` timeout의 구체값, 시험별 필수 문항 집합, 신규 retry API 성공 응답 세부 계약이 아직 정해지지 않았다. Learning Core의 `Idempotency-Key` 전송만으로 Python AI 내부 멱등 처리가 자동 보장되지는 않는다.
+- 다음 작업 전에 확인할 사항: 사용자가 초안을 승인하고 명시적으로 생성 요청한 경우에만 검증된 Payload를 전송한다. 구현 전 미정 정책과 Python AI 멱등 키 처리의 별도 이슈 분리 여부를 확정하며 Git commit과 push는 사용자가 수행한다.
+
+## 2026-07-28 — Jira TMI-25 채점 복구·멱등성 작업 생성
+
+<!-- codex-turn:019fa769-4107-7c71-a088-d1d3b64d4f50 -->
+
+- 날짜: `2026-07-28`
+- 브랜치: `refactor/TMI-14-jwt-production-hardening`
+- Jira: [`TMI-25`](https://to-teacher.atlassian.net/browse/TMI-25)
+- 작업 목표: 사용자가 승인한 Payload를 그대로 사용해 TMI 프로젝트에 `[Learning Core] 시험 단위 재채점 및 AI 채점·Callback 멱등성 보장` 작업 이슈를 생성한다.
+- 생성 Payload: 프로젝트 `TMI`, 이슈 유형 `작업`(ID `10003`), 승인된 제목과 Markdown 설명, 우선순위 `High`(ID `2`)만 전송했다.
+- 생략한 필드: 담당자, 라벨, 상위 항목, 스프린트, 에픽과 상태 전환을 전송하지 않았다.
+- 생성 결과: Jira `TMI-25`가 기본 상태 `해야 할 일`(상태 ID `10000`)로 생성됐다.
+- 생성 후 검증: 상세 재조회에서 프로젝트 `TMI`, 승인된 제목·설명, 유형 `작업`, 우선순위 `High`, 상태 `해야 할 일`, 담당자 미지정과 빈 라벨을 확인했다. Jira 수정·댓글·상태 전환 API는 호출하지 않았다.
+- 변경 파일: `docs/codex/WORKLOG.md`, `docs/codex/CURRENT_STATE.md`. 애플리케이션 코드와 설정은 변경하지 않았다.
+- 유지한 외부 계약: 기존 submit·전체 상태 API, Request/Response DTO·`BaseResponse`, 기존 `retryCount`, Redis Key·S3 Key, 음성 제출·Polling, Python AI 요청과 Callback의 `user_id = examId`, 실제 `userId` 비노출과 시험 소유권 검증을 변경하지 않았다. 신규 시험 단위 retry API는 Jira 구현 범위로만 기록했다.
+- 실행한 검증과 결과: Atlassian MCP 이슈 생성과 생성 후 상세 재조회, `git diff --check`, 전용 marker의 정확히 한 번 존재 확인이 모두 성공했다. 문서 변경만 있어 `./gradlew clean test`는 실행하지 않았다.
+- 남아 있는 위험 요소: `PENDING` timeout 구체값, 시험별 필수 문항 집합, 신규 retry API 성공 응답의 세부 계약은 구현 전에 확정해야 한다. Python AI가 `Idempotency-Key`를 실제 처리하는 작업은 별도 이슈로 분리할 수 있다.
+- 다음 작업 전에 확인할 사항: TMI-25 구현 전 미정 정책을 확정한다. Jira 상태 변경, 댓글 등록, Git commit과 push는 별도 명시적 요청이 있을 때만 수행한다.
+
+## 2026-07-28 — Jira TMI-25 현재 상태 및 전환 조회
+
+<!-- codex-turn:019fa76c-d011-7b72-8e5e-34efeab63cb3 -->
+
+- 날짜: `2026-07-28`
+- 브랜치: `refactor/TMI-14-jwt-production-hardening`
+- Jira: [`TMI-25`](https://to-teacher.atlassian.net/browse/TMI-25)
+- 작업 목표: 직전에 생성한 TMI-25의 현재 상태와 현재 사용자에게 가능한 상태 전환을 Atlassian MCP로 읽기 전용 조회한다.
+- 현재 상태: `해야 할 일`(상태 ID `10000`, 상태 범주 `해야 할 일`)이다.
+- 가능한 전환: `해야 할 일`(전환 ID `11`), `검토 중`(`31`), `진행 중`(`21`), `완료`(`41`)이며 조회 시점에 모두 `isAvailable=true`였다.
+- Jira 변경 여부: 이슈 상세와 전환 목록 조회만 수행했다. 상태 전환, 필드 수정, 댓글 등록 API는 호출하지 않아 TMI-25의 상태와 내용은 변경되지 않았다.
+- 변경 파일: `docs/codex/WORKLOG.md`, `docs/codex/CURRENT_STATE.md`. 애플리케이션 코드와 설정은 변경하지 않았다.
+- 유지한 외부 계약: 기존 공개 API·DTO·`BaseResponse`, `retryCount`, Redis·S3, Python AI와 Callback의 `user_id = examId`, 실제 `userId` 비노출과 시험 소유권 계약을 변경하지 않았다.
+- 실행한 검증과 결과: Atlassian MCP의 TMI-25 상세 조회와 전환 목록 조회, `git diff --check`, 전용 marker의 정확히 한 번 존재 확인이 모두 성공했다. 문서 변경만 있어 `./gradlew clean test`는 실행하지 않았다.
+- 남아 있는 위험 요소: 전환 목록과 가용성은 조회 시점의 Jira 워크플로와 현재 사용자 권한 기준이므로 이후 달라질 수 있다. 현재 상태와 같은 `해야 할 일`로의 전환도 제공된다.
+- 다음 작업 전에 확인할 사항: 실제 전환이 요청되면 직전에 전환 목록을 다시 조회하고 사용자가 승인한 전환 ID만 사용한다. Jira 댓글·다른 필드 변경, Git commit과 push는 별도 요청이 있을 때만 수행한다.
+
+## 2026-07-28 — Jira TMI-25 진행 중 전환
+
+<!-- codex-turn:019fa76e-5891-7863-9041-cd7454511e72 -->
+
+- 날짜: `2026-07-28`
+- 브랜치: `refactor/TMI-14-jwt-production-hardening`
+- Jira: [`TMI-25`](https://to-teacher.atlassian.net/browse/TMI-25)
+- 작업 목표: 사용자 요청에 따라 직전에 확인한 TMI-25의 `진행 중` 전환만 적용하고 다른 Jira 필드와 이슈는 수정하지 않는다.
+- 전환 전 확인: TMI-25의 상태가 `해야 할 일`(상태 ID `10000`)이고 `진행 중` 전환 ID `21`이 `isAvailable=true`인지 Atlassian MCP로 다시 확인했다.
+- 변경한 동작: TMI-25에 전환 ID `21`만 전송했다. 전환 요청에 `fields`, `update`, 댓글을 포함하지 않았고 다른 Jira 이슈를 호출하지 않았다.
+- 전환 결과: 전환 응답과 후속 상세 재조회에서 TMI-25가 `진행 중`(상태 ID `10001`, 상태 범주 `진행 중`)으로 변경됐음을 확인했다.
+- 변경 파일: `docs/codex/WORKLOG.md`, `docs/codex/CURRENT_STATE.md`. 애플리케이션 코드와 설정은 변경하지 않았다.
+- 유지한 외부 계약: 기존 공개 API·DTO·`BaseResponse`, `retryCount`, Redis·S3, Python AI와 Callback의 `user_id = examId`, 실제 `userId` 비노출과 시험 소유권 계약을 변경하지 않았다.
+- 실행한 검증과 결과: 전환 전 상태·전환 가용성 조회, 전환 ID `21` 적용, 전환 후 상태 재조회, `git diff --check`, 전용 marker의 정확히 한 번 존재 확인이 모두 성공했다. 문서 변경만 있어 `./gradlew clean test`는 실행하지 않았다.
+- 남아 있는 위험 요소: Jira 상태만 `진행 중`으로 변경됐으며 TMI-25의 채점 복구·멱등성 구현은 아직 수행하지 않았다.
+- 다음 작업 전에 확인할 사항: 구현 전 `PENDING` timeout, 필수 문항 집합, 신규 retry API 성공 응답 세부 계약과 Python AI 멱등 키 처리 분리 여부를 확정한다. 추가 Jira 변경과 Git commit·push는 별도 요청이 있을 때만 수행한다.
+
+## 2026-07-28 — Jira TMI-25 구현 전 채점 복구·멱등성 정적 분석
+
+<!-- codex-turn:019fa771-88e6-7783-a0af-34cc0fe739e6 -->
+
+- 날짜: `2026-07-28`
+- 브랜치: `refactor/TMI-14-jwt-production-hardening`
+- Jira: [`TMI-25`](https://to-teacher.atlassian.net/browse/TMI-25)
+- 작업 목표: `AGENTS.md`, CURRENT_STATE와 Jira TMI-25 설명·완료 조건을 기준으로 시험 생성부터 S3 업로드·submit·AI 요청·Redis Polling·네 종류 Callback·ExamResult/ExamSummary·전체 요약 Trigger·소유권·Mongo/S3/Clock/테스트 구조를 구현 전에 정적으로 분석한다.
+- Jira 확인: Atlassian MCP로 TMI-25의 승인된 제목, 설명, 완료 조건, 상태 `진행 중`, 우선순위 `High`를 읽기 전용으로 재조회했다. Jira 댓글·필드·상태는 변경하지 않았다.
+- 현재 제출 흐름: 시험 생성은 Redis `PENDING`을 먼저 기록하고 `mock_exam_003` 문제지를 조립한 뒤 `ExamSession(examId, 실제 userId, createdAt)`을 저장한다. upload-url은 기존 `temp/{examId}/q_{questionNumber}_r{retryCount}.wav` PUT URL만 발급하며 Job을 만들지 않는다. submit은 전체 Redis 상태를 `PROCESSING`으로 덮어쓰고 같은 S3 파일을 `byte[]`로 다시 내려받아 Job·Lock·결과 확인 없이 AI multipart 요청을 보낸다.
+- 중복 분석: 동일 submit N회는 최대 N회 S3 다운로드와 N회 AI 요청을 만든다. 동일 Feedback·SpeechAce·Azure·전체 요약 Callback N회는 각각 N개의 새 결과 문서를 만들 수 있고, 동일 11번 Feedback Callback은 최대 N개의 전체 요약 요청을 시작할 수 있다.
+- 상태·요약 분석: 전체 상태 조회는 Mongo 결과나 Job을 보지 않고 Redis 단일 값만 사용하며 miss를 `FAILED`로 해석한다. `progressPercent`는 실제 계산 없이 항상 `60`이다. 11번 Callback은 다른 문항 완료 여부와 `retryCount=0` 여부를 확인하지 않고 공용 `CompletableFuture`에서 요약을 요청한다.
+- 저장·호환 분석: 현재 모든 결과 엔티티에는 `@Version`·논리 Unique Index가 없고, 기존 중복 문서와 `retryCount=0/null/missing` 혼재 가능성이 있어 기존 결과 컬렉션에 Unique Index를 즉시 추가하면 충돌할 수 있다. 신규 Job에는 결정적 `_id`를 안전하게 사용할 수 있으며 기존 결과의 신규 저장에도 사용할 수 있지만 ObjectId와 문자열 `_id` 혼재 시 `_id DESC`가 시간순을 보장하지 않아 결정적 ID 우선·legacy 최신 fallback 조회가 필요하다.
+- 인프라 분석: AWS S3 SDK 의존성으로 `S3Client` 타입은 사용 가능하지만 현재 Bean과 `headObject` 호출은 없고 `S3Presigner`만 있다. Clock Bean과 Mongo 원자 claim 구현, Redis Lock, MongoTransactionManager는 없다. 새 Repository를 기존 `web.tosunsaeng.domain.exams.domain.repository` 아래에 두면 현재 `@EnableMongoRepositories` 범위에서 scan된다.
+- 최소 설계 결론: `question:{examId}:{questionNumber}:{retryCount}`와 `summary:{examId}:v1` 결정적 ID의 Question/Summary Job, 상태·dispatchAttempt·필수 timestamp·실패 정보·`@Version`, Mongo 조건부 `findAndModify` claim, UTC Clock, S3 `headObject`, 안정적인 AI `Idempotency-Key`, 결과 `insert`와 `DuplicateKeyException` 성공 처리, 모든 필수 retry 0 Feedback 완료 gate를 사용한다. 시험 단위 retry는 retry 0만 복구하고 사용자 재녹음 retryCount>0은 제외한다.
+- 전체 상태 결론: Mongo Question/Summary Job을 기준으로 `PENDING/PROCESSING/FAILED/COMPLETED`와 실제 진행률을 산정하고 기존 Redis Key·TTL은 캐시로만 유지한다. Redis miss는 Mongo에서 재산정하며 문항 Polling도 Job 네 상태와 legacy 결과 fallback을 사용한다.
+- 테스트 계획: 고정 Clock 경계, 동일 submit·retry 동시 claim, 상태별 retry 행렬, S3 존재·404·403·장애, 네 Callback 순차·동시 중복, 11번 단독 요약 금지, 전체 문항 완료 후 요약 1회, 요약만 재시도, Redis miss·실제 progress, legacy null·중복·결정적 ID 조회, 소유권과 외부 계약을 검증한다. Mongo `findAndModify`의 원자성은 disposable Mongo 기반 Repository 통합 테스트가 필요하다.
+- 변경 파일: Stop Hook 요구에 따라 `docs/codex/WORKLOG.md`, `docs/codex/CURRENT_STATE.md`만 갱신했다. 애플리케이션 코드·설정·테스트 파일은 생성·수정·삭제하지 않았다.
+- 유지한 외부 계약: 기존 API URL·Method·Path/Query·Request/Response DTO·`BaseResponse`, `retryCount`, Redis Key·TTL, S3 Key·Presigned URL, 음성 제출·Polling, Python AI 요청과 Callback의 `user_id = examId`, 실제 `userId` 비노출과 사용자용 API 소유권 검증을 변경하지 않았다.
+- 실행한 검증과 결과: `AGENTS.md`, CURRENT_STATE, 관련 Java·설정·테스트 전체 정적 확인, Atlassian MCP Jira 재조회와 `git diff --check`가 성공했다. 구현 변경이 없고 분석 중 파일 무변경 지침이 있었으므로 `./gradlew clean test`는 실행하지 않았다.
+- 남아 있는 위험 요소: `PENDING` timeout, 필수 문항 집합의 세션 고정 방식, 신규 retry API 성공 응답 세부 계약이 미정이다. Python AI가 멱등 키를 실제 처리하기 전에는 Mongo claim과 외부 HTTP 사이 crash window의 AI 중복 실행을 완전히 제거할 수 없고, S3 객체 부재가 권한에 따라 404 대신 403으로 나타날 수 있다.
+- 다음 작업 전에 확인할 사항: 위 세 정책과 Python AI 멱등 처리 분리 여부를 확정한 후에만 최대 두 단계로 구현한다. 구현 후 외부 인프라를 Mock 또는 disposable 환경으로 격리한 전체 테스트를 실행하며 Git commit과 push는 사용자가 수행한다.
+
+## 2026-07-28 — Jira TMI-25 API 호환성 규칙 제한 예외 기록
+
+<!-- codex-turn:019fa78c-55af-7003-bc2d-84b6f3f62a5a -->
+
+- 날짜: `2026-07-28`
+- 브랜치: `refactor/TMI-14-jwt-production-hardening`
+- Jira: [`TMI-25`](https://to-teacher.atlassian.net/browse/TMI-25)
+- 작업 목표: 사용자가 승인한 TMI-25 전용 API 변경 금지 규칙의 제한 예외를 `AGENTS.md`에 명시하고 다른 작업으로 확대되지 않도록 허용·금지 범위를 고정한다.
+- 허용 범위 기록: 신규 `POST /api/v1/exams/{examId}/grading/retry`, 신규 API 전용 Request/Response DTO, Question/Summary Job, 외부 계약을 유지한 submit 멱등화, 기존 URL·Method·필드를 유지한 status 내부 처리, 네 Callback 저장 멱등화와 모든 필수 retry 0 문항 완료 기준 요약 Trigger를 허용했다.
+- 금지 범위 기록: 기존 API URL·Method·Request Parameter·Response 필드, retryCount 의미, AI `user_id = examId`, Redis Key, S3 Object Key와 소유권 검증 변경을 금지했다. retryCount>0 새 녹음의 시험 전체 복구, 프론트 문항 목록 전달, 별도 외부 summary retry API도 금지했다.
+- 추가 경계: 신규 시험 단위 retry API의 Request Body 없음 계약을 유지하고, 예외는 Jira TMI-25에만 적용되며 완료 후나 다른 작업에 자동 적용되지 않음을 명시했다.
+- Jira 변경 여부: Jira 이슈를 조회·수정·댓글·전환하지 않았다. 현재 이슈 키는 기존 작업 문맥과 CURRENT_STATE의 TMI-25를 사용했다.
+- 변경 파일: `AGENTS.md`, `docs/codex/WORKLOG.md`, `docs/codex/CURRENT_STATE.md`. 애플리케이션 코드·설정·테스트 파일은 변경하지 않았다.
+- 유지한 외부 계약: 이번 문서 변경 자체는 모든 런타임 계약을 변경하지 않았다. 향후 구현에서도 명시적으로 허용된 신규 API 외의 기존 URL·Method·Parameter·Response DTO·`BaseResponse`, retryCount, Redis/S3 Key, AI·Callback `user_id = examId`, 사용자 소유권을 유지해야 한다.
+- 실행한 검증과 결과: 변경 문서 정적 확인, 전용 marker의 정확히 한 번 존재 확인과 `git diff --check`를 수행한다. 애플리케이션 코드 변경이 없어 `./gradlew clean test`는 실행하지 않는다.
+- 남아 있는 위험 요소: 예외 범위를 일반 API 재설계나 retryCount>0 복구, 외부 summary retry API로 확대하면 사용자 승인 범위를 벗어난다. TMI-25 구현 전 미정인 `PENDING` timeout, 필수 문항 집합 고정 방식과 신규 retry 응답 세부 계약은 여전히 확정해야 한다.
+- 다음 작업 전에 확인할 사항: 실제 구현에서 허용 목록과 금지 목록을 체크리스트로 사용하고 외부 계약 테스트로 위반 여부를 검증한다. Git commit과 push는 사용자가 수행한다.
+
+## 2026-07-28 — Jira TMI-25 시험 단위 채점 복구·멱등성 구현
+
+<!-- codex-turn:019fa790-a59c-7c11-ad61-47b0712575ae -->
+
+- 날짜: `2026-07-28`
+- 브랜치: `feat/TMI-25-grading-retry-idempotency`
+- Jira: [`TMI-25`](https://to-teacher.atlassian.net/browse/TMI-25)
+- 작업 목표: 프론트가 전체 상태만 Polling하고 시험 단위 retry API 하나를 호출하면 백엔드가 최초 응시 문항과 전체 요약 Job을 기준으로 실패·timeout 작업만 원자적으로 재전송하도록 구현한다.
+- Jira 변경 여부: 이슈 설명과 완료 조건은 구현 기준으로만 사용했다. Jira 댓글·필드·상태·다른 이슈는 변경하지 않았으며 TMI-25는 계속 `진행 중`이다.
+- 변경 파일: `AGENTS.md`; `application.yml`; `S3Config`, 신규 `GradingConfig`·`GradingProperties`; 신규 `GradingKeys`·`GradingDispatchService`·`ExamGradingService`; `ExamService`·`ExamServiceImpl`·`ExamRestController`; `ExamResponseDTO`·`ExamConverter`; 신규 Job entity/enums/repositories와 결과 repositories; `ExamServiceImplTest`·`ExamOwnershipServiceTest`·`FeedbackCallbackServiceTest`·JWT/Legacy 보안 테스트; 신규 `ExamGradingServiceTest`·`GradingDispatchServiceTest`·`GradingPropertiesTest`; `docs/codex/WORKLOG.md`·`docs/codex/CURRENT_STATE.md`를 변경했다.
+- 문항 Job: `_id=question:{examId}:{questionNumber}:{retryCount}`에 상태, S3 fileKey, dispatchAttempt, pending/processing/dispatch/completed/failed 시각, 실패 사유와 `@Version`을 저장한다. submit은 결정적 `insert` 성공자만 PROCESSING으로 optimistic claim하고 AI를 호출하며 동일 Job 재호출은 기존 상태만 반환한다.
+- 시험 retry: `mock_exam_003`의 `MockExam.questions`를 정렬된 예상 문항으로 사용하고 retryCount 0만 검사한다. COMPLETED는 건너뛰고 fresh PENDING/PROCESSING은 waiting, stale PENDING/PROCESSING과 시도 한도 미만 FAILED만 claim한다. 한도에 도달해도 아직 fresh PROCESSING이면 현재 시도를 기다리고 timeout 이후 FAILED로 고정한다.
+- S3 복구: Job이 없을 때 기존 `temp/{examId}/q_{questionNumber}_r0.wav`에 SDK `HeadObject`를 실행한다. 404만 missingSubmission으로 분류하고 객체가 있으면 Job을 복구해 dispatch하며 403과 인프라 오류는 missing으로 오인하지 않는다.
+- Callback 멱등성: Feedback·SpeechAce·Azure·Summary는 legacy 논리 결과를 먼저 확인한 뒤 `feedback|speechace|azure:{examId}:{questionNumber}:{retryCount}` 또는 `summary:{examId}:v1` 결정적 `_id`로 `insert`한다. 동시 `DuplicateKeyException`은 성공으로 흡수하고 기존 결과나 중복 문서는 삭제하지 않으며 Unique Index와 자동 마이그레이션을 추가하지 않았다.
+- 요약 Job: `_id=summary:{examId}:v1`과 Question Job과 같은 상태·시각·attempt·failure·`@Version` 구조를 사용한다. 11번 특별 Trigger를 제거하고 모든 필수 retryCount 0 Feedback 결과 또는 COMPLETED Job이 있을 때만 한 요청을 claim한다. 시험 retry에서 문항 작업이 남아 있으면 요약을 건드리지 않고, 모든 문항 완료 후 fresh PROCESSING 대기·stale PROCESSING/FAILED 재전송·COMPLETED 무동작을 적용한다.
+- 전체 상태: retryCount 0 결과와 Question/Summary Job을 일괄 조회해 FAILED 우선, active PROCESSING, 미제출 PENDING, 문항 완료·요약 미완료 PROCESSING, 전체 완료 COMPLETED로 산정하고 기존 `exam:status:{examId}`·1시간 TTL에 projection한다. 기존 status DTO와 `progressPercent=60`은 변경하지 않았다.
+- AI 계약: 기존 Question multipart와 Summary JSON Body, `mock_exam_003`, `user_id = examId`를 유지했다. Header만 Question Job ID 또는 Summary Job ID의 안정적인 `Idempotency-Key`로 추가했으며 실제 userId는 보내지 않는다.
+- 설정: `GRADING_PENDING_TIMEOUT` 기본 `PT1M`, `GRADING_PROCESSING_TIMEOUT` 기본 `PT3M`, `GRADING_MAX_DISPATCH_ATTEMPTS` 기본 `3`을 타입 안전하게 바인딩하고 timeout 양수·attempt 1 이상을 검증한다. 신규 시간 로직은 고정 가능한 UTC `Clock` Bean을 사용한다.
+- 기존 데이터 호환: retryCount `null`을 0으로 읽는 기존 조회를 유지하고, legacy 결과가 있거나 Callback이 먼저 도착하면 누락 COMPLETED Job을 지연 복구한다. 기존 `ExamResult`·`ExamSummary` 조회와 legacy summary fallback을 유지하며 애플리케이션 시작 시 DB 정리·백필을 실행하지 않는다.
+- 유지한 외부 계약: 허용된 신규 `POST /api/v1/exams/{examId}/grading/retry` 외 기존 URL·Method·Path/Query·Request/Response DTO·`BaseResponse`, retryCount 의미, Redis Key·TTL, S3 Key·Presigned URL, AI Callback JSON, 음성 제출·Polling, 사용자 소유권 검증을 유지했다. 별도 summary retry API와 프론트 문항 목록 입력은 추가하지 않았다.
+- 실행한 테스트와 결과: TMI-25 집중 테스트가 성공했고 `./gradlew clean test`에서 126개 테스트 모두 실패·오류·건너뜀 없이 `BUILD SUCCESSFUL`이었다. Mockito 저장소로 결정적 insert와 optimistic version 충돌을 재현해 동시 submit·시험 retry의 문항당 dispatch 1회를 검증했으며 실제 Atlas·Redis·S3·AI 서버를 호출하지 않았다.
+- 추가 검증: `git diff --check`, 기존/현재 Controller Mapping 비교, AI Body·`user_id`·retryCount·Redis/S3 Key 검색, 신규 로직의 직접 `Instant.now`/`LocalDateTime.now` 부재 확인, AWS Key·Private Key·credential 포함 Mongo URI·JWT literal 패턴 검색이 모두 통과했다. Stop Hook marker는 이 항목에 정확히 한 번 기록한다.
+- 남아 있는 위험 요소: Learning Core의 원자 claim과 안정적인 Header만으로는 Python AI 내부 계산 중복까지 막을 수 없다. Job claim과 외부 HTTP 사이 crash window도 있으므로 Python AI가 두 멱등 키를 실제 저장·재사용해야 한다. 운영 S3 IAM의 HeadObject 권한, Mongo 신규 컬렉션 생성 권한, 기존 RestTemplate의 timeout·전체 음성 `byte[]` 메모리 사용을 staging에서 확인해야 한다.
+- 다음 작업 전에 확인할 사항: 사용자가 변경분을 검토해 commit/push하고, Python AI의 Question/Summary `Idempotency-Key` 처리 작업을 별도 이슈로 진행한다. Jira 완료 댓글 등록이나 상태 전환은 별도 명시적 요청이 있을 때만 수행한다.

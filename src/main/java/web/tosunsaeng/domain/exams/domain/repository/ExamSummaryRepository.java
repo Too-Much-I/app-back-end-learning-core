@@ -7,4 +7,6 @@ import java.util.Optional;
 
 public interface ExamSummaryRepository extends MongoRepository<ExamSummary, String> {
     Optional<ExamSummary> findFirstByExamIdOrderByIdDesc(String examId);
+
+    boolean existsByExamId(String examId);
 }

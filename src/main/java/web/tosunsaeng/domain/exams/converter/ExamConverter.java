@@ -66,9 +66,14 @@ public class ExamConverter {
 
     // --- Req -> Entity 변환 ---
     public static ExamResult toExamResult(ExamRequestDTO.AiResultReq req, String userId) {
+        return toExamResult(req, userId, null);
+    }
+
+    public static ExamResult toExamResult(ExamRequestDTO.AiResultReq req, String userId, String resultId) {
         if (req == null) return null;
 
         return ExamResult.builder()
+                .id(resultId)
                 .examId(req.getExamId())
                 .userId(userId)
                 .mockExamId(req.getMockExamId())
@@ -93,9 +98,14 @@ public class ExamConverter {
     }
 
     public static ExamSummary toExamSummary(ExamRequestDTO.AiResultReq req, String userId) {
+        return toExamSummary(req, userId, null);
+    }
+
+    public static ExamSummary toExamSummary(ExamRequestDTO.AiResultReq req, String userId, String resultId) {
         if (req == null) return null;
 
         return ExamSummary.builder()
+                .id(resultId)
                 .examId(req.getExamId())
                 .userId(userId)
                 .mockExamId(req.getMockExamId())

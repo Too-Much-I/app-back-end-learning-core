@@ -232,6 +232,39 @@ AI Callback에서는 examId로 ExamSession을 조회하여 실제 userId를 찾�
 - 외부 API와 AI 계약은 변경하지 않는다.
 - TMI-14 완료 후에도 다른 작업에는 이 예외가 자동 적용되지 않는다.
 
+## TMI-25 명시적 예외
+
+- Jira TMI-25에 한하여 최우선 호환성 규칙과 “현재 추가하지 않을 기능” 규칙의 제한적 예외를 허용한다.
+- 이 예외는 시험 단위 재채점과 AI 채점·Callback 멱등성 구현에만 적용한다.
+
+허용 범위는 다음과 같다.
+
+- 신규 API `POST /api/v1/exams/{examId}/grading/retry` 하나 추가
+- 신규 API 전용 Request/Response DTO 추가
+- `QuestionGradingJob`과 `SummaryGradingJob` 추가
+- 기존 submit API의 외부 계약을 유지하면서 내부 처리를 멱등하게 변경
+- 기존 status API의 URL, HTTP Method와 기존 Response 필드를 유지하면서 Job 기반 상태 산정으로 내부 처리 변경
+- Feedback, SpeechAce, Azure와 전체 요약 Callback 저장을 멱등하게 변경
+- 전체 요약 Trigger를 모든 필수 문항의 최초 응시 `retryCount=0` 완료 기준으로 변경
+
+다음 변경은 이 예외에서도 허용하지 않는다.
+
+- 기존 API URL 또는 HTTP Method 변경
+- 기존 Request Parameter 변경
+- 기존 Response 필드 삭제 또는 이름 변경
+- 기존 `retryCount` 의미 변경
+- Python AI 요청과 Callback의 `user_id = examId` 계약 변경
+- Redis Key 형식 변경
+- S3 Object Key 변경
+- 사용자 소유권 검증 변경 또는 신규 시험 단위 retry API의 소유권 검증 누락
+- 사용자 새 녹음인 `retryCount>0` 문항을 시험 전체 복구 대상에 포함
+- 프론트가 필수 문항 번호 목록을 보내는 구조 추가
+- 별도의 외부 전체 요약 retry API 추가
+
+- Jira TMI-25에 명시된 신규 시험 단위 retry API는 Request Body 없음 계약을 유지한다.
+- 기존 공개 API·DTO·`BaseResponse`, 음성 제출·Polling과 AI Callback JSON의 나머지 계약은 유지한다.
+- 이 예외는 Jira TMI-25에만 적용되며 완료 후 또는 다른 작업에 자동 적용되지 않는다.
+
 # Redis 및 S3 규칙
 
 기존 Redis 상태 및 Lock 흐름을 임의로 변경하지 않는다.

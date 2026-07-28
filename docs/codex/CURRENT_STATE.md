@@ -6,12 +6,45 @@
 
 ## Current branch
 
-- `refactor/TMI-14-jwt-production-hardening`
-- HEAD는 `bc19caf` (`Merge pull request #10 from Too-Much-I/test/TMI-11-auth-e2e`)이며 `origin/main`과 동일하다.
-- 현재 브랜치에는 upstream이 설정돼 있지 않다.
-- working tree에는 TMI-14의 제한 예외, 인증 설정·Startup 검증·Legacy profile 차단, 미사용 HMAC/JJWT/Secret 제거, 테스트·README·계약·Codex 기록 변경만 있다. Codex는 commit과 push를 수행하지 않았다.
+- `feat/TMI-25-grading-retry-idempotency`
+- HEAD는 `3746464`다.
+- TMI-25 구현 변경은 작업 트리에 있으며 Codex는 commit과 push를 수행하지 않았다.
+
+## Current Jira issue
+
+- [`TMI-25`](https://to-teacher.atlassian.net/browse/TMI-25) — [Learning Core] 시험 단위 재채점 및 AI 채점·Callback 멱등성 보장
+- 프로젝트: `TMI` (ID `10000`)
+- 이슈 유형: `작업` (ID `10003`)
+- Jira 상태: `진행 중` (상태 ID `10001`, 상태 범주 `진행 중`)
+- 우선순위: `High` (ID `2`)
+- 담당자: 미지정
+- 라벨: 없음
+- 사용자가 승인한 제목과 Markdown 설명을 그대로 사용해 생성했다. 설명에는 기존 문항 submit·전체 상태 API 유지, 신규 시험 단위 retry API, retryCount 0 복구 규칙, 문항·요약 Job, Callback 멱등성, Redis 전체 상태, AI `Idempotency-Key`, 완료 조건과 범위 제외가 포함된다.
+- 생성 Payload에는 프로젝트, 이슈 유형, 제목, 설명, 우선순위만 포함했다. 담당자·라벨·상위 항목·스프린트·에픽·상태 전환은 설정하지 않았다.
+- 생성 후 상세 재조회로 승인된 제목·설명, `작업`, `High`, 기본 상태 `해야 할 일`, 담당자 미지정과 빈 라벨을 확인했다.
+- 2026-07-28 전환 전 읽기 전용 조회에서 상태 `해야 할 일`과 사용 가능한 전환 `해야 할 일`(ID `11`)·`검토 중`(`31`)·`진행 중`(`21`)·`완료`(`41`)를 확인했다.
+- 사용자 요청에 따라 전환 직전 상태와 `진행 중` 전환 ID `21`의 가용성을 다시 확인한 뒤 해당 전환만 적용했다. 전환 Payload에는 다른 필드·댓글·업데이트를 포함하지 않았고 다른 Jira 이슈를 호출하지 않았다.
+- 전환 후 상세 재조회에서 현재 상태 `진행 중`(상태 ID `10001`)을 확인했다.
+- 구현 전 정적 분석에서 동일 submit·네 종류 Callback·11번 요약 Trigger의 중복 가능성, Redis 단일 상태와 고정 progress, Job·Clock·S3Client Bean·Mongo `@Version`·원자 claim 부재, legacy Unique Index 충돌 위험을 확인했다. 애플리케이션 구현과 Jira 변경은 수행하지 않았다.
+- 사용자가 TMI-25에 한해 API 변경 금지 규칙의 제한 예외를 승인했고 `AGENTS.md`에 전용 예외를 기록했다. 신규 시험 단위 retry API·전용 DTO·Question/Summary Job·submit/Callback 멱등성·Job 기반 status 내부 처리·전체 필수 retry 0 문항 완료 요약 Trigger만 허용되며 다른 작업에는 자동 적용되지 않는다.
+- 승인된 범위의 구현과 Mockito 기반 검증을 완료했다. Jira 댓글·필드·상태는 이번 구현 작업에서 변경하지 않았으며 Jira 상태는 계속 `진행 중`이다.
+- `./gradlew clean test`는 126개 테스트 모두 성공했고 `git diff --check`, 외부 API·AI/Redis/S3 계약 검색과 Secret 패턴 검색도 통과했다.
 
 ## Latest completed Jira issue
+
+- [`TMI-14`](https://to-teacher.atlassian.net/browse/TMI-14) — [Learning Core] 운영 JWT 모드 강제 및 Legacy/HMAC 인증 정리
+- 프로젝트: `TMI` (ID `10000`)
+- 이슈 유형: `작업` (ID `10003`)
+- Jira 상태: `완료` (상태 ID `10003`, resolution `완료` ID `10000`)
+- 우선순위: `High` (ID `2`)
+- 담당자: 설정됨 (개인 식별 정보는 기록하지 않으며 이번 작업에서는 변경하지 않음)
+- 타입 안전 `AuthMode`, staging/prod Startup Validator, Legacy profile 격리와 미사용 HMAC/JJWT/`JWT_SECRET_KEY` 제거를 구현했고, 사용자가 PR 병합과 테스트 성공을 확인했다.
+- 전환 직전 상태는 `진행 중`(상태 ID `10001`)이었고 `완료` 전환 ID `41`이 사용 가능했다.
+- 사용자 요청에 따라 TMI-14에 전환 ID `41`만 전송했다. 전환 Payload에 다른 필드·업데이트·댓글을 포함하지 않았고 다른 Jira 이슈를 수정하지 않았다.
+- 후속 상세 조회에서 상태 `완료`와 resolution `완료`를 확인했다. resolution은 완료 전환 워크플로가 자동으로 설정했으며 별도 필드 수정으로 지정하지 않았다.
+- Jira 완료 댓글은 등록하지 않았다.
+
+## Previous completed Jira issue
 
 - [`TMI-11`](https://to-teacher.atlassian.net/browse/TMI-11) — [Integration] Identity·Learning Core E2E 인증 테스트 및 JWT 계약 확정
 - 이슈 유형: `작업` (ID `10003`)
@@ -23,27 +56,6 @@
 - 완료 댓글 ID `10002`에 구현 파일, 자동화 범위, JWT 계약, 정적·Gradle 테스트 결과, 실제 서버 E2E 미실행과 수동 DB 확인 잔여 항목을 기록했다.
 - 사용자 요청에 따라 완료 전환 ID `41`을 실행하고 상태와 resolution을 재조회해 확인했다.
 - 로컬 구현과 정적 검증, 두 저장소 전체 테스트는 완료했다. 실제 Identity 8081과 Learning Core 8080이 실행 중이지 않아 두 서버 E2E 실행과 직접 `ExamSession.userId` 확인은 후속 운영 검증으로 남아 있다.
-
-## Current Jira issue
-
-- 진행 중 작업: Jira TMI-14
-- [`TMI-14`](https://to-teacher.atlassian.net/browse/TMI-14) — [Learning Core] 운영 JWT 모드 강제 및 Legacy/HMAC 인증 정리
-- 프로젝트: `TMI` (ID `10000`)
-- 이슈 유형: `작업` (ID `10003`)
-- Jira 상태: `진행 중` (상태 ID `10001`, 상태 범주 `진행 중`)
-- 우선순위: `High` (ID `2`)
-- 담당자: 설정됨 (개인 식별 정보는 기록하지 않으며 이번 작업에서는 변경하지 않음)
-- 스프린트·에픽·라벨: 생성 Payload에서 설정하지 않았고 라벨은 빈 값으로 재조회됐다.
-- Atlassian MCP로 동일 제목 이슈가 없음을 확인한 뒤 승인된 제목과 설명을 그대로 사용해 한 건 생성했다.
-- 생성 후 제목·설명·프로젝트·유형·우선순위·기본 상태·담당자·라벨을 재조회해 확인했으며 상태 전환은 수행하지 않았다.
-- 2026-07-28 읽기 전용 재조회 기준 현재 상태는 `해야 할 일`(상태 ID `10000`)이며, 사용 가능한 전환은 `해야 할 일`(전환 ID `11`), `진행 중`(`21`), `검토 중`(`31`), `완료`(`41`)이다.
-- 이번 재조회에서는 Jira 이슈 수정·댓글·상태 전환 API를 호출하지 않았다.
-- 사용자 요청에 따라 전환 직전 상태와 가용 전환을 다시 확인하고 전환 ID `21`만 사용해 `진행 중`으로 변경했다. 후속 상세 조회로 상태 ID `10001`을 확인했다.
-- 전환 요청에는 다른 필드·댓글·업데이트를 포함하지 않았고 다른 Jira 이슈를 수정하지 않았다.
-- 구현 착수 전 Atlassian MCP로 설명과 완료 조건을 재조회했고, 사용자가 TMI-14에 한해 “JWT 인증 강제 제외” 규칙의 제한 예외를 명시적으로 승인했다. 예외 범위는 staging/prod Startup 검증·Legacy 차단·auth mode 검증·미사용 HMAC 정리뿐이다.
-- 제한 예외를 `AGENTS.md`에 추가하고 전체 규칙을 재검토한 뒤 구현했다. 기존 JWT 보호·공개 경로, local/test Legacy와 외부 계약은 변경하지 않았다.
-- 타입 안전 `AuthMode`, Startup Validator, profile 격리, HMAC/JJWT/`JWT_SECRET_KEY` 제거와 관련 문서·테스트 구현을 완료했다. Jira 댓글·필드·상태는 변경하지 않아 이슈는 계속 `진행 중`이다.
-- 공개 API·DTO·`BaseResponse`, AI `user_id = examId`, `retryCount`, Redis·S3와 시험 소유권 계약에서는 Jira와 저장소 규칙 간 충돌이 확인되지 않았다.
 
 ## Related completed Jira issue
 
@@ -93,6 +105,36 @@
 - 미사용 `JwtAuthenticationFilter`, `JwtTokenProvider`, JJWT 의존성, `jwt.secret`, `JWT_SECRET_KEY` 설정 제거
 - 기존 OAuth2 Resource Server, RS256·issuer·audience·timestamp·UUID subject 검증과 보호·공개 경로 유지
 - README와 JWT 계약·E2E 실행 문서에 local/test Legacy와 staging/prod JWT 환경 규칙 반영
+- 사용자가 TMI-14 PR 병합과 테스트 성공을 확인한 뒤 Jira `TMI-14`를 다른 필드·댓글 변경 없이 `완료`로 전환하고 상태와 자동 resolution을 재조회해 검증 완료
+- Learning Core 시험 단위 재채점과 AI 채점·Callback 멱등성 보장 Jira Payload 초안 작성 및 TMI 생성 필드·`High` 지원 여부 검증 완료. Jira 이슈는 생성하지 않음
+- 승인된 채점 복구·멱등성 Payload로 Jira `TMI-25`를 `작업`, `High`, 기본 상태 `해야 할 일`로 생성하고 제목·설명·미지정 담당자·빈 라벨을 재조회해 검증 완료
+- Jira `TMI-25` 구현 전 제출·Callback·요약·상태·소유권·MockExam·S3·Mongo·테스트 구조 정적 분석과 Question/Summary Job·retry·Callback 멱등성·legacy 호환 설계 완료
+- Jira `TMI-25`에만 적용되는 신규 retry API와 채점·Callback 멱등성 구현의 제한적 호환성 예외를 `AGENTS.md`에 명시
+- Jira `TMI-25`의 시험 단위 retry API, Question/Summary Job, submit·Callback·요약 dispatch 멱등성, Job 기반 전체 상태 산정과 legacy 결과 지연 복구 구현 완료
+- Question/Summary AI 요청에 안정적인 `Idempotency-Key`를 추가하고 S3 `HeadObject` 기반 누락/복구 분기, 양수 timeout·최소 attempt 설정 검증과 UTC `Clock` Bean 추가
+- TMI-25 집중·회귀 테스트와 전체 `./gradlew clean test` 126개 성공, 외부 인프라 호출 없음
+
+## TMI-25 implementation state
+
+- 신규 `POST /api/v1/exams/{examId}/grading/retry`는 Request Body 없이 기존 `BaseResponse`로 `examId`, `overallStatus`, retried/waiting/missing 문항 번호와 `summaryAction`을 반환하며 기존 소유권 검증을 먼저 수행한다.
+- `QuestionGradingJob`의 결정적 `_id`는 `question:{examId}:{questionNumber}:{retryCount}`, `SummaryGradingJob`은 `summary:{examId}:v1`이다. 두 문서 모두 상태·dispatch 횟수·필수 시각·실패 정보와 Mongo `@Version`을 가진다.
+- submit은 결정적 Job `insert`에 성공한 최초 요청만 `PROCESSING`으로 optimistic claim하고 AI를 호출한다. PENDING/PROCESSING/COMPLETED 및 기존 FAILED Job의 동일 submit은 새 요청을 만들지 않는다.
+- 시험 retry는 `mock_exam_003`의 `MockExam.questions`에서 예상 문항을 읽고 retryCount 0만 처리한다. fresh PENDING/PROCESSING은 대기하고 stale PENDING/PROCESSING 또는 시도 한도 미만 FAILED만 optimistic claim 후 재전송한다.
+- Job이 없으면 기존 S3 Key에 `HeadObject`를 수행한다. 404만 미제출로 분류하고 객체가 있으면 PENDING Job을 복구해 dispatch하며 403·timeout·인프라 오류는 미제출로 오인하지 않는다.
+- Feedback·SpeechAce·Azure·전체 요약 결과는 논리 키의 legacy 존재 여부를 먼저 확인하고 결정적 `_id`로 `insert`한다. 동시 중복의 `DuplicateKeyException`은 멱등 성공으로 처리하며 기존 결과에 Unique Index나 자동 마이그레이션을 적용하지 않는다.
+- Feedback Callback은 Question Job을 COMPLETED로 전이하거나 legacy 시험의 누락 Job을 복구한 뒤 매번 요약 gate를 확인한다. 11번 특별 Trigger는 제거했고 모든 필수 retryCount 0 결과 또는 COMPLETED Job이 있어야 Summary Job을 한 번 claim한다.
+- 시험 retry는 문항 작업이 남지 않았을 때만 Summary Job을 처리한다. 요약 fresh PROCESSING은 `WAITING`, stale PROCESSING/FAILED는 재전송, 완료는 `ALREADY_COMPLETED`, Job 없음은 생성·dispatch한다.
+- 전체 상태는 retryCount 0 결과와 Question/Summary Job을 일괄 조회해 산정하고 기존 `exam:status:{examId}`와 1시간 TTL에 캐시한다. 기존 status DTO와 `progressPercent=60`은 프론트 계약을 위해 유지한다.
+- AI multipart/JSON Body와 `user_id = examId`는 유지하고 Header만 `question:{examId}:{questionNumber}:{retryCount}` 또는 `summary:{examId}:v1`로 추가했다.
+- 설정 기본값은 pending `PT1M`, processing `PT3M`, max dispatch attempts `3`이며 Duration 양수와 attempt 1 이상을 검증한다. 신규 시간 로직은 UTC `Clock` Bean만 사용한다.
+
+### Approved limited exception
+
+- TMI-25에 한해 `POST /api/v1/exams/{examId}/grading/retry`, 해당 API 전용 DTO, Question/Summary Job, 기존 submit·Callback의 멱등 내부 처리와 모든 필수 retry 0 문항 완료 기반 요약 Trigger를 구현할 수 있다.
+- 기존 status API는 URL·Method·기존 필드를 유지하면서 Job 기반으로 내부 상태 산정을 변경할 수 있다.
+- 기존 API URL·Method·Request Parameter·Response 필드, retryCount 의미, AI `user_id = examId`, Redis/S3 Key, 소유권 검증은 변경할 수 없다.
+- retryCount>0 사용자 새 녹음의 시험 전체 복구, 프론트 문항 목록 전달, 별도 외부 summary retry API는 허용되지 않는다.
+- 이 예외는 TMI-25 전용이며 다른 Jira나 후속 작업에 승계되지 않는다.
 
 ## Authentication modes
 
@@ -165,14 +207,20 @@
 - 실제 `userId`를 Python AI 서버로 보내지 않는다.
 - 클라이언트 Request Body, Path, Query, Response DTO에 `userId`를 추가하지 않는다.
 - 기존 API URL·Method·Parameter·DTO·`BaseResponse`·`retryCount` 계약을 유지한다.
+- TMI-25에서 허용된 신규 API는 `POST /api/v1/exams/{examId}/grading/retry` 하나뿐이며 Request Body와 별도 summary retry API가 없다.
+- 기존 status 응답 필드와 `progressPercent=60`, Redis `exam:status:{examId}`·1시간 TTL을 유지한다.
 - 기존 Redis Key·TTL, S3 Presigned URL·Object Key, 음성 제출·Polling 흐름을 유지한다.
+- AI Body 계약은 그대로 두고 `Idempotency-Key` Header만 Question/Summary 논리 키로 추가한다.
 - 종합 피드백 저장소 분리는 MongoDB 연결·database 설정을 추가하지 않고 컬렉션만 `exam_summaries`로 분리했다.
 - 운영 앱에서는 Legacy 모드를 금지한다.
 - `logout`과 `logout-all`은 Refresh Session을 폐기하지만 기존 Access Token의 즉시 무효화를 보장하지 않는다.
 
 ## Test status
 
-- `./gradlew clean test` 성공: 88개 테스트, 실패·오류·건너뜀 0개
+- `./gradlew clean test` 성공: 126개 테스트, 실패·오류·건너뜀 0개
+- TMI-25 집중 테스트에서 최초·반복·동시 submit, 상태/timeout/attempt별 시험 retry, S3 HeadObject 404·403, retryCount>0 제외와 concurrent claim을 검증했다.
+- 네 Callback의 결정적 ID·중복 1개 저장, legacy null retry 결과와 누락 Job 복구, 11번 단독 요약 금지, 전체 필수 문항 완료 후 요약 1회와 요약 timeout/FAILED retry를 검증했다.
+- AI `user_id = examId`, 기존 multipart/summary Body, 안정적인 두 `Idempotency-Key`, 신규 API의 Request Body 없음·기존 BaseResponse, status `progressPercent=60`, 소유권 검증을 확인했다.
 - AuthMode의 legacy/JWT 변환, 누락 시 local Legacy 기본값, 빈 값·대문자·오타 실패 검증 성공
 - local/test Legacy 성공, profile 없는 Legacy와 staging/prod Legacy 실패, staging/prod 정상 JWT 설정 성공 검증
 - staging/prod issuer·JWKS URL·audience 누락, URI 형식 오류, localhost·loopback, placeholder audience 실패 검증
@@ -196,6 +244,7 @@
 - Atlassian MCP에서 운영 JWT 보안 정리용 TMI 생성 권한과 `작업`·설명·`High` 필드를 재검증하고 동일 제목 중복이 없음을 확인한 뒤 `TMI-14`를 생성했다. 생성 후 승인된 제목·설명, `작업`, `High`, 기본 상태 `해야 할 일`, 담당자 미지정과 빈 라벨을 재조회했다. 초안 및 생성 turn의 필수 marker가 각각 정확히 한 번 존재하고 `git diff --check`가 성공했다. 애플리케이션 코드는 변경하지 않아 Gradle 테스트를 실행하지 않았다.
 - Atlassian MCP로 `TMI-14`의 현재 상태 `해야 할 일`과 사용 가능한 전환 `해야 할 일(11)`·`진행 중(21)`·`검토 중(31)`·`완료(41)`를 직접 조회했다. Jira 변경 API와 애플리케이션 코드는 호출·수정하지 않아 Gradle 테스트를 실행하지 않았다.
 - Atlassian MCP로 `TMI-14`의 `진행 중` 전환 ID `21`을 실행하고 상태 ID `10001`을 후속 재조회했다. 전환 Payload에는 다른 필드·댓글·업데이트가 없었고 다른 Jira 이슈를 수정하지 않았다. 애플리케이션 코드 변경이 없어 Gradle 테스트를 실행하지 않았다.
+- 사용자 확인 기준 TMI-14 PR 병합과 테스트가 성공했다. Atlassian MCP로 `진행 중` 상태와 사용 가능한 `완료` 전환 ID `41`을 확인한 뒤 TMI-14에 해당 전환만 실행했고, 후속 조회에서 상태 `완료`(ID `10003`)와 워크플로가 자동 설정한 resolution `완료`(ID `10000`)를 확인했다. 애플리케이션 코드 변경이 없어 Gradle 테스트는 다시 실행하지 않았다.
 - TMI-14 구현 전 `AGENTS.md`, CURRENT_STATE와 Jira 설명·완료 조건을 대조했다. “JWT 인증 강제” 금지와 staging/prod JWT 모드 강제 요구의 충돌로 구현을 시작하지 않았고, 코드 변경이 없어 인증 모드 테스트와 Gradle 테스트를 실행하지 않았다.
 - Atlassian MCP로 `TMI-11`을 생성한 뒤 제목·설명·프로젝트·이슈 유형·상태·우선순위를 재조회해 승인된 Payload 반영을 확인했다. 애플리케이션 코드는 변경하지 않았다.
 - Stop Hook 보완 기록의 필수 marker 단일 존재와 `git diff --check`를 검증했다.
@@ -204,6 +253,11 @@
 - Learning Core `./gradlew clean test` 성공: 56개, 실패·오류·건너뜀 0개. 기존 `ExamServiceImpl` unchecked 경고만 남았다.
 - Identity 저장소 `./gradlew clean test` 성공: 138개, 실패·오류·건너뜀 0개. Identity 소스와 추적 파일은 변경하지 않았다.
 - 기본 8081/8080 포트 모두 연결되지 않아 실제 E2E 스크립트는 실행하지 않았다.
+- 이번 Jira Payload 초안 작업에서는 Atlassian MCP로 TMI 생성 권한, `작업` 유형, 설명과 `High` 우선순위 지원 및 동일 제목 후보 부재를 읽기 전용으로 확인했다. 애플리케이션 코드 변경이 없어 `./gradlew clean test`는 실행하지 않았다.
+- Atlassian MCP로 `TMI-25`를 생성한 뒤 제목·설명·프로젝트·유형·우선순위·기본 상태·담당자·라벨을 재조회했다. 애플리케이션 코드 변경이 없어 `./gradlew clean test`는 실행하지 않았다.
+- Atlassian MCP로 `TMI-25`의 현재 상태와 사용 가능한 전환을 읽기 전용으로 조회했다. 현재 상태는 `해야 할 일`이고 전환 `11`·`31`·`21`·`41`이 모두 사용 가능했다. Jira 변경 API와 애플리케이션 코드를 호출·수정하지 않아 `./gradlew clean test`는 실행하지 않았다.
+- Atlassian MCP로 TMI-25의 전환 직전 상태와 `진행 중` 전환 ID `21`을 재확인한 뒤 전환 ID만 적용하고, 후속 조회에서 상태 ID `10001`을 확인했다. 애플리케이션 코드 변경이 없어 `./gradlew clean test`는 실행하지 않았다.
+- TMI-25 구현 전 분석에서는 관련 소스·설정·테스트와 Jira 설명·완료 조건을 정적으로 확인하고 `git diff --check`를 실행했다. 애플리케이션 구현 변경이 없어 `./gradlew clean test`는 실행하지 않았다.
 
 ## HMAC cleanup
 
@@ -229,9 +283,14 @@
 - Jira 완료 조건의 `ExamSession.userId == JWT sub` 직접 DB 비교는 MongoDB 자격증명을 스크립트에 넣지 않기 위해 수동 검증으로 남겼다. 소유권 200/403 시나리오는 API 경계에서 간접 검증한다.
 - AI Callback은 사용자 JWT 없이 공개 상태이며 서비스 간 인증은 아직 없다.
 - 사용자·시험 삭제 API가 없어 로컬 E2E 계정과 시험 문서는 테스트 DB에 남으며 운영자 정리가 필요하다.
-- TMI-14의 가능한 전환 목록은 조회 시점의 워크플로와 현재 사용자 권한 기준이므로 실제 전환 직전에 다시 확인해야 한다.
 - Startup Validator는 설정 형식과 로컬 URL 사용 여부만 확인하며 실제 staging/prod Identity·JWKS 네트워크 도달성은 배포 전 별도 확인이 필요하다.
 - staging/prod 전체 애플리케이션을 실제 운영 인프라 설정으로 기동하는 smoke test는 수행하지 않았고 외부 호출 없는 ApplicationContext 검증으로 대체했다.
+- Learning Core가 안정적인 `Idempotency-Key`를 보내더라도 Python AI가 그 키를 실제 처리하기 전까지는 AI 서버 내부 중복 실행까지 단독으로 보장할 수 없다.
+- DB Job claim과 외부 AI HTTP 요청은 단일 트랜잭션이 아니므로 Python AI가 멱등 키를 처리하기 전까지 crash window의 정확히 한 번 실행은 보장할 수 없다.
+- S3 `HeadObject`는 404만 미제출로 분류한다. 운영 IAM에 대상 버킷 객체 조회 권한이 없으면 403이 API 오류로 전파되므로 배포 전 권한을 확인해야 한다.
+- 기존 결과의 ObjectId와 신규 결정적 문자열 `_id`가 혼재하면 `_id DESC`가 생성 시간순이 아닐 수 있으며, legacy 중복은 현재 파트 점수와 풀이 문항 수를 부풀릴 수 있다.
+- 기존 결과의 중복은 삭제하지 않고 논리 존재 확인으로 신규 중복만 막는다. 운영 중복 정리가 필요하면 별도 검토·백업 후 명시적 일회성 스크립트로 수행해야 한다.
+- 현재 `RestTemplate`에는 명시적 연결·응답 timeout이 없고 음성을 전체 `byte[]`로 읽으므로 시험 단위 다문항 복구의 응답 시간과 메모리 사용을 운영 부하에서 확인해야 한다.
 
 ## Next
 
@@ -239,10 +298,13 @@
 - 실제 E2E 성공 후 출력된 수동 확인 식별자로 `exam_sessions.userId`와 JWT `sub`를 폐기 가능한 로컬 DB에서 비교한다.
 - 배포 환경에서 `APP_AUTH_MODE=jwt` 전환 전 issuer·JWKS·audience와 네트워크 접근성을 확인한다.
 - 실제 배포 전에 staging/prod에 `APP_AUTH_MODE=jwt`, 환경별 issuer·JWKS URL·audience와 나머지 인프라 설정을 주입해 smoke test한다.
-- Jira TMI-14 완료 댓글 초안을 사용자가 검토한 뒤 댓글 등록과 상태 변경 여부를 직접 결정한다.
-- Jira `TMI-14`의 추가 상태 전환은 사용자가 다시 명시적으로 요청하기 전에는 수행하지 않으며, 요청 시 전환 목록을 다시 조회한다.
+- Jira `TMI-14`는 완료됐으며 완료 댓글은 등록하지 않았다. 다시 열기나 댓글 등록은 사용자가 명시적으로 요청하는 경우에만 수행한다.
 - Jira `TMI-10`은 완료됐으므로 후속 위험은 별도 Jira 이슈로 추적한다.
 - 물리적으로 다른 MongoDB database가 필요한지 확인하고, 필요하면 별도 MongoTemplate·자격증명·배포 환경변수 범위를 정의한다.
 - 운영 데이터 규모에 따라 `exam_summaries` 조회 인덱스와 legacy 종합 문서 이관·보존 정책을 결정한다.
 - Jira `TMI-11`은 완료 처리됐으며 실제 서버 E2E나 수동 DB 검증에서 문제가 발견되면 이슈를 다시 열거나 별도 후속 이슈로 추적한다.
+- Jira `TMI-25`는 현재 `진행 중`이며 이번 구현에서는 댓글·필드·상태를 변경하지 않았다. 완료 댓글 등록이나 상태 전환은 사용자가 명시적으로 요청할 때만 수행한다.
+- TMI-25 상태 변경이 요청되면 실행 직전에 전환 목록을 다시 조회하고 승인된 전환만 수행한다.
+- Python AI가 두 `Idempotency-Key`를 실제 저장·중복 반환하도록 하는 후속 작업을 별도 이슈로 분리한다.
+- 배포 전 staging에서 S3 HeadObject 권한, Mongo 신규 컬렉션 생성 권한과 AI Header 전달을 smoke test한다.
 - 사용자가 변경분을 검토한 뒤 commit과 push를 수행한다.
