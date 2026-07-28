@@ -1,0 +1,6 @@
+app:
+  auth:
+    identity:
+      issuer: ${IDENTITY_ISSUER:http://localhost:8081}
+      jwk-set-uri: ${IDENTITY_JWK_SET_URI:http://localhost:8081/.well-known/jwks.json}
+      audience: ${IDENTITY_AUDIENCE:tosunsaeng-learning-core}

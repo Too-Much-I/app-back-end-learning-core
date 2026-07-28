@@ -17,6 +17,7 @@ Identity는 8081에서 실행하고 Learning Core는 다음과 같이 JWT 모드
 
 ```bash
 APP_AUTH_MODE=jwt \
+SPRING_PROFILES_ACTIVE=local \
 IDENTITY_ISSUER=http://localhost:8081 \
 IDENTITY_JWK_SET_URI=http://localhost:8081/.well-known/jwks.json \
 IDENTITY_AUDIENCE=tosunsaeng-learning-core \
@@ -96,4 +97,3 @@ LEARNING_CORE_BASE_URL=http://localhost:8080 \
 - Learning Core가 Python AI로 보내는 `user_id`도 `examId`이며 실제 `userId`를 포함하지 않는다. 이 outbound 계약은 기존 Java 단위 테스트가 검증하며, 본 스크립트는 실제 음성·AI 서버 호출을 만들지 않는다.
 - JWKS key rotation, 캐시 동작, Identity 장애 중 기존 키 사용은 이 로컬 시나리오의 범위 밖이다.
 - 이 스크립트는 로컬 통합 검증 전용이다. 운영 환경에서 실행하지 않는다.
-

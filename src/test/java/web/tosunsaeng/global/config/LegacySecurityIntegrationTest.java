@@ -8,6 +8,7 @@ import org.springframework.context.ApplicationContext;
 import org.springframework.context.annotation.Import;
 import org.springframework.core.env.Environment;
 import org.springframework.security.oauth2.jwt.JwtDecoder;
+import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
@@ -24,9 +25,9 @@ import web.tosunsaeng.domain.exams.dto.ExamResponseDTO;
 import web.tosunsaeng.global.auth.CurrentUserProvider;
 import web.tosunsaeng.global.auth.JwtCurrentUserProvider;
 import web.tosunsaeng.global.auth.LegacyCurrentUserProvider;
-import web.tosunsaeng.global.config.security.JwtTokenProvider;
 
 import java.util.List;
+import java.util.Set;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
@@ -95,9 +96,13 @@ class LegacySecurityIntegrationTest {
         assertEquals("legacy", environment.getProperty("app.auth.mode"));
         assertInstanceOf(LegacyCurrentUserProvider.class, currentUserProvider);
         assertEquals(LEGACY_USER_ID, currentUserProvider.getCurrentUserId());
+        assertEquals(1, applicationContext.getBeansOfType(CurrentUserProvider.class).size());
         assertTrue(applicationContext.getBeansOfType(JwtCurrentUserProvider.class).isEmpty());
         assertTrue(applicationContext.getBeansOfType(JwtDecoder.class).isEmpty());
-        assertTrue(applicationContext.getBeansOfType(JwtTokenProvider.class).isEmpty());
+        assertEquals(
+                Set.of("legacySecurityFilterChain"),
+                applicationContext.getBeansOfType(SecurityFilterChain.class).keySet()
+        );
     }
 
     @Test
