@@ -21,10 +21,12 @@ import software.amazon.awssdk.services.s3.presigner.model.GetObjectPresignReques
 import software.amazon.awssdk.services.s3.presigner.model.PresignedGetObjectRequest;
 import web.tosunsaeng.domain.exams.domain.entity.ExamResult;
 import web.tosunsaeng.domain.exams.domain.entity.ExamSession;
+import web.tosunsaeng.domain.exams.domain.entity.ExamSummary;
 import web.tosunsaeng.domain.exams.domain.enums.ExamStatus;
 import web.tosunsaeng.domain.exams.domain.repository.AzureResultRepository;
 import web.tosunsaeng.domain.exams.domain.repository.ExamResultRepository;
 import web.tosunsaeng.domain.exams.domain.repository.ExamSessionRepository;
+import web.tosunsaeng.domain.exams.domain.repository.ExamSummaryRepository;
 import web.tosunsaeng.domain.exams.domain.repository.MockExamRepository;
 import web.tosunsaeng.domain.exams.domain.repository.SpeechAceResultRepository;
 import web.tosunsaeng.domain.exams.dto.ExamRequestDTO;
@@ -81,6 +83,9 @@ class FeedbackCallbackServiceTest {
     private ExamResultRepository examResultRepository;
 
     @Mock
+    private ExamSummaryRepository examSummaryRepository;
+
+    @Mock
     private ExamSessionRepository examSessionRepository;
 
     @Mock
@@ -105,6 +110,7 @@ class FeedbackCallbackServiceTest {
                 s3Presigner,
                 restTemplate,
                 examResultRepository,
+                examSummaryRepository,
                 examSessionRepository,
                 mockExamRepository,
                 speechAceResultRepository,
@@ -226,7 +232,7 @@ class FeedbackCallbackServiceTest {
                 () -> assertEquals(92.0, spokenWord.getPronunciationScore()),
                 () -> assertEquals("None", spokenWord.getErrorType())
         );
-        verifyNoInteractions(currentUserProvider, redisTemplate, restTemplate);
+        verifyNoInteractions(examSummaryRepository, currentUserProvider, redisTemplate, restTemplate);
     }
 
     @Test
@@ -252,8 +258,8 @@ class FeedbackCallbackServiceTest {
 
         examService.updateExamResult(req);
 
-        ArgumentCaptor<ExamResult> resultCaptor = ArgumentCaptor.forClass(ExamResult.class);
-        InOrder callbackOrder = inOrder(examSessionRepository, valueOperations, examResultRepository);
+        ArgumentCaptor<ExamSummary> summaryCaptor = ArgumentCaptor.forClass(ExamSummary.class);
+        InOrder callbackOrder = inOrder(examSessionRepository, valueOperations, examSummaryRepository);
         callbackOrder.verify(examSessionRepository).findById(EXAM_ID);
         callbackOrder.verify(valueOperations).set(
                 "exam:status:" + EXAM_ID,
@@ -261,27 +267,24 @@ class FeedbackCallbackServiceTest {
                 1,
                 TimeUnit.HOURS
         );
-        callbackOrder.verify(examResultRepository).save(resultCaptor.capture());
+        callbackOrder.verify(examSummaryRepository).save(summaryCaptor.capture());
 
-        ExamResult savedResult = resultCaptor.getValue();
+        ExamSummary savedSummary = summaryCaptor.getValue();
         assertAll(
-                () -> assertEquals(EXAM_ID, savedResult.getExamId()),
-                () -> assertEquals(USER_ID, savedResult.getUserId()),
-                () -> assertNotEquals(savedResult.getExamId(), savedResult.getUserId()),
-                () -> assertEquals("mock_exam_003", savedResult.getMockExamId()),
-                () -> assertEquals(0, savedResult.getPartNumber()),
-                () -> assertEquals(0, savedResult.getQuestionNumber()),
-                () -> assertEquals(0, savedResult.getRetryCount()),
-                () -> assertEquals(170, savedResult.getTotalScore()),
-                () -> assertEquals("Advanced Mid", savedResult.getLevelEstimate()),
-                () -> assertEquals("test overall summary", savedResult.getSummary()),
-                () -> assertEquals("test overall feedback", savedResult.getOverallFeedback()),
-                () -> assertEquals(Map.of("part1", "test part feedback"), savedResult.getPartFeedback()),
-                () -> assertEquals(List.of("test strength"), savedResult.getStrengths()),
-                () -> assertEquals(List.of("test weakness"), savedResult.getWeaknesses()),
-                () -> assertEquals(List.of("test practice"), savedResult.getRecommendedPractice())
+                () -> assertEquals(EXAM_ID, savedSummary.getExamId()),
+                () -> assertEquals(USER_ID, savedSummary.getUserId()),
+                () -> assertNotEquals(savedSummary.getExamId(), savedSummary.getUserId()),
+                () -> assertEquals("mock_exam_003", savedSummary.getMockExamId()),
+                () -> assertEquals(170, savedSummary.getTotalScore()),
+                () -> assertEquals("Advanced Mid", savedSummary.getLevelEstimate()),
+                () -> assertEquals("test overall summary", savedSummary.getSummary()),
+                () -> assertEquals("test overall feedback", savedSummary.getOverallFeedback()),
+                () -> assertEquals(Map.of("part1", "test part feedback"), savedSummary.getPartFeedback()),
+                () -> assertEquals(List.of("test strength"), savedSummary.getStrengths()),
+                () -> assertEquals(List.of("test weakness"), savedSummary.getWeaknesses()),
+                () -> assertEquals(List.of("test practice"), savedSummary.getRecommendedPractice())
         );
-        verifyNoInteractions(currentUserProvider, restTemplate);
+        verifyNoInteractions(examResultRepository, currentUserProvider, restTemplate);
     }
 
     @Test
@@ -304,7 +307,13 @@ class FeedbackCallbackServiceTest {
 
         assertSame(ErrorStatus._EXAM_NOT_FOUND, exception.getCode());
         verify(examSessionRepository).findById(EXAM_ID);
-        verifyNoInteractions(examResultRepository, redisTemplate, currentUserProvider, restTemplate);
+        verifyNoInteractions(
+                examResultRepository,
+                examSummaryRepository,
+                redisTemplate,
+                currentUserProvider,
+                restTemplate
+        );
     }
 
     @Test

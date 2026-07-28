@@ -24,6 +24,7 @@ import software.amazon.awssdk.services.s3.presigner.model.PutObjectPresignReques
 import web.tosunsaeng.domain.exams.domain.entity.AzureResult;
 import web.tosunsaeng.domain.exams.domain.entity.ExamResult;
 import web.tosunsaeng.domain.exams.domain.entity.ExamSession;
+import web.tosunsaeng.domain.exams.domain.entity.ExamSummary;
 import web.tosunsaeng.domain.exams.domain.entity.MockExam;
 import web.tosunsaeng.domain.exams.domain.entity.Question;
 import web.tosunsaeng.domain.exams.domain.entity.SpeechAceResult;
@@ -31,6 +32,7 @@ import web.tosunsaeng.domain.exams.domain.enums.ExamStatus;
 import web.tosunsaeng.domain.exams.domain.repository.AzureResultRepository;
 import web.tosunsaeng.domain.exams.domain.repository.ExamResultRepository;
 import web.tosunsaeng.domain.exams.domain.repository.ExamSessionRepository;
+import web.tosunsaeng.domain.exams.domain.repository.ExamSummaryRepository;
 import web.tosunsaeng.domain.exams.domain.repository.MockExamRepository;
 import web.tosunsaeng.domain.exams.domain.repository.SpeechAceResultRepository;
 import web.tosunsaeng.domain.exams.dto.ExamRequestDTO;
@@ -41,6 +43,7 @@ import web.tosunsaeng.global.error.code.status.ErrorStatus;
 
 import java.net.URI;
 import java.time.LocalDateTime;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -89,6 +92,9 @@ class ExamOwnershipServiceTest {
     private ExamResultRepository examResultRepository;
 
     @Mock
+    private ExamSummaryRepository examSummaryRepository;
+
+    @Mock
     private ExamSessionRepository examSessionRepository;
 
     @Mock
@@ -113,6 +119,7 @@ class ExamOwnershipServiceTest {
                 s3Presigner,
                 restTemplate,
                 examResultRepository,
+                examSummaryRepository,
                 examSessionRepository,
                 mockExamRepository,
                 speechAceResultRepository,
@@ -198,10 +205,9 @@ class ExamOwnershipServiceTest {
     @Test
     void ownerCanReadExamSummaryAfterOwnershipCheck() {
         stubOwnedSession();
-        ExamResult summary = ExamResult.builder()
+        ExamSummary summary = ExamSummary.builder()
                 .examId(EXAM_ID)
                 .userId(OWNER_USER_ID)
-                .questionNumber(0)
                 .totalScore(180)
                 .levelEstimate("Advanced")
                 .build();
@@ -214,7 +220,9 @@ class ExamOwnershipServiceTest {
                 .score(5.0)
                 .build();
         when(examResultRepository.findByExamId(EXAM_ID))
-                .thenReturn(List.of(summary, questionResult));
+                .thenReturn(List.of(questionResult));
+        when(examSummaryRepository.findFirstByExamIdOrderByIdDesc(EXAM_ID))
+                .thenReturn(Optional.of(summary));
 
         ExamResponseDTO.SummaryResult result = examService.getExamSummary(EXAM_ID);
 
@@ -225,6 +233,58 @@ class ExamOwnershipServiceTest {
                 () -> assertEquals(5.0, result.getPartScores().get("part1"))
         );
         verify(examResultRepository).findByExamId(EXAM_ID);
+        verify(examSummaryRepository).findFirstByExamIdOrderByIdDesc(EXAM_ID);
+    }
+
+    @Test
+    void latestOverallFeedbackFromSeparateCollectionIsUsed() {
+        stubOwnedSession();
+        ExamSummary latestSummary = ExamSummary.builder()
+                .id("000000000000000000000002")
+                .examId(EXAM_ID)
+                .userId(OWNER_USER_ID)
+                .totalScore(190)
+                .summary("latest overall summary")
+                .build();
+        when(examResultRepository.findByExamId(EXAM_ID)).thenReturn(List.of());
+        when(examSummaryRepository.findFirstByExamIdOrderByIdDesc(EXAM_ID))
+                .thenReturn(Optional.of(latestSummary));
+
+        ExamResponseDTO.SummaryResult result = examService.getExamSummary(EXAM_ID);
+
+        assertAll(
+                () -> assertEquals(190, result.getTotalScore()),
+                () -> assertEquals("latest overall summary", result.getSummary()),
+                () -> assertEquals(0, result.getTotalSolvedQuestions())
+        );
+        verify(examSummaryRepository).findFirstByExamIdOrderByIdDesc(EXAM_ID);
+    }
+
+    @Test
+    void latestLegacyOverallFeedbackIsUsedWhenSeparateCollectionIsEmpty() {
+        stubOwnedSession();
+        ExamResult latestLegacySummary = ExamResult.builder()
+                .id("000000000000000000000002")
+                .examId(EXAM_ID)
+                .userId(OWNER_USER_ID)
+                .totalScore(175)
+                .summary("latest legacy overall summary")
+                .build();
+        when(examResultRepository.findByExamId(EXAM_ID)).thenReturn(List.of());
+        when(examSummaryRepository.findFirstByExamIdOrderByIdDesc(EXAM_ID))
+                .thenReturn(Optional.empty());
+        when(examResultRepository.findFirstByExamIdAndTotalScoreIsNotNullOrderByIdDesc(EXAM_ID))
+                .thenReturn(Optional.of(latestLegacySummary));
+
+        ExamResponseDTO.SummaryResult result = examService.getExamSummary(EXAM_ID);
+
+        assertAll(
+                () -> assertEquals(175, result.getTotalScore()),
+                () -> assertEquals("latest legacy overall summary", result.getSummary())
+        );
+        verify(examSummaryRepository).findFirstByExamIdOrderByIdDesc(EXAM_ID);
+        verify(examResultRepository)
+                .findFirstByExamIdAndTotalScoreIsNotNullOrderByIdDesc(EXAM_ID);
     }
 
     @Test
@@ -239,6 +299,11 @@ class ExamOwnershipServiceTest {
                 .score(5.0)
                 .build();
         when(examResultRepository.findByExamId(EXAM_ID)).thenReturn(List.of(questionResult));
+        when(examResultRepository.findFirstByExamIdAndQuestionNumberAndRetryCountInOrderByIdDesc(
+                EXAM_ID,
+                1,
+                Arrays.asList(0, null)
+        )).thenReturn(Optional.of(questionResult));
         when(azureResultRepository.findFirstByExamIdAndQuestionNumberAndRetryCountOrderByIdDesc(EXAM_ID, 1, 0))
                 .thenReturn(Optional.empty());
         when(mockExamRepository.findByMockExamId("mock_exam_003"))
@@ -257,10 +322,66 @@ class ExamOwnershipServiceTest {
                 () -> assertEquals(5.0, result.getQuestion().getScore())
         );
         verify(examResultRepository).findByExamId(EXAM_ID);
+        verify(examResultRepository).findFirstByExamIdAndQuestionNumberAndRetryCountInOrderByIdDesc(
+                EXAM_ID,
+                1,
+                Arrays.asList(0, null)
+        );
         verify(azureResultRepository)
                 .findFirstByExamIdAndQuestionNumberAndRetryCountOrderByIdDesc(EXAM_ID, 1, 0);
         verify(mockExamRepository).findByMockExamId("mock_exam_003");
         verify(s3Presigner).presignGetObject(any(GetObjectPresignRequest.class));
+    }
+
+    @Test
+    void latestAiQuestionFeedbackIsUsedWhenTheSameRetryWasSavedMoreThanOnce() throws Exception {
+        stubOwnedSession();
+        ExamResult olderResult = ExamResult.builder()
+                .id("000000000000000000000001")
+                .examId(EXAM_ID)
+                .userId(OWNER_USER_ID)
+                .partNumber(1)
+                .questionNumber(1)
+                .retryCount(2)
+                .score(3.0)
+                .build();
+        ExamResult latestResult = ExamResult.builder()
+                .id("000000000000000000000002")
+                .examId(EXAM_ID)
+                .userId(OWNER_USER_ID)
+                .partNumber(1)
+                .questionNumber(1)
+                .retryCount(2)
+                .score(9.0)
+                .build();
+        when(examResultRepository.findByExamId(EXAM_ID))
+                .thenReturn(List.of(olderResult, latestResult));
+        when(examResultRepository.findFirstByExamIdAndQuestionNumberAndRetryCountInOrderByIdDesc(
+                EXAM_ID,
+                1,
+                List.of(2)
+        )).thenReturn(Optional.of(latestResult));
+        when(azureResultRepository.findFirstByExamIdAndQuestionNumberAndRetryCountOrderByIdDesc(EXAM_ID, 1, 2))
+                .thenReturn(Optional.empty());
+        when(mockExamRepository.findByMockExamId("mock_exam_003"))
+                .thenReturn(Optional.of(mockExam()));
+        when(s3Presigner.presignGetObject(any(GetObjectPresignRequest.class)))
+                .thenReturn(presignedGetObjectRequest);
+        when(presignedGetObjectRequest.url())
+                .thenReturn(URI.create("https://example.com/submitted-audio.wav").toURL());
+
+        ExamResponseDTO.QuestionResult result = examService.getExamQuestion(EXAM_ID, 1, 2);
+
+        assertAll(
+                () -> assertEquals(9.0, result.getQuestion().getScore()),
+                () -> assertEquals(2, result.getQuestion().getRetryCount()),
+                () -> assertEquals(3, result.getQuestion().getTotalRetryCount())
+        );
+        verify(examResultRepository).findFirstByExamIdAndQuestionNumberAndRetryCountInOrderByIdDesc(
+                EXAM_ID,
+                1,
+                List.of(2)
+        );
     }
 
     @Test
@@ -298,6 +419,7 @@ class ExamOwnershipServiceTest {
                 s3Presigner,
                 restTemplate,
                 examResultRepository,
+                examSummaryRepository,
                 azureResultRepository,
                 speechAceResultRepository,
                 mockExamRepository
@@ -322,6 +444,7 @@ class ExamOwnershipServiceTest {
                 s3Presigner,
                 restTemplate,
                 examResultRepository,
+                examSummaryRepository,
                 azureResultRepository,
                 speechAceResultRepository,
                 mockExamRepository
@@ -357,7 +480,13 @@ class ExamOwnershipServiceTest {
                         resultCaptor.getValue().getUserId()
                 )
         );
-        verifyNoInteractions(currentUserProvider, redisTemplate, s3Presigner, restTemplate);
+        verifyNoInteractions(
+                examSummaryRepository,
+                currentUserProvider,
+                redisTemplate,
+                s3Presigner,
+                restTemplate
+        );
     }
 
     @Test
@@ -383,7 +512,8 @@ class ExamOwnershipServiceTest {
                 redisTemplate,
                 s3Presigner,
                 restTemplate,
-                examResultRepository
+                examResultRepository,
+                examSummaryRepository
         );
     }
 

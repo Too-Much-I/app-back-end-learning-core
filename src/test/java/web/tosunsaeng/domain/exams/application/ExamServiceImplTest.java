@@ -24,6 +24,7 @@ import web.tosunsaeng.domain.exams.domain.enums.ExamStatus;
 import web.tosunsaeng.domain.exams.domain.repository.AzureResultRepository;
 import web.tosunsaeng.domain.exams.domain.repository.ExamResultRepository;
 import web.tosunsaeng.domain.exams.domain.repository.ExamSessionRepository;
+import web.tosunsaeng.domain.exams.domain.repository.ExamSummaryRepository;
 import web.tosunsaeng.domain.exams.domain.repository.MockExamRepository;
 import web.tosunsaeng.domain.exams.domain.repository.SpeechAceResultRepository;
 import web.tosunsaeng.domain.exams.dto.ExamResponseDTO;
@@ -64,6 +65,9 @@ class ExamServiceImplTest {
 
     @Mock
     private ExamResultRepository examResultRepository;
+
+    @Mock
+    private ExamSummaryRepository examSummaryRepository;
 
     @Mock
     private ExamSessionRepository examSessionRepository;
