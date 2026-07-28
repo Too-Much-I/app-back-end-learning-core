@@ -306,6 +306,16 @@ Codex는 파일 수정과 테스트까지만 수행한다.
 
 커밋과 push는 사용자가 직접 수행한다.
 
+# 작업 기록 규칙
+
+- 모든 Codex 구현·분석·리뷰 작업은 종료 전에 `docs/codex/WORKLOG.md` 끝에 새 항목을 append한다.
+- 모든 Codex 작업은 종료 전에 `docs/codex/CURRENT_STATE.md`를 최신 상태로 갱신한다.
+- Jira 이슈 키가 있으면 WORKLOG와 CURRENT_STATE에 기록한다.
+- WORKLOG의 과거 항목은 수정하거나 삭제하지 않는다.
+- 코드 변경이 없는 분석 작업도 WORKLOG와 CURRENT_STATE에 기록한다.
+- Secret과 Token은 WORKLOG와 CURRENT_STATE에 기록하지 않는다.
+- Git commit과 push는 사용자가 직접 수행한다.
+
 # 작업 완료 보고 규칙
 
 각 작업이 끝나면 다음 내용을 보고한다.
