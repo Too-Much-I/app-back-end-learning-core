@@ -84,6 +84,9 @@ class ExamServiceImplTest {
     @Mock
     private CurrentUserProvider currentUserProvider;
 
+    @Mock
+    private ExamGradingService gradingService;
+
     @InjectMocks
     private ExamServiceImpl examService;
 

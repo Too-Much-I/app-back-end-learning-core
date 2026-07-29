@@ -53,6 +53,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.inOrder;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
@@ -100,6 +101,9 @@ class FeedbackCallbackServiceTest {
     @Mock
     private CurrentUserProvider currentUserProvider;
 
+    @Mock
+    private ExamGradingService gradingService;
+
     private final ObjectMapper objectMapper = new ObjectMapper();
     private ExamServiceImpl examService;
 
@@ -108,7 +112,7 @@ class FeedbackCallbackServiceTest {
         examService = new ExamServiceImpl(
                 redisTemplate,
                 s3Presigner,
-                restTemplate,
+                gradingService,
                 examResultRepository,
                 examSummaryRepository,
                 examSessionRepository,
@@ -180,7 +184,7 @@ class FeedbackCallbackServiceTest {
         ArgumentCaptor<ExamResult> resultCaptor = ArgumentCaptor.forClass(ExamResult.class);
         InOrder callbackOrder = inOrder(examSessionRepository, examResultRepository);
         callbackOrder.verify(examSessionRepository).findById(EXAM_ID);
-        callbackOrder.verify(examResultRepository).save(resultCaptor.capture());
+        callbackOrder.verify(examResultRepository).insert(resultCaptor.capture());
 
         ExamResult savedResult = resultCaptor.getValue();
         ExamResult.ItemFeedback feedback = savedResult.getFeedback();
@@ -189,6 +193,7 @@ class FeedbackCallbackServiceTest {
 
         assertAll(
                 () -> assertEquals(EXAM_ID, savedResult.getExamId()),
+                () -> assertEquals("feedback:" + EXAM_ID + ":4:2", savedResult.getId()),
                 () -> assertEquals(USER_ID, savedResult.getUserId()),
                 () -> assertNotEquals(savedResult.getExamId(), savedResult.getUserId()),
                 () -> assertEquals("mock_exam_003", savedResult.getMockExamId()),
@@ -232,6 +237,8 @@ class FeedbackCallbackServiceTest {
                 () -> assertEquals(92.0, spokenWord.getPronunciationScore()),
                 () -> assertEquals("None", spokenWord.getErrorType())
         );
+        verify(gradingService).completeQuestion(EXAM_ID, 4, 2);
+        verify(gradingService).ensureSummaryStartedIfReady(EXAM_ID);
         verifyNoInteractions(examSummaryRepository, currentUserProvider, redisTemplate, restTemplate);
     }
 
@@ -254,24 +261,17 @@ class FeedbackCallbackServiceTest {
                 }
                 """, ExamRequestDTO.AiResultReq.class);
         when(examSessionRepository.findById(EXAM_ID)).thenReturn(Optional.of(examSession()));
-        when(redisTemplate.opsForValue()).thenReturn(valueOperations);
-
         examService.updateExamResult(req);
 
         ArgumentCaptor<ExamSummary> summaryCaptor = ArgumentCaptor.forClass(ExamSummary.class);
-        InOrder callbackOrder = inOrder(examSessionRepository, valueOperations, examSummaryRepository);
+        InOrder callbackOrder = inOrder(examSessionRepository, examSummaryRepository);
         callbackOrder.verify(examSessionRepository).findById(EXAM_ID);
-        callbackOrder.verify(valueOperations).set(
-                "exam:status:" + EXAM_ID,
-                ExamStatus.COMPLETED.name(),
-                1,
-                TimeUnit.HOURS
-        );
-        callbackOrder.verify(examSummaryRepository).save(summaryCaptor.capture());
+        callbackOrder.verify(examSummaryRepository).insert(summaryCaptor.capture());
 
         ExamSummary savedSummary = summaryCaptor.getValue();
         assertAll(
                 () -> assertEquals(EXAM_ID, savedSummary.getExamId()),
+                () -> assertEquals("summary:" + EXAM_ID + ":v1", savedSummary.getId()),
                 () -> assertEquals(USER_ID, savedSummary.getUserId()),
                 () -> assertNotEquals(savedSummary.getExamId(), savedSummary.getUserId()),
                 () -> assertEquals("mock_exam_003", savedSummary.getMockExamId()),
@@ -284,7 +284,9 @@ class FeedbackCallbackServiceTest {
                 () -> assertEquals(List.of("test weakness"), savedSummary.getWeaknesses()),
                 () -> assertEquals(List.of("test practice"), savedSummary.getRecommendedPractice())
         );
-        verifyNoInteractions(examResultRepository, currentUserProvider, restTemplate);
+        verify(gradingService).completeSummary(EXAM_ID);
+        verify(gradingService).calculateAndCacheOverallStatus(EXAM_ID);
+        verifyNoInteractions(currentUserProvider, restTemplate);
     }
 
     @Test
@@ -344,62 +346,88 @@ class FeedbackCallbackServiceTest {
     }
 
     @Test
-    @SuppressWarnings({"rawtypes", "unchecked"})
-    void multipartAiRequestKeepsExamIdAsExternalUserId() throws Exception {
+    void duplicateFeedbackCallbackStoresOneResultAndDoesNotRetriggerSummary() throws Exception {
+        ExamRequestDTO.AiResultReq req = objectMapper.readValue("""
+                {
+                  "user_id": "ex_callback_001",
+                  "mock_exam_id": "mock_exam_003",
+                  "question_number": 4,
+                  "retry_count": 0,
+                  "score": 8.0
+                }
+                """, ExamRequestDTO.AiResultReq.class);
         when(examSessionRepository.findById(EXAM_ID)).thenReturn(Optional.of(examSession()));
-        when(currentUserProvider.getCurrentUserId()).thenReturn(USER_ID);
-        when(redisTemplate.opsForValue()).thenReturn(valueOperations);
-        when(s3Presigner.presignGetObject(any(GetObjectPresignRequest.class)))
-                .thenReturn(presignedGetObjectRequest);
-        when(presignedGetObjectRequest.url())
-                .thenReturn(URI.create("https://example.com/test-audio.wav").toURL());
-        when(restTemplate.getForObject(any(URI.class), eq(byte[].class)))
-                .thenReturn(new byte[]{1, 2, 3});
+        when(examResultRepository.existsByExamIdAndQuestionNumberAndRetryCountIn(
+                eq(EXAM_ID), eq(4), any()))
+                .thenReturn(false, true);
 
-        examService.submitAudio(EXAM_ID, 4, 2);
+        examService.updateExamResult(req);
+        examService.updateExamResult(req);
 
-        ArgumentCaptor<HttpEntity> requestCaptor = ArgumentCaptor.forClass(HttpEntity.class);
-        verify(restTemplate).postForEntity(eq(AI_SERVER_URL), requestCaptor.capture(), eq(String.class));
-
-        Object rawBody = requestCaptor.getValue().getBody();
-        MultiValueMap<String, Object> body = (MultiValueMap<String, Object>)
-                assertInstanceOf(MultiValueMap.class, rawBody);
-        assertAll(
-                () -> assertEquals(EXAM_ID, body.getFirst("user_id")),
-                () -> assertNotEquals(USER_ID, body.getFirst("user_id")),
-                () -> assertEquals("mock_exam_003", body.getFirst("mock_exam_id")),
-                () -> assertEquals(2, body.getFirst("part_number")),
-                () -> assertEquals(4, body.getFirst("question_number")),
-                () -> assertEquals(2, body.getFirst("retry_count")),
-                () -> assertInstanceOf(ByteArrayResource.class, body.getFirst("audio_file"))
-        );
-        verify(examSessionRepository).findById(EXAM_ID);
-        verify(currentUserProvider).getCurrentUserId();
+        verify(examResultRepository, times(1)).insert(any(ExamResult.class));
+        verify(gradingService, times(2)).completeQuestion(EXAM_ID, 4, 0);
+        verify(gradingService, times(2)).ensureSummaryStartedIfReady(EXAM_ID);
     }
 
     @Test
-    void overallSummaryAiRequestKeepsExamIdAndExistingZeroFlags() {
-        ReflectionTestUtils.invokeMethod(
-                examService,
-                "requestOverallSummary",
-                EXAM_ID,
-                null
-        );
+    void duplicateSpeechAceCallbackStoresOneResult() throws Exception {
+        ExamRequestDTO.SpeechAceReq req = objectMapper.readValue("""
+                {
+                  "user_id": "ex_callback_001",
+                  "question_number": 4,
+                  "retry_count": 0,
+                  "speechace_result": {"score": 90}
+                }
+                """, ExamRequestDTO.SpeechAceReq.class);
+        when(speechAceResultRepository.existsByExamIdAndQuestionNumberAndRetryCountIn(
+                eq(EXAM_ID), eq(4), any()))
+                .thenReturn(false, true);
 
-        ArgumentCaptor<HttpEntity> requestCaptor = ArgumentCaptor.forClass(HttpEntity.class);
-        verify(restTemplate).postForEntity(eq(AI_SERVER_URL), requestCaptor.capture(), eq(String.class));
+        examService.saveSpeechAceResult(req);
+        examService.saveSpeechAceResult(req);
 
-        Object rawBody = requestCaptor.getValue().getBody();
-        Map<?, ?> body = assertInstanceOf(Map.class, rawBody);
-        assertAll(
-                () -> assertEquals(EXAM_ID, body.get("user_id")),
-                () -> assertNotEquals(USER_ID, body.get("user_id")),
-                () -> assertEquals("mock_exam_003", body.get("mock_exam_id")),
-                () -> assertEquals(0, body.get("question_number")),
-                () -> assertEquals(0, body.get("part_number")),
-                () -> assertNull(body.get("retry_count"))
+        verify(speechAceResultRepository, times(1)).insert(any(web.tosunsaeng.domain.exams.domain.entity.SpeechAceResult.class));
+    }
+
+    @Test
+    void duplicateAzureCallbackStoresOneResult() {
+        Map<String, Object> payload = Map.of(
+                "metadata", Map.of(
+                        "user_id", EXAM_ID,
+                        "question_number", 4,
+                        "retry_count", 0
+                )
         );
-        verifyNoInteractions(currentUserProvider, examSessionRepository);
+        when(azureResultRepository.existsByExamIdAndQuestionNumberAndRetryCountIn(
+                eq(EXAM_ID), eq(4), any()))
+                .thenReturn(false, true);
+
+        examService.processAzureCallback(payload);
+        examService.processAzureCallback(payload);
+
+        verify(azureResultRepository, times(1)).insert(any(web.tosunsaeng.domain.exams.domain.entity.AzureResult.class));
+    }
+
+    @Test
+    void duplicateSummaryCallbackStoresOneResult() throws Exception {
+        ExamRequestDTO.AiResultReq req = objectMapper.readValue("""
+                {
+                  "user_id": "ex_callback_001",
+                  "mock_exam_id": "mock_exam_003",
+                  "suggested_total_score": 170,
+                  "question_number": 0
+                }
+                """, ExamRequestDTO.AiResultReq.class);
+        when(examSessionRepository.findById(EXAM_ID)).thenReturn(Optional.of(examSession()));
+        when(examSummaryRepository.existsById("summary:" + EXAM_ID + ":v1"))
+                .thenReturn(false, true);
+
+        examService.updateExamResult(req);
+        examService.updateExamResult(req);
+
+        verify(examSummaryRepository, times(1)).insert(any(ExamSummary.class));
+        verify(gradingService, times(2)).completeSummary(EXAM_ID);
+        verify(gradingService, times(2)).calculateAndCacheOverallStatus(EXAM_ID);
     }
 
     private ExamSession examSession() {

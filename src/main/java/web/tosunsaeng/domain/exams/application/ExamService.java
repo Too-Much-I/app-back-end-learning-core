@@ -13,6 +13,8 @@ public interface ExamService {
 
     ExamResponseDTO.SubmitResult submitAudio(String examId, Integer questionNumber, Integer retryCount);
 
+    ExamResponseDTO.GradingRetryResult retryGrading(String examId);
+
     ExamResponseDTO.StatusResult getExamStatus(String examId);
 
     void updateExamResult(ExamRequestDTO.AiResultReq req);

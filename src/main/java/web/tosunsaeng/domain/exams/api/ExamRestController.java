@@ -48,6 +48,13 @@ public class ExamRestController {
         return BaseResponse.onSuccess(SuccessStatus.OK, examService.submitAudio(examId, questionNumber, retryCount));
     }
 
+    @Operation(summary = "시험 단위 재채점 API", description = "최초 응시 문항과 전체 요약 중 실패하거나 제한 시간을 초과한 채점 작업만 복구합니다.")
+    @PostMapping("/{examId}/grading/retry")
+    public BaseResponse<ExamResponseDTO.GradingRetryResult> retryGrading(
+            @PathVariable("examId") String examId) {
+        return BaseResponse.onSuccess(SuccessStatus.OK, examService.retryGrading(examId));
+    }
+
     @Operation(summary = "채점 진행 상태 조회 API", description = "비동기 채점이 완료되었는지 진행 상태를 폴링(Polling)합니다.")
     @GetMapping("/{examId}/status")
     public BaseResponse<ExamResponseDTO.StatusResult> getExamStatus(

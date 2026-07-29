@@ -20,8 +20,12 @@ import web.tosunsaeng.domain.exams.domain.repository.ExamSessionRepository;
 import web.tosunsaeng.domain.exams.domain.repository.ExamSummaryRepository;
 import web.tosunsaeng.domain.exams.domain.repository.MockExamRepository;
 import web.tosunsaeng.domain.exams.domain.repository.QuestionRepository;
+import web.tosunsaeng.domain.exams.domain.repository.QuestionGradingJobRepository;
 import web.tosunsaeng.domain.exams.domain.repository.SpeechAceResultRepository;
+import web.tosunsaeng.domain.exams.domain.repository.SummaryGradingJobRepository;
 import web.tosunsaeng.domain.exams.dto.ExamResponseDTO;
+import web.tosunsaeng.domain.exams.domain.enums.ExamStatus;
+import web.tosunsaeng.domain.exams.domain.enums.SummaryAction;
 import web.tosunsaeng.global.auth.CurrentUserProvider;
 import web.tosunsaeng.global.auth.JwtCurrentUserProvider;
 import web.tosunsaeng.global.auth.LegacyCurrentUserProvider;
@@ -33,6 +37,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.when;
+import static org.mockito.Mockito.verify;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -80,6 +85,12 @@ class LegacySecurityIntegrationTest {
     @MockitoBean
     private AzureResultRepository azureResultRepository;
 
+    @MockitoBean
+    private QuestionGradingJobRepository questionGradingJobRepository;
+
+    @MockitoBean
+    private SummaryGradingJobRepository summaryGradingJobRepository;
+
     @BeforeEach
     void setUp() {
         when(examService.createExamSession()).thenReturn(
@@ -114,5 +125,31 @@ class LegacySecurityIntegrationTest {
                 .andExpect(jsonPath("$.result.examId").value("ex_legacy_test"))
                 .andExpect(jsonPath("$..userId").doesNotExist())
                 .andExpect(jsonPath("$..user_id").doesNotExist());
+    }
+
+    @Test
+    void gradingRetryEndpointRequiresNoRequestBodyAndKeepsBaseResponse() throws Exception {
+        when(examService.retryGrading("ex_legacy_test")).thenReturn(
+                ExamResponseDTO.GradingRetryResult.builder()
+                        .examId("ex_legacy_test")
+                        .overallStatus(ExamStatus.PROCESSING)
+                        .retriedQuestionNumbers(List.of(2))
+                        .waitingQuestionNumbers(List.of(3))
+                        .missingSubmissionQuestionNumbers(List.of(4))
+                        .summaryAction(SummaryAction.NOT_READY)
+                        .build()
+        );
+
+        mockMvc.perform(post("/api/v1/exams/{examId}/grading/retry", "ex_legacy_test"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.isSuccess").value(true))
+                .andExpect(jsonPath("$.result.examId").value("ex_legacy_test"))
+                .andExpect(jsonPath("$.result.overallStatus").value("PROCESSING"))
+                .andExpect(jsonPath("$.result.retriedQuestionNumbers[0]").value(2))
+                .andExpect(jsonPath("$.result.waitingQuestionNumbers[0]").value(3))
+                .andExpect(jsonPath("$.result.missingSubmissionQuestionNumbers[0]").value(4))
+                .andExpect(jsonPath("$.result.summaryAction").value("NOT_READY"));
+
+        verify(examService).retryGrading("ex_legacy_test");
     }
 }

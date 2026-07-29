@@ -39,6 +39,8 @@ import software.amazon.awssdk.services.s3.presigner.model.GetObjectPresignReques
 import software.amazon.awssdk.services.s3.presigner.model.PresignedGetObjectRequest;
 import web.tosunsaeng.domain.exams.api.ExamRestController;
 import web.tosunsaeng.domain.exams.application.ExamServiceImpl;
+import web.tosunsaeng.domain.exams.application.ExamGradingService;
+import web.tosunsaeng.domain.exams.domain.entity.ExamResult;
 import web.tosunsaeng.domain.exams.domain.entity.ExamSession;
 import web.tosunsaeng.domain.exams.domain.entity.MockExam;
 import web.tosunsaeng.domain.exams.domain.entity.Question;
@@ -48,8 +50,10 @@ import web.tosunsaeng.domain.exams.domain.repository.ExamResultRepository;
 import web.tosunsaeng.domain.exams.domain.repository.ExamSessionRepository;
 import web.tosunsaeng.domain.exams.domain.repository.ExamSummaryRepository;
 import web.tosunsaeng.domain.exams.domain.repository.MockExamRepository;
+import web.tosunsaeng.domain.exams.domain.repository.QuestionGradingJobRepository;
 import web.tosunsaeng.domain.exams.domain.repository.QuestionRepository;
 import web.tosunsaeng.domain.exams.domain.repository.SpeechAceResultRepository;
+import web.tosunsaeng.domain.exams.domain.repository.SummaryGradingJobRepository;
 import web.tosunsaeng.global.auth.CurrentUserProvider;
 import web.tosunsaeng.global.auth.JwtCurrentUserProvider;
 import web.tosunsaeng.global.auth.LegacyCurrentUserProvider;
@@ -128,6 +132,9 @@ class JwtSecurityIntegrationTest {
     private RestTemplate restTemplate;
 
     @MockitoBean
+    private ExamGradingService gradingService;
+
+    @MockitoBean
     private ExamResultRepository examResultRepository;
 
     @MockitoBean
@@ -147,6 +154,12 @@ class JwtSecurityIntegrationTest {
 
     @MockitoBean
     private AzureResultRepository azureResultRepository;
+
+    @MockitoBean
+    private QuestionGradingJobRepository questionGradingJobRepository;
+
+    @MockitoBean
+    private SummaryGradingJobRepository summaryGradingJobRepository;
 
     private final Map<String, ExamSession> sessions = new ConcurrentHashMap<>();
     private ValueOperations<String, Object> valueOperations;
@@ -173,7 +186,7 @@ class JwtSecurityIntegrationTest {
         sessions.clear();
         valueOperations = mock(ValueOperations.class);
         when(redisTemplate.opsForValue()).thenReturn(valueOperations);
-        when(valueOperations.get(anyString())).thenReturn(ExamStatus.PENDING.name());
+        when(gradingService.calculateAndCacheOverallStatus(anyString())).thenReturn(ExamStatus.PENDING);
 
         when(examSessionRepository.save(any(ExamSession.class))).thenAnswer(invocation -> {
             ExamSession session = invocation.getArgument(0);
@@ -301,7 +314,7 @@ class JwtSecurityIntegrationTest {
                 .andExpect(jsonPath("$.isSuccess").value(true));
 
         verify(examSessionRepository).findById(CALLBACK_EXAM_ID);
-        verify(examResultRepository).save(any());
+        verify(examResultRepository).insert(any(ExamResult.class));
     }
 
     @Test

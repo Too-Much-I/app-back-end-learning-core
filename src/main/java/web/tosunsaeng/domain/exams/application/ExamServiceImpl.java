@@ -3,6 +3,7 @@ package web.tosunsaeng.domain.exams.application;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.dao.DuplicateKeyException;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -20,10 +21,6 @@ import web.tosunsaeng.domain.exams.dto.ExamResponseDTO;
 import web.tosunsaeng.domain.exams.exception.ExamsException;
 import web.tosunsaeng.global.auth.CurrentUserProvider;
 import web.tosunsaeng.global.error.code.status.ErrorStatus;
-import org.springframework.web.client.RestTemplate;
-import org.springframework.http.*;
-import org.springframework.util.LinkedMultiValueMap;
-import org.springframework.util.MultiValueMap;
 
 import java.time.Duration;
 import java.time.LocalDateTime;
@@ -32,6 +29,7 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
@@ -43,9 +41,7 @@ public class ExamServiceImpl implements ExamService {
 
     private final RedisTemplate<String, Object> redisTemplate;
     private final software.amazon.awssdk.services.s3.presigner.S3Presigner s3Presigner;
-    private final RestTemplate restTemplate;
-
-    private final String AI_SERVER_URL = "http://ai-server:8000/evaluations";
+    private final ExamGradingService gradingService;
 
     private final ExamResultRepository examResultRepository;
     private final ExamSummaryRepository examSummaryRepository;
@@ -195,68 +191,25 @@ public class ExamServiceImpl implements ExamService {
         return ExamConverter.toUploadUrlResult(url, fileKey, 60);
     }
 
-    // 사용자의 특정 문항 녹음 파일을 S3에서 바이트 배열로 읽어와 AI 채점 파이썬 서버로 멀티파트 요청을 토스합니다.
+    // 기존 submit 계약은 유지하고 결정적 Job을 생성한 최초 요청만 AI 채점을 시작합니다.
     @Override
     public ExamResponseDTO.SubmitResult submitAudio(String examId, Integer questionNumber, Integer retryCount) {
         requireOwnedSession(examId);
-
-        String redisKey = "exam:status:" + examId;
-
-        // 상태를 연산 중(PROCESSING)으로 변경하여 클라이언트의 폴링 진입을 유도합니다.
-        redisTemplate.opsForValue().set(redisKey, ExamStatus.PROCESSING.name(), 1, TimeUnit.HOURS);
-
-        try {
-            String downloadUrl = getDownloadUrl(examId, questionNumber, retryCount);
-            byte[] audioBytes = restTemplate.getForObject(java.net.URI.create(downloadUrl), byte[].class);
-
-            if (audioBytes == null) {
-                throw new RuntimeException("S3 Storage에서 오디오 소스를 데이터 배열로 로드하는 데 실패했습니다.");
-            }
-
-            org.springframework.core.io.ByteArrayResource audioResource = new org.springframework.core.io.ByteArrayResource(audioBytes) {
-                @Override
-                public String getFilename() {
-                    return "q_" + questionNumber + "_r" + retryCount + ".webm";
-                }
-            };
-
-            // AI 서버 전송용 파라미터 셋과 바이너리 리소스를 폼 데이터에 적재합니다.
-            MultiValueMap<String, Object> body = new LinkedMultiValueMap<>();
-            body.add("user_id", examId);
-            body.add("mock_exam_id", "mock_exam_003");
-            body.add("part_number", getPartNumber(questionNumber));
-            body.add("question_number", questionNumber);
-            body.add("retry_count", retryCount);
-            body.add("audio_file", audioResource);
-
-            HttpHeaders headers = new HttpHeaders();
-            headers.setContentType(MediaType.MULTIPART_FORM_DATA);
-
-            HttpEntity<MultiValueMap<String, Object>> entity = new HttpEntity<>(body, headers);
-
-            restTemplate.postForEntity(AI_SERVER_URL, entity, String.class);
-            log.info("AI 모델 채점 요청 발송 완료: examId={}, qNum={}, retryCount={}", examId, questionNumber, retryCount);
-
-        } catch (Exception e) {
-            log.error("AI 채점 서버 전송 오류 발생", e);
-            redisTemplate.opsForValue().set(redisKey, ExamStatus.FAILED.name(), 1, TimeUnit.HOURS);
-            throw new ExamsException(ErrorStatus._AI_SERVER_CONNECTION_ERROR);
-        }
-
-        return ExamConverter.toSubmitResult(ExamStatus.PROCESSING);
+        ExamStatus status = gradingService.submitQuestion(examId, questionNumber, retryCount);
+        return ExamConverter.toSubmitResult(status);
     }
 
-    // 클라이언트가 결과 요약 팝업이나 대시보드 렌더링 시점에 호출하는 세션 전체 진행 상태를 빠른 메모리(Redis)에서 획득합니다.
+    @Override
+    public ExamResponseDTO.GradingRetryResult retryGrading(String examId) {
+        requireOwnedSession(examId);
+        return gradingService.retryExam(examId);
+    }
+
+    // Job과 저장 결과를 기준으로 전체 상태를 산정하고 기존 Redis Key/TTL에 projection합니다.
     @Override
     public ExamResponseDTO.StatusResult getExamStatus(String examId) {
         requireOwnedSession(examId);
-
-        String redisKey = "exam:status:" + examId;
-        String statusStr = (String) redisTemplate.opsForValue().get(redisKey);
-
-        if (statusStr == null) statusStr = ExamStatus.FAILED.name();
-
-        ExamStatus currentStatus = ExamStatus.valueOf(statusStr);
+        ExamStatus currentStatus = gradingService.calculateAndCacheOverallStatus(examId);
         return ExamConverter.toStatusResult(examId, currentStatus, 60);
     }
 
@@ -265,34 +218,51 @@ public class ExamServiceImpl implements ExamService {
     public void updateExamResult(ExamRequestDTO.AiResultReq req) {
         String examId = req.getExamId();
         ExamSession examSession = resolveSession(examId);
-        String redisKey = "exam:status:" + examId;
 
-        // AI 서버로부터 전체 최종 점수가 포함된 총합 데이터 수신 시 정규 세션 종료 처리
+        // 종합 결과도 결정적 ID와 legacy 논리 결과 확인으로 멱등 저장합니다.
         if (req.getTotalScore() != null) {
-            redisTemplate.opsForValue().set(redisKey, ExamStatus.COMPLETED.name(), 1, TimeUnit.HOURS);
-
-            ExamSummary summary = ExamConverter.toExamSummary(req, examSession.getUserId());
-            examSummaryRepository.save(summary);
-
-            log.info("AI 종합 피드백 영구 데이터 적재 완료: examId={}", examId);
+            String resultId = GradingKeys.summaryJobId(examId);
+            boolean alreadyStored = examSummaryRepository.existsById(resultId)
+                    || examSummaryRepository.existsByExamId(examId)
+                    || examResultRepository.findFirstByExamIdAndTotalScoreIsNotNullOrderByIdDesc(examId).isPresent();
+            if (!alreadyStored) {
+                try {
+                    ExamSummary summary = ExamConverter.toExamSummary(req, examSession.getUserId(), resultId);
+                    examSummaryRepository.insert(summary);
+                    log.info("AI 종합 피드백 영구 데이터 적재 완료: examId={}", examId);
+                } catch (DuplicateKeyException duplicateCallback) {
+                    log.info("중복 AI 종합 피드백 Callback 멱등 처리: examId={}", examId);
+                }
+            }
+            gradingService.completeSummary(examId);
+            gradingService.calculateAndCacheOverallStatus(examId);
             return;
         }
 
-        // 수신된 문항별 피드백 단건 조각을 전용 MongoDB 컬렉션에 저장
-        ExamResult result = ExamConverter.toExamResult(req, examSession.getUserId());
-        examResultRepository.save(result);
-
-        log.info("AI 피드백 영구 데이터 적재 완료: examId={}, qNum={}, retryCount={}",
-                req.getExamId(), req.getQuestionNumber(), req.getRetryCount());
-
-        if (req.getQuestionNumber() != null) {
-            // 시나리오 A: 정규 시험 세션의 경우 마지막 11번 문항 콜백 수신 완료 후 전체 성적서 요약을 비동기 트리거
-            if (examId.startsWith("ex_") && req.getQuestionNumber() == 11) {
-                java.util.concurrent.CompletableFuture.runAsync(() -> {
-                    requestOverallSummary(examId, req.getMockExamId());
-                });
+        int retryCount = GradingKeys.canonicalRetryCount(req.getRetryCount());
+        boolean alreadyStored = examResultRepository.existsByExamIdAndQuestionNumberAndRetryCountIn(
+                examId,
+                req.getQuestionNumber(),
+                compatibleRetryCounts(retryCount)
+        );
+        if (!alreadyStored) {
+            try {
+                ExamResult result = ExamConverter.toExamResult(
+                        req,
+                        examSession.getUserId(),
+                        GradingKeys.feedbackResultId(examId, req.getQuestionNumber(), retryCount)
+                );
+                examResultRepository.insert(result);
+                log.info("AI 피드백 영구 데이터 적재 완료: examId={}, qNum={}, retryCount={}",
+                        examId, req.getQuestionNumber(), retryCount);
+            } catch (DuplicateKeyException duplicateCallback) {
+                log.info("중복 AI Feedback Callback 멱등 처리: examId={}, qNum={}, retryCount={}",
+                        examId, req.getQuestionNumber(), retryCount);
             }
         }
+
+        gradingService.completeQuestion(examId, req.getQuestionNumber(), retryCount);
+        gradingService.ensureSummaryStartedIfReady(examId);
     }
 
     // 특정 시험 세션의 AI 총합 진단 레코드와 파트별 획득 점수의 누적 가산 합산 값을 연산하여 성적표 리포트를 반환합니다.
@@ -342,8 +312,7 @@ public class ExamServiceImpl implements ExamService {
         List<ExamResult> examResults = examResultRepository.findByExamId(examId);
 
         // Azure 연산 결과 레포지토리에서 문항 식별 및 특정 회차 타겟 레코드를 로드합니다.
-        AzureResult matchingAzure = azureResultRepository
-                .findFirstByExamIdAndQuestionNumberAndRetryCountOrderByIdDesc(examId, questionNumber, retryCount)
+        AzureResult matchingAzure = findCanonicalAzureResult(examId, questionNumber, retryCount)
                 .orElse(null);
 
         // 해당 문항에 대해 유저가 누적하여 도전한 총 횟수를 연산합니다.
@@ -393,37 +362,29 @@ public class ExamServiceImpl implements ExamService {
     // 별도의 3rd 파티 발음 평가 데이터인 SpeechAce 분석의 원본 수록 JSON을 전용 가공 컬렉션에 영구 보존합니다.
     @Override
     public void saveSpeechAceResult(ExamRequestDTO.SpeechAceReq req) {
+        int retryCount = GradingKeys.canonicalRetryCount(req.getRetryCount());
+        if (speechAceResultRepository.existsByExamIdAndQuestionNumberAndRetryCountIn(
+                req.getExamId(),
+                req.getQuestionNumber(),
+                compatibleRetryCounts(retryCount))) {
+            return;
+        }
+
         SpeechAceResult result = SpeechAceResult.builder()
+                .id(GradingKeys.speechAceResultId(req.getExamId(), req.getQuestionNumber(), retryCount))
                 .examId(req.getExamId())
                 .questionNumber(req.getQuestionNumber())
-                .retryCount(req.getRetryCount())
+                .retryCount(retryCount)
                 .speechAceData(req.getSpeechAceData())
                 .build();
 
-        speechAceResultRepository.save(result);
-        log.info("SpeechAce 가공 분석 원본 데이터 수복 완료: examId={}, questionNum={}", req.getExamId(), req.getQuestionNumber());
-    }
-
-    // AI 채점 서버에 종합 진단 및 전체 피드백 리포트(Summary) 생성을 비동기 요청합니다.
-    private void requestOverallSummary(String examId, String mockExamId) {
         try {
-            HttpHeaders headers = new HttpHeaders();
-            headers.setContentType(MediaType.APPLICATION_JSON);
-
-            // 약속된 포맷인 0번 문항 플래그를 할당하여 AI 비동기 오케스트레이션을 수행합니다.
-            java.util.Map<String, Object> body = new java.util.HashMap<>();
-            body.put("user_id", examId);
-            body.put("mock_exam_id", mockExamId != null ? mockExamId : "mock_exam_003");
-
-            body.put("question_number", 0);
-            body.put("part_number", 0);
-
-            HttpEntity<java.util.Map<String, Object>> entity = new HttpEntity<>(body, headers);
-
-            restTemplate.postForEntity(AI_SERVER_URL, entity, String.class);
-            log.info("AI 서버 종합 요약 피드백 생성 트리거 요청 완료: examId={}", examId);
-        } catch (Exception e) {
-            log.error("AI 서버 종합 요약 피드백 생성 트리거 요청 실패: examId={}", examId, e);
+            speechAceResultRepository.insert(result);
+            log.info("SpeechAce 가공 분석 원본 데이터 수복 완료: examId={}, questionNum={}",
+                    req.getExamId(), req.getQuestionNumber());
+        } catch (DuplicateKeyException duplicateCallback) {
+            log.info("중복 SpeechAce Callback 멱등 처리: examId={}, qNum={}, retryCount={}",
+                    req.getExamId(), req.getQuestionNumber(), retryCount);
         }
     }
 
@@ -438,14 +399,27 @@ public class ExamServiceImpl implements ExamService {
 
         log.info("Azure 음성인식 분석 원본 수신 및 저장 시작: examId={}, questionNumber={}, retryCount={}", examId, questionNumber, retryCount);
 
+        if (azureResultRepository.existsByExamIdAndQuestionNumberAndRetryCountIn(
+                examId,
+                questionNumber,
+                compatibleRetryCounts(retryCount))) {
+            return;
+        }
+
         AzureResult entity = AzureResult.builder()
+                .id(GradingKeys.azureResultId(examId, questionNumber, retryCount))
                 .examId(examId)
                 .questionNumber(questionNumber)
                 .retryCount(retryCount)
                 .rawData(rawPayload)
                 .build();
 
-        azureResultRepository.save(entity);
+        try {
+            azureResultRepository.insert(entity);
+        } catch (DuplicateKeyException duplicateCallback) {
+            log.info("중복 Azure Callback 멱등 처리: examId={}, qNum={}, retryCount={}",
+                    examId, questionNumber, retryCount);
+        }
     }
 
     // 프론트엔드가 개별 문항 녹음본을 제출한 후, 해당 단건 채점 분석 결과가 MongoDB에 도착했는지 추적하기 위한 폴링 엔드포인트용 조회 메서드입니다.
@@ -454,10 +428,7 @@ public class ExamServiceImpl implements ExamService {
     public ExamResponseDTO.QuestionPollResult getQuestionProcessingStatus(String examId, Integer questionNumber, Integer retryCount) {
         requireOwnedSession(examId);
 
-        boolean isSaved = examResultRepository.existsByExamIdAndQuestionNumberAndRetryCount(examId, questionNumber, retryCount);
-
-        // MongoDB 피드백 엔티티 적재 완료 여부를 기준으로 문항별 채점 상태 분기 판별
-        ExamStatus questionStatus = isSaved ? ExamStatus.COMPLETED : ExamStatus.PROCESSING;
+        ExamStatus questionStatus = gradingService.getQuestionStatus(examId, questionNumber, retryCount);
 
         return ExamResponseDTO.QuestionPollResult.builder()
                 .examId(examId)
@@ -465,5 +436,40 @@ public class ExamServiceImpl implements ExamService {
                 .retryCount(retryCount)
                 .status(questionStatus)
                 .build();
+    }
+
+    private static List<Integer> compatibleRetryCounts(int retryCount) {
+        return retryCount == 0 ? Arrays.asList(0, null) : List.of(retryCount);
+    }
+
+    private Optional<AzureResult> findCanonicalAzureResult(
+            String examId,
+            Integer questionNumber,
+            Integer retryCount) {
+        int canonicalRetryCount = GradingKeys.canonicalRetryCount(retryCount);
+        Optional<AzureResult> deterministic = azureResultRepository.findById(
+                GradingKeys.azureResultId(examId, questionNumber, canonicalRetryCount)
+        );
+        if (deterministic.isPresent()) {
+            return deterministic;
+        }
+
+        Optional<AzureResult> exact = azureResultRepository
+                .findFirstByExamIdAndQuestionNumberAndRetryCountOrderByIdDesc(
+                        examId,
+                        questionNumber,
+                        canonicalRetryCount
+                );
+        if (exact.isPresent() || canonicalRetryCount > 0) {
+            return exact;
+        }
+
+        Optional<AzureResult> legacyNull = azureResultRepository
+                .findFirstLegacyNullRetryCount(examId, questionNumber);
+        if (legacyNull.isPresent()) {
+            return legacyNull;
+        }
+
+        return azureResultRepository.findFirstLegacyMissingRetryCount(examId, questionNumber);
     }
 }
