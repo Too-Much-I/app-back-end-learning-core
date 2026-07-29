@@ -31,6 +31,10 @@ app:
     pending-timeout: ${GRADING_PENDING_TIMEOUT:PT1M}
     processing-timeout: ${GRADING_PROCESSING_TIMEOUT:PT3M}
     max-dispatch-attempts: ${GRADING_MAX_DISPATCH_ATTEMPTS:3}
+    ai-connect-timeout: ${GRADING_AI_CONNECT_TIMEOUT:PT3S}
+    ai-read-timeout: ${GRADING_AI_READ_TIMEOUT:PT30S}
+    summary-dispatch-threads: ${GRADING_SUMMARY_DISPATCH_THREADS:2}
+    summary-dispatch-queue-capacity: ${GRADING_SUMMARY_DISPATCH_QUEUE_CAPACITY:100}
   auth:
     mode: ${APP_AUTH_MODE:legacy}
     legacy-user-id: ${LEGACY_USER_ID:00000000-0000-0000-0000-000000000001}

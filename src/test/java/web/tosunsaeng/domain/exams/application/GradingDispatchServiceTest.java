@@ -14,8 +14,6 @@ import org.springframework.web.client.RestTemplate;
 import software.amazon.awssdk.services.s3.presigner.S3Presigner;
 import software.amazon.awssdk.services.s3.presigner.model.GetObjectPresignRequest;
 import software.amazon.awssdk.services.s3.presigner.model.PresignedGetObjectRequest;
-import web.tosunsaeng.domain.exams.domain.entity.QuestionGradingJob;
-
 import java.net.URI;
 import java.time.Instant;
 import java.util.Map;
@@ -62,16 +60,17 @@ class GradingDispatchServiceTest {
                 .thenReturn(URI.create("https://example.com/test-audio.wav").toURL());
         when(restTemplate.getForObject(any(URI.class), eq(byte[].class)))
                 .thenReturn(new byte[]{1, 2, 3});
-        QuestionGradingJob job = QuestionGradingJob.pending(
+        QuestionDispatchClaim claim = new QuestionDispatchClaim(
                 "question:" + EXAM_ID + ":4:2",
+                1,
+                Instant.parse("2026-07-28T00:00:00Z"),
                 EXAM_ID,
                 4,
                 2,
-                "temp/" + EXAM_ID + "/q_4_r2.wav",
-                Instant.parse("2026-07-28T00:00:00Z")
+                "temp/" + EXAM_ID + "/q_4_r2.wav"
         );
 
-        service.dispatchQuestion(job);
+        service.dispatchQuestion(claim);
 
         ArgumentCaptor<HttpEntity> requestCaptor = ArgumentCaptor.forClass(HttpEntity.class);
         verify(restTemplate).postForEntity(eq(AI_SERVER_URL), requestCaptor.capture(), eq(String.class));
@@ -95,7 +94,12 @@ class GradingDispatchServiceTest {
     @Test
     @SuppressWarnings("rawtypes")
     void summaryDispatchKeepsExistingBodyAndUsesStableIdempotencyKey() {
-        service.dispatchSummary(EXAM_ID);
+        service.dispatchSummary(new SummaryDispatchClaim(
+                "summary:" + EXAM_ID + ":v1",
+                1,
+                Instant.parse("2026-07-28T00:00:00Z"),
+                EXAM_ID
+        ));
 
         ArgumentCaptor<HttpEntity> requestCaptor = ArgumentCaptor.forClass(HttpEntity.class);
         verify(restTemplate).postForEntity(eq(AI_SERVER_URL), requestCaptor.capture(), eq(String.class));

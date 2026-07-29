@@ -2,13 +2,14 @@
 
 ## Last updated
 
-- 2026-07-28
+- 2026-07-29
 
 ## Current branch
 
 - `feat/TMI-25-grading-retry-idempotency`
-- HEAD는 `3746464`다.
-- TMI-25 구현 변경은 작업 트리에 있으며 Codex는 commit과 push를 수행하지 않았다.
+- HEAD는 `fb354b6`이며 원격 `origin/feat/TMI-25-grading-retry-idempotency`와 같다.
+- HIGH 2건과 MEDIUM 3건의 회귀 수정은 HEAD 이후 작업 트리에 있으며 Codex는 commit과 push를 수행하지 않았다.
+- `codex resume --last` 요청 시점에도 현재 대화가 이미 마지막 세션으로 재개되어 있어 중첩 Codex 프로세스는 실행하지 않았다.
 
 ## Current Jira issue
 
@@ -27,8 +28,30 @@
 - 전환 후 상세 재조회에서 현재 상태 `진행 중`(상태 ID `10001`)을 확인했다.
 - 구현 전 정적 분석에서 동일 submit·네 종류 Callback·11번 요약 Trigger의 중복 가능성, Redis 단일 상태와 고정 progress, Job·Clock·S3Client Bean·Mongo `@Version`·원자 claim 부재, legacy Unique Index 충돌 위험을 확인했다. 애플리케이션 구현과 Jira 변경은 수행하지 않았다.
 - 사용자가 TMI-25에 한해 API 변경 금지 규칙의 제한 예외를 승인했고 `AGENTS.md`에 전용 예외를 기록했다. 신규 시험 단위 retry API·전용 DTO·Question/Summary Job·submit/Callback 멱등성·Job 기반 status 내부 처리·전체 필수 retry 0 문항 완료 요약 Trigger만 허용되며 다른 작업에는 자동 적용되지 않는다.
-- 승인된 범위의 구현과 Mockito 기반 검증을 완료했다. Jira 댓글·필드·상태는 이번 구현 작업에서 변경하지 않았으며 Jira 상태는 계속 `진행 중`이다.
-- `./gradlew clean test`는 126개 테스트 모두 성공했고 `git diff --check`, 외부 API·AI/Redis/S3 계약 검색과 Secret 패턴 검색도 통과했다.
+- 승인된 범위의 구현과 리뷰 finding 회귀 수정을 완료했다. Jira 댓글·필드·상태는 이번 작업에서 변경하지 않았으며 기록상 Jira 상태는 계속 `진행 중`이다.
+- Atlassian MCP 재조회는 OAuth `unauthorized_client`로 실패했다. 저장된 Jira 설명·완료 조건과 사용자의 현재 원문을 기준으로 진행했으며 Jira 쓰기 API는 호출하지 않았다.
+- `./gradlew clean test`는 142개 테스트 모두 성공했고 `git diff --check`, 외부 API·AI/Redis/S3 계약 검색과 Secret 패턴 검색도 통과했다.
+
+## Latest TMI-25 regression fixes
+
+- Question/Summary dispatch는 immutable claim에 `jobId`, `dispatchAttempt`, `claimedAt`을 고정한다. HTTP 실패는 Mongo `_id + status=PROCESSING + dispatchAttempt=claimedAttempt` 조건 update만 사용하며 0건이면 이전 attempt의 늦은 실패로 무시한다.
+- Feedback Callback은 결과 저장과 Question Job 완료·복구 후 모든 필수 retry 0 완료를 확인하고 Summary PENDING만 확보한다. bounded 전용 executor에 task를 넘기고 실제 Summary HTTP는 worker가 `@Version` claim에 성공한 경우에만 실행한다.
+- Callback gate `ensureSummaryStartedIfReady`는 기존 FAILED 또는 stale PROCESSING Summary를 재시도하지 않는다. `retrySummaryIfEligible` 경로만 FAILED·stale PENDING/PROCESSING과 max attempts를 판정해 recovery task를 제출한다.
+- AI HTTP connect/read timeout 기본값은 각각 `PT3S`/`PT30S`, Summary worker/queue 기본값은 `2`/`100`이며 모두 `app.grading` 타입 안전 설정이다. queue rejection은 Job을 변경하지 않아 PENDING 복구가 가능하다.
+- submit은 Job insert 전에 retry 0의 `0/null/missing` compatible Feedback 결과를 확인하고 COMPLETED Job을 지연 복구한다. 기존 non-COMPLETED Job보다 결과를 우선해 COMPLETED로 보정하며 AI를 재호출하지 않는다.
+- Azure retry 0 조회는 결정적 ID, 정확한 0, 명시적 BSON null, 필드 누락 순서다. retryCount>0은 정확한 회차만 조회하며 ObjectId와 문자열 ID를 한 정렬에서 시간순으로 비교하지 않는다.
+- 실제 attempt 1 HTTP를 timeout 경계 너머까지 대기시켜 attempt 2를 claim한 뒤 attempt 1 실패를 도착시키는 Question/Summary 동시성 테스트, 중복 scheduler task 단일 dispatch, queue rejection, Callback/retry gate 분리, legacy submit 복구와 Azure null/missing 조회 테스트가 통과했다. 자체 재리뷰에서 남은 HIGH/MEDIUM finding은 확인하지 않았다.
+
+## Latest code review state
+
+- 2026-07-29에 사용자 요청으로 merge base `bc15c504b4130e011cbb476d71a37e98e1d8a862` 기준 전체 diff와 미커밋 회귀 수정까지 다시 재검증했다. 리뷰 대상 애플리케이션·테스트 코드는 수정하지 않았고 Git/Jira 쓰기 작업도 수행하지 않았다.
+- P1: 시험 retry가 여러 Question의 S3 GET과 AI POST를 요청 스레드에서 직렬 실행하므로 downstream timeout 시 단일 요청이 수분간 지속되고 Tomcat 스레드 풀이 고갈될 수 있다.
+- P2: 세션이 생성될 때 제공한 문항 집합을 고정하지 않고 매 status/retry/Callback gate에서 현재 `mock_exam_003`을 다시 읽어, 시험지 변경 시 진행 중 세션의 완료 기준이 바뀐다.
+- P2: retry 0 Azure의 legacy BSON null·필드 누락 fallback 쿼리에 최신순 정렬이 없어 pre-idempotency 중복 문서 중 임의 결과를 반환할 수 있다.
+- P2: staging/prod localhost 차단이 축약형 IPv6만 열거해 `[0:0:0:0:0:0:0:1]`, IPv4-mapped IPv6 같은 loopback 표기를 허용한다.
+- P2: E2E의 단일 logout은 Refresh 재사용 탐지가 이미 폐기한 Token을 사용해 logout이 no-op이어도 통과한다.
+- P2: E2E의 `logout-all`은 활성 Session을 하나만 만들어 단일 logout 구현도 통과할 수 있다.
+- 정적 검증인 `git diff --check bc15c504b4130e011cbb476d71a37e98e1d8a862`와 E2E `bash -n`은 성공했다. `./gradlew clean test --no-daemon`은 사용자 Gradle home lock 쓰기 제한으로, cache를 `/tmp`에 복제한 offline 재시도는 sandbox의 file-lock contention socket 제한으로 시작되지 않았다. 기존 XML 결과는 현재 소스로 컴파일된 142개 테스트와 실패·오류·건너뜀 0개를 기록한다.
 
 ## Latest completed Jira issue
 
@@ -189,7 +212,8 @@
 
 ## Latest feedback lookup assessment
 
-- Azure 문항 피드백은 `examId + questionNumber + retryCount` 조건에 `OrderByIdDesc`를 적용해 해당 회차의 최신 문서를 조회한다.
+- Azure retry 0 문항 피드백은 신규 결정적 ID, 정확한 `retryCount=0`, legacy BSON null, legacy 필드 누락 순서로 조회한다. retryCount>0은 결정적 ID와 정확한 회차만 사용한다.
+- Azure의 null과 missing은 별도 Mongo 쿼리로 구분하며 ObjectId와 결정적 문자열 `_id`를 한 정렬에서 시간순으로 간주하지 않는다.
 - AI 문항 피드백인 `ExamResult`도 `examId + questionNumber + retryCount` 조건에 `OrderByIdDesc`를 적용한 Repository 단건 조회로 최신 문서를 선택한다.
 - 0회차 조회는 기존 `retryCount=null` 문서를 0으로 해석하던 호환성을 유지하기 위해 `retryCount in [0, null]` 조건을 사용한다.
 - 문항 피드백 API는 클라이언트가 전달한 `retryCount` 회차를 조회하며 가장 큰 retryCount를 자동 선택하지 않는다.
@@ -217,7 +241,11 @@
 
 ## Test status
 
-- `./gradlew clean test` 성공: 126개 테스트, 실패·오류·건너뜀 0개
+- `./gradlew clean test` 성공: 142개 테스트, 실패·오류·건너뜀 0개
+- TMI-25 finding 집중 테스트가 성공했다. 실제 Atlas·S3·Redis·Python AI 서버는 호출하지 않고 Repository, S3Client, RestTemplate과 executor 경계를 Mockito/단위 테스트로 검증했다.
+- Question/Summary attempt 1 HTTP를 timeout까지 대기시킨 뒤 attempt 2를 claim하고 attempt 1 실패를 늦게 도착시켜 최신 PROCESSING/attempt 2, null `failedAt`·`failureReason`을 확인했다.
+- Callback Summary gate의 FAILED/stale PROCESSING 비재시도, grading retry의 recovery scheduling, 중복 task 단일 HTTP, queue rejection PENDING 유지, HTTP timeout의 claimedAttempt 조건 실패 전이를 확인했다.
+- legacy Feedback `retryCount=null/0`과 Job 부재·기존 FAILED Job submit 복구, Azure null/missing retry 0 조회와 retry 1 격리, executor 크기·queue와 connect/read timeout 설정을 확인했다.
 - TMI-25 집중 테스트에서 최초·반복·동시 submit, 상태/timeout/attempt별 시험 retry, S3 HeadObject 404·403, retryCount>0 제외와 concurrent claim을 검증했다.
 - 네 Callback의 결정적 ID·중복 1개 저장, legacy null retry 결과와 누락 Job 복구, 11번 단독 요약 금지, 전체 필수 문항 완료 후 요약 1회와 요약 timeout/FAILED retry를 검증했다.
 - AI `user_id = examId`, 기존 multipart/summary Body, 안정적인 두 `Idempotency-Key`, 신규 API의 Request Body 없음·기존 BaseResponse, status `progressPercent=60`, 소유권 검증을 확인했다.
@@ -290,7 +318,7 @@
 - S3 `HeadObject`는 404만 미제출로 분류한다. 운영 IAM에 대상 버킷 객체 조회 권한이 없으면 403이 API 오류로 전파되므로 배포 전 권한을 확인해야 한다.
 - 기존 결과의 ObjectId와 신규 결정적 문자열 `_id`가 혼재하면 `_id DESC`가 생성 시간순이 아닐 수 있으며, legacy 중복은 현재 파트 점수와 풀이 문항 수를 부풀릴 수 있다.
 - 기존 결과의 중복은 삭제하지 않고 논리 존재 확인으로 신규 중복만 막는다. 운영 중복 정리가 필요하면 별도 검토·백업 후 명시적 일회성 스크립트로 수행해야 한다.
-- 현재 `RestTemplate`에는 명시적 연결·응답 timeout이 없고 음성을 전체 `byte[]`로 읽으므로 시험 단위 다문항 복구의 응답 시간과 메모리 사용을 운영 부하에서 확인해야 한다.
+- AI `RestTemplate`은 connect/read timeout 기본값 `PT3S`/`PT30S`를 갖지만, 문항 음성을 계속 전체 `byte[]`로 읽으므로 시험 단위 다문항 복구의 메모리 사용과 timeout 적정값을 운영 부하에서 확인해야 한다.
 
 ## Next
 

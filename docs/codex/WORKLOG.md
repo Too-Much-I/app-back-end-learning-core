@@ -539,3 +539,117 @@
 - 추가 검증: `git diff --check`, 기존/현재 Controller Mapping 비교, AI Body·`user_id`·retryCount·Redis/S3 Key 검색, 신규 로직의 직접 `Instant.now`/`LocalDateTime.now` 부재 확인, AWS Key·Private Key·credential 포함 Mongo URI·JWT literal 패턴 검색이 모두 통과했다. Stop Hook marker는 이 항목에 정확히 한 번 기록한다.
 - 남아 있는 위험 요소: Learning Core의 원자 claim과 안정적인 Header만으로는 Python AI 내부 계산 중복까지 막을 수 없다. Job claim과 외부 HTTP 사이 crash window도 있으므로 Python AI가 두 멱등 키를 실제 저장·재사용해야 한다. 운영 S3 IAM의 HeadObject 권한, Mongo 신규 컬렉션 생성 권한, 기존 RestTemplate의 timeout·전체 음성 `byte[]` 메모리 사용을 staging에서 확인해야 한다.
 - 다음 작업 전에 확인할 사항: 사용자가 변경분을 검토해 commit/push하고, Python AI의 Question/Summary `Idempotency-Key` 처리 작업을 별도 이슈로 진행한다. Jira 완료 댓글 등록이나 상태 전환은 별도 명시적 요청이 있을 때만 수행한다.
+
+## 2026-07-28 — TMI-25 main 기준 코드 리뷰
+
+<!-- codex-turn:review-20260728-bc15c504 -->
+
+- 날짜: `2026-07-28`
+- 브랜치: `feat/TMI-25-grading-retry-idempotency`
+- Jira: [`TMI-25`](https://to-teacher.atlassian.net/browse/TMI-25)
+- 작업 목표: 사용자가 지정한 merge base `bc15c504b4130e011cbb476d71a37e98e1d8a862`를 기준으로 `git diff` 전체를 검토하고 정확성·동시성·외부 계약·legacy 호환 문제를 우선순위화한다.
+- 변경 파일: 리뷰 대상 애플리케이션 코드는 수정하지 않았고 작업 기록 규칙에 따라 `docs/codex/WORKLOG.md`, `docs/codex/CURRENT_STATE.md`만 갱신했다. Git commit과 push, Jira 댓글·필드·상태 변경은 수행하지 않았다.
+- 리뷰 결과: 이전 dispatch attempt가 timeout 후 실패하면 이미 claim된 다음 Question/Summary attempt를 FAILED로 덮어쓸 수 있는 경쟁 조건, 마지막 Feedback Callback 안의 동기 Summary POST로 인한 AI 단일 worker 교착 가능성, legacy 결과만 있고 Job이 없는 회차의 submit 중복 dispatch, `retry_count=null` legacy Azure 결과를 중복으로 버리면서 정확히 0만 조회하는 비호환을 actionable finding으로 확정했다.
+- 유지한 외부 계약: 허용된 TMI-25 신규 retry API 외 기존 공개 URL·Method·Parameter·Response DTO·`BaseResponse`, `retryCount`, Redis Key·TTL, S3 Object Key, Python AI·Callback `user_id = examId`, 실제 `userId` 비노출과 사용자용 소유권 검증은 리뷰 중 변경하지 않았다.
+- 실행한 검증과 결과: `git diff bc15c504b4130e011cbb476d71a37e98e1d8a862`, 변경 파일·커밋·관련 기존 코드와 테스트 정적 분석, `git diff --check`, `bash -n scripts/e2e/auth-integration-test.sh`를 수행했고 정적 검증은 성공했다. `./gradlew clean test`는 사용자 홈 Gradle lock 쓰기 제한으로 실패했고, cache를 `/tmp`에 복제한 재시도도 샌드박스가 Gradle file-lock contention socket 생성을 거부해 실행되지 않았다. 기존 `build/test-results`의 최신 XML은 126개 테스트, 실패·오류·건너뜀 0개다.
+- 남아 있는 위험 요소: Mockito 저장소 테스트는 실제 Mongo `@Version` 동작과 늦게 종료되는 HTTP attempt 간 경쟁을 재현하지 않으며, 현재 `RestTemplate`에는 timeout이 없다. Python AI의 `Idempotency-Key` 처리 여부도 이 저장소만으로 확인할 수 없다.
+- 다음 작업 전에 확인할 사항: 네 finding을 수정하고 늦은 이전 attempt 실패·Callback/AI 단일 worker 경계·legacy Job 부재 submit·Azure null retry 조회 회귀 테스트를 추가한 뒤, socket 사용이 허용된 환경에서 `./gradlew clean test`를 다시 실행한다.
+
+## 2026-07-29 — TMI-25 main 기준 코드 리뷰 재검증
+
+<!-- codex-turn:review-20260729-bc15c504 -->
+
+- 날짜: `2026-07-29`
+- 브랜치: `feat/TMI-25-grading-retry-idempotency`
+- Jira: [`TMI-25`](https://to-teacher.atlassian.net/browse/TMI-25)
+- 작업 목표: 사용자가 지정한 merge base `bc15c504b4130e011cbb476d71a37e98e1d8a862` 기준 전체 diff를 다시 검토하고 이전 리뷰 기록과 독립적으로 actionable finding을 확정한다.
+- 변경 파일: 리뷰 대상 애플리케이션 코드는 수정하지 않았고 작업 기록 규칙에 따라 `docs/codex/WORKLOG.md`, `docs/codex/CURRENT_STATE.md`만 갱신했다. Git commit·push와 Jira 변경은 수행하지 않았다.
+- 리뷰 결과: timeout 뒤 새 attempt가 claim된 후 이전 HTTP dispatch가 늦게 실패하면 최신 Question/Summary Job을 FAILED로 덮어쓰는 경쟁 조건, Feedback Callback 안의 동기 Summary POST로 인한 단일·포화 AI worker 교착, legacy `ExamResult`만 존재하는 동일 submit의 재전송, `retry_count=null` legacy Azure 중복 억제와 정확히 0인 조회 조건의 불일치를 각각 P1·P1·P2·P2 finding으로 재확인했다.
+- 유지한 외부 계약: 허용된 신규 시험 단위 retry API 외 기존 공개 API·DTO·`BaseResponse`, `retryCount`, Redis/S3 Key, Python AI·Callback `user_id = examId`, 실제 `userId` 비노출과 시험 소유권 계약은 변경하지 않았다.
+- 실행한 검증과 결과: 전체 diff·관련 base 구현·현재 테스트를 정적으로 추적했고 `git diff --check`와 `bash -n scripts/e2e/auth-integration-test.sh`는 성공했다. `./gradlew clean test`는 사용자 홈 wrapper lock 쓰기 제한으로 시작되지 않았고, 별도 `/tmp` Gradle home 재시도도 sandbox의 file-lock contention socket 금지로 시작되지 않았다. 기존 XML 결과는 126개 테스트, 실패·오류·건너뜀 0개다.
+- 남아 있는 위험 요소: 실제 Mongo optimistic locking과 지연 HTTP 응답 경쟁은 Mockito 테스트로 재현되지 않았고 Python AI worker·`Idempotency-Key` 구현은 이 저장소만으로 검증할 수 없다.
+- 다음 작업 전에 확인할 사항: 네 finding을 수정한 회귀 테스트를 추가하고 socket 사용이 허용된 환경에서 `./gradlew clean test`를 다시 실행한다. Jira 상태 변경과 Git commit·push는 사용자가 수행한다.
+
+## 2026-07-29 — TMI-25 채점 복구 변경 정밀 재리뷰
+
+<!-- codex-turn:019fab73-024a-7842-b367-3edd9901f8dd -->
+
+- 날짜: `2026-07-29`
+- 브랜치: `feat/TMI-25-grading-retry-idempotency`
+- Jira: [`TMI-25`](https://to-teacher.atlassian.net/browse/TMI-25)
+- 작업 목표: AGENTS.md와 TMI-25 완료 조건을 기준으로 동일 submit·동시 시험 retry·Mongo claim·늦은 HTTP 실패·Callback/요약 멱등성·legacy 결과·attempt 상한·S3·Redis·외부 계약을 심각도 순으로 재검토한다.
+- 비교 기준: 로컬 `main`은 `bc15c504b4130e011cbb476d71a37e98e1d8a862`으로 뒤처져 있고 브랜치는 저장된 `origin/main` `3746464` 위의 TMI-25 커밋 `fb354b6`이므로 TMI-25 고유 diff `3746464..fb354b6`를 주 기준으로 사용하고 로컬 main 전체 diff도 확인했다.
+- Jira 확인: Atlassian MCP의 OAuth 재인증이 필요해 TMI-25 실시간 조회는 실패했다. Jira 변경 API는 호출하지 않았으며 저장소에 기록된 승인 설명·완료 조건과 현재 대화의 Jira 원문을 기준으로 검토했다.
+- HIGH finding: 이전 Question/Summary HTTP dispatch가 timeout 뒤 늦게 실패하면 failure helper가 claimed attempt/version을 조건으로 쓰지 않고 최신 Job을 재조회해 다음 PROCESSING attempt를 FAILED로 덮을 수 있다. 마지막 Feedback Callback은 Summary POST까지 동기 실행하므로 AI worker가 단일·포화 상태이면 교착하거나 timeout 없는 Callback 스레드를 무기한 점유할 수 있다.
+- MEDIUM finding: 기존 `ExamResult`만 있고 Job이 없는 회차의 동일 submit은 신규 Job을 만들고 AI를 재호출한다. 중복 Feedback도 항상 Summary gate를 호출하므로 기존 Summary가 FAILED 또는 timeout이면 실제 재dispatch가 발생한다. Azure retry 0 Callback은 legacy null 문서를 보고 신규 저장을 생략하지만 조회는 정확히 0만 사용해 결과가 계속 보이지 않을 수 있다.
+- finding 없음: 현재 코드만 동시에 실행되는 조건에서 동일 신규 submit과 동시 시험 retry는 결정적 `_id`와 `@Version`으로 단일 dispatch된다. 네 Callback 저장의 결정적 ID·legacy 존재 확인, 11번 특별 Trigger 제거, 모든 필수 retryCount 0 gate, Summary timeout/FAILED retry, retryCount>0 제외, S3 403 전파, dispatchAttempt 상한, Mongo 기준 전체 상태, 기존 API·DTO·retryCount·Redis/S3 Key와 AI `user_id = examId`에서는 별도 actionable finding을 확인하지 않았다.
+- 변경 파일: 리뷰 대상 애플리케이션·테스트 코드는 수정하지 않았다. 작업 기록 규칙에 따라 `docs/codex/WORKLOG.md` 끝에 이 항목을 append하고 `docs/codex/CURRENT_STATE.md`만 최신화했다. Git commit·push와 Jira 댓글·필드·상태 변경은 수행하지 않았다.
+- 실행한 검증과 결과: TMI-25 고유 diff와 관련 base·현재 소스·테스트를 정적으로 추적하고 11번 특례, `@Version` claim, 결정적 결과 ID, timeout/attempt, Redis/S3/API/AI 계약을 검색했다. `git diff --check`는 성공했고 기존 XML 결과는 126개 테스트·실패·오류·건너뜀 0개다. 코드 변경 없는 리뷰이므로 Gradle 테스트는 다시 실행하지 않았다.
+- 남아 있는 위험 요소: 실제 Mongo optimistic locking과 지연 HTTP의 교차 attempt 경쟁은 Mockito 저장소 테스트로 재현되지 않으며, Python AI의 `Idempotency-Key` 처리와 실제 worker 모델은 이 저장소만으로 검증할 수 없다.
+- 다음 작업 전에 확인할 사항: HIGH 2건과 MEDIUM 3건을 수정하고 claimed attempt 조건 실패 전이, Callback 이후 Summary 비동기 경계, legacy result-only submit, duplicate Feedback+FAILED/timeout Summary, Azure null retry 조회 회귀 테스트를 추가한다.
+
+## 2026-07-29 — TMI-25 리뷰 HIGH/MEDIUM 회귀 수정
+
+<!-- codex-turn:019fabe5-0846-74a0-a52e-ed6320230252 -->
+
+- 날짜: `2026-07-29`
+- 브랜치: `feat/TMI-25-grading-retry-idempotency` (HEAD `fb354b6`, 수정은 미커밋 작업 트리)
+- Jira: [`TMI-25`](https://to-teacher.atlassian.net/browse/TMI-25)
+- 작업 목표: 기존 Question/Summary Job·시험 retry·Callback 멱등 구조를 유지하면서 이전 attempt 실패 덮어쓰기, Callback의 동기 Summary HTTP, legacy 결과 submit, Callback/retry Summary gate 혼합, Azure retry 0 legacy 조회 불일치를 수정한다.
+- Jira 확인: Atlassian MCP 재조회는 OAuth `unauthorized_client`로 실패했다. 저장된 Jira 설명·완료 조건과 사용자의 현재 원문을 기준으로 구현했으며 Jira 댓글·필드·상태 변경 API는 호출하지 않았다.
+- HIGH 1 수정: `QuestionDispatchClaim`, `SummaryDispatchClaim`에 `jobId + dispatchAttempt + claimedAt`을 고정하고 Question/Summary Repository의 `_id + PROCESSING + claimedAttempt` 조건 update로만 실패 전이한다. 0건이면 이전 attempt의 늦은 실패로 무시하며 최신 attempt나 COMPLETED를 재조회·`save()`로 덮지 않는다.
+- HIGH 2 수정: `SummaryDispatchScheduler`와 bounded `ThreadPoolTaskExecutor`를 추가했다. Callback은 모든 필수 retry 0 완료 시 Summary PENDING을 확보하고 task만 제출하며 worker가 `@Version` claim에 성공한 경우에만 HTTP를 호출한다. queue rejection은 PENDING을 유지하고 AI connect/read timeout 기본값은 `PT3S`/`PT30S`다.
+- MEDIUM 1 수정: submit의 Job insert 전에 `retryCount=0/null/missing` compatible Feedback 결과를 확인하고 COMPLETED Question Job을 지연 복구한다. 기존 non-COMPLETED Job보다 저장 결과를 우선해 완료 보정하며 결과 복사나 AI 재호출을 하지 않는다.
+- MEDIUM 2 수정: Callback용 `ensureSummaryStartedIfReady`는 신규·기존 PENDING만 scheduler에 전달하고 FAILED/stale PROCESSING을 재시도하지 않는다. grading retry의 `retrySummaryIfEligible`만 FAILED·stale PENDING/PROCESSING과 max attempts를 판정해 recovery task를 제출한다.
+- MEDIUM 3 수정: Azure retry 0 조회를 결정적 ID → 정확한 0 → BSON null → 필드 누락 순서로 분리했고 retryCount>0은 정확한 회차만 허용한다. null/missing 쿼리는 `_id` 혼합 정렬에 의존하지 않는다.
+- 변경 파일: `ExamGradingService`, `ExamServiceImpl`, `GradingDispatchService`, Question/Summary/Azure Repository, `GradingConfig`, `GradingProperties`, `RestTemplateConfig`, `application.yml`, 신규 두 claim과 `SummaryDispatchScheduler`, 관련 서비스·dispatcher·설정 테스트, `SummaryDispatchSchedulerTest`, `GradingInfrastructureConfigTest`, `docs/codex/WORKLOG.md`, `docs/codex/CURRENT_STATE.md`다.
+- 유지한 외부 계약: 기존 API URL·Method·Parameter·DTO·`BaseResponse`, 신규 `POST /api/v1/exams/{examId}/grading/retry`, `retryCount`, Redis Key·TTL, S3 Object Key, Callback URL·JSON, `progressPercent=60`, 시험 소유권, Python AI Question/Summary `user_id = examId`와 기존 multipart/summary Body를 변경하지 않았다.
+- 실행한 테스트와 결과: finding 집중 테스트와 `./gradlew clean test`가 성공했다. 전체 142개 테스트, 실패·오류·건너뜀 0개다. attempt 1 HTTP 대기 → timeout attempt 2 claim → attempt 1 늦은 실패를 Question/Summary 모두 재현했고 최종 PROCESSING/2와 null 실패 정보를 확인했다. 중복 scheduler task 단일 HTTP, queue rejection PENDING, claimed timeout 실패, Callback/retry gate, legacy null/0 submit 복구, Azure null/missing/positive retry, executor·timeout 설정도 검증했다.
+- 추가 검증: `git diff --check`, 신규 로직의 직접 `Instant.now`/`LocalDateTime.now` 부재, Controller/DTO/GradingKeys 무변경, AI `user_id = examId`, Redis/S3 Key와 고정 progress 검색, 11번 특별 Trigger·이전 Summary 메서드 부재, AWS Key·Private Key·credential Mongo URI·JWT literal 패턴 검색이 모두 통과했다.
+- 자체 리뷰: 요청된 HIGH/MEDIUM finding은 재현 테스트로 닫혔고 현재 변경에서 추가 HIGH/MEDIUM finding은 확인하지 않았다. 실제 Mongo Atlas·S3·Redis·Python AI 서버는 테스트에서 호출하지 않았다.
+- 남아 있는 위험 요소: Learning Core의 안정적인 `Idempotency-Key`만으로 Python AI 내부 계산 중복은 막을 수 없으며 DB claim과 외부 HTTP 사이 crash window도 남는다. 배포 전 실제 Mongo `@Version`/repository update, S3 HeadObject IAM, bounded queue·timeout 적정값과 전체 음성 `byte[]` 메모리 사용을 staging에서 확인해야 한다.
+- 다음 작업 전에 확인할 사항: 사용자가 diff를 검토해 commit/push하고 Python AI가 Question/Summary `Idempotency-Key`를 저장·재사용하는 별도 작업을 진행한다. Jira 완료 댓글과 상태 전환은 별도 명시적 요청이 있을 때만 수행한다.
+
+## 2026-07-29 — TMI-25 main 기준 전체 변경 재리뷰
+
+<!-- codex-turn:review-20260729-final-bc15c504 -->
+
+- 날짜: `2026-07-29`
+- 브랜치: `feat/TMI-25-grading-retry-idempotency` (HEAD `fb354b6`, 리뷰 시점의 미커밋 회귀 수정 포함)
+- Jira: [`TMI-25`](https://to-teacher.atlassian.net/browse/TMI-25)
+- 작업 목표: 사용자가 지정한 merge base `bc15c504b4130e011cbb476d71a37e98e1d8a862` 기준 `git diff` 전체를 다시 검토하고 정확성·성능·인증 Startup 검증·E2E 검증의 actionable finding을 확정한다.
+- 변경 파일: 리뷰 대상 애플리케이션·테스트 코드는 수정하지 않았다. 작업 기록 규칙에 따라 `docs/codex/WORKLOG.md`에 이 항목을 append하고 `docs/codex/CURRENT_STATE.md`만 최신화했다. Git commit·push와 Jira 댓글·필드·상태 변경은 수행하지 않았다.
+- 리뷰 결과: 시험 retry가 여러 Question의 S3/AI HTTP를 요청 스레드에서 직렬 실행해 장애 시 수분 동안 Tomcat 스레드를 점유하는 P1을 확인했다. 세션 생성 시점 문항 집합 미고정, legacy null/missing Azure fallback 무정렬, 확장 IPv6 loopback Startup 검증 우회, 이미 재사용 탐지로 폐기된 Refresh Token을 사용하는 단일 logout E2E, 한 세션만으로 `logout-all`을 검증하는 문제를 P2로 확인했다.
+- 유지한 외부 계약: 허용된 신규 시험 단위 retry API 외 기존 공개 API·DTO·`BaseResponse`, `retryCount`, Redis/S3 Key, Python AI·Callback `user_id = examId`, 실제 `userId` 비노출과 사용자용 소유권 계약은 리뷰 중 변경하지 않았다.
+- 실행한 검증과 결과: 전체 diff·base 구현·현재 소스와 관련 테스트를 정적으로 추적했고 `git diff --check bc15c504b4130e011cbb476d71a37e98e1d8a862`와 `bash -n scripts/e2e/auth-integration-test.sh`는 성공했다. `./gradlew clean test`는 사용자 홈 Gradle lock 쓰기 제한으로 시작되지 않았고, `/tmp` Gradle home 및 기존 배포본을 사용한 재시도도 각각 네트워크 차단과 sandbox의 file-lock contention socket 금지로 시작되지 않았다. 기존 `build/test-results` XML은 현재 소스 컴파일 이후 142개 테스트, 실패·오류·건너뜀 0개를 기록한다.
+- 남아 있는 위험 요소: 실제 Mongo 정렬·인덱스와 S3/AI 지연, Python AI의 멱등 키 처리, 실제 Identity·Learning Core E2E는 이 리뷰 환경에서 실행하지 않았다. 로컬 `.idea`의 비추적 개발자 설정은 리뷰 대상 diff와 작업 기록에 포함하지 않았다.
+- 다음 작업 전에 확인할 사항: finding별 회귀 테스트를 추가하고 socket 사용이 허용된 환경에서 `./gradlew clean test`와 실제 두 서버 E2E를 다시 실행한다. Jira 상태 변경과 Git commit·push는 사용자가 수행한다.
+
+## 2026-07-29 — TMI-25 main 기준 전체 변경 리뷰 재검증
+
+<!-- codex-turn:review-20260729-repeat-bc15c504 -->
+
+- 날짜: `2026-07-29`
+- 브랜치: `feat/TMI-25-grading-retry-idempotency` (HEAD `fb354b6`, 미커밋 회귀 수정 포함)
+- Jira: [`TMI-25`](https://to-teacher.atlassian.net/browse/TMI-25)
+- 작업 목표: 사용자가 지정한 merge base `bc15c504b4130e011cbb476d71a37e98e1d8a862` 기준 전체 작업 트리를 다시 검토하고 우선순위가 있는 actionable finding을 확정한다.
+- 변경 파일: 리뷰 대상 애플리케이션·테스트 코드는 수정하지 않았다. 작업 기록 규칙에 따라 `docs/codex/WORKLOG.md` 끝에 이 항목을 append하고 `docs/codex/CURRENT_STATE.md`의 최신 리뷰 상태만 갱신했다. Git commit·push와 Jira 댓글·필드·상태 변경은 수행하지 않았다.
+- 리뷰 결과: 여러 문항의 동기·직렬 S3/AI dispatch로 요청/Tomcat 스레드가 장시간 점유되는 P1을 확인했다. 세션별 문항 집합 미고정, legacy Azure fallback 무정렬, loopback IP 표기 우회, 이미 폐기된 Refresh Token을 사용하는 단일 logout 검증, 활성 Session 하나만 사용하는 logout-all 검증을 각각 P2로 확정했다.
+- 유지한 외부 계약: 허용된 신규 `POST /api/v1/exams/{examId}/grading/retry` 외 기존 공개 API·DTO·`BaseResponse`, `retryCount`, Redis/S3 Key, Python AI·Callback `user_id = examId`, 실제 `userId` 비노출과 사용자용 소유권 계약은 리뷰 중 변경하지 않았다.
+- 실행한 검증과 결과: `git diff bc15c504b4130e011cbb476d71a37e98e1d8a862`, 관련 base·현재 소스·테스트 정적 추적, `git diff --check`와 `bash -n scripts/e2e/auth-integration-test.sh`를 수행했고 정적 검증은 성공했다. Java URI 표기 확인으로 확장 IPv6·IPv4-mapped IPv6·정수형 IPv4 loopback이 현재 문자열 검사에서 누락됨을 재현했다.
+- 테스트 결과: `./gradlew clean test --no-daemon`은 사용자 홈 Gradle wrapper lock 쓰기 제한으로 시작되지 않았다. Gradle wrapper/cache를 `/tmp`의 쓰기 가능한 home으로 복제한 offline 재시도도 sandbox가 Gradle file-lock contention socket 생성을 금지해 시작되지 않았다. 기존 `build/test-results` XML은 현재 소스로 컴파일된 142개 테스트, 실패·오류·건너뜀 0개다.
+- 남아 있는 위험 요소: 실제 Mongo legacy 문서 선택 순서, S3/AI 지연 시 retry API 응답 시간, Python AI의 `Idempotency-Key`, 실제 Identity·Learning Core E2E는 이 환경에서 실행하지 않았다.
+- 다음 작업 전에 확인할 사항: 여섯 finding별 회귀 테스트를 추가하고 socket 사용이 허용된 환경에서 전체 Gradle 테스트와 실제 두 서버 E2E를 다시 실행한다. Jira 상태 변경과 Git commit·push는 사용자가 수행한다.
+
+## 2026-07-29 — Codex 마지막 세션 재개 요청 확인
+
+<!-- codex-turn:019fac7a-23dd-7f40-8dbe-dcf8c6df9e9f -->
+
+- 날짜: `2026-07-29`
+- 브랜치: `feat/TMI-25-grading-retry-idempotency` (HEAD `fb354b6`, 기존 미커밋 변경 유지)
+- Jira: [`TMI-25`](https://to-teacher.atlassian.net/browse/TMI-25)
+- 작업 목표: 사용자 입력 `codex resume --last`의 실행 필요 여부를 확인한다.
+- 처리 결과: 현재 대화가 이미 마지막 세션을 이어서 실행 중이므로 중첩된 대화형 Codex 프로세스는 시작하지 않았다.
+- 변경 파일: 작업 기록 규칙에 따라 `docs/codex/WORKLOG.md`, `docs/codex/CURRENT_STATE.md`만 갱신했다. 애플리케이션·테스트 코드, Jira, Git 상태는 변경하지 않았다.
+- 실행한 테스트: 코드 변경이 없어 Gradle 테스트를 다시 실행하지 않았다.
+- 다음 작업 전에 확인할 사항: 사용자가 원하면 현재 세션에서 TMI-25 리뷰 또는 finding 수정을 계속한다. Atlassian 로그인이 필요하면 로컬 터미널에서 인증 명령을 완료한다.

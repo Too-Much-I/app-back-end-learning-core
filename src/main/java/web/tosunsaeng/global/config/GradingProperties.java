@@ -13,7 +13,11 @@ import java.time.Duration;
 public record GradingProperties(
         @NotNull Duration pendingTimeout,
         @NotNull Duration processingTimeout,
-        @Min(1) int maxDispatchAttempts
+        @Min(1) int maxDispatchAttempts,
+        @NotNull Duration aiConnectTimeout,
+        @NotNull Duration aiReadTimeout,
+        @Min(1) int summaryDispatchThreads,
+        @Min(1) int summaryDispatchQueueCapacity
 ) {
 
     @AssertTrue(message = "app.grading.pending-timeout must be positive")
@@ -24,5 +28,15 @@ public record GradingProperties(
     @AssertTrue(message = "app.grading.processing-timeout must be positive")
     public boolean isProcessingTimeoutPositive() {
         return processingTimeout != null && !processingTimeout.isZero() && !processingTimeout.isNegative();
+    }
+
+    @AssertTrue(message = "app.grading.ai-connect-timeout must be positive")
+    public boolean isAiConnectTimeoutPositive() {
+        return aiConnectTimeout != null && !aiConnectTimeout.isZero() && !aiConnectTimeout.isNegative();
+    }
+
+    @AssertTrue(message = "app.grading.ai-read-timeout must be positive")
+    public boolean isAiReadTimeoutPositive() {
+        return aiReadTimeout != null && !aiReadTimeout.isZero() && !aiReadTimeout.isNegative();
     }
 }

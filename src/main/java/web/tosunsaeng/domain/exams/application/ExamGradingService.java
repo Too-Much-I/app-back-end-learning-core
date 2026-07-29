@@ -48,7 +48,6 @@ public class ExamGradingService {
 
     private static final int CALLBACK_COMPLETION_RETRIES = 5;
     private static final String QUESTION_DISPATCH_FAILED = "QUESTION_DISPATCH_FAILED";
-    private static final String SUMMARY_DISPATCH_FAILED = "SUMMARY_DISPATCH_FAILED";
     private static final String MAX_DISPATCH_ATTEMPTS = "MAX_DISPATCH_ATTEMPTS";
 
     private final QuestionGradingJobRepository questionJobRepository;
@@ -58,6 +57,7 @@ public class ExamGradingService {
     private final MockExamRepository mockExamRepository;
     private final S3Client s3Client;
     private final GradingDispatchService dispatchService;
+    private final SummaryDispatchScheduler summaryDispatchScheduler;
     private final RedisTemplate<String, Object> redisTemplate;
     private final GradingProperties properties;
     private final Clock clock;
@@ -68,6 +68,12 @@ public class ExamGradingService {
     public ExamStatus submitQuestion(String examId, Integer questionNumber, Integer retryCount) {
         int canonicalRetryCount = GradingKeys.canonicalRetryCount(retryCount);
         String jobId = GradingKeys.questionJobId(examId, questionNumber, canonicalRetryCount);
+        if (hasQuestionResult(examId, questionNumber, canonicalRetryCount)) {
+            completeQuestion(examId, questionNumber, canonicalRetryCount);
+            calculateAndCacheOverallStatus(examId);
+            return ExamStatus.COMPLETED;
+        }
+
         Instant now = clock.instant();
         QuestionGradingJob pending = QuestionGradingJob.pending(
                 jobId,
@@ -89,6 +95,12 @@ public class ExamGradingService {
             return status;
         }
 
+        if (hasQuestionResult(examId, questionNumber, canonicalRetryCount)) {
+            completeQuestion(examId, questionNumber, canonicalRetryCount);
+            calculateAndCacheOverallStatus(examId);
+            return ExamStatus.COMPLETED;
+        }
+
         QuestionGradingJob claimed;
         try {
             inserted.startProcessing(now);
@@ -101,10 +113,11 @@ public class ExamGradingService {
             return status;
         }
 
+        QuestionDispatchClaim claim = QuestionDispatchClaim.from(claimed);
         try {
-            dispatchService.dispatchQuestion(claimed);
+            dispatchService.dispatchQuestion(claim);
         } catch (RuntimeException dispatchFailure) {
-            failQuestionJob(claimed.getJobId(), QUESTION_DISPATCH_FAILED);
+            failQuestionClaim(claim, QUESTION_DISPATCH_FAILED);
             calculateAndCacheOverallStatus(examId);
             throw new ExamsException(ErrorStatus._AI_SERVER_CONNECTION_ERROR);
         }
@@ -137,7 +150,7 @@ public class ExamGradingService {
 
         boolean questionWorkRemains = !retried.isEmpty() || !waiting.isEmpty() || !missing.isEmpty();
         SummaryAction summaryAction = !questionWorkRemains && allQuestionsComplete(examId, questionNumbers)
-                ? retrySummary(examId)
+                ? retrySummaryIfEligible(examId)
                 : SummaryAction.NOT_READY;
         ExamStatus overallStatus = calculateAndCacheOverallStatus(examId, questionNumbers);
 
@@ -219,7 +232,7 @@ public class ExamGradingService {
         log.warn("Summary Job completion raced repeatedly: jobId={}", jobId);
     }
 
-    public void tryDispatchOverallSummary(String examId) {
+    public void ensureSummaryStartedIfReady(String examId) {
         List<Integer> questionNumbers = expectedQuestionNumbers();
         if (!allQuestionsComplete(examId, questionNumbers)) {
             calculateAndCacheOverallStatus(examId, questionNumbers);
@@ -234,16 +247,20 @@ public class ExamGradingService {
 
         String jobId = GradingKeys.summaryJobId(examId);
         Optional<SummaryGradingJob> existing = summaryJobRepository.findById(jobId);
+        SummaryGradingJob summaryJob = null;
         if (existing.isEmpty()) {
             SummaryGradingJob pending = SummaryGradingJob.pending(jobId, examId, clock.instant());
             try {
-                SummaryGradingJob inserted = summaryJobRepository.insert(pending);
-                claimAndDispatchSummary(inserted, true);
+                summaryJob = summaryJobRepository.insert(pending);
             } catch (DuplicateKeyException concurrentInsert) {
-                // The concurrent creator owns the initial dispatch.
+                summaryJob = summaryJobRepository.findById(jobId).orElse(null);
             }
-        } else if (isSummaryRetryEligible(existing.get(), clock.instant())) {
-            claimAndDispatchSummary(existing.get(), false);
+        } else {
+            summaryJob = existing.get();
+        }
+
+        if (summaryJob != null && summaryJob.getStatus() == GradingJobStatus.PENDING) {
+            summaryDispatchScheduler.schedulePending(jobId);
         }
 
         calculateAndCacheOverallStatus(examId, questionNumbers);
@@ -340,29 +357,25 @@ public class ExamGradingService {
             return DispatchOutcome.CLAIM_LOST;
         }
 
+        QuestionDispatchClaim claim = QuestionDispatchClaim.from(claimed);
         try {
-            dispatchService.dispatchQuestion(claimed);
+            dispatchService.dispatchQuestion(claim);
             return DispatchOutcome.DISPATCHED;
         } catch (RuntimeException dispatchFailure) {
-            failQuestionJob(claimed.getJobId(), QUESTION_DISPATCH_FAILED);
+            failQuestionClaim(claim, QUESTION_DISPATCH_FAILED);
             return DispatchOutcome.FAILED;
         }
     }
 
-    private void failQuestionJob(String jobId, String reason) {
-        for (int attempt = 0; attempt < CALLBACK_COMPLETION_RETRIES; attempt++) {
-            Optional<QuestionGradingJob> existing = questionJobRepository.findById(jobId);
-            if (existing.isEmpty() || existing.get().getStatus() == GradingJobStatus.COMPLETED) {
-                return;
-            }
-            QuestionGradingJob job = existing.get();
-            job.fail(clock.instant(), reason);
-            try {
-                questionJobRepository.save(job);
-                return;
-            } catch (OptimisticLockingFailureException concurrentUpdate) {
-                // Re-read before recording the synchronous dispatch failure.
-            }
+    private void failQuestionClaim(QuestionDispatchClaim claim, String reason) {
+        long updated = questionJobRepository.failClaimedAttempt(
+                claim.jobId(),
+                claim.dispatchAttempt(),
+                clock.instant(),
+                reason
+        );
+        if (updated == 0) {
+            log.debug("Ignored a stale Question dispatch failure");
         }
     }
 
@@ -379,7 +392,7 @@ public class ExamGradingService {
         }
     }
 
-    private SummaryAction retrySummary(String examId) {
+    private SummaryAction retrySummaryIfEligible(String examId) {
         if (hasSummaryResult(examId)) {
             completeSummary(examId);
             return SummaryAction.ALREADY_COMPLETED;
@@ -392,7 +405,7 @@ public class ExamGradingService {
                 SummaryGradingJob inserted = summaryJobRepository.insert(
                         SummaryGradingJob.pending(jobId, examId, clock.instant())
                 );
-                return claimAndDispatchSummary(inserted, true)
+                return summaryDispatchScheduler.schedulePending(inserted.getJobId())
                         ? SummaryAction.RETRIED
                         : SummaryAction.WAITING;
             } catch (DuplicateKeyException concurrentInsert) {
@@ -407,32 +420,9 @@ public class ExamGradingService {
         if (!isSummaryRetryEligible(job, clock.instant())) {
             return SummaryAction.WAITING;
         }
-        return claimAndDispatchSummary(job, false)
+        return summaryDispatchScheduler.scheduleRetry(job.getJobId())
                 ? SummaryAction.RETRIED
                 : SummaryAction.WAITING;
-    }
-
-    private boolean claimAndDispatchSummary(SummaryGradingJob job, boolean initialDispatch) {
-        if (!initialDispatch && job.getDispatchAttempt() >= properties.maxDispatchAttempts()) {
-            markSummaryAttemptLimitReached(job);
-            return false;
-        }
-
-        SummaryGradingJob claimed;
-        try {
-            job.startProcessing(clock.instant());
-            claimed = summaryJobRepository.save(job);
-        } catch (OptimisticLockingFailureException lostClaim) {
-            return false;
-        }
-
-        try {
-            dispatchService.dispatchSummary(claimed.getExamId());
-            return true;
-        } catch (RuntimeException dispatchFailure) {
-            failSummaryJob(claimed.getJobId(), SUMMARY_DISPATCH_FAILED);
-            return false;
-        }
     }
 
     private boolean isSummaryRetryEligible(SummaryGradingJob job, Instant now) {
@@ -452,22 +442,6 @@ public class ExamGradingService {
         return true;
     }
 
-    private void failSummaryJob(String jobId, String reason) {
-        for (int attempt = 0; attempt < CALLBACK_COMPLETION_RETRIES; attempt++) {
-            Optional<SummaryGradingJob> existing = summaryJobRepository.findById(jobId);
-            if (existing.isEmpty() || existing.get().getStatus() == GradingJobStatus.COMPLETED) {
-                return;
-            }
-            SummaryGradingJob job = existing.get();
-            job.fail(clock.instant(), reason);
-            try {
-                summaryJobRepository.save(job);
-                return;
-            } catch (OptimisticLockingFailureException concurrentUpdate) {
-                // Re-read before recording the synchronous dispatch failure.
-            }
-        }
-    }
 
     private void markSummaryAttemptLimitReached(SummaryGradingJob job) {
         if (job.getStatus() == GradingJobStatus.FAILED

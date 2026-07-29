@@ -238,7 +238,7 @@ class FeedbackCallbackServiceTest {
                 () -> assertEquals("None", spokenWord.getErrorType())
         );
         verify(gradingService).completeQuestion(EXAM_ID, 4, 2);
-        verify(gradingService).tryDispatchOverallSummary(EXAM_ID);
+        verify(gradingService).ensureSummaryStartedIfReady(EXAM_ID);
         verifyNoInteractions(examSummaryRepository, currentUserProvider, redisTemplate, restTemplate);
     }
 
@@ -366,7 +366,7 @@ class FeedbackCallbackServiceTest {
 
         verify(examResultRepository, times(1)).insert(any(ExamResult.class));
         verify(gradingService, times(2)).completeQuestion(EXAM_ID, 4, 0);
-        verify(gradingService, times(2)).tryDispatchOverallSummary(EXAM_ID);
+        verify(gradingService, times(2)).ensureSummaryStartedIfReady(EXAM_ID);
     }
 
     @Test

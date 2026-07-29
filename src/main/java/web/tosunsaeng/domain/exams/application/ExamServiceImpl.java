@@ -29,6 +29,7 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
@@ -261,7 +262,7 @@ public class ExamServiceImpl implements ExamService {
         }
 
         gradingService.completeQuestion(examId, req.getQuestionNumber(), retryCount);
-        gradingService.tryDispatchOverallSummary(examId);
+        gradingService.ensureSummaryStartedIfReady(examId);
     }
 
     // 특정 시험 세션의 AI 총합 진단 레코드와 파트별 획득 점수의 누적 가산 합산 값을 연산하여 성적표 리포트를 반환합니다.
@@ -311,8 +312,7 @@ public class ExamServiceImpl implements ExamService {
         List<ExamResult> examResults = examResultRepository.findByExamId(examId);
 
         // Azure 연산 결과 레포지토리에서 문항 식별 및 특정 회차 타겟 레코드를 로드합니다.
-        AzureResult matchingAzure = azureResultRepository
-                .findFirstByExamIdAndQuestionNumberAndRetryCountOrderByIdDesc(examId, questionNumber, retryCount)
+        AzureResult matchingAzure = findCanonicalAzureResult(examId, questionNumber, retryCount)
                 .orElse(null);
 
         // 해당 문항에 대해 유저가 누적하여 도전한 총 횟수를 연산합니다.
@@ -440,5 +440,36 @@ public class ExamServiceImpl implements ExamService {
 
     private static List<Integer> compatibleRetryCounts(int retryCount) {
         return retryCount == 0 ? Arrays.asList(0, null) : List.of(retryCount);
+    }
+
+    private Optional<AzureResult> findCanonicalAzureResult(
+            String examId,
+            Integer questionNumber,
+            Integer retryCount) {
+        int canonicalRetryCount = GradingKeys.canonicalRetryCount(retryCount);
+        Optional<AzureResult> deterministic = azureResultRepository.findById(
+                GradingKeys.azureResultId(examId, questionNumber, canonicalRetryCount)
+        );
+        if (deterministic.isPresent()) {
+            return deterministic;
+        }
+
+        Optional<AzureResult> exact = azureResultRepository
+                .findFirstByExamIdAndQuestionNumberAndRetryCountOrderByIdDesc(
+                        examId,
+                        questionNumber,
+                        canonicalRetryCount
+                );
+        if (exact.isPresent() || canonicalRetryCount > 0) {
+            return exact;
+        }
+
+        Optional<AzureResult> legacyNull = azureResultRepository
+                .findFirstLegacyNullRetryCount(examId, questionNumber);
+        if (legacyNull.isPresent()) {
+            return legacyNull;
+        }
+
+        return azureResultRepository.findFirstLegacyMissingRetryCount(examId, questionNumber);
     }
 }

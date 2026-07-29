@@ -5,6 +5,8 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.EnumSource;
+import org.junit.jupiter.params.provider.NullSource;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -35,6 +37,7 @@ import web.tosunsaeng.global.config.GradingProperties;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
+import java.time.ZoneId;
 import java.time.ZoneOffset;
 import java.util.ArrayList;
 import java.util.List;
@@ -42,17 +45,22 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.concurrent.Callable;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicReference;
 
 import static org.junit.jupiter.api.Assertions.assertAll;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doThrow;
@@ -90,6 +98,9 @@ class ExamGradingServiceTest {
     private GradingDispatchService dispatchService;
 
     @Mock
+    private SummaryDispatchScheduler summaryDispatchScheduler;
+
+    @Mock
     private RedisTemplate<String, Object> redisTemplate;
 
     @Mock
@@ -98,16 +109,20 @@ class ExamGradingServiceTest {
     private final Map<String, QuestionGradingJob> questionJobs = new ConcurrentHashMap<>();
     private final Map<String, SummaryGradingJob> summaryJobs = new ConcurrentHashMap<>();
     private List<Integer> expectedQuestionNumbers;
+    private MutableClock clock;
     private ExamGradingService service;
 
     @BeforeEach
     void setUp() {
         expectedQuestionNumbers = List.of(1);
+        clock = new MutableClock(NOW);
         installQuestionRepositoryStore();
         installSummaryRepositoryStore();
         lenient().when(redisTemplate.opsForValue()).thenReturn(valueOperations);
         lenient().when(mockExamRepository.findByMockExamId(GradingKeys.MOCK_EXAM_ID))
                 .thenAnswer(invocation -> Optional.of(mockExam(expectedQuestionNumbers)));
+        lenient().when(summaryDispatchScheduler.schedulePending(anyString())).thenReturn(true);
+        lenient().when(summaryDispatchScheduler.scheduleRetry(anyString())).thenReturn(true);
 
         service = new ExamGradingService(
                 questionJobRepository,
@@ -117,9 +132,18 @@ class ExamGradingServiceTest {
                 mockExamRepository,
                 s3Client,
                 dispatchService,
+                summaryDispatchScheduler,
                 redisTemplate,
-                new GradingProperties(Duration.ofMinutes(1), Duration.ofMinutes(3), 3),
-                Clock.fixed(NOW, ZoneOffset.UTC)
+                new GradingProperties(
+                        Duration.ofMinutes(1),
+                        Duration.ofMinutes(3),
+                        3,
+                        Duration.ofSeconds(3),
+                        Duration.ofSeconds(30),
+                        2,
+                        100
+                ),
+                clock
         );
         ReflectionTestUtils.setField(service, "bucketName", "test-learning-core-bucket");
     }
@@ -137,7 +161,7 @@ class ExamGradingServiceTest {
                 () -> assertEquals(NOW, stored.getLastDispatchedAt()),
                 () -> assertEquals("temp/" + EXAM_ID + "/q_1_r0.wav", stored.getFileKey())
         );
-        verify(dispatchService).dispatchQuestion(any(QuestionGradingJob.class));
+        verify(dispatchService).dispatchQuestion(any(QuestionDispatchClaim.class));
     }
 
     @Test
@@ -146,7 +170,7 @@ class ExamGradingServiceTest {
         ExamStatus repeatedStatus = service.submitQuestion(EXAM_ID, 1, 0);
 
         assertEquals(ExamStatus.PROCESSING, repeatedStatus);
-        verify(dispatchService, times(1)).dispatchQuestion(any(QuestionGradingJob.class));
+        verify(dispatchService, times(1)).dispatchQuestion(any(QuestionDispatchClaim.class));
     }
 
     @Test
@@ -156,7 +180,7 @@ class ExamGradingServiceTest {
                 () -> service.submitQuestion(EXAM_ID, 1, 0)
         );
 
-        verify(dispatchService, times(1)).dispatchQuestion(any(QuestionGradingJob.class));
+        verify(dispatchService, times(1)).dispatchQuestion(any(QuestionDispatchClaim.class));
         assertEquals(1, storedQuestion(1, 0).getDispatchAttempt());
     }
 
@@ -179,7 +203,7 @@ class ExamGradingServiceTest {
 
         assertEquals(List.of(1), result.getRetriedQuestionNumbers());
         assertEquals(SummaryAction.NOT_READY, result.getSummaryAction());
-        verify(dispatchService).dispatchQuestion(any(QuestionGradingJob.class));
+        verify(dispatchService).dispatchQuestion(any(QuestionDispatchClaim.class));
     }
 
     @Test
@@ -265,7 +289,7 @@ class ExamGradingServiceTest {
                 () -> assertEquals("test-learning-core-bucket", headRequest.getValue().bucket()),
                 () -> assertEquals("temp/" + EXAM_ID + "/q_1_r0.wav", headRequest.getValue().key())
         );
-        verify(dispatchService).dispatchQuestion(any(QuestionGradingJob.class));
+        verify(dispatchService).dispatchQuestion(any(QuestionDispatchClaim.class));
     }
 
     @Test
@@ -315,7 +339,7 @@ class ExamGradingServiceTest {
                 () -> service.retryExam(EXAM_ID)
         );
 
-        verify(dispatchService, times(1)).dispatchQuestion(any(QuestionGradingJob.class));
+        verify(dispatchService, times(1)).dispatchQuestion(any(QuestionDispatchClaim.class));
         assertEquals(2, storedQuestion(1, 0).getDispatchAttempt());
     }
 
@@ -325,12 +349,13 @@ class ExamGradingServiceTest {
         doAnswer(invocation -> {
             service.completeQuestion(EXAM_ID, 1, 0);
             return null;
-        }).when(dispatchService).dispatchQuestion(any(QuestionGradingJob.class));
+        }).when(dispatchService).dispatchQuestion(any(QuestionDispatchClaim.class));
 
         ExamResponseDTO.GradingRetryResult result = service.retryExam(EXAM_ID);
 
         assertEquals(SummaryAction.NOT_READY, result.getSummaryAction());
-        verify(dispatchService, never()).dispatchSummary(anyString());
+        verify(summaryDispatchScheduler, never()).schedulePending(anyString());
+        verify(summaryDispatchScheduler, never()).scheduleRetry(anyString());
     }
 
     @Test
@@ -368,6 +393,112 @@ class ExamGradingServiceTest {
         verify(dispatchService, never()).dispatchQuestion(any());
     }
 
+    @ParameterizedTest
+    @NullSource
+    @ValueSource(ints = 0)
+    void submitBackfillsCompletedJobFromCanonicalLegacyResultWithoutDispatch(Integer storedRetryCount) {
+        ExamResult legacyResult = ExamResult.builder()
+                .examId(EXAM_ID)
+                .questionNumber(1)
+                .retryCount(storedRetryCount)
+                .build();
+        lenient().when(examResultRepository.existsByExamIdAndQuestionNumberAndRetryCountIn(
+                        eq(EXAM_ID), eq(1), any()))
+                .thenReturn(true);
+        lenient().when(examResultRepository.findByExamId(EXAM_ID)).thenReturn(List.of(legacyResult));
+
+        ExamStatus result = service.submitQuestion(EXAM_ID, 1, 0);
+
+        QuestionGradingJob stored = storedQuestion(1, 0);
+        assertAll(
+                () -> assertEquals(ExamStatus.COMPLETED, result),
+                () -> assertEquals(GradingJobStatus.COMPLETED, stored.getStatus()),
+                () -> assertEquals(0, stored.getDispatchAttempt()),
+                () -> assertEquals(NOW, stored.getCompletedAt())
+        );
+        verify(dispatchService, never()).dispatchQuestion(any());
+    }
+
+    @Test
+    void submitRepairsExistingNonCompletedJobWhenCanonicalResultAlreadyExists() {
+        ExamResult existingResult = ExamResult.builder()
+                .examId(EXAM_ID)
+                .questionNumber(1)
+                .retryCount(0)
+                .build();
+        putQuestion(questionJob(1, 0, GradingJobStatus.FAILED, 1, NOW.minusSeconds(30)));
+        lenient().when(examResultRepository.existsByExamIdAndQuestionNumberAndRetryCountIn(
+                        eq(EXAM_ID), eq(1), any()))
+                .thenReturn(true);
+        lenient().when(examResultRepository.findByExamId(EXAM_ID)).thenReturn(List.of(existingResult));
+
+        ExamStatus result = service.submitQuestion(EXAM_ID, 1, 0);
+
+        QuestionGradingJob stored = storedQuestion(1, 0);
+        assertAll(
+                () -> assertEquals(ExamStatus.COMPLETED, result),
+                () -> assertEquals(GradingJobStatus.COMPLETED, stored.getStatus()),
+                () -> assertEquals(1, stored.getDispatchAttempt()),
+                () -> assertNull(stored.getFailedAt()),
+                () -> assertNull(stored.getFailureReason())
+        );
+        verify(dispatchService, never()).dispatchQuestion(any());
+    }
+
+    @Test
+    void staleQuestionAttemptFailureDoesNotOverwriteNewerProcessingAttempt() {
+        CountDownLatch attemptOneStarted = new CountDownLatch(1);
+        CountDownLatch releaseAttemptOne = new CountDownLatch(1);
+        doAnswer(invocation -> {
+            QuestionDispatchClaim claim = invocation.getArgument(0);
+            if (claim.dispatchAttempt() == 1) {
+                attemptOneStarted.countDown();
+                if (!releaseAttemptOne.await(5, TimeUnit.SECONDS)) {
+                    throw new IllegalStateException("attempt 1 was not released");
+                }
+                throw new RuntimeException("attempt 1 failed after attempt 2 was claimed");
+            }
+            return null;
+        }).when(dispatchService).dispatchQuestion(any(QuestionDispatchClaim.class));
+
+        ExecutorService executor = Executors.newSingleThreadExecutor();
+        try {
+            Future<ExamStatus> attemptOne = executor.submit(() -> service.submitQuestion(EXAM_ID, 1, 0));
+            assertTrue(attemptOneStarted.await(5, TimeUnit.SECONDS));
+            Instant retryAt = NOW.plus(Duration.ofMinutes(3));
+            clock.set(retryAt);
+
+            ExamResponseDTO.GradingRetryResult result = service.retryExam(EXAM_ID);
+            releaseAttemptOne.countDown();
+            ExecutionException dispatchFailure = assertThrows(
+                    ExecutionException.class,
+                    () -> attemptOne.get(5, TimeUnit.SECONDS)
+            );
+
+            QuestionGradingJob stored = storedQuestion(1, 0);
+            assertAll(
+                    () -> assertTrue(dispatchFailure.getCause() instanceof web.tosunsaeng.domain.exams.exception.ExamsException),
+                    () -> assertEquals(List.of(1), result.getRetriedQuestionNumbers()),
+                    () -> assertEquals(GradingJobStatus.PROCESSING, stored.getStatus()),
+                    () -> assertEquals(2, stored.getDispatchAttempt()),
+                    () -> assertNull(stored.getFailedAt()),
+                    () -> assertNull(stored.getFailureReason())
+            );
+            verify(questionJobRepository).failClaimedAttempt(
+                    GradingKeys.questionJobId(EXAM_ID, 1, 0),
+                    1,
+                    retryAt,
+                    "QUESTION_DISPATCH_FAILED"
+            );
+        } catch (InterruptedException interrupted) {
+            Thread.currentThread().interrupt();
+            throw new AssertionError(interrupted);
+        } finally {
+            releaseAttemptOne.countDown();
+            executor.shutdownNow();
+        }
+    }
+
     @Test
     void summaryCallbackCompletionRecoversMissingLegacyJob() {
         service.completeSummary(EXAM_ID);
@@ -385,27 +516,44 @@ class ExamGradingServiceTest {
         expectedQuestionNumbers = List.of(1, 11);
         putQuestion(questionJob(11, 0, GradingJobStatus.COMPLETED, 1, NOW.minusSeconds(10)));
 
-        service.tryDispatchOverallSummary(EXAM_ID);
+        service.ensureSummaryStartedIfReady(EXAM_ID);
+        service.ensureSummaryStartedIfReady(EXAM_ID);
 
-        verify(dispatchService, never()).dispatchSummary(anyString());
+        verify(summaryDispatchScheduler, never()).schedulePending(anyString());
         assertTrue(summaryJobs.isEmpty());
     }
 
     @Test
-    void allRequiredQuestionsTriggerSummaryOnlyOnce() {
+    void allRequiredQuestionsCreateOnePendingSummaryJobAndOnlyScheduleIt() {
         expectedQuestionNumbers = List.of(1, 2);
         putCompletedQuestions(expectedQuestionNumbers);
 
-        service.tryDispatchOverallSummary(EXAM_ID);
-        service.tryDispatchOverallSummary(EXAM_ID);
+        service.ensureSummaryStartedIfReady(EXAM_ID);
+        service.ensureSummaryStartedIfReady(EXAM_ID);
 
-        verify(dispatchService, times(1)).dispatchSummary(EXAM_ID);
+        verify(summaryJobRepository, times(1)).insert(any(SummaryGradingJob.class));
+        verify(summaryDispatchScheduler, times(2)).schedulePending(GradingKeys.summaryJobId(EXAM_ID));
+        verify(dispatchService, never()).dispatchSummary(any());
         SummaryGradingJob stored = storedSummary();
         assertAll(
-                () -> assertEquals(GradingJobStatus.PROCESSING, stored.getStatus()),
-                () -> assertEquals(1, stored.getDispatchAttempt()),
+                () -> assertEquals(GradingJobStatus.PENDING, stored.getStatus()),
+                () -> assertEquals(0, stored.getDispatchAttempt()),
                 () -> assertEquals("summary:" + EXAM_ID + ":v1", stored.getJobId())
         );
+    }
+
+    @ParameterizedTest
+    @EnumSource(value = GradingJobStatus.class, names = {"FAILED", "PROCESSING"})
+    void feedbackGateDoesNotRecoverFailedOrStaleProcessingSummary(GradingJobStatus status) {
+        putCompletedQuestions(expectedQuestionNumbers);
+        putSummary(summaryJob(status, 1, NOW.minus(Duration.ofMinutes(4))));
+
+        service.ensureSummaryStartedIfReady(EXAM_ID);
+        service.ensureSummaryStartedIfReady(EXAM_ID);
+
+        verify(summaryDispatchScheduler, never()).schedulePending(anyString());
+        verify(summaryDispatchScheduler, never()).scheduleRetry(anyString());
+        verify(dispatchService, never()).dispatchSummary(any());
     }
 
     @Test
@@ -416,7 +564,7 @@ class ExamGradingServiceTest {
         ExamResponseDTO.GradingRetryResult result = service.retryExam(EXAM_ID);
 
         assertEquals(SummaryAction.WAITING, result.getSummaryAction());
-        verify(dispatchService, never()).dispatchSummary(anyString());
+        verify(summaryDispatchScheduler, never()).scheduleRetry(anyString());
     }
 
     @Test
@@ -430,7 +578,7 @@ class ExamGradingServiceTest {
                 () -> assertEquals(SummaryAction.WAITING, result.getSummaryAction()),
                 () -> assertEquals(GradingJobStatus.PROCESSING, storedSummary().getStatus())
         );
-        verify(dispatchService, never()).dispatchSummary(anyString());
+        verify(summaryDispatchScheduler, never()).scheduleRetry(anyString());
     }
 
     @ParameterizedTest
@@ -442,8 +590,9 @@ class ExamGradingServiceTest {
         ExamResponseDTO.GradingRetryResult result = service.retryExam(EXAM_ID);
 
         assertEquals(SummaryAction.RETRIED, result.getSummaryAction());
-        assertEquals(2, storedSummary().getDispatchAttempt());
-        verify(dispatchService).dispatchSummary(EXAM_ID);
+        assertEquals(1, storedSummary().getDispatchAttempt());
+        verify(summaryDispatchScheduler).scheduleRetry(GradingKeys.summaryJobId(EXAM_ID));
+        verify(dispatchService, never()).dispatchSummary(any());
     }
 
     @Test
@@ -455,7 +604,7 @@ class ExamGradingServiceTest {
 
         assertEquals(SummaryAction.ALREADY_COMPLETED, result.getSummaryAction());
         assertEquals(ExamStatus.COMPLETED, result.getOverallStatus());
-        verify(dispatchService, never()).dispatchSummary(anyString());
+        verify(summaryDispatchScheduler, never()).scheduleRetry(anyString());
     }
 
     @Test
@@ -522,6 +671,26 @@ class ExamGradingServiceTest {
                 return copy(stored, stored.getVersion());
             }
         });
+        lenient().when(questionJobRepository.failClaimedAttempt(
+                        anyString(), anyInt(), any(Instant.class), anyString()))
+                .thenAnswer(invocation -> {
+                    synchronized (questionJobs) {
+                        String jobId = invocation.getArgument(0);
+                        int claimedAttempt = invocation.getArgument(1);
+                        Instant failedAt = invocation.getArgument(2);
+                        String reason = invocation.getArgument(3);
+                        QuestionGradingJob current = questionJobs.get(jobId);
+                        if (current == null
+                                || current.getStatus() != GradingJobStatus.PROCESSING
+                                || current.getDispatchAttempt() != claimedAttempt) {
+                            return 0L;
+                        }
+                        QuestionGradingJob failed = copy(current, current.getVersion());
+                        failed.fail(failedAt, reason);
+                        questionJobs.put(jobId, copy(failed, current.getVersion() + 1));
+                        return 1L;
+                    }
+                });
     }
 
     private void installSummaryRepositoryStore() {
@@ -678,6 +847,34 @@ class ExamGradingServiceTest {
             return results;
         } finally {
             executor.shutdownNow();
+        }
+    }
+
+    private static final class MutableClock extends Clock {
+
+        private final AtomicReference<Instant> instant;
+
+        private MutableClock(Instant initialInstant) {
+            instant = new AtomicReference<>(initialInstant);
+        }
+
+        void set(Instant newInstant) {
+            instant.set(newInstant);
+        }
+
+        @Override
+        public ZoneId getZone() {
+            return ZoneOffset.UTC;
+        }
+
+        @Override
+        public Clock withZone(ZoneId zone) {
+            return this;
+        }
+
+        @Override
+        public Instant instant() {
+            return instant.get();
         }
     }
 }

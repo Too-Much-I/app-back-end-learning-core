@@ -53,11 +53,14 @@ import static org.junit.jupiter.api.Assertions.assertAll;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.inOrder;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
@@ -311,6 +314,57 @@ class ExamOwnershipServiceTest {
     }
 
     @Test
+    void retryZeroQuestionReadReturnsLegacyAzureWithNullRetryCount() throws Exception {
+        stubEmptyQuestionRead(0);
+        AzureResult legacyNull = legacyAzure("legacy-null", null, 7);
+        when(azureResultRepository.findFirstLegacyNullRetryCount(EXAM_ID, 1))
+                .thenReturn(Optional.of(legacyNull));
+
+        ExamResponseDTO.QuestionResult result = examService.getExamQuestion(EXAM_ID, 1, 0);
+
+        assertAll(
+                () -> assertNotNull(result.getQuestion().getAzureFeedback()),
+                () -> assertEquals(
+                        7,
+                        result.getQuestion().getAzureFeedback().getErrorCounts().getOmission()
+                )
+        );
+        verify(azureResultRepository, never()).findFirstLegacyMissingRetryCount(EXAM_ID, 1);
+    }
+
+    @Test
+    void retryZeroQuestionReadFallsBackToLegacyAzureWithMissingRetryCount() throws Exception {
+        stubEmptyQuestionRead(0);
+        AzureResult legacyMissing = legacyAzure("legacy-missing", null, 8);
+        when(azureResultRepository.findFirstLegacyNullRetryCount(EXAM_ID, 1))
+                .thenReturn(Optional.empty());
+        when(azureResultRepository.findFirstLegacyMissingRetryCount(EXAM_ID, 1))
+                .thenReturn(Optional.of(legacyMissing));
+
+        ExamResponseDTO.QuestionResult result = examService.getExamQuestion(EXAM_ID, 1, 0);
+
+        assertAll(
+                () -> assertNotNull(result.getQuestion().getAzureFeedback()),
+                () -> assertEquals(
+                        8,
+                        result.getQuestion().getAzureFeedback().getErrorCounts().getOmission()
+                )
+        );
+        verify(azureResultRepository).findFirstLegacyMissingRetryCount(EXAM_ID, 1);
+    }
+
+    @Test
+    void positiveRetryQuestionReadNeverReturnsLegacyZeroAzure() throws Exception {
+        stubEmptyQuestionRead(1);
+
+        ExamResponseDTO.QuestionResult result = examService.getExamQuestion(EXAM_ID, 1, 1);
+
+        assertNull(result.getQuestion().getAzureFeedback());
+        verify(azureResultRepository, never()).findFirstLegacyNullRetryCount(EXAM_ID, 1);
+        verify(azureResultRepository, never()).findFirstLegacyMissingRetryCount(EXAM_ID, 1);
+    }
+
+    @Test
     void latestAiQuestionFeedbackIsUsedWhenTheSameRetryWasSavedMoreThanOnce() throws Exception {
         stubOwnedSession();
         ExamResult olderResult = ExamResult.builder()
@@ -458,7 +512,7 @@ class ExamOwnershipServiceTest {
                 )
         );
         verify(gradingService).completeQuestion(EXAM_ID, 1, 0);
-        verify(gradingService).tryDispatchOverallSummary(EXAM_ID);
+        verify(gradingService).ensureSummaryStartedIfReady(EXAM_ID);
         verifyNoInteractions(
                 examSummaryRepository,
                 currentUserProvider,
@@ -547,6 +601,35 @@ class ExamOwnershipServiceTest {
         when(examSessionRepository.findById(EXAM_ID))
                 .thenReturn(Optional.of(sessionFor(OWNER_USER_ID)));
         when(currentUserProvider.getCurrentUserId()).thenReturn(OWNER_USER_ID);
+    }
+
+    private void stubEmptyQuestionRead(int retryCount) throws Exception {
+        stubOwnedSession();
+        when(examResultRepository.findByExamId(EXAM_ID)).thenReturn(List.of());
+        when(examResultRepository.findFirstByExamIdAndQuestionNumberAndRetryCountInOrderByIdDesc(
+                EXAM_ID,
+                1,
+                retryCount == 0 ? Arrays.asList(0, null) : List.of(retryCount)
+        )).thenReturn(Optional.empty());
+        when(mockExamRepository.findByMockExamId("mock_exam_003"))
+                .thenReturn(Optional.of(mockExam()));
+        when(s3Presigner.presignGetObject(any(GetObjectPresignRequest.class)))
+                .thenReturn(presignedGetObjectRequest);
+        when(presignedGetObjectRequest.url())
+                .thenReturn(URI.create("https://example.com/submitted-audio.wav").toURL());
+    }
+
+    private AzureResult legacyAzure(String id, Integer retryCount, int omissionCount) {
+        return AzureResult.builder()
+                .id(id)
+                .examId(EXAM_ID)
+                .questionNumber(1)
+                .retryCount(retryCount)
+                .rawData(Map.of(
+                        "azure_speech_result",
+                        Map.of("error_counts", Map.of("omission", omissionCount))
+                ))
+                .build();
     }
 
     private ExamSession sessionFor(String userId) {

@@ -18,7 +18,11 @@ class GradingPropertiesTest {
         GradingProperties properties = new GradingProperties(
                 Duration.ofMinutes(1),
                 Duration.ofMinutes(3),
-                3
+                3,
+                Duration.ofSeconds(3),
+                Duration.ofSeconds(30),
+                2,
+                100
         );
 
         assertTrue(validator.validate(properties).isEmpty());
@@ -26,8 +30,16 @@ class GradingPropertiesTest {
 
     @Test
     void nonPositiveTimeoutsAndAttemptLimitAreRejected() {
-        GradingProperties properties = new GradingProperties(Duration.ZERO, Duration.ofSeconds(-1), 0);
+        GradingProperties properties = new GradingProperties(
+                Duration.ZERO,
+                Duration.ofSeconds(-1),
+                0,
+                Duration.ZERO,
+                Duration.ofSeconds(-1),
+                0,
+                0
+        );
 
-        assertEquals(3, validator.validate(properties).size());
+        assertEquals(7, validator.validate(properties).size());
     }
 }
