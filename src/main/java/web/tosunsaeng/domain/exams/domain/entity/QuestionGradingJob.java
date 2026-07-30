@@ -24,6 +24,7 @@ public class QuestionGradingJob {
     private Integer questionNumber;
     private Integer retryCount;
     private String fileKey;
+    private String mockExamId;
     private GradingJobStatus status;
     private int dispatchAttempt;
     private Instant pendingAt;
@@ -43,12 +44,24 @@ public class QuestionGradingJob {
             Integer retryCount,
             String fileKey,
             Instant now) {
+        return pending(jobId, examId, questionNumber, retryCount, fileKey, null, now);
+    }
+
+    public static QuestionGradingJob pending(
+            String jobId,
+            String examId,
+            Integer questionNumber,
+            Integer retryCount,
+            String fileKey,
+            String mockExamId,
+            Instant now) {
         return QuestionGradingJob.builder()
                 .jobId(jobId)
                 .examId(examId)
                 .questionNumber(questionNumber)
                 .retryCount(retryCount)
                 .fileKey(fileKey)
+                .mockExamId(mockExamId)
                 .status(GradingJobStatus.PENDING)
                 .dispatchAttempt(0)
                 .pendingAt(now)
@@ -62,12 +75,24 @@ public class QuestionGradingJob {
             Integer retryCount,
             String fileKey,
             Instant now) {
+        return completed(jobId, examId, questionNumber, retryCount, fileKey, null, now);
+    }
+
+    public static QuestionGradingJob completed(
+            String jobId,
+            String examId,
+            Integer questionNumber,
+            Integer retryCount,
+            String fileKey,
+            String mockExamId,
+            Instant now) {
         return QuestionGradingJob.builder()
                 .jobId(jobId)
                 .examId(examId)
                 .questionNumber(questionNumber)
                 .retryCount(retryCount)
                 .fileKey(fileKey)
+                .mockExamId(mockExamId)
                 .status(GradingJobStatus.COMPLETED)
                 .dispatchAttempt(0)
                 .pendingAt(now)

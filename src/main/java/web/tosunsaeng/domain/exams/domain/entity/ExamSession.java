@@ -22,4 +22,16 @@ public class ExamSession {
     private String userId;
 
     private LocalDateTime createdAt;
+
+    private String mockExamId;
+
+    private Integer cycleNumber;
+
+    private Boolean active;
+
+    private LocalDateTime completedAt;
+
+    public boolean isActive() {
+        return Boolean.TRUE.equals(active);
+    }
 }

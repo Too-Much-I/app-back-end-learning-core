@@ -67,7 +67,8 @@ class GradingDispatchServiceTest {
                 EXAM_ID,
                 4,
                 2,
-                "temp/" + EXAM_ID + "/q_4_r2.wav"
+                "temp/" + EXAM_ID + "/q_4_r2.wav",
+                "mock_exam_002"
         );
 
         service.dispatchQuestion(claim);
@@ -79,7 +80,7 @@ class GradingDispatchServiceTest {
         assertAll(
                 () -> assertEquals(EXAM_ID, body.getFirst("user_id")),
                 () -> assertNotEquals("00000000-0000-0000-0000-000000000001", body.getFirst("user_id")),
-                () -> assertEquals("mock_exam_003", body.getFirst("mock_exam_id")),
+                () -> assertEquals("mock_exam_002", body.getFirst("mock_exam_id")),
                 () -> assertEquals(2, body.getFirst("part_number")),
                 () -> assertEquals(4, body.getFirst("question_number")),
                 () -> assertEquals(2, body.getFirst("retry_count")),
@@ -98,7 +99,8 @@ class GradingDispatchServiceTest {
                 "summary:" + EXAM_ID + ":v1",
                 1,
                 Instant.parse("2026-07-28T00:00:00Z"),
-                EXAM_ID
+                EXAM_ID,
+                "mock_exam_002"
         ));
 
         ArgumentCaptor<HttpEntity> requestCaptor = ArgumentCaptor.forClass(HttpEntity.class);
@@ -106,7 +108,7 @@ class GradingDispatchServiceTest {
         Map<?, ?> body = assertInstanceOf(Map.class, requestCaptor.getValue().getBody());
         assertAll(
                 () -> assertEquals(EXAM_ID, body.get("user_id")),
-                () -> assertEquals("mock_exam_003", body.get("mock_exam_id")),
+                () -> assertEquals("mock_exam_002", body.get("mock_exam_id")),
                 () -> assertEquals(0, body.get("question_number")),
                 () -> assertEquals(0, body.get("part_number")),
                 () -> assertNull(body.get("retry_count")),

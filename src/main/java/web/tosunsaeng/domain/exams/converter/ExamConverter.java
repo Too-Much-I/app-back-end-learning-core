@@ -70,13 +70,21 @@ public class ExamConverter {
     }
 
     public static ExamResult toExamResult(ExamRequestDTO.AiResultReq req, String userId, String resultId) {
+        return toExamResult(req, userId, resultId, req != null ? req.getMockExamId() : null);
+    }
+
+    public static ExamResult toExamResult(
+            ExamRequestDTO.AiResultReq req,
+            String userId,
+            String resultId,
+            String mockExamId) {
         if (req == null) return null;
 
         return ExamResult.builder()
                 .id(resultId)
                 .examId(req.getExamId())
                 .userId(userId)
-                .mockExamId(req.getMockExamId())
+                .mockExamId(mockExamId)
                 .partNumber(req.getPartNumber())
                 .questionNumber(req.getQuestionNumber())
                 .retryCount(req.getRetryCount() != null ? req.getRetryCount() : 0) // 🌟 재시도 회차 누적 저장의 핵심!
@@ -102,13 +110,21 @@ public class ExamConverter {
     }
 
     public static ExamSummary toExamSummary(ExamRequestDTO.AiResultReq req, String userId, String resultId) {
+        return toExamSummary(req, userId, resultId, req != null ? req.getMockExamId() : null);
+    }
+
+    public static ExamSummary toExamSummary(
+            ExamRequestDTO.AiResultReq req,
+            String userId,
+            String resultId,
+            String mockExamId) {
         if (req == null) return null;
 
         return ExamSummary.builder()
                 .id(resultId)
                 .examId(req.getExamId())
                 .userId(userId)
-                .mockExamId(req.getMockExamId())
+                .mockExamId(mockExamId)
                 .totalScore(req.getTotalScore())
                 .levelEstimate(req.getLevelEstimate())
                 .summary(req.getSummary())

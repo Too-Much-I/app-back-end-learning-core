@@ -9,8 +9,10 @@ import org.springframework.core.task.TaskExecutor;
 import org.springframework.core.task.TaskRejectedException;
 import org.springframework.dao.OptimisticLockingFailureException;
 import org.springframework.web.client.ResourceAccessException;
+import web.tosunsaeng.domain.exams.domain.entity.ExamSession;
 import web.tosunsaeng.domain.exams.domain.entity.SummaryGradingJob;
 import web.tosunsaeng.domain.exams.domain.enums.GradingJobStatus;
+import web.tosunsaeng.domain.exams.domain.repository.ExamSessionRepository;
 import web.tosunsaeng.domain.exams.domain.repository.SummaryGradingJobRepository;
 import web.tosunsaeng.global.config.GradingProperties;
 
@@ -46,6 +48,7 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
+import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
 class SummaryDispatchSchedulerTest {
@@ -67,13 +70,16 @@ class SummaryDispatchSchedulerTest {
     private SummaryGradingJobRepository summaryJobRepository;
 
     @Mock
+    private ExamSessionRepository examSessionRepository;
+
+    @Mock
     private GradingDispatchService dispatchService;
 
     @Test
     void duplicatePendingTasksDispatchSummaryOnlyOnce() {
         CapturingTaskExecutor taskExecutor = new CapturingTaskExecutor();
         AtomicReference<SummaryGradingJob> store = installRepositoryStore(
-                SummaryGradingJob.pending(JOB_ID, EXAM_ID, NOW)
+                SummaryGradingJob.pending(JOB_ID, EXAM_ID, "mock_exam_002", NOW)
         );
         SummaryDispatchScheduler scheduler = scheduler(taskExecutor);
 
@@ -90,9 +96,45 @@ class SummaryDispatchSchedulerTest {
         assertAll(
                 () -> assertEquals(JOB_ID, claimCaptor.getValue().jobId()),
                 () -> assertEquals(1, claimCaptor.getValue().dispatchAttempt()),
+                () -> assertEquals("mock_exam_002", claimCaptor.getValue().mockExamId()),
                 () -> assertEquals(GradingJobStatus.PROCESSING, stored.getStatus()),
                 () -> assertEquals(1, stored.getDispatchAttempt())
         );
+    }
+
+    @Test
+    void legacySummaryJobUsesSessionMockExamId() {
+        CapturingTaskExecutor taskExecutor = new CapturingTaskExecutor();
+        installRepositoryStore(SummaryGradingJob.pending(JOB_ID, EXAM_ID, NOW));
+        when(examSessionRepository.findById(EXAM_ID)).thenReturn(Optional.of(ExamSession.builder()
+                .examId(EXAM_ID)
+                .mockExamId("mock_exam_002")
+                .build()));
+        SummaryDispatchScheduler scheduler = scheduler(taskExecutor);
+
+        assertTrue(scheduler.schedulePending(JOB_ID));
+        taskExecutor.runAll();
+
+        ArgumentCaptor<SummaryDispatchClaim> claimCaptor =
+                ArgumentCaptor.forClass(SummaryDispatchClaim.class);
+        verify(dispatchService).dispatchSummary(claimCaptor.capture());
+        assertEquals("mock_exam_002", claimCaptor.getValue().mockExamId());
+    }
+
+    @Test
+    void legacySummaryJobWithoutSessionUsesLegacyFallback() {
+        CapturingTaskExecutor taskExecutor = new CapturingTaskExecutor();
+        installRepositoryStore(SummaryGradingJob.pending(JOB_ID, EXAM_ID, NOW));
+        when(examSessionRepository.findById(EXAM_ID)).thenReturn(Optional.empty());
+        SummaryDispatchScheduler scheduler = scheduler(taskExecutor);
+
+        assertTrue(scheduler.schedulePending(JOB_ID));
+        taskExecutor.runAll();
+
+        ArgumentCaptor<SummaryDispatchClaim> claimCaptor =
+                ArgumentCaptor.forClass(SummaryDispatchClaim.class);
+        verify(dispatchService).dispatchSummary(claimCaptor.capture());
+        assertEquals(GradingKeys.LEGACY_MOCK_EXAM_ID, claimCaptor.getValue().mockExamId());
     }
 
     @Test
@@ -221,6 +263,7 @@ class SummaryDispatchSchedulerTest {
         return new SummaryDispatchScheduler(
                 taskExecutor,
                 summaryJobRepository,
+                examSessionRepository,
                 dispatchService,
                 PROPERTIES,
                 clock
@@ -286,6 +329,7 @@ class SummaryDispatchSchedulerTest {
         return SummaryGradingJob.builder()
                 .jobId(source.getJobId())
                 .examId(source.getExamId())
+                .mockExamId(source.getMockExamId())
                 .summaryVersion(source.getSummaryVersion())
                 .status(source.getStatus())
                 .dispatchAttempt(source.getDispatchAttempt())

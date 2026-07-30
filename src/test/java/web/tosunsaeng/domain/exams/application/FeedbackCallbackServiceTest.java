@@ -27,7 +27,6 @@ import web.tosunsaeng.domain.exams.domain.repository.AzureResultRepository;
 import web.tosunsaeng.domain.exams.domain.repository.ExamResultRepository;
 import web.tosunsaeng.domain.exams.domain.repository.ExamSessionRepository;
 import web.tosunsaeng.domain.exams.domain.repository.ExamSummaryRepository;
-import web.tosunsaeng.domain.exams.domain.repository.MockExamRepository;
 import web.tosunsaeng.domain.exams.domain.repository.SpeechAceResultRepository;
 import web.tosunsaeng.domain.exams.dto.ExamRequestDTO;
 import web.tosunsaeng.domain.exams.exception.ExamsException;
@@ -53,6 +52,8 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.inOrder;
+import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
@@ -90,7 +91,7 @@ class FeedbackCallbackServiceTest {
     private ExamSessionRepository examSessionRepository;
 
     @Mock
-    private MockExamRepository mockExamRepository;
+    private MockExamCatalogService mockExamCatalogService;
 
     @Mock
     private SpeechAceResultRepository speechAceResultRepository;
@@ -104,6 +105,9 @@ class FeedbackCallbackServiceTest {
     @Mock
     private ExamGradingService gradingService;
 
+    @Mock
+    private ExamSessionManager examSessionManager;
+
     private final ObjectMapper objectMapper = new ObjectMapper();
     private ExamServiceImpl examService;
 
@@ -113,10 +117,11 @@ class FeedbackCallbackServiceTest {
                 redisTemplate,
                 s3Presigner,
                 gradingService,
+                examSessionManager,
                 examResultRepository,
                 examSummaryRepository,
                 examSessionRepository,
-                mockExamRepository,
+                mockExamCatalogService,
                 speechAceResultRepository,
                 azureResultRepository,
                 currentUserProvider
@@ -239,6 +244,7 @@ class FeedbackCallbackServiceTest {
         );
         verify(gradingService).completeQuestion(EXAM_ID, 4, 2);
         verify(gradingService).ensureSummaryStartedIfReady(EXAM_ID);
+        verify(examSessionManager, never()).completeIfIncomplete(any());
         verifyNoInteractions(examSummaryRepository, currentUserProvider, redisTemplate, restTemplate);
     }
 
@@ -264,9 +270,10 @@ class FeedbackCallbackServiceTest {
         examService.updateExamResult(req);
 
         ArgumentCaptor<ExamSummary> summaryCaptor = ArgumentCaptor.forClass(ExamSummary.class);
-        InOrder callbackOrder = inOrder(examSessionRepository, examSummaryRepository);
+        InOrder callbackOrder = inOrder(examSessionRepository, examSummaryRepository, examSessionManager);
         callbackOrder.verify(examSessionRepository).findById(EXAM_ID);
         callbackOrder.verify(examSummaryRepository).insert(summaryCaptor.capture());
+        callbackOrder.verify(examSessionManager).completeIfIncomplete(EXAM_ID);
 
         ExamSummary savedSummary = summaryCaptor.getValue();
         assertAll(
@@ -287,6 +294,52 @@ class FeedbackCallbackServiceTest {
         verify(gradingService).completeSummary(EXAM_ID);
         verify(gradingService).calculateAndCacheOverallStatus(EXAM_ID);
         verifyNoInteractions(currentUserProvider, restTemplate);
+    }
+
+    @Test
+    void summaryStorageFailureDoesNotCompleteSession() throws Exception {
+        ExamRequestDTO.AiResultReq req = objectMapper.readValue("""
+                {
+                  "user_id": "ex_callback_001",
+                  "mock_exam_id": "mock_exam_002",
+                  "suggested_total_score": 170,
+                  "question_number": 0
+                }
+                """, ExamRequestDTO.AiResultReq.class);
+        when(examSessionRepository.findById(EXAM_ID)).thenReturn(Optional.of(examSession()));
+        doThrow(new IllegalStateException("synthetic summary storage failure"))
+                .when(examSummaryRepository).insert(any(ExamSummary.class));
+
+        assertThrows(IllegalStateException.class, () -> examService.updateExamResult(req));
+
+        verify(examSessionManager, never()).completeIfIncomplete(EXAM_ID);
+        verify(gradingService, never()).completeSummary(EXAM_ID);
+    }
+
+    @Test
+    void callbackPersistsSessionMockExamIdInsteadOfMismatchedPayload() throws Exception {
+        ExamRequestDTO.AiResultReq req = objectMapper.readValue("""
+                {
+                  "user_id": "ex_callback_001",
+                  "mock_exam_id": "mock_exam_999",
+                  "question_number": 4,
+                  "retry_count": 0,
+                  "score": 8.0
+                }
+                """, ExamRequestDTO.AiResultReq.class);
+        ExamSession selectedSession = ExamSession.builder()
+                .examId(EXAM_ID)
+                .userId(USER_ID)
+                .mockExamId("mock_exam_002")
+                .active(true)
+                .build();
+        when(examSessionRepository.findById(EXAM_ID)).thenReturn(Optional.of(selectedSession));
+
+        examService.updateExamResult(req);
+
+        ArgumentCaptor<ExamResult> resultCaptor = ArgumentCaptor.forClass(ExamResult.class);
+        verify(examResultRepository).insert(resultCaptor.capture());
+        assertEquals("mock_exam_002", resultCaptor.getValue().getMockExamId());
     }
 
     @Test
@@ -426,6 +479,7 @@ class FeedbackCallbackServiceTest {
         examService.updateExamResult(req);
 
         verify(examSummaryRepository, times(1)).insert(any(ExamSummary.class));
+        verify(examSessionManager, times(2)).completeIfIncomplete(EXAM_ID);
         verify(gradingService, times(2)).completeSummary(EXAM_ID);
         verify(gradingService, times(2)).calculateAndCacheOverallStatus(EXAM_ID);
     }

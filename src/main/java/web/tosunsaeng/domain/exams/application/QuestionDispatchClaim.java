@@ -11,10 +11,26 @@ public record QuestionDispatchClaim(
         String examId,
         Integer questionNumber,
         Integer retryCount,
-        String fileKey
+        String fileKey,
+        String mockExamId
 ) {
 
+    public QuestionDispatchClaim(
+            String jobId,
+            int dispatchAttempt,
+            Instant claimedAt,
+            String examId,
+            Integer questionNumber,
+            Integer retryCount,
+            String fileKey) {
+        this(jobId, dispatchAttempt, claimedAt, examId, questionNumber, retryCount, fileKey, null);
+    }
+
     public static QuestionDispatchClaim from(QuestionGradingJob job) {
+        return from(job, GradingKeys.effectiveMockExamId(job.getMockExamId()));
+    }
+
+    public static QuestionDispatchClaim from(QuestionGradingJob job, String mockExamId) {
         return new QuestionDispatchClaim(
                 job.getJobId(),
                 job.getDispatchAttempt(),
@@ -22,7 +38,8 @@ public record QuestionDispatchClaim(
                 job.getExamId(),
                 job.getQuestionNumber(),
                 job.getRetryCount(),
-                job.getFileKey()
+                job.getFileKey(),
+                mockExamId
         );
     }
 }

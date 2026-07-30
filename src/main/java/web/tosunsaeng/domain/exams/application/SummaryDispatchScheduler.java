@@ -8,6 +8,7 @@ import org.springframework.dao.OptimisticLockingFailureException;
 import org.springframework.stereotype.Component;
 import web.tosunsaeng.domain.exams.domain.entity.SummaryGradingJob;
 import web.tosunsaeng.domain.exams.domain.enums.GradingJobStatus;
+import web.tosunsaeng.domain.exams.domain.repository.ExamSessionRepository;
 import web.tosunsaeng.domain.exams.domain.repository.SummaryGradingJobRepository;
 import web.tosunsaeng.global.config.GradingProperties;
 
@@ -24,6 +25,7 @@ public class SummaryDispatchScheduler {
 
     private final TaskExecutor taskExecutor;
     private final SummaryGradingJobRepository summaryJobRepository;
+    private final ExamSessionRepository examSessionRepository;
     private final GradingDispatchService dispatchService;
     private final GradingProperties properties;
     private final Clock clock;
@@ -31,11 +33,13 @@ public class SummaryDispatchScheduler {
     public SummaryDispatchScheduler(
             @Qualifier("summaryDispatchExecutor") TaskExecutor taskExecutor,
             SummaryGradingJobRepository summaryJobRepository,
+            ExamSessionRepository examSessionRepository,
             GradingDispatchService dispatchService,
             GradingProperties properties,
             Clock clock) {
         this.taskExecutor = taskExecutor;
         this.summaryJobRepository = summaryJobRepository;
+        this.examSessionRepository = examSessionRepository;
         this.dispatchService = dispatchService;
         this.properties = properties;
         this.clock = clock;
@@ -80,7 +84,7 @@ public class SummaryDispatchScheduler {
             return;
         }
 
-        SummaryDispatchClaim claim = SummaryDispatchClaim.from(claimed);
+        SummaryDispatchClaim claim = SummaryDispatchClaim.from(claimed, resolveMockExamId(claimed));
         try {
             dispatchService.dispatchSummary(claim);
         } catch (RuntimeException dispatchFailure) {
@@ -106,6 +110,15 @@ public class SummaryDispatchScheduler {
             case PROCESSING -> timedOut(job.getProcessingStartedAt(), properties.processingTimeout(), now);
             case COMPLETED -> false;
         };
+    }
+
+    private String resolveMockExamId(SummaryGradingJob job) {
+        if (job.getMockExamId() != null && !job.getMockExamId().isBlank()) {
+            return job.getMockExamId();
+        }
+        return examSessionRepository.findById(job.getExamId())
+                .map(session -> GradingKeys.effectiveMockExamId(session.getMockExamId()))
+                .orElse(GradingKeys.LEGACY_MOCK_EXAM_ID);
     }
 
     private static boolean timedOut(Instant startedAt, Duration timeout, Instant now) {
