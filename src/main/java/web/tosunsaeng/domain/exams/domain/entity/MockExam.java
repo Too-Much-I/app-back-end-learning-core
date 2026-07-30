@@ -18,5 +18,9 @@ public class MockExam {
 
     private String title;
 
+    private Integer sequence;
+
+    private Boolean active;
+
     private List<Question> questions;
 }

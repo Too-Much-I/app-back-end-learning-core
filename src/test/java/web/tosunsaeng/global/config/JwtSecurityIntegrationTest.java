@@ -40,6 +40,8 @@ import software.amazon.awssdk.services.s3.presigner.model.PresignedGetObjectRequ
 import web.tosunsaeng.domain.exams.api.ExamRestController;
 import web.tosunsaeng.domain.exams.application.ExamServiceImpl;
 import web.tosunsaeng.domain.exams.application.ExamGradingService;
+import web.tosunsaeng.domain.exams.application.ExamSessionManager;
+import web.tosunsaeng.domain.exams.application.MockExamCatalogService;
 import web.tosunsaeng.domain.exams.domain.entity.ExamResult;
 import web.tosunsaeng.domain.exams.domain.entity.ExamSession;
 import web.tosunsaeng.domain.exams.domain.entity.MockExam;
@@ -70,6 +72,7 @@ import java.util.Date;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.stream.Stream;
 
@@ -135,6 +138,9 @@ class JwtSecurityIntegrationTest {
     private ExamGradingService gradingService;
 
     @MockitoBean
+    private ExamSessionManager examSessionManager;
+
+    @MockitoBean
     private ExamResultRepository examResultRepository;
 
     @MockitoBean
@@ -142,6 +148,9 @@ class JwtSecurityIntegrationTest {
 
     @MockitoBean
     private ExamSessionRepository examSessionRepository;
+
+    @MockitoBean
+    private MockExamCatalogService mockExamCatalogService;
 
     @MockitoBean
     private MockExamRepository mockExamRepository;
@@ -206,8 +215,23 @@ class JwtSecurityIntegrationTest {
                 .title("JWT integration test exam")
                 .questions(List.of(question))
                 .build();
-        when(mockExamRepository.findByMockExamId("mock_exam_003"))
-                .thenReturn(java.util.Optional.of(mockExam));
+        when(examSessionManager.findOrCreate(anyString())).thenAnswer(invocation -> {
+            String userId = invocation.getArgument(0);
+            String examId = "ex_" + UUID.randomUUID().toString().replace("-", "").substring(0, 10)
+                    + "_0729_0600";
+            ExamSession session = ExamSession.builder()
+                    .examId(examId)
+                    .userId(userId)
+                    .createdAt(LocalDateTime.of(2026, 7, 29, 6, 0))
+                    .mockExamId("mock_exam_003")
+                    .cycleNumber(1)
+                    .active(true)
+                    .build();
+            sessions.put(examId, session);
+            return new ExamSessionManager.Assignment(session, mockExam, true);
+        });
+        when(mockExamCatalogService.getRequiredExam("mock_exam_003"))
+                .thenReturn(mockExam);
 
         PresignedGetObjectRequest presignedGetObjectRequest = mock(PresignedGetObjectRequest.class);
         when(s3Presigner.presignGetObject(any(GetObjectPresignRequest.class)))

@@ -8,15 +8,25 @@ public record SummaryDispatchClaim(
         String jobId,
         int dispatchAttempt,
         Instant claimedAt,
-        String examId
+        String examId,
+        String mockExamId
 ) {
 
+    public SummaryDispatchClaim(String jobId, int dispatchAttempt, Instant claimedAt, String examId) {
+        this(jobId, dispatchAttempt, claimedAt, examId, null);
+    }
+
     public static SummaryDispatchClaim from(SummaryGradingJob job) {
+        return from(job, GradingKeys.effectiveMockExamId(job.getMockExamId()));
+    }
+
+    public static SummaryDispatchClaim from(SummaryGradingJob job, String mockExamId) {
         return new SummaryDispatchClaim(
                 job.getJobId(),
                 job.getDispatchAttempt(),
                 job.getLastDispatchedAt(),
-                job.getExamId()
+                job.getExamId(),
+                mockExamId
         );
     }
 }

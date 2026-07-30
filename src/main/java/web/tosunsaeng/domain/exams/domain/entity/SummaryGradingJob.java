@@ -21,6 +21,7 @@ public class SummaryGradingJob {
     @Id
     private String jobId;
     private String examId;
+    private String mockExamId;
     private int summaryVersion;
     private GradingJobStatus status;
     private int dispatchAttempt;
@@ -35,9 +36,14 @@ public class SummaryGradingJob {
     private Long version;
 
     public static SummaryGradingJob pending(String jobId, String examId, Instant now) {
+        return pending(jobId, examId, null, now);
+    }
+
+    public static SummaryGradingJob pending(String jobId, String examId, String mockExamId, Instant now) {
         return SummaryGradingJob.builder()
                 .jobId(jobId)
                 .examId(examId)
+                .mockExamId(mockExamId)
                 .summaryVersion(1)
                 .status(GradingJobStatus.PENDING)
                 .dispatchAttempt(0)
@@ -46,9 +52,14 @@ public class SummaryGradingJob {
     }
 
     public static SummaryGradingJob completed(String jobId, String examId, Instant now) {
+        return completed(jobId, examId, null, now);
+    }
+
+    public static SummaryGradingJob completed(String jobId, String examId, String mockExamId, Instant now) {
         return SummaryGradingJob.builder()
                 .jobId(jobId)
                 .examId(examId)
+                .mockExamId(mockExamId)
                 .summaryVersion(1)
                 .status(GradingJobStatus.COMPLETED)
                 .dispatchAttempt(0)

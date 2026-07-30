@@ -33,7 +33,6 @@ import web.tosunsaeng.domain.exams.domain.repository.AzureResultRepository;
 import web.tosunsaeng.domain.exams.domain.repository.ExamResultRepository;
 import web.tosunsaeng.domain.exams.domain.repository.ExamSessionRepository;
 import web.tosunsaeng.domain.exams.domain.repository.ExamSummaryRepository;
-import web.tosunsaeng.domain.exams.domain.repository.MockExamRepository;
 import web.tosunsaeng.domain.exams.domain.repository.SpeechAceResultRepository;
 import web.tosunsaeng.domain.exams.dto.ExamRequestDTO;
 import web.tosunsaeng.domain.exams.dto.ExamResponseDTO;
@@ -101,7 +100,7 @@ class ExamOwnershipServiceTest {
     private ExamSessionRepository examSessionRepository;
 
     @Mock
-    private MockExamRepository mockExamRepository;
+    private MockExamCatalogService mockExamCatalogService;
 
     @Mock
     private SpeechAceResultRepository speechAceResultRepository;
@@ -115,6 +114,9 @@ class ExamOwnershipServiceTest {
     @Mock
     private ExamGradingService gradingService;
 
+    @Mock
+    private ExamSessionManager examSessionManager;
+
     private final ObjectMapper objectMapper = new ObjectMapper();
     private ExamServiceImpl examService;
 
@@ -124,10 +126,11 @@ class ExamOwnershipServiceTest {
                 redisTemplate,
                 s3Presigner,
                 gradingService,
+                examSessionManager,
                 examResultRepository,
                 examSummaryRepository,
                 examSessionRepository,
-                mockExamRepository,
+                mockExamCatalogService,
                 speechAceResultRepository,
                 azureResultRepository,
                 currentUserProvider
@@ -286,8 +289,8 @@ class ExamOwnershipServiceTest {
         )).thenReturn(Optional.of(questionResult));
         when(azureResultRepository.findFirstByExamIdAndQuestionNumberAndRetryCountOrderByIdDesc(EXAM_ID, 1, 0))
                 .thenReturn(Optional.empty());
-        when(mockExamRepository.findByMockExamId("mock_exam_003"))
-                .thenReturn(Optional.of(mockExam()));
+        when(mockExamCatalogService.getRequiredExam("mock_exam_003"))
+                .thenReturn(mockExam());
         when(s3Presigner.presignGetObject(any(GetObjectPresignRequest.class)))
                 .thenReturn(presignedGetObjectRequest);
         when(presignedGetObjectRequest.url())
@@ -309,8 +312,48 @@ class ExamOwnershipServiceTest {
         );
         verify(azureResultRepository)
                 .findFirstByExamIdAndQuestionNumberAndRetryCountOrderByIdDesc(EXAM_ID, 1, 0);
-        verify(mockExamRepository).findByMockExamId("mock_exam_003");
+        verify(mockExamCatalogService).getRequiredExam("mock_exam_003");
         verify(s3Presigner).presignGetObject(any(GetObjectPresignRequest.class));
+    }
+
+    @Test
+    void questionResultUsesMockExamIdStoredInSession() throws Exception {
+        ExamSession selectedSession = ExamSession.builder()
+                .examId(EXAM_ID)
+                .userId(OWNER_USER_ID)
+                .mockExamId("mock_exam_002")
+                .active(true)
+                .build();
+        when(examSessionRepository.findById(EXAM_ID)).thenReturn(Optional.of(selectedSession));
+        when(currentUserProvider.getCurrentUserId()).thenReturn(OWNER_USER_ID);
+        when(examResultRepository.findByExamId(EXAM_ID)).thenReturn(List.of());
+        when(examResultRepository.findFirstByExamIdAndQuestionNumberAndRetryCountInOrderByIdDesc(
+                EXAM_ID,
+                1,
+                Arrays.asList(0, null)
+        )).thenReturn(Optional.empty());
+        when(azureResultRepository.findFirstByExamIdAndQuestionNumberAndRetryCountOrderByIdDesc(EXAM_ID, 1, 0))
+                .thenReturn(Optional.empty());
+        MockExam selectedPaper = MockExam.builder()
+                .mockExamId("mock_exam_002")
+                .questions(List.of(Question.builder()
+                        .partNumber(1)
+                        .questionNumber(1)
+                        .question("Selected paper question")
+                        .build()))
+                .build();
+        when(mockExamCatalogService.getRequiredExam("mock_exam_002"))
+                .thenReturn(selectedPaper);
+        when(s3Presigner.presignGetObject(any(GetObjectPresignRequest.class)))
+                .thenReturn(presignedGetObjectRequest);
+        when(presignedGetObjectRequest.url())
+                .thenReturn(URI.create("https://example.com/submitted-audio.wav").toURL());
+
+        ExamResponseDTO.QuestionResult result = examService.getExamQuestion(EXAM_ID, 1, 0);
+
+        assertEquals("Selected paper question", result.getQuestion().getQuestionInfo().getText());
+        verify(mockExamCatalogService).getRequiredExam("mock_exam_002");
+        verify(mockExamCatalogService, never()).getRequiredExam("mock_exam_003");
     }
 
     @Test
@@ -394,8 +437,8 @@ class ExamOwnershipServiceTest {
         )).thenReturn(Optional.of(latestResult));
         when(azureResultRepository.findFirstByExamIdAndQuestionNumberAndRetryCountOrderByIdDesc(EXAM_ID, 1, 2))
                 .thenReturn(Optional.empty());
-        when(mockExamRepository.findByMockExamId("mock_exam_003"))
-                .thenReturn(Optional.of(mockExam()));
+        when(mockExamCatalogService.getRequiredExam("mock_exam_003"))
+                .thenReturn(mockExam());
         when(s3Presigner.presignGetObject(any(GetObjectPresignRequest.class)))
                 .thenReturn(presignedGetObjectRequest);
         when(presignedGetObjectRequest.url())
@@ -451,7 +494,7 @@ class ExamOwnershipServiceTest {
                 examSummaryRepository,
                 azureResultRepository,
                 speechAceResultRepository,
-                mockExamRepository,
+                mockExamCatalogService,
                 gradingService
         );
     }
@@ -477,7 +520,7 @@ class ExamOwnershipServiceTest {
                 examSummaryRepository,
                 azureResultRepository,
                 speechAceResultRepository,
-                mockExamRepository,
+                mockExamCatalogService,
                 gradingService
         );
     }
@@ -611,8 +654,8 @@ class ExamOwnershipServiceTest {
                 1,
                 retryCount == 0 ? Arrays.asList(0, null) : List.of(retryCount)
         )).thenReturn(Optional.empty());
-        when(mockExamRepository.findByMockExamId("mock_exam_003"))
-                .thenReturn(Optional.of(mockExam()));
+        when(mockExamCatalogService.getRequiredExam("mock_exam_003"))
+                .thenReturn(mockExam());
         when(s3Presigner.presignGetObject(any(GetObjectPresignRequest.class)))
                 .thenReturn(presignedGetObjectRequest);
         when(presignedGetObjectRequest.url())

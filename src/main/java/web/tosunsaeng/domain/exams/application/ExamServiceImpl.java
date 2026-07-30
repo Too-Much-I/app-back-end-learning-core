@@ -14,7 +14,6 @@ import web.tosunsaeng.domain.exams.domain.repository.AzureResultRepository;
 import web.tosunsaeng.domain.exams.domain.repository.ExamResultRepository;
 import web.tosunsaeng.domain.exams.domain.repository.ExamSessionRepository;
 import web.tosunsaeng.domain.exams.domain.repository.ExamSummaryRepository;
-import web.tosunsaeng.domain.exams.domain.repository.MockExamRepository;
 import web.tosunsaeng.domain.exams.domain.repository.SpeechAceResultRepository;
 import web.tosunsaeng.domain.exams.dto.ExamRequestDTO;
 import web.tosunsaeng.domain.exams.dto.ExamResponseDTO;
@@ -23,14 +22,11 @@ import web.tosunsaeng.global.auth.CurrentUserProvider;
 import web.tosunsaeng.global.error.code.status.ErrorStatus;
 
 import java.time.Duration;
-import java.time.LocalDateTime;
-import java.time.format.DateTimeFormatter;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
-import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 
@@ -42,11 +38,12 @@ public class ExamServiceImpl implements ExamService {
     private final RedisTemplate<String, Object> redisTemplate;
     private final software.amazon.awssdk.services.s3.presigner.S3Presigner s3Presigner;
     private final ExamGradingService gradingService;
+    private final ExamSessionManager examSessionManager;
 
     private final ExamResultRepository examResultRepository;
     private final ExamSummaryRepository examSummaryRepository;
     private final ExamSessionRepository examSessionRepository;
-    private final MockExamRepository mockExamRepository;
+    private final MockExamCatalogService mockExamCatalogService;
     private final SpeechAceResultRepository speechAceResultRepository;
     private final AzureResultRepository azureResultRepository;
     private final CurrentUserProvider currentUserProvider;
@@ -125,43 +122,33 @@ public class ExamServiceImpl implements ExamService {
     // 새로운 정규 모의고사 세션을 생성하고 초기 시험 지문 및 S3 오디오 스트리밍 주소를 조립합니다.
     @Override
     public ExamResponseDTO.CreateSessionResult createExamSession() {
-        String uuidPart = UUID.randomUUID().toString().replace("-", "").substring(0, 10);
-        String timePart = LocalDateTime.now().format(DateTimeFormatter.ofPattern("MMdd_HHmm"));
-        String examId = "ex_" + uuidPart + "_" + timePart;
+        String userId = currentUserProvider.getCurrentUserId();
+        ExamSessionManager.Assignment assignment = examSessionManager.findOrCreate(userId);
+        String examId = assignment.session().getExamId();
         String redisKey = "exam:status:" + examId;
 
-        // Redis에 진행 상태를 대기(PENDING)로 등록하고 1시간 만료 시간을 부여합니다.
-        redisTemplate.opsForValue().set(redisKey, ExamStatus.PENDING.name(), 1, TimeUnit.HOURS);
-        log.info("정규 모의고사 세션 생성 완료: {}", examId);
+        if (assignment.created()) {
+            redisTemplate.opsForValue().set(redisKey, ExamStatus.PENDING.name(), 1, TimeUnit.HOURS);
+            log.info("정규 모의고사 세션 생성 완료: examId={}, mockExamId={}",
+                    examId, assignment.mockExam().getMockExamId());
+        } else if (!Boolean.TRUE.equals(redisTemplate.hasKey(redisKey))) {
+            gradingService.calculateAndCacheOverallStatus(examId);
+        }
 
-        // 지정된 족보 데이터인 mock_exam_003 셋을 MongoDB에서 로드합니다.
-        MockExam mockExam = mockExamRepository.findByMockExamId("mock_exam_003")
-                .orElseThrow(() -> new ExamsException(ErrorStatus._EXAM_PAPER_NOT_FOUND));
-
-        // 전체 문항 배열을 순회하며 문항별 다운로드용 오디오 URL 및 가이드 URL을 결합합니다.
+        MockExam mockExam = assignment.mockExam();
         List<ExamResponseDTO.QuestionDTO> questionDTOs = mockExam.getQuestions().stream()
+                .filter(q -> q != null && q.getQuestionNumber() != null && q.getQuestionNumber() > 0)
                 .map(q -> {
                     ExamResponseDTO.QuestionDTO dto = ExamConverter.toQuestionDTO(q);
                     dto.setAudioUrl(getQuestionAudioUrl(mockExam.getMockExamId(), q.getQuestionNumber()));
-                    if (q.getPartNumber() == 3) {
+                    if (Integer.valueOf(3).equals(q.getPartNumber())) {
                         dto.setGuideAudioUrl(getQuestionGuideAudioUrl(mockExam.getMockExamId()));
                     }
                     return dto;
                 })
                 .collect(Collectors.toList());
 
-        ExamResponseDTO.CreateSessionResult result =
-                ExamConverter.toCreateSessionResult(examId, mockExam.getTitle(), questionDTOs);
-
-        String userId = currentUserProvider.getCurrentUserId();
-        ExamSession examSession = ExamSession.builder()
-                .examId(examId)
-                .userId(userId)
-                .createdAt(LocalDateTime.now())
-                .build();
-        examSessionRepository.save(examSession);
-
-        return result;
+        return ExamConverter.toCreateSessionResult(examId, mockExam.getTitle(), questionDTOs);
     }
 
     // 사용자가 가상으로 녹음 오디오 파일을 업로드할 수 있는 임시 S3 PutObject용 Presigned URL을 발급합니다.
@@ -218,6 +205,7 @@ public class ExamServiceImpl implements ExamService {
     public void updateExamResult(ExamRequestDTO.AiResultReq req) {
         String examId = req.getExamId();
         ExamSession examSession = resolveSession(examId);
+        String mockExamId = GradingKeys.effectiveMockExamId(examSession.getMockExamId());
 
         // 종합 결과도 결정적 ID와 legacy 논리 결과 확인으로 멱등 저장합니다.
         if (req.getTotalScore() != null) {
@@ -227,13 +215,19 @@ public class ExamServiceImpl implements ExamService {
                     || examResultRepository.findFirstByExamIdAndTotalScoreIsNotNullOrderByIdDesc(examId).isPresent();
             if (!alreadyStored) {
                 try {
-                    ExamSummary summary = ExamConverter.toExamSummary(req, examSession.getUserId(), resultId);
+                    ExamSummary summary = ExamConverter.toExamSummary(
+                            req,
+                            examSession.getUserId(),
+                            resultId,
+                            mockExamId
+                    );
                     examSummaryRepository.insert(summary);
                     log.info("AI 종합 피드백 영구 데이터 적재 완료: examId={}", examId);
                 } catch (DuplicateKeyException duplicateCallback) {
                     log.info("중복 AI 종합 피드백 Callback 멱등 처리: examId={}", examId);
                 }
             }
+            examSessionManager.completeIfIncomplete(examId);
             gradingService.completeSummary(examId);
             gradingService.calculateAndCacheOverallStatus(examId);
             return;
@@ -250,7 +244,8 @@ public class ExamServiceImpl implements ExamService {
                 ExamResult result = ExamConverter.toExamResult(
                         req,
                         examSession.getUserId(),
-                        GradingKeys.feedbackResultId(examId, req.getQuestionNumber(), retryCount)
+                        GradingKeys.feedbackResultId(examId, req.getQuestionNumber(), retryCount),
+                        mockExamId
                 );
                 examResultRepository.insert(result);
                 log.info("AI 피드백 영구 데이터 적재 완료: examId={}, qNum={}, retryCount={}",
@@ -307,7 +302,7 @@ public class ExamServiceImpl implements ExamService {
     // 유저가 채점 결과를 문항 단위로 핀포인트 조회할 때, 문제 원본(MongoDB)과 AI 결과 조각, Azure 발음 분석 세션을 결합합니다.
     @Override
     public ExamResponseDTO.QuestionResult getExamQuestion(String examId, Integer questionNumber, Integer retryCount) {
-        requireOwnedSession(examId);
+        ExamSession examSession = requireOwnedSession(examId);
 
         List<ExamResult> examResults = examResultRepository.findByExamId(examId);
 
@@ -336,8 +331,8 @@ public class ExamServiceImpl implements ExamService {
                 )
                 .orElse(null);
 
-        MockExam mockExam = mockExamRepository.findByMockExamId("mock_exam_003")
-                .orElseThrow(() -> new ExamsException(ErrorStatus._EXAM_PAPER_NOT_FOUND));
+        String mockExamId = GradingKeys.effectiveMockExamId(examSession.getMockExamId());
+        MockExam mockExam = mockExamCatalogService.getRequiredExam(mockExamId);
 
         // 모의고사 원본 데이터셋에서 현재 문항에 일치하는 기준 문제 엔티티를 검출합니다.
         Question rawQuestion = mockExam.getQuestions().stream()

@@ -2,7 +2,7 @@ package web.tosunsaeng.domain.exams.application;
 
 public final class GradingKeys {
 
-    public static final String MOCK_EXAM_ID = "mock_exam_003";
+    public static final String LEGACY_MOCK_EXAM_ID = "mock_exam_003";
 
     private GradingKeys() {
     }
@@ -33,5 +33,9 @@ public final class GradingKeys {
 
     public static int canonicalRetryCount(Integer retryCount) {
         return retryCount == null ? 0 : retryCount;
+    }
+
+    public static String effectiveMockExamId(String mockExamId) {
+        return mockExamId == null || mockExamId.isBlank() ? LEGACY_MOCK_EXAM_ID : mockExamId;
     }
 }

@@ -18,8 +18,8 @@ import web.tosunsaeng.domain.exams.domain.enums.ExamStatus;
 import web.tosunsaeng.domain.exams.domain.enums.GradingJobStatus;
 import web.tosunsaeng.domain.exams.domain.enums.SummaryAction;
 import web.tosunsaeng.domain.exams.domain.repository.ExamResultRepository;
+import web.tosunsaeng.domain.exams.domain.repository.ExamSessionRepository;
 import web.tosunsaeng.domain.exams.domain.repository.ExamSummaryRepository;
-import web.tosunsaeng.domain.exams.domain.repository.MockExamRepository;
 import web.tosunsaeng.domain.exams.domain.repository.QuestionGradingJobRepository;
 import web.tosunsaeng.domain.exams.domain.repository.SummaryGradingJobRepository;
 import web.tosunsaeng.domain.exams.dto.ExamResponseDTO;
@@ -54,7 +54,8 @@ public class ExamGradingService {
     private final SummaryGradingJobRepository summaryJobRepository;
     private final ExamResultRepository examResultRepository;
     private final ExamSummaryRepository examSummaryRepository;
-    private final MockExamRepository mockExamRepository;
+    private final ExamSessionRepository examSessionRepository;
+    private final MockExamCatalogService mockExamCatalogService;
     private final S3Client s3Client;
     private final GradingDispatchService dispatchService;
     private final SummaryDispatchScheduler summaryDispatchScheduler;
@@ -67,6 +68,7 @@ public class ExamGradingService {
 
     public ExamStatus submitQuestion(String examId, Integer questionNumber, Integer retryCount) {
         int canonicalRetryCount = GradingKeys.canonicalRetryCount(retryCount);
+        String mockExamId = resolveMockExamId(examId);
         String jobId = GradingKeys.questionJobId(examId, questionNumber, canonicalRetryCount);
         if (hasQuestionResult(examId, questionNumber, canonicalRetryCount)) {
             completeQuestion(examId, questionNumber, canonicalRetryCount);
@@ -81,6 +83,7 @@ public class ExamGradingService {
                 questionNumber,
                 canonicalRetryCount,
                 GradingKeys.questionFileKey(examId, questionNumber, canonicalRetryCount),
+                mockExamId,
                 now
         );
 
@@ -127,7 +130,7 @@ public class ExamGradingService {
     }
 
     public ExamResponseDTO.GradingRetryResult retryExam(String examId) {
-        List<Integer> questionNumbers = expectedQuestionNumbers();
+        List<Integer> questionNumbers = expectedQuestionNumbers(examId);
         List<Integer> retried = new ArrayList<>();
         List<Integer> waiting = new ArrayList<>();
         List<Integer> missing = new ArrayList<>();
@@ -166,6 +169,7 @@ public class ExamGradingService {
 
     public void completeQuestion(String examId, Integer questionNumber, Integer retryCount) {
         int canonicalRetryCount = GradingKeys.canonicalRetryCount(retryCount);
+        String mockExamId = resolveMockExamId(examId);
         String jobId = GradingKeys.questionJobId(examId, questionNumber, canonicalRetryCount);
 
         for (int attempt = 0; attempt < CALLBACK_COMPLETION_RETRIES; attempt++) {
@@ -179,6 +183,7 @@ public class ExamGradingService {
                             questionNumber,
                             canonicalRetryCount,
                             GradingKeys.questionFileKey(examId, questionNumber, canonicalRetryCount),
+                            mockExamId,
                             now
                     ));
                     return;
@@ -204,13 +209,14 @@ public class ExamGradingService {
 
     public void completeSummary(String examId) {
         String jobId = GradingKeys.summaryJobId(examId);
+        String mockExamId = resolveMockExamId(examId);
 
         for (int attempt = 0; attempt < CALLBACK_COMPLETION_RETRIES; attempt++) {
             Instant now = clock.instant();
             Optional<SummaryGradingJob> existing = summaryJobRepository.findById(jobId);
             if (existing.isEmpty()) {
                 try {
-                    summaryJobRepository.insert(SummaryGradingJob.completed(jobId, examId, now));
+                    summaryJobRepository.insert(SummaryGradingJob.completed(jobId, examId, mockExamId, now));
                     return;
                 } catch (DuplicateKeyException concurrentInsert) {
                     continue;
@@ -233,7 +239,7 @@ public class ExamGradingService {
     }
 
     public void ensureSummaryStartedIfReady(String examId) {
-        List<Integer> questionNumbers = expectedQuestionNumbers();
+        List<Integer> questionNumbers = expectedQuestionNumbers(examId);
         if (!allQuestionsComplete(examId, questionNumbers)) {
             calculateAndCacheOverallStatus(examId, questionNumbers);
             return;
@@ -249,7 +255,12 @@ public class ExamGradingService {
         Optional<SummaryGradingJob> existing = summaryJobRepository.findById(jobId);
         SummaryGradingJob summaryJob = null;
         if (existing.isEmpty()) {
-            SummaryGradingJob pending = SummaryGradingJob.pending(jobId, examId, clock.instant());
+            SummaryGradingJob pending = SummaryGradingJob.pending(
+                    jobId,
+                    examId,
+                    resolveMockExamId(examId),
+                    clock.instant()
+            );
             try {
                 summaryJob = summaryJobRepository.insert(pending);
             } catch (DuplicateKeyException concurrentInsert) {
@@ -267,7 +278,7 @@ public class ExamGradingService {
     }
 
     public ExamStatus calculateAndCacheOverallStatus(String examId) {
-        return calculateAndCacheOverallStatus(examId, expectedQuestionNumbers());
+        return calculateAndCacheOverallStatus(examId, expectedQuestionNumbers(examId));
     }
 
     public ExamStatus getQuestionStatus(String examId, Integer questionNumber, Integer retryCount) {
@@ -300,6 +311,7 @@ public class ExamGradingService {
                 questionNumber,
                 0,
                 fileKey,
+                resolveMockExamId(examId),
                 clock.instant()
         );
         try {
@@ -357,7 +369,7 @@ public class ExamGradingService {
             return DispatchOutcome.CLAIM_LOST;
         }
 
-        QuestionDispatchClaim claim = QuestionDispatchClaim.from(claimed);
+        QuestionDispatchClaim claim = QuestionDispatchClaim.from(claimed, resolveMockExamId(claimed));
         try {
             dispatchService.dispatchQuestion(claim);
             return DispatchOutcome.DISPATCHED;
@@ -403,7 +415,12 @@ public class ExamGradingService {
         if (existing.isEmpty()) {
             try {
                 SummaryGradingJob inserted = summaryJobRepository.insert(
-                        SummaryGradingJob.pending(jobId, examId, clock.instant())
+                        SummaryGradingJob.pending(
+                                jobId,
+                                examId,
+                                resolveMockExamId(examId),
+                                clock.instant()
+                        )
                 );
                 return summaryDispatchScheduler.schedulePending(inserted.getJobId())
                         ? SummaryAction.RETRIED
@@ -552,10 +569,13 @@ public class ExamGradingService {
         return new QuestionCompletionSnapshot(completedResultQuestions, jobsByQuestionNumber);
     }
 
-    private List<Integer> expectedQuestionNumbers() {
-        MockExam mockExam = mockExamRepository.findByMockExamId(GradingKeys.MOCK_EXAM_ID)
-                .orElseThrow(() -> new ExamsException(ErrorStatus._EXAM_PAPER_NOT_FOUND));
-        List<Integer> questionNumbers = mockExam.getQuestions().stream()
+    private List<Integer> expectedQuestionNumbers(String examId) {
+        String mockExamId = resolveMockExamId(examId);
+        MockExam mockExam = mockExamCatalogService.getRequiredExam(mockExamId);
+        List<Integer> questionNumbers = Optional.ofNullable(mockExam.getQuestions())
+                .orElseGet(Collections::emptyList)
+                .stream()
+                .filter(question -> question != null)
                 .map(question -> question.getQuestionNumber())
                 .filter(questionNumber -> questionNumber != null && questionNumber > 0)
                 .distinct()
@@ -565,6 +585,19 @@ public class ExamGradingService {
             throw new ExamsException(ErrorStatus._QUESTION_NOT_FOUND);
         }
         return questionNumbers;
+    }
+
+    private String resolveMockExamId(String examId) {
+        return examSessionRepository.findById(examId)
+                .map(session -> GradingKeys.effectiveMockExamId(session.getMockExamId()))
+                .orElse(GradingKeys.LEGACY_MOCK_EXAM_ID);
+    }
+
+    private String resolveMockExamId(QuestionGradingJob job) {
+        if (job.getMockExamId() != null && !job.getMockExamId().isBlank()) {
+            return job.getMockExamId();
+        }
+        return resolveMockExamId(job.getExamId());
     }
 
     private boolean s3ObjectExists(String fileKey) {

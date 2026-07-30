@@ -20,6 +20,7 @@ import software.amazon.awssdk.services.s3.model.HeadObjectRequest;
 import software.amazon.awssdk.services.s3.model.S3Exception;
 import web.tosunsaeng.domain.exams.domain.entity.MockExam;
 import web.tosunsaeng.domain.exams.domain.entity.ExamResult;
+import web.tosunsaeng.domain.exams.domain.entity.ExamSession;
 import web.tosunsaeng.domain.exams.domain.entity.Question;
 import web.tosunsaeng.domain.exams.domain.entity.QuestionGradingJob;
 import web.tosunsaeng.domain.exams.domain.entity.SummaryGradingJob;
@@ -27,8 +28,8 @@ import web.tosunsaeng.domain.exams.domain.enums.ExamStatus;
 import web.tosunsaeng.domain.exams.domain.enums.GradingJobStatus;
 import web.tosunsaeng.domain.exams.domain.enums.SummaryAction;
 import web.tosunsaeng.domain.exams.domain.repository.ExamResultRepository;
+import web.tosunsaeng.domain.exams.domain.repository.ExamSessionRepository;
 import web.tosunsaeng.domain.exams.domain.repository.ExamSummaryRepository;
-import web.tosunsaeng.domain.exams.domain.repository.MockExamRepository;
 import web.tosunsaeng.domain.exams.domain.repository.QuestionGradingJobRepository;
 import web.tosunsaeng.domain.exams.domain.repository.SummaryGradingJobRepository;
 import web.tosunsaeng.domain.exams.dto.ExamResponseDTO;
@@ -69,6 +70,7 @@ import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
 class ExamGradingServiceTest {
@@ -89,7 +91,10 @@ class ExamGradingServiceTest {
     private ExamSummaryRepository examSummaryRepository;
 
     @Mock
-    private MockExamRepository mockExamRepository;
+    private ExamSessionRepository examSessionRepository;
+
+    @Mock
+    private MockExamCatalogService mockExamCatalogService;
 
     @Mock
     private S3Client s3Client;
@@ -119,8 +124,13 @@ class ExamGradingServiceTest {
         installQuestionRepositoryStore();
         installSummaryRepositoryStore();
         lenient().when(redisTemplate.opsForValue()).thenReturn(valueOperations);
-        lenient().when(mockExamRepository.findByMockExamId(GradingKeys.MOCK_EXAM_ID))
-                .thenAnswer(invocation -> Optional.of(mockExam(expectedQuestionNumbers)));
+        lenient().when(examSessionRepository.findById(EXAM_ID))
+                .thenReturn(Optional.of(web.tosunsaeng.domain.exams.domain.entity.ExamSession.builder()
+                        .examId(EXAM_ID)
+                        .mockExamId(GradingKeys.LEGACY_MOCK_EXAM_ID)
+                        .build()));
+        lenient().when(mockExamCatalogService.getRequiredExam(GradingKeys.LEGACY_MOCK_EXAM_ID))
+                .thenAnswer(invocation -> mockExam(expectedQuestionNumbers));
         lenient().when(summaryDispatchScheduler.schedulePending(anyString())).thenReturn(true);
         lenient().when(summaryDispatchScheduler.scheduleRetry(anyString())).thenReturn(true);
 
@@ -129,7 +139,8 @@ class ExamGradingServiceTest {
                 summaryJobRepository,
                 examResultRepository,
                 examSummaryRepository,
-                mockExamRepository,
+                examSessionRepository,
+                mockExamCatalogService,
                 s3Client,
                 dispatchService,
                 summaryDispatchScheduler,
@@ -162,6 +173,22 @@ class ExamGradingServiceTest {
                 () -> assertEquals("temp/" + EXAM_ID + "/q_1_r0.wav", stored.getFileKey())
         );
         verify(dispatchService).dispatchQuestion(any(QuestionDispatchClaim.class));
+    }
+
+    @Test
+    void submitStoresAndDispatchesSessionMockExamId() {
+        stubSelectedPaper("mock_exam_002", List.of(1));
+
+        service.submitQuestion(EXAM_ID, 1, 0);
+
+        ArgumentCaptor<QuestionDispatchClaim> claimCaptor =
+                ArgumentCaptor.forClass(QuestionDispatchClaim.class);
+        verify(dispatchService).dispatchQuestion(claimCaptor.capture());
+        assertAll(
+                () -> assertEquals("mock_exam_002", storedQuestion(1, 0).getMockExamId()),
+                () -> assertEquals("mock_exam_002", claimCaptor.getValue().mockExamId()),
+                () -> assertEquals(EXAM_ID, claimCaptor.getValue().examId())
+        );
     }
 
     @Test
@@ -204,6 +231,25 @@ class ExamGradingServiceTest {
         assertEquals(List.of(1), result.getRetriedQuestionNumbers());
         assertEquals(SummaryAction.NOT_READY, result.getSummaryAction());
         verify(dispatchService).dispatchQuestion(any(QuestionDispatchClaim.class));
+    }
+
+    @Test
+    void retryUsesSelectedPaperQuestionsAndSessionFallbackForLegacyJob() {
+        stubSelectedPaper("mock_exam_002", List.of(7));
+        putQuestion(questionJob(7, 0, GradingJobStatus.FAILED, 1, NOW.minusSeconds(600)));
+
+        ExamResponseDTO.GradingRetryResult result = service.retryExam(EXAM_ID);
+
+        ArgumentCaptor<QuestionDispatchClaim> claimCaptor =
+                ArgumentCaptor.forClass(QuestionDispatchClaim.class);
+        verify(dispatchService).dispatchQuestion(claimCaptor.capture());
+        assertAll(
+                () -> assertEquals(List.of(7), result.getRetriedQuestionNumbers()),
+                () -> assertEquals("mock_exam_002", claimCaptor.getValue().mockExamId()),
+                () -> assertNull(storedQuestion(7, 0).getMockExamId())
+        );
+        verify(mockExamCatalogService).getRequiredExam("mock_exam_002");
+        verify(mockExamCatalogService, never()).getRequiredExam(GradingKeys.LEGACY_MOCK_EXAM_ID);
     }
 
     @Test
@@ -542,6 +588,16 @@ class ExamGradingServiceTest {
         );
     }
 
+    @Test
+    void summaryJobStoresSelectedSessionMockExamId() {
+        stubSelectedPaper("mock_exam_002", List.of(1));
+        putCompletedQuestions(List.of(1));
+
+        service.ensureSummaryStartedIfReady(EXAM_ID);
+
+        assertEquals("mock_exam_002", storedSummary().getMockExamId());
+    }
+
     @ParameterizedTest
     @EnumSource(value = GradingJobStatus.class, names = {"FAILED", "PROCESSING"})
     void feedbackGateDoesNotRecoverFailedOrStaleProcessingSummary(GradingJobStatus status) {
@@ -792,6 +848,7 @@ class ExamGradingServiceTest {
                 .questionNumber(source.getQuestionNumber())
                 .retryCount(source.getRetryCount())
                 .fileKey(source.getFileKey())
+                .mockExamId(source.getMockExamId())
                 .status(source.getStatus())
                 .dispatchAttempt(source.getDispatchAttempt())
                 .pendingAt(source.getPendingAt())
@@ -808,6 +865,7 @@ class ExamGradingServiceTest {
         return SummaryGradingJob.builder()
                 .jobId(source.getJobId())
                 .examId(source.getExamId())
+                .mockExamId(source.getMockExamId())
                 .summaryVersion(source.getSummaryVersion())
                 .status(source.getStatus())
                 .dispatchAttempt(source.getDispatchAttempt())
@@ -829,9 +887,19 @@ class ExamGradingServiceTest {
                         .build())
                 .toList();
         return MockExam.builder()
-                .mockExamId(GradingKeys.MOCK_EXAM_ID)
+                .mockExamId(GradingKeys.LEGACY_MOCK_EXAM_ID)
                 .questions(questions)
                 .build();
+    }
+
+    private void stubSelectedPaper(String mockExamId, List<Integer> questionNumbers) {
+        when(examSessionRepository.findById(EXAM_ID)).thenReturn(Optional.of(ExamSession.builder()
+                .examId(EXAM_ID)
+                .mockExamId(mockExamId)
+                .active(true)
+                .build()));
+        MockExam selected = mockExam(questionNumbers);
+        when(mockExamCatalogService.getRequiredExam(mockExamId)).thenReturn(selected);
     }
 
     private static <T> List<T> runConcurrently(Callable<T> first, Callable<T> second) throws Exception {

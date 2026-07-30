@@ -2,21 +2,113 @@
 
 ## Last updated
 
-- 2026-07-29
+- 2026-07-30
 
 ## Current branch
 
-- `feat/TMI-25-grading-retry-idempotency`
-- HEAD는 `fb354b6`이며 원격 `origin/feat/TMI-25-grading-retry-idempotency`와 같다.
-- HIGH 2건과 MEDIUM 3건의 회귀 수정은 HEAD 이후 작업 트리에 있으며 Codex는 commit과 push를 수행하지 않았다.
-- `codex resume --last` 요청 시점에도 현재 대화가 이미 마지막 세션으로 재개되어 있어 중첩 Codex 프로세스는 실행하지 않았다.
+- `feat/TMI-31-sequential-exam-assignment`
+- HEAD는 `b71b54b`다.
+- TMI-31 애플리케이션·테스트·MongoDB migration 스크립트와 Codex 문서 변경이 작업 트리에 있다.
+- Codex는 commit과 push를 수행하지 않았고 Jira 댓글·필드·상태도 변경하지 않았다.
+- 기존 순차·순환 선택, 진행 중 세션 재사용, Summary 저장 후 완료와 전 과정 `mockExamId` 전파 구조는 유지했다.
+- merge base `b71b54bb4ff871a8e082cd6d94a34007c84b062c` 기준 최종 리뷰의 HIGH 1건과 MEDIUM 4건을 수정했다. summarized legacy Session 판정/backfill, 운영 partial unique index 시작 검증, 명시적 migration DB 선택, 완료 횟수 aggregation/index, 중복 `mockExamId` 차단이 현재 작업 트리에 반영됐다.
+- 같은 merge base 기준 재리뷰에서 확인한 HIGH 1건과 MEDIUM 1건을 최소 범위로 수정했다. 분리 이전 `exam_results.totalScore != null` 종합 결과도 legacy 완료 증거로 인정하며, migration은 inactive/empty 등 배정 제외 MockExam을 먼저 분류한 뒤 assignable 시험에만 sequence를 강제한다.
+- 필수 partial unique index fail-closed, 명시적 migration DB 선택, 완료 횟수 Mongo aggregation/index, 중복 `mockExamId` runtime/migration 차단과 외부 API·AI·Redis·S3 계약은 그대로 유지했다.
+- 2026-07-30 사용자 지정 최종 명령 `git diff --check`, migration `node --check`, `./gradlew clean test`를 다시 실행해 모두 성공했다. 애플리케이션·테스트·migration 코드는 이 재검증에서 변경하지 않았다.
+- 같은 merge base 기준 독립 최종 리뷰에서 P1 live migration stale activation, P2 Java `Integer` 범위를 넘는 sequence 허용, P3 기존 WORKLOG 항목 수정 3건을 확인했다. 리뷰 대상 코드는 수정하지 않았다.
+- AGENTS.md와 Jira TMI-31을 다시 대조한 사용자 지정 11개 항목 최종 리뷰에서도 위 HIGH 1건, MEDIUM 1건, LOW 1건을 재확인했다. 정상 runtime의 legacy 증거 판정·단일 Session 집계·조건부 backfill·순환 선택·활성 재사용·운영 인덱스 fail-closed·DB 선택·제외 catalog·ID 고유성·`mockExamId` 전파와 외부 계약에는 별도 finding이 없었다.
+- 후속 수정에서 HIGH를 해소했다. apply는 `TMI31_LEGACY_WRITER_STOPPED=true`를 필수로 요구하고, legacy 활성화 직전에 최신 Session과 `exam_summaries`, `exam_results.totalScore != null`을 재조회한다. 새 완료 증거는 `active=false`/`completedAt`으로 조건부 보정하며 apply 후 active/완료 증거/사용자 중복/필수 인덱스를 현재 DB 상태로 교차검증해 불일치 시 실패한다.
+- Runtime은 `active=true`이면서 `cycleNumber`가 없는 legacy 의심 Session에만 완료 증거 방어 조회를 추가했다. 신규 `cycleNumber`가 있는 active Session은 빠른 재사용 경로를 유지한다.
+- 후속 수정에서 MEDIUM을 해소했다. migration의 명시 sequence와 ID suffix는 공통 Java `Integer` 범위 `1..2147483647`만 허용하고 오류 유형을 구분한다. Runtime catalog는 suffix overflow와 repository mapping overflow를 민감한 BSON 내용 없는 설정 오류로 처리한다.
+- LOW의 과거 WORKLOG branch/HEAD 한 줄은 main 원문 `feat/TMI-25-grading-retry-idempotency` / `fb354b6`로 복원했고 정정 경위는 새 append 항목에만 기록했다.
+- 최종 검증은 `git diff --check`, 두 migration 파일 `node --check`, Node 49개, `./gradlew clean test` Java 205개 모두 성공했고 failures/errors/skipped는 0개다. 공개 Controller/DTO diff는 없고 실제 AWS Access Key·자격증명 포함 Mongo URI·private key 패턴도 발견되지 않았다.
+- 이번 merge base 최종 재리뷰는 tracked diff와 신규 미추적 application·migration·테스트 파일을 다시 독립 검토했으며, 수정 가치가 확실한 신규 finding을 확인하지 않았다. 공개 API·DTO·`BaseResponse`, 소유권, Redis/S3 Key, `retryCount`, AI/Callback `user_id=examId` 계약도 그대로다.
+- 이번 환경에서 migration 두 파일 `node --check`, Node 49개와 whitespace/Secret 정적 검사는 성공했다. 정확한 `./gradlew clean test`와 writable offline Gradle home 재시도는 각각 sandbox의 사용자 Gradle lock 쓰기 제한과 file-lock UDP socket 제한으로 task 실행 전에 중단됐고, 현재 소스보다 최신인 기존 XML은 Java 205개와 failures/errors/skipped 0개를 기록한다.
+- 추가 HIGH/MEDIUM/LOW 해소 여부 최종 리뷰에서도 신규 severity finding은 확인하지 않았다. 초기 snapshot 뒤 완료 증거는 legacy 활성화 직전 실DB 재조회에서 차단되고, 성공 종료 전 active/완료 증거/사용자 중복/필수 인덱스 교차검증이 남은 불일치를 실패 처리한다. apply는 실제 writer 종료를 전제로 `TMI31_LEGACY_WRITER_STOPPED=true`를 필수 요구하며 이 승인값을 거짓으로 설정하는 운영 위반은 자동 프로세스 탐지 대상이 아니다.
+- assignable sequence와 ID suffix는 `1..2147483647` 범위로 제한되고 Runtime mapping/suffix overflow도 안전한 catalog 오류로 실패한다. WORKLOG는 main 대비 기존 행 삭제·수정 없이 append-only 상태이며 공개 API·DTO·`BaseResponse`, `retryCount`, Redis/S3 Key, Callback JSON과 AI `user_id=examId` 계약도 유지된다.
+- 이번 targeted review에서 `git diff --check`, migration `node --check`, Node 49개가 성공했고 현재 source의 기존 Java XML은 205개·failures/errors/skipped 0개다. 애플리케이션·migration·테스트 파일은 수정하지 않았다.
+- TMI-31은 로컬 구현·테스트 기준 세 finding이 해소됐지만 Jira 상태는 계속 `해야 할 일`이다. 실제 Atlas backup/dry-run/apply·index build·aggregation explain 및 Redis·S3·Python AI staging E2E는 수행하지 않았다.
 
 ## Current Jira issue
+
+- [`TMI-31`](https://to-teacher.atlassian.net/browse/TMI-31) — [Learning Core] 사용자별 모의고사 순차 배정 및 순환 제공
+- 프로젝트: `TMI` (ID `10000`)
+- 이슈 유형: `작업` (ID `10003`)
+- Jira 상태: `해야 할 일` (기본 상태, ID `10000`)
+- 우선순위: `High` (ID `2`)
+- 담당자: 미지정
+- 라벨: 없음
+- 사용자별 활성 MockExam 완료 횟수와 sequence 기반 순차·순환 선택, 진행 중 활성 ExamSession 재사용, 사용자당 활성 세션 하나, 선택된 `mockExamId`의 S3·문항 조회·AI grading retry·summary 전 과정 전파, legacy null의 `mock_exam_003` fallback과 Summary Callback 기반 완료 처리를 다룬다.
+- 생성 Payload에는 프로젝트, 이슈 유형, 승인된 제목·Markdown 설명과 우선순위만 포함했다. 담당자·라벨·스프린트·에픽·상위 항목·상태 전환은 설정하지 않았다.
+- 생성 후 상세 재조회로 승인된 제목·설명, `작업`, `High`, 기본 상태 `해야 할 일`, 담당자 미지정과 빈 라벨을 확인했다.
+
+## Latest independent TMI-31 review
+
+- merge base `b71b54bb4ff871a8e082cd6d94a34007c84b062c` 기준 tracked 변경과 신규 미추적 production·migration·test 파일을 함께 검토했다.
+- 순차·순환 선택, 활성 Session 재사용·동시 insert 충돌 복구, legacy 완료 증거와 조건부 backfill, Summary 성공 후 완료, 선택된 `mockExamId`의 S3·Job·AI·retry·조회 전파, staging/prod 필수 인덱스 검증과 migration fail-closed 경로에서 신규 actionable finding은 확인하지 않았다.
+- Controller·Request/Response DTO·`BaseResponse`에는 diff가 없고 사용자 소유권, 실제 userId 비노출, Redis/S3 Key, `retryCount`, Callback JSON과 Python AI `user_id=examId` 계약이 유지된다.
+- Node syntax와 migration 49개 테스트, tracked/untracked whitespace 및 Secret 패턴 검사는 성공했다. fresh Gradle은 sandbox 제약으로 task 시작 전에 실패했으며, 2026-07-30 16:02에 현재 소스로 생성된 XML은 Java 205개, failures/errors/skipped 0개다.
+- 실제 Atlas migration/index, 다중 인스턴스 동시성, Redis·S3·Python AI staging E2E는 이번 리뷰 범위에서 실행하지 않았다. 애플리케이션·migration·테스트 코드는 수정하지 않았고 Jira와 Git commit/push도 변경하지 않았다.
+
+## Previous independent TMI-31 review
+
+- merge base `b71b54bb4ff871a8e082cd6d94a34007c84b062c`의 tracked diff와 신규 미추적 파일을 함께 재검토했다.
+- P1: `TMI31_APPLY=true`가 기존 main Callback과 겹치면 plan snapshot 뒤 Summary가 저장된 Session도 stale `activateIncompleteLegacy` 목록에서 `active=true`가 된다. 기존 Callback은 Session 완료 필드를 쓰지 않고 신규 Manager는 true-active 후보의 evidence를 확인하지 않으므로 구버전 writer quiescence 또는 activation/index 전 재검증이 필요하다.
+- P2: migration은 explicit sequence와 ID suffix를 JavaScript integer 범위로만 검사해 Java Entity의 `Integer.MAX_VALUE`를 넘는 값을 저장할 수 있다. APPLY 전에 두 경로 모두 signed 32-bit 상한을 검증해야 한다.
+- P3: 기존 WORKLOG의 `019fac7a-...` branch 기록 한 줄을 append가 아니라 수정했다. append-only 규칙에 따라 원문을 복원하고 정정은 새 항목으로 남겨야 한다.
+- 외부 공개 API·DTO·`BaseResponse`, 소유권, Redis/S3 Key, `retryCount`, AI/Callback `user_id=examId` 계약은 리뷰 중 변경하지 않았다.
+- tracked/untracked whitespace 검사, migration 두 파일 `node --check`와 Node 테스트 25개는 성공했다. fresh Gradle은 sandbox lock/socket 제한으로 task 시작 전에 실패했으며, 현재 소스보다 최신인 기존 XML은 Java 200개와 failures/errors/skipped 0개를 기록한다.
+- 후속 사용자 지정 최종 리뷰는 AGENTS.md와 Atlassian MCP의 TMI-31 설명을 다시 읽고 요청된 11개 경로를 추적했으며, 위 세 finding 외 추가 HIGH/MEDIUM/LOW finding을 확인하지 않았다. Jira 쓰기와 application·migration·테스트 코드 수정은 수행하지 않았다.
+
+## Previous TMI-31 code review and resolution
+
+- merge base `b71b54bb4ff871a8e082cd6d94a34007c84b062c`의 tracked diff와 신규 미추적 파일을 함께 검토했다.
+- HIGH 수정: `ExamCompletionEvidenceService`가 `exam_summaries`와 `exam_results.totalScore != null`을 동일한 완료 증거로 조회한다. legacy null active/null completedAt Session에 증거가 있으면 재사용하지 않고, 가장 이른 명시 시각·실제 BSON ObjectId 시각·Session createdAt 순으로 완료 시각을 산정해 조건부 원자 backfill한다. 시각을 얻지 못해도 활성으로 재사용하지 않는다.
+- MEDIUM 수정: migration catalog 검사는 `INACTIVE`, `EMPTY_QUESTIONS`, `MISSING_ID`, `INVALID_ACTIVE`를 먼저 분류하고 assignable 문서에만 `deriveSequence`와 sequence 중복 검증을 적용한다. `mockExamId` 중복 검증은 전체 catalog 범위를 유지한다.
+- migration도 Summary와 legacy totalScore 증거를 합쳐 Session당 한 번만 완료 처리하고, 가장 이른 신뢰 가능한 완료 시각과 evidence overlap·duplicate·orphan·unresolved 통계를 dry-run에 출력한다. 배정 제외 문서는 별도 목록에 표시하며 sequence/active 보정 대상에서 제외한다.
+- 공개 API·DTO·`BaseResponse`, 소유권, Redis/S3 Key, `retryCount`, AI/Callback `user_id=examId` 계약은 변경하지 않았다.
+- `git diff --check main --`, migration `node --check`, Node 테스트 25개와 `./gradlew clean test`가 성공했다. XML 기준 Java 테스트 200개, 실패·오류·건너뜀 0개다.
+
+## TMI-31 implementation state
+
+- `MockExam`에 `sequence`, `active`를 추가했다. `active=null`은 활성, `sequence=null`은 `mockExamId` 끝 숫자를 임시 sequence로 해석하며 활성·비어 있지 않은 시험지를 숫자 sequence 오름차순으로 반환한다. 유효하지 않은 sequence, 활성 sequence 중복, 전체 catalog의 null/blank/whitespace/중복 `mockExamId`는 `EXAM_5001` 설정 오류로 안전하게 실패하고 빈 시험지는 배정에서 제외한다. 단건 조회도 `List` 결과가 2개 이상이면 임의 선택하지 않는다.
+- `ExamSession`에 `mockExamId`, `cycleNumber`, `active`, `completedAt`을 추가했다. 신규 세션은 사용자별 완료 횟수가 최소인 활성 시험 중 sequence가 가장 작은 시험을 선택하고 `cycleNumber=completionCount+1`, `active=true`, `completedAt=null`로 Mongo `insert`한다.
+- `POST /api/v1/exams`는 현재 사용자의 재사용 가능 세션을 먼저 조회한다. `active=true`는 재사용하고 `active=false` 또는 완료 시각이 있는 세션은 제외한다. null active+null completedAt 후보는 결정적/legacy `ExamSummary` 또는 분리 이전 `exam_results.totalScore != null` 증거를 확인해 완료면 조건부 원자 backfill하고, 증거가 없는 실제 진행 중 legacy Session만 같은 `examId`로 재사용한다. 문제·가이드 Presigned GET URL은 매 호출 새로 발급하고 Redis 누락은 기존 Key/TTL로 복구한다.
+- 완료 횟수는 전체 `ExamSession` Entity 목록을 읽지 않고 Mongo aggregation으로 현재 `userId`, `completedAt != null`만 `mockExamId`별 집계한다. null `mockExamId`는 `mock_exam_003`으로 그룹화한다.
+- 동시 신규 생성은 `active=true` 문서에 대한 사용자별 Mongo partial unique index `uniq_exam_sessions_active_user`를 전제로 한다. 두 요청이 동시에 insert하면 한 요청만 성공하고 loser는 `DuplicateKeyException`을 500으로 노출하지 않고 승자 활성 세션을 재조회한다. staging/prod는 시작 시 이름·키·unique·partial 정의를 검증해 누락/불일치 시 fail-closed하고 local은 경고한다.
+- Summary Callback은 `ExamSummary`가 신규 또는 멱등 성공으로 확인된 뒤에만 `completedAt is null` 조건 원자 update로 세션 완료 시각을 기존 UTC `Clock`에서 설정하고 `active=false`로 바꾼다. 저장 예외 전에는 완료하지 않고 중복 Callback은 최초 전이 이후 no-op이다. 문항 결과/Job 완료만으로는 세션을 완료하지 않는다.
+- 신규 `QuestionGradingJob`과 `SummaryGradingJob`은 최소 필드 `mockExamId`를 저장한다. 세션의 선택값이 문제 조회, `questions/{mockExamId}/q_N.wav`, `part3_intro.wav`, 문항 AI multipart, 시험 retry 예상 문항, Summary AI JSON과 문항 상세 조회까지 전파된다. 기존 Job의 값이 없으면 세션을 조회하고 세션도 없거나 값이 null/blank이면 legacy `mock_exam_003`만 fallback한다.
+- AI outbound `user_id`와 Callback `user_id`는 계속 `examId`다. Callback 저장 시 외부 `mock_exam_id`보다 세션의 canonical `mockExamId`를 사용하며 실제 사용자 UUID를 AI 서버로 보내거나 외부 응답에 추가하지 않는다.
+- `scripts/mongodb/tmi-31-migrate-exam-assignment.js`와 실행 문서를 추가했다. Node entrypoint가 `MONGODB_DATABASE`를 필수 검증하고 URI의 DB와 무관하게 `getSiblingDB`로 명시 선택한다. 기본은 dry-run이며 `TMI31_APPLY=true`일 때만 Summary/legacy totalScore 증거에 따른 완료 Session backfill, assignable MockExam/Session 보정과 active unique·완료 집계·`mock_exam_id` unique 세 인덱스를 생성한다. 완료 증거·시각 충돌, 중복 ID, 여러 활성 후보와 인덱스 충돌은 쓰기 전에 중단한다.
+- `POST /api/v1/exams`의 URL·Method·Request Body 없음, `CreateSessionResult` 세 필드와 `BaseResponse`를 포함한 기존 공개 API/DTO, `retryCount`, Redis Key/TTL, 제출 S3 Key, Callback JSON 계약은 변경하지 않았다.
+
+## Previous TMI-31 finding resolution
+
+- HIGH 수정: null/missing `active`와 null `completedAt`인 legacy 후보는 Summary 증거를 조회한다. Summary가 있으면 재사용하지 않고 ObjectId 또는 Summary Job 완료 시각을 사용해 `active=false`, `completedAt`을 기존 값이 여전히 없는 경우에만 원자 보정한다. 중복 Summary는 임의 선택하지 않고 안전하게 실패한다.
+- MEDIUM 수정: `ExamAssignmentIndexValidator`가 `uniq_exam_sessions_active_user`와 `uniq_mock_exams_mock_exam_id`를 정확한 이름·순서 있는 키·unique·partial 기준으로 검증한다. staging/prod는 실패 시 기동하지 않으며 test profile은 실제 Mongo를 검사하지 않는다. 완료 집계 인덱스는 정확성 필수와 분리해 경고한다.
+- MEDIUM 수정: migration은 `MONGODB_DATABASE` 누락·공백·시스템 DB를 거부하고 URI와 별개로 해당 DB를 선택하며 DB/collection/예정 변경 수를 dry-run과 apply 직전에 표시한다. URI와 자격증명은 출력하지 않는다.
+- MEDIUM 수정: 완료 횟수 집계를 Mongo aggregation으로 옮기고 `idx_exam_sessions_user_completed_mock_exam`을 migration apply 대상으로 추가했다. 현재 사용자·완료 Session만 집계하며 legacy null 시험 ID fallback을 유지한다.
+- MEDIUM 수정: runtime 전체 catalog와 단건 조회에서 중복/null/blank/공백 `mockExamId`를 거부하고, migration은 실제 저장 필드 `mock_exam_id`의 중복 metadata와 인덱스 충돌을 보고한 뒤 문제가 없을 때만 `uniq_mock_exams_mock_exam_id`를 생성한다.
+- 추가 HIGH 수정: `ExamCompletionEvidenceService`가 Summary와 `exam_results.totalScore != null` projection을 합쳐 가장 이른 완료 시각을 결정한다. Manager는 완료 증거가 있는 legacy Session을 재사용하지 않고 조건부 원자 backfill한 뒤 기존 `completedAt` aggregation으로 한 번만 집계한다. `totalScore=null` 문항 결과는 증거에서 제외한다.
+- 추가 MEDIUM 수정: migration은 assignable 여부를 sequence 해석 전에 판정한다. sequence uniqueness는 assignable 시험에만 적용하고, 전체 catalog `mockExamId` uniqueness는 그대로 유지하며 제외 문서를 임의 활성화·수정하지 않는다.
+- Jira TMI-31 설명과 완료 조건은 Atlassian MCP로 읽기 전용 재조회했고 Jira 쓰기 API는 호출하지 않았다.
+- migration Node 테스트 25개와 현재 소스의 `./gradlew clean test`가 성공했다. XML 기준 Java 테스트 200개, 실패·오류·건너뜀 0개이며 기존 `ExamServiceImpl` unchecked 경고만 남았다.
+
+## TMI-31 application package map
+
+- `ExamService`는 Controller가 의존하는 시험 유스케이스 계약이고 `ExamServiceImpl`은 사용자 소유권, S3 URL, 세션 생성·재사용, 제출·상태·결과 조회와 세 종류 Callback 저장을 조율하는 API 파사드다.
+- `ExamSessionManager`는 활성 세션 재사용, 사용자별 완료 횟수·sequence 기반 신규 배정, 동시 insert 충돌 복구와 Summary 성공 뒤 세션 완료를 담당한다. `MockExamCatalogService`는 활성·비어 있지 않은 문제지와 유효한 숫자 sequence로 배정 catalog를 만든다.
+- `ExamGradingService`는 Question/Summary Job 생성·완료·retry, S3 제출 존재 확인, optimistic claim, Mongo 결과 기반 전체/문항 상태 계산과 Redis projection을 담당하는 채점 상태 오케스트레이터다.
+- `SummaryDispatchScheduler`는 bounded executor에서 Summary Job을 원자 claim하고 비동기 AI 전송·실패 전이를 수행하며, `GradingDispatchService`는 S3 음성 로드와 Python AI multipart/JSON HTTP 계약을 실제로 실행한다.
+- `QuestionDispatchClaim`과 `SummaryDispatchClaim`은 claim 시점의 attempt·시간·`examId`·`mockExamId`를 고정하는 immutable 전송 스냅샷이고, `GradingKeys`는 결정적 Job/결과 ID, 기존 S3 제출 Key, retry 0 정규화와 `mock_exam_003` legacy fallback을 중앙화한다.
+- 2026-07-29 역할 분석에서는 application 패키지 10개 파일과 Controller 호출 관계를 읽기 전용으로 확인했다. 애플리케이션·테스트 코드는 수정하지 않았고 기존 TMI-31 외부 계약과 직전 169개 전체 테스트 성공 상태를 유지한다.
+
+## Previous completed Jira issue — TMI-25
 
 - [`TMI-25`](https://to-teacher.atlassian.net/browse/TMI-25) — [Learning Core] 시험 단위 재채점 및 AI 채점·Callback 멱등성 보장
 - 프로젝트: `TMI` (ID `10000`)
 - 이슈 유형: `작업` (ID `10003`)
-- Jira 상태: `진행 중` (상태 ID `10001`, 상태 범주 `진행 중`)
+- Jira 상태: `완료` (상태 ID `10003`, resolution `완료` ID `10000`)
 - 우선순위: `High` (ID `2`)
 - 담당자: 미지정
 - 라벨: 없음
@@ -28,9 +120,16 @@
 - 전환 후 상세 재조회에서 현재 상태 `진행 중`(상태 ID `10001`)을 확인했다.
 - 구현 전 정적 분석에서 동일 submit·네 종류 Callback·11번 요약 Trigger의 중복 가능성, Redis 단일 상태와 고정 progress, Job·Clock·S3Client Bean·Mongo `@Version`·원자 claim 부재, legacy Unique Index 충돌 위험을 확인했다. 애플리케이션 구현과 Jira 변경은 수행하지 않았다.
 - 사용자가 TMI-25에 한해 API 변경 금지 규칙의 제한 예외를 승인했고 `AGENTS.md`에 전용 예외를 기록했다. 신규 시험 단위 retry API·전용 DTO·Question/Summary Job·submit/Callback 멱등성·Job 기반 status 내부 처리·전체 필수 retry 0 문항 완료 요약 Trigger만 허용되며 다른 작업에는 자동 적용되지 않는다.
-- 승인된 범위의 구현과 리뷰 finding 회귀 수정을 완료했다. Jira 댓글·필드·상태는 이번 작업에서 변경하지 않았으며 기록상 Jira 상태는 계속 `진행 중`이다.
-- Atlassian MCP 재조회는 OAuth `unauthorized_client`로 실패했다. 저장된 Jira 설명·완료 조건과 사용자의 현재 원문을 기준으로 진행했으며 Jira 쓰기 API는 호출하지 않았다.
+- 승인된 범위의 구현과 리뷰 finding 회귀 수정을 완료했다. 사용자의 종료 요청에 따라 Atlassian MCP로 전환 직전 `진행 중`과 `완료` 전환 ID `41`을 재확인한 뒤 해당 전환만 적용했다.
+- 후속 상세 조회에서 상태 `완료`와 resolution `완료`를 확인했다. 댓글·다른 필드·다른 Jira 이슈는 변경하지 않았다.
 - `./gradlew clean test`는 142개 테스트 모두 성공했고 `git diff --check`, 외부 API·AI/Redis/S3 계약 검색과 Secret 패턴 검색도 통과했다.
+
+## Latest Jira creation
+
+- 프로젝트 `TMI`에 `[Learning Core] 사용자별 모의고사 순차 배정 및 순환 제공` 제목의 `작업` 이슈를 `TMI-31`로 생성했다.
+- Atlassian 메타데이터에서 프로젝트 ID `10000`, 이슈 유형 ID `10003`, 설명 필드와 우선순위 `High`(ID `2`) 지원을 확인했고 동일 제목 검색 결과는 없었다.
+- 설명은 사용자별 활성 MockExam 완료 횟수와 sequence 기반 순차·순환 선택, 진행 중 활성 ExamSession 재사용, 사용자당 활성 세션 하나, 선택된 `mockExamId`의 S3·문항 조회·AI grading retry·summary 전 과정 전파, legacy null의 `mock_exam_003` fallback과 Summary Callback 기반 완료 처리를 포함한다.
+- 프로젝트, 이슈 유형, 승인된 제목·Markdown 설명과 `High`만 전송했다. 담당자·라벨·스프린트·에픽·상위 항목·상태 전환은 설정하지 않았고 기본 상태 `해야 할 일`을 유지했다.
 
 ## Latest TMI-25 regression fixes
 
@@ -42,7 +141,7 @@
 - Azure retry 0 조회는 결정적 ID, 정확한 0, 명시적 BSON null, 필드 누락 순서다. retryCount>0은 정확한 회차만 조회하며 ObjectId와 문자열 ID를 한 정렬에서 시간순으로 비교하지 않는다.
 - 실제 attempt 1 HTTP를 timeout 경계 너머까지 대기시켜 attempt 2를 claim한 뒤 attempt 1 실패를 도착시키는 Question/Summary 동시성 테스트, 중복 scheduler task 단일 dispatch, queue rejection, Callback/retry gate 분리, legacy submit 복구와 Azure null/missing 조회 테스트가 통과했다. 자체 재리뷰에서 남은 HIGH/MEDIUM finding은 확인하지 않았다.
 
-## Latest code review state
+## Previous TMI-25 code review state
 
 - 2026-07-29에 사용자 요청으로 merge base `bc15c504b4130e011cbb476d71a37e98e1d8a862` 기준 전체 diff와 미커밋 회귀 수정까지 다시 재검증했다. 리뷰 대상 애플리케이션·테스트 코드는 수정하지 않았고 Git/Jira 쓰기 작업도 수행하지 않았다.
 - P1: 시험 retry가 여러 Question의 S3 GET과 AI POST를 요청 스레드에서 직렬 실행하므로 downstream timeout 시 단일 요청이 수분간 지속되고 Tomcat 스레드 풀이 고갈될 수 있다.
@@ -53,7 +152,7 @@
 - P2: E2E의 `logout-all`은 활성 Session을 하나만 만들어 단일 logout 구현도 통과할 수 있다.
 - 정적 검증인 `git diff --check bc15c504b4130e011cbb476d71a37e98e1d8a862`와 E2E `bash -n`은 성공했다. `./gradlew clean test --no-daemon`은 사용자 Gradle home lock 쓰기 제한으로, cache를 `/tmp`에 복제한 offline 재시도는 sandbox의 file-lock contention socket 제한으로 시작되지 않았다. 기존 XML 결과는 현재 소스로 컴파일된 142개 테스트와 실패·오류·건너뜀 0개를 기록한다.
 
-## Latest completed Jira issue
+## Previous completed Jira issue
 
 - [`TMI-14`](https://to-teacher.atlassian.net/browse/TMI-14) — [Learning Core] 운영 JWT 모드 강제 및 Legacy/HMAC 인증 정리
 - 프로젝트: `TMI` (ID `10000`)
@@ -67,7 +166,7 @@
 - 후속 상세 조회에서 상태 `완료`와 resolution `완료`를 확인했다. resolution은 완료 전환 워크플로가 자동으로 설정했으며 별도 필드 수정으로 지정하지 않았다.
 - Jira 완료 댓글은 등록하지 않았다.
 
-## Previous completed Jira issue
+## Earlier completed Jira issue
 
 - [`TMI-11`](https://to-teacher.atlassian.net/browse/TMI-11) — [Integration] Identity·Learning Core E2E 인증 테스트 및 JWT 계약 확정
 - 이슈 유형: `작업` (ID `10003`)
@@ -241,7 +340,15 @@
 
 ## Test status
 
-- `./gradlew clean test` 성공: 142개 테스트, 실패·오류·건너뜀 0개
+- 사용자 지정 최종 재검증에서 `git diff --check`와 `node --check scripts/mongodb/tmi-31-migrate-exam-assignment.js`가 종료 코드 0, `./gradlew clean test`가 `BUILD SUCCESSFUL`로 완료됐다.
+- TMI-31 최신 finding 수정 후 정확한 `./gradlew clean test`가 성공했다: Java 200개 테스트, 실패·오류·건너뜀 0개.
+- migration은 `node --check`와 `node --test scripts/mongodb/tmi-31-migrate-exam-assignment.test.js` 25개가 성공했다. DB 필수 선택, 환경 DB 우선, 시스템 DB 거부, Summary와 legacy totalScore 완료 증거/backfill, assignable 선판정, 제외 catalog, 중복 Summary/ID, 인덱스 필드와 URI 비출력을 검증했다.
+- TMI-31 집중 테스트에서 완료 이력별 sequence 선택과 cycle 증가, 비활성·빈 시험 제외, legacy sequence fallback, 중복·해석 불가 sequence 실패와 다른 사용자 이력 격리를 확인했다.
+- 진행 중 세션 재사용 시 같은 `examId`와 새 Presigned URL, Redis 누락 복구, 동시 insert unique 충돌 시 승자 세션 재조회와 활성 세션 1개 유지를 검증했다.
+- Summary 저장 성공 뒤 원자적 세션 완료, 중복 Callback no-op, 저장 실패·문항 완료만으로는 미완료임을 검증했다.
+- 선택된 `mockExamId`가 문제 조회·S3 문제 음성·Question/Summary Job·문항/요약 AI 요청·시험 retry 예상 문항·상세 결과 조회까지 전파되고 legacy Session/Job은 세션 또는 `mock_exam_003`으로 fallback함을 확인했다.
+- `POST /api/v1/exams` Request Body 없음, 기존 `CreateSessionResult`·`BaseResponse`, AI `user_id=examId` 계약이 유지되는 회귀 테스트가 성공했다.
+- migration 스크립트는 기본 dry-run이고 명시적 `TMI31_APPLY=true`에서만 write 함수를 실행하도록 검증했다. 이 환경에는 `mongosh`와 실제 DB가 없어 실제 staging dry-run/apply는 수행하지 않았다.
 - TMI-25 finding 집중 테스트가 성공했다. 실제 Atlas·S3·Redis·Python AI 서버는 호출하지 않고 Repository, S3Client, RestTemplate과 executor 경계를 Mockito/단위 테스트로 검증했다.
 - Question/Summary attempt 1 HTTP를 timeout까지 대기시킨 뒤 attempt 2를 claim하고 attempt 1 실패를 늦게 도착시켜 최신 PROCESSING/attempt 2, null `failedAt`·`failureReason`을 확인했다.
 - Callback Summary gate의 FAILED/stale PROCESSING 비재시도, grading retry의 recovery scheduling, 중복 task 단일 HTTP, queue rejection PENDING 유지, HTTP timeout의 claimedAttempt 조건 실패 전이를 확인했다.
@@ -297,6 +404,11 @@
 
 ## Known risks
 
+- 운영 배포 전에 `scripts/mongodb/tmi-31-migrate-exam-assignment.js`를 먼저 dry-run으로 실행해 중복 sequence, 여러 legacy 활성 세션과 호환되지 않는 기존 인덱스를 해소한 뒤 `TMI31_APPLY=true`로 사용자당 활성 세션 partial unique index를 설치해야 한다. 인덱스가 없으면 다중 인스턴스 동시 요청의 단일 활성 세션 보장이 완성되지 않는다.
+- legacy `active` 누락/null이면서 `completedAt`도 없는 세션이 사용자당 여러 개면 런타임은 최신 세션을 선택하고 경고하지만 migration apply는 운영자 조정 전 중단한다. 자동 데이터 migration은 의도적으로 없다.
+- 활성 세션 재사용 시 해당 `MockExam`이 삭제됐거나 문제가 비어 있으면 안전하게 설정 오류로 실패한다. 진행 중 시험의 문항 구성을 운영 중 변경하지 않는 정책이 필요하다.
+- TMI-31 테스트는 실제 Atlas·Redis·S3·Python AI 서버를 호출하지 않았다. partial unique index 충돌, Presigned URL과 AI multipart/JSON의 실제 인프라 연동은 staging smoke test가 필요하다.
+- Summary 문서 insert와 ExamSession 완료 update는 서로 다른 Mongo 연산이므로 둘 사이 프로세스 중단 window가 남는다. Summary가 저장된 Callback은 멱등 재전달되면 세션 완료가 복구되므로 Python AI/인프라의 Callback 재시도 정책을 staging에서 확인해야 한다.
 - Jira `TMI-10`은 사용자 요청에 따라 완료 처리됐지만 실제 Identity와 Learning Core 로컬 E2E는 수행하지 않았다. 테스트용 JWKS 경계 통합 검증으로 대체한 상태다.
 - 배포 환경에서 JWT 모드를 활성화하기 전에 실제 Identity issuer·JWKS 주소와 audience 설정을 확인해야 한다.
 - Nimbus 기본 clock skew가 적용되므로 exp와 nbf 경계에는 표준 허용 오차가 있다.
@@ -322,6 +434,9 @@
 
 ## Next
 
+- 운영 데이터 백업 후 TMI-31 migration을 먼저 dry-run하고 보고된 sequence·legacy 활성 세션 문제를 조정한 뒤 명시적 apply로 필드 보정과 `uniq_exam_sessions_active_user` 인덱스를 설치한다.
+- staging에서 같은 사용자 동시 `POST /api/v1/exams`, 활성 세션 재사용, 순차·순환 배정, Summary Callback 완료 전이와 선택된 `mockExamId`의 S3·Python AI 전파를 실제 MongoDB·Redis·S3·AI 연동으로 smoke test한다.
+- Jira `TMI-31` 댓글·필드·상태는 이번 작업에서 변경하지 않았다. 완료 댓글 등록이나 상태 전환은 사용자가 별도로 요청할 때만 수행한다.
 - Identity를 8081, Learning Core를 JWT 모드 8080으로 기동한 뒤 `scripts/e2e/auth-integration-test.sh`를 실행한다.
 - 실제 E2E 성공 후 출력된 수동 확인 식별자로 `exam_sessions.userId`와 JWT `sub`를 폐기 가능한 로컬 DB에서 비교한다.
 - 배포 환경에서 `APP_AUTH_MODE=jwt` 전환 전 issuer·JWKS·audience와 네트워크 접근성을 확인한다.
@@ -331,8 +446,7 @@
 - 물리적으로 다른 MongoDB database가 필요한지 확인하고, 필요하면 별도 MongoTemplate·자격증명·배포 환경변수 범위를 정의한다.
 - 운영 데이터 규모에 따라 `exam_summaries` 조회 인덱스와 legacy 종합 문서 이관·보존 정책을 결정한다.
 - Jira `TMI-11`은 완료 처리됐으며 실제 서버 E2E나 수동 DB 검증에서 문제가 발견되면 이슈를 다시 열거나 별도 후속 이슈로 추적한다.
-- Jira `TMI-25`는 현재 `진행 중`이며 이번 구현에서는 댓글·필드·상태를 변경하지 않았다. 완료 댓글 등록이나 상태 전환은 사용자가 명시적으로 요청할 때만 수행한다.
-- TMI-25 상태 변경이 요청되면 실행 직전에 전환 목록을 다시 조회하고 승인된 전환만 수행한다.
+- Jira `TMI-25`는 `완료` 상태와 resolution `완료`로 닫혔으며 완료 댓글은 등록하지 않았다. 다시 열기나 댓글 등록은 사용자가 명시적으로 요청하는 경우에만 수행한다.
 - Python AI가 두 `Idempotency-Key`를 실제 저장·중복 반환하도록 하는 후속 작업을 별도 이슈로 분리한다.
 - 배포 전 staging에서 S3 HeadObject 권한, Mongo 신규 컬렉션 생성 권한과 AI Header 전달을 smoke test한다.
 - 사용자가 변경분을 검토한 뒤 commit과 push를 수행한다.

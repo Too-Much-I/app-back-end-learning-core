@@ -49,7 +49,7 @@ public class GradingDispatchService {
 
         MultiValueMap<String, Object> body = new LinkedMultiValueMap<>();
         body.add("user_id", claim.examId());
-        body.add("mock_exam_id", GradingKeys.MOCK_EXAM_ID);
+        body.add("mock_exam_id", GradingKeys.effectiveMockExamId(claim.mockExamId()));
         body.add("part_number", partNumber(claim.questionNumber()));
         body.add("question_number", claim.questionNumber());
         body.add("retry_count", claim.retryCount());
@@ -69,7 +69,7 @@ public class GradingDispatchService {
     public void dispatchSummary(SummaryDispatchClaim claim) {
         Map<String, Object> body = new HashMap<>();
         body.put("user_id", claim.examId());
-        body.put("mock_exam_id", GradingKeys.MOCK_EXAM_ID);
+        body.put("mock_exam_id", GradingKeys.effectiveMockExamId(claim.mockExamId()));
         body.put("question_number", 0);
         body.put("part_number", 0);
 
