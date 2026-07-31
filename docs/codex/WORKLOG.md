@@ -969,3 +969,87 @@
 - 검증: `git diff --check`, migration `node --check`, Node migration 테스트 49개가 성공했다. 현재 source의 기존 Gradle XML 보고서는 Java 205개와 failures/errors/skipped 0개다. 이번 리뷰에서는 애플리케이션·migration·테스트 코드를 수정하지 않았고 fresh Gradle을 재실행하지 않았다.
 - 변경 파일: 종료 기록 규칙에 따라 `docs/codex/WORKLOG.md` 끝에 이 항목을 append하고 `docs/codex/CURRENT_STATE.md`만 최신화했다. Git commit·push와 Jira 쓰기는 수행하지 않았다.
 - 남아 있는 운영 전제: 실제 Atlas apply의 성공 보장은 README 순서대로 writer를 실제 중지한 maintenance window에서 실행하는 경우에 한한다. 실제 Atlas migration/index와 Redis·S3·Python AI staging E2E는 이 리뷰에서 실행하지 않았다.
+
+## 2026-07-31 — TMI-31 문항별 피드백 응답 구조 분석
+
+<!-- codex-turn:019fb5d2-8f65-7123-91fc-cbe49a7d281e -->
+
+- 날짜: `2026-07-31`
+- 브랜치: `feat/TMI-31-sequential-exam-assignment` (HEAD `b71b54b`, 전체 TMI-31 구현은 미커밋 작업 트리)
+- Jira: [`TMI-31`](https://to-teacher.atlassian.net/browse/TMI-31), 기록상 상태 `해야 할 일`; Jira 댓글·필드·상태를 변경하지 않았다.
+- 작업 목표: 현재 문항별 AI 피드백이 저장되고 프론트에 반환되는 API 흐름과 실제 Response DTO를 코드 기준으로 설명한다.
+- 분석 결과: AI는 `POST /api/v1/exams/callback/feedback`으로 `user_id=examId`, 문항·회차·점수·transcript·feedback·spoken word 데이터를 전송한다. Callback 응답은 저장 성공을 나타내는 `BaseResponse<Void>`이며 피드백 본문은 즉시 반환하지 않는다.
+- 프론트 흐름: `GET /api/v1/exams/{examId}/questions/status`로 문항·회차 상태를 폴링하고, 완료 후 `GET /api/v1/exams/{examId}/questions?questionNumber=...&retryCount=...`에서 `BaseResponse<QuestionResult>`를 조회한다. 응답은 examId와 단일 question 객체에 part/question/retry, 전체 재시도 횟수, 5분 제출 음성 URL, 점수·transcript, AI feedback, Azure feedback, spoken word sequence와 선택된 MockExam의 questionInfo를 결합한다.
+- 조회 규칙: 사용자 소유권을 먼저 확인하고 Session의 `mockExamId` 문제지를 사용한다. 요청한 retry의 최신 결과를 선택하며 retry 0은 legacy null retry도 호환한다. Azure도 같은 회차를 사용한다. 채점 결과가 아직 없어도 상세 조회는 실패하지 않고 점수·transcript·Azure 등 null 필드는 바깥 question 객체에서 생략될 수 있으며, feedback 객체는 생성되어 문제지의 correctedAnswer가 들어갈 수 있다. 따라서 정상 UI 흐름은 status가 `COMPLETED`인 뒤 상세를 조회하는 방식이다.
+- 변경 파일: 분석 기록을 위해 `docs/codex/WORKLOG.md` 끝에 이 항목을 append하고 `docs/codex/CURRENT_STATE.md`를 최신화했다. 애플리케이션·migration·테스트 코드는 수정하지 않았다.
+- 실행한 검증: Controller, Service, Converter, Request/Response DTO, BaseResponse, ErrorStatus와 관련 문항 조회 테스트를 읽기 전용으로 확인했다. 코드 변경이 없어 Gradle 테스트는 다시 실행하지 않았다.
+- 유지한 계약: 공개 API URL·Method·Parameter·DTO·`BaseResponse`, 실제 userId 비노출, AI/Callback `user_id=examId`, retryCount, Redis·S3 계약을 변경하지 않았다. Secret과 Token은 기록하지 않았다.
+
+## 2026-07-31 — TMI-31 문항별 retry 점수 배열 응답 추가
+
+<!-- codex-turn:019fb5d7-3c52-7f41-a7da-4d6d39f18444 -->
+
+- 날짜: `2026-07-31`
+- 브랜치: `feat/TMI-31-sequential-exam-assignment` (HEAD `b71b54b`, 변경은 미커밋 작업 트리)
+- Jira: [`TMI-31`](https://to-teacher.atlassian.net/browse/TMI-31), 기록상 상태 `해야 할 일`; Jira 댓글·필드·상태를 변경하지 않았다.
+- 작업 목표: 문항별 상세 피드백 응답에 동일 examId·questionNumber의 retryCount별 점수 배열을 추가한다.
+- 응답 계약: 기존 `QuestionResult.question`에 `retryScores`를 additive 필드로 추가했다. JSON은 `[{"retryCount":0,"score":2.0},{"retryCount":1,"score":2.0}]` 형태이며 retryCount 오름차순으로 반환한다. 기존 필드는 삭제하거나 이름을 변경하지 않았다.
+- 집계 규칙: 같은 examId와 questionNumber 결과만 사용하고 legacy `retryCount=null`은 0으로 해석한다. 동일 retry 문서가 여러 개면 기존 단건 조회와 동일하게 `_id`가 가장 큰 최신 문서 하나를 선택한다. 그 최신 문서의 score가 null이면 해당 retry는 배열에서 제외해 오래된 점수를 대신 노출하지 않는다.
+- 변경 파일: `ExamResponseDTO.java`, `ExamServiceImpl.java`, `ExamConverter.java`, `ExamResultTest.java`, `ExamOwnershipServiceTest.java`, `docs/codex/WORKLOG.md`, `docs/codex/CURRENT_STATE.md`다.
+- 테스트: DTO JSON 배열 직렬화, 서로 다른 문항 제외, legacy null retry와 explicit 0 병합, 동일 retry 최신 점수 선택, 점수 없는 최신 결과 제외, retry 오름차순을 추가 검증했다. 집중 테스트와 `./gradlew clean test`가 성공했고 XML 기준 Java 207개, failures/errors/skipped 0개다. `git diff --check`도 성공했다.
+- 유지한 외부 계약: 문항 상세 조회 URL·Method·Query Parameter와 기존 Response 필드, `BaseResponse`, 사용자 소유권, 실제 userId 비노출, AI/Callback `user_id=examId`, retryCount 의미, Redis Key/TTL, S3 Key와 grading 멱등성은 유지했다. 이번 사용자 요청에 따라 문항 상세 Response에 새 배열 필드만 명시적으로 추가했다.
+- Git/Jira: commit·push와 Jira 댓글·필드·상태 변경을 수행하지 않았다. Secret과 Token은 기록하지 않았다.
+
+## 2026-07-31 — TMI-31 retry 세부 피드백 점수 배열 응답 제안
+
+<!-- codex-turn:019fb5dd-5912-7ee3-b3db-1e9a277bc385 -->
+
+- 날짜: `2026-07-31`
+- 브랜치: `feat/TMI-31-sequential-exam-assignment` (HEAD `b71b54b`, 기존 변경은 미커밋 작업 트리)
+- Jira: [`TMI-31`](https://to-teacher.atlassian.net/browse/TMI-31), 기록상 상태 `해야 할 일`; Jira 댓글·필드·상태를 변경하지 않았다.
+- 작업 목표: 현재 문항 상세의 `feedback.pronunciationFluencyScore`, `contentRelevanceScore`, `detailedScores`를 retry별로 비교할 수 있는 추가 배열 응답 형태를 애플리케이션 수정 전에 제안한다.
+- 제안 계약: 기존 `feedback`과 `retryScores`를 유지하고 `question.retryFeedbackScores`에 `retryCount`, `pronunciationFluencyScore`, `contentRelevanceScore`, `detailedScores`를 담는 객체를 retryCount 오름차순으로 배치한다. `retryCount=0`만 의미하는지, 0부터 모든 retry 이력을 의미하는지는 사용자 확인 후 구현한다.
+- 변경 파일: 이 단계에서는 애플리케이션·테스트 코드를 수정하지 않았다. 작업 기록 규칙에 따라 `docs/codex/WORKLOG.md`에 이 항목을 append하고 `docs/codex/CURRENT_STATE.md`를 갱신했다.
+- 검증: 현재 `ExamResponseDTO`, `ExamServiceImpl`, `ExamConverter`의 문항 상세 조립 경로를 읽기 전용으로 확인했다. 코드 변경이 없어 Gradle 테스는 다시 실행하지 않았다.
+- 유지 계약: 공개 API URL·Method·Query Parameter, 기존 응답 필드, `BaseResponse`, 소유권, AI/Callback `user_id=examId`, retryCount 의미, Redis·S3·grading 계약은 수정하지 않았다. Secret과 Token은 기록하지 않았다.
+
+## 2026-07-31 — TMI-31 최초 응시 세부 피드백 비교 배열 추가
+
+<!-- codex-turn:019fb5e1-5532-7bf1-9b4e-93a88980cde4 -->
+
+- 날짜: `2026-07-31`
+- 브랜치: `feat/TMI-31-sequential-exam-assignment` (HEAD `b71b54b`, 변경은 미커밋 작업 트리)
+- Jira: [`TMI-31`](https://to-teacher.atlassian.net/browse/TMI-31), 기록상 상태 `해야 할 일`; Jira 댓글·필드·상태를 변경하지 않았다.
+- 변경 동작: 문항 상세 `question` 객체에 `retryFeedbackScores` 배열을 추가했다. 요청한 현재 retry의 기존 `feedback`은 그대로 반환하고, 새 배열은 최초 응시 `retryCount=0`의 `pronunciationFluencyScore`, `contentRelevanceScore`, `detailedScores`만 한 객체로 반환한다. 최초 피드백이 없으면 빈 배열이다.
+- 선택 규칙: 동일 `examId + questionNumber`만 사용하고 legacy `retryCount=null`을 0으로 해석한다. null과 명시적 0을 포함해 최초 응시 문서가 중복되면 기존 문항 상세 정책과 맞게 `_id`가 가장 큰 최신 문서 하나만 사용하며 retry 1 이상은 배열에 넣지 않는다.
+- 변경 파일: `ExamResponseDTO.java`, `ExamServiceImpl.java`, `ExamConverter.java`, `ExamResultTest.java`, `ExamOwnershipServiceTest.java`, `docs/codex/WORKLOG.md`, `docs/codex/CURRENT_STATE.md`.
+- 테스트: DTO JSON 직렬화와 서비스 조립 테스트에서 최초 응시 한 건만 반환, legacy null/0 병합, 최신 0회차 선택, retry 1 이상 제외, 현재 retry `feedback` 유지와 세부 점수 형태를 확인했다. 집중 테스트와 `./gradlew clean test`가 성공했고 XML 기준 Java 207개, failures/errors/skipped 0개이다. `git diff --check`도 성공했다.
+- 유지한 계약: 문항 상세 URL·Method·Query Parameter, 기존 Response 필드와 `BaseResponse`, 소유권, AI/Callback `user_id=examId`, retryCount 의미, Redis Key/TTL, S3 Key, Callback JSON과 grading 멱등성은 유지했다. 사용자가 명시적으로 요청한 문항 상세 응답 배열만 추가했다.
+- 남은 위험: 기존 ObjectId와 결정적 String `_id`가 한 retry에 혼재한 legacy 중복은 문자열 `_id` 정렬이 실제 생성 시각과 다를 수 있는 기존 호환 위험이 남아 있다. Git commit·push와 Jira 쓰기는 수행하지 않았고 Secret과 Token은 기록하지 않았다.
+
+## 2026-07-31 — TMI-31 문항 상세 프론트 응답 계약 정리
+
+<!-- codex-turn:019fb5e8-1525-7810-a8f7-95909109ff9b -->
+
+- 날짜: `2026-07-31`
+- 브랜치: `feat/TMI-31-sequential-exam-assignment` (HEAD `b71b54b`, 변경은 미커밋 작업 트리)
+- Jira: [`TMI-31`](https://to-teacher.atlassian.net/browse/TMI-31), 기록상 상태 `해야 할 일`; Jira 댓글·필드·상태를 변경하지 않았다.
+- 작업 목표: 프론트엔드에 전달할 현재 `GET /api/v1/exams/{examId}/questions?questionNumber=...&retryCount=...` 성공 응답 계약을 실제 Controller·DTO·Converter 기준으로 정리한다.
+- 응답 계약: HTTP 200의 `BaseResponse` 필드는 `isSuccess`, `code=COMMON_200`, `message=성공입니다.`, `result`이다. `result.question.feedback`은 query의 현재 retry 피드백, `retryScores`는 점수가 있는 retry별 총점 이력, `retryFeedbackScores`는 비교 기준인 canonical retry 0 세부 점수 한 건이다.
+- optional 규칙: `PartResultDTO`의 null 필드와 `QuestionDTO`의 null 필드는 JSON에서 생략될 수 있다. 최초 피드백이 없으면 `retryFeedbackScores=[]`이며, Azure 결과가 없으면 `azureFeedback`은 생략될 수 있다. 문항 조회는 소유권 확인 후 응답한다.
+- 변경 파일: 애플리케이션·테스트 코드는 수정하지 않았다. 작업 기록 규칙에 따라 `docs/codex/WORKLOG.md`에 이 항목을 append하고 `docs/codex/CURRENT_STATE.md`를 갱신했다.
+- 검증: `ExamRestController`, `BaseResponse`, `SuccessStatus`, `ExamResponseDTO`, `ExamConverter`를 읽기 전용으로 확인했다. 코드 변경이 없어 Gradle은 다시 실행하지 않았고 직전 `./gradlew clean test`는 Java 207개, failures/errors/skipped 0개로 성공한 상태다.
+- 유지한 계약: API URL·Method·Query Parameter, 기존 Response 필드, `BaseResponse`, 소유권, AI/Callback `user_id=examId`, retryCount, Redis·S3·grading 계약을 변경하지 않았다. Git commit·push와 Jira 쓰기를 수행하지 않았고 Secret과 Token은 기록하지 않았다.
+
+## 2026-07-31 — TMI-31 Jira 완료 전환
+
+<!-- codex-turn:019fb664-4d0f-79d1-93e0-23a09560acb5 -->
+
+- 날짜: `2026-07-31`
+- 브랜치: `feat/TMI-31-sequential-exam-assignment` (HEAD `b71b54b`, 코드 변경은 미커밋 작업 트리)
+- Jira: [`TMI-31`](https://to-teacher.atlassian.net/browse/TMI-31) 상태를 사용자의 명시적 요청에 따라 완료로 전환했다.
+- 전환 전 확인: 상태는 `해야 할 일`(ID `10000`), resolution은 null이었고, 사용 가능한 `완료` 전환 ID는 `41`이었다.
+- 실행 범위: `transitionJiraIssue`에 이슈 키 `TMI-31`과 transition ID `41`만 전달했다. 댓글, 설명, 담당자, 우선순위, 라벨 및 다른 필드는 변경하지 않았다.
+- 전환 후 확인: 재조회에서 상태 `완료`(ID `10003`, done category)와 resolution `완료`(ID `10000`)를 확인했다.
+- 변경 파일: 애플리케이션·테스트 코드는 수정하지 않았다. 작업 기록 규칙에 따라 `docs/codex/WORKLOG.md`에 이 항목을 append하고 `docs/codex/CURRENT_STATE.md`의 현재 Jira 상태를 갱신했다.
+- 검증: Atlassian MCP 재조회로 상태와 resolution을 확인했다. 코드 변경이 없어 Gradle은 다시 실행하지 않았으며, Git commit·push는 수행하지 않았고 Secret과 Token은 기록하지 않았다.

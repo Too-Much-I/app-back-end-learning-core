@@ -2,7 +2,7 @@
 
 ## Last updated
 
-- 2026-07-30
+- 2026-07-31
 
 ## Current branch
 
@@ -27,14 +27,19 @@
 - 추가 HIGH/MEDIUM/LOW 해소 여부 최종 리뷰에서도 신규 severity finding은 확인하지 않았다. 초기 snapshot 뒤 완료 증거는 legacy 활성화 직전 실DB 재조회에서 차단되고, 성공 종료 전 active/완료 증거/사용자 중복/필수 인덱스 교차검증이 남은 불일치를 실패 처리한다. apply는 실제 writer 종료를 전제로 `TMI31_LEGACY_WRITER_STOPPED=true`를 필수 요구하며 이 승인값을 거짓으로 설정하는 운영 위반은 자동 프로세스 탐지 대상이 아니다.
 - assignable sequence와 ID suffix는 `1..2147483647` 범위로 제한되고 Runtime mapping/suffix overflow도 안전한 catalog 오류로 실패한다. WORKLOG는 main 대비 기존 행 삭제·수정 없이 append-only 상태이며 공개 API·DTO·`BaseResponse`, `retryCount`, Redis/S3 Key, Callback JSON과 AI `user_id=examId` 계약도 유지된다.
 - 이번 targeted review에서 `git diff --check`, migration `node --check`, Node 49개가 성공했고 현재 source의 기존 Java XML은 205개·failures/errors/skipped 0개다. 애플리케이션·migration·테스트 파일은 수정하지 않았다.
-- TMI-31은 로컬 구현·테스트 기준 세 finding이 해소됐지만 Jira 상태는 계속 `해야 할 일`이다. 실제 Atlas backup/dry-run/apply·index build·aggregation explain 및 Redis·S3·Python AI staging E2E는 수행하지 않았다.
+- 문항별 피드백 응답 흐름을 코드 기준으로 재확인했다. AI Callback은 결과를 Mongo에 멱등 저장하고 `BaseResponse<Void>`만 반환하며, 프론트는 문항 상태를 폴링한 뒤 `GET /api/v1/exams/{examId}/questions`에서 `QuestionResult`를 받는다. 상세 응답은 요청 회차의 최신 AI 결과, Azure 결과, 5분 제출 음성 URL과 Session `mockExamId`의 문제 정보를 결합한다. 채점 전 상세 조회도 가능해 빈 feedback/누락된 nullable 결과 필드가 반환될 수 있으므로 UI는 `COMPLETED` 뒤 조회하는 흐름이 안전하다.
+- 사용자 요청으로 문항 상세의 `question` 객체에 additive `retryScores` 배열을 추가했다. 각 원소는 `retryCount`와 `score`를 가지며 동일 examId·questionNumber의 점수 있는 최신 결과를 retry 오름차순으로 반환한다. legacy null retry는 0으로 병합하고 동일 retry 중복은 `_id` 최신 문서만 사용하며, 최신 score가 null이면 과거 점수로 fallback하지 않고 해당 retry를 제외한다.
+- 사용자 확정에 따라 문항 상세 `question.retryFeedbackScores`를 구현했다. 기존 `feedback`은 요청한 현재 retry를 유지하고, 새 배열은 동일 examId·questionNumber의 최초 응시 `retryCount=0` 세부 점수만 한 건 반환한다. legacy null retry도 0으로 병합하고 중복 0회차는 `_id` 최신 문서 하나만 사용하며, 최초 피드백이 없으면 빈 배열을 반환한다.
+- 프론트 전달용 문항 상세 응답 계약을 현재 Controller·DTO 기준으로 재확인했다. HTTP 200 `BaseResponse.result.question`에 현재 retry `feedback`, 총점 이력 `retryScores`, 최초 응시 비교값 `retryFeedbackScores`와 음성·Azure·문제 정보가 들어간다. null인 question 필드는 생략될 수 있고 최초 피드백이 없으면 `retryFeedbackScores=[]`이다. 애플리케이션·테스트 코드는 이 정리 작업에서 수정하지 않았다.
+- 변경 후 집중 테스트와 `./gradlew clean test`가 성공했다. XML 기준 Java 207개, failures/errors/skipped 0개이며 `git diff --check`도 통과했다. 문항 상세 기존 필드와 URL·Method·Query, `BaseResponse`, 소유권, AI user_id, retryCount, Redis·S3·grading 계약은 유지했다.
+- TMI-31은 사용자 요청으로 Jira `완료`(ID `10003`, resolution `완료` ID `10000`)로 전환했고 재조회로 확인했다. 실제 Atlas backup/dry-run/apply·index build·aggregation explain 및 Redis·S3·Python AI staging E2E는 수행하지 않았다.
 
 ## Current Jira issue
 
 - [`TMI-31`](https://to-teacher.atlassian.net/browse/TMI-31) — [Learning Core] 사용자별 모의고사 순차 배정 및 순환 제공
 - 프로젝트: `TMI` (ID `10000`)
 - 이슈 유형: `작업` (ID `10003`)
-- Jira 상태: `해야 할 일` (기본 상태, ID `10000`)
+- Jira 상태: `완료` (상태 ID `10003`, resolution `완료` ID `10000`)
 - 우선순위: `High` (ID `2`)
 - 담당자: 미지정
 - 라벨: 없음
@@ -436,7 +441,7 @@
 
 - 운영 데이터 백업 후 TMI-31 migration을 먼저 dry-run하고 보고된 sequence·legacy 활성 세션 문제를 조정한 뒤 명시적 apply로 필드 보정과 `uniq_exam_sessions_active_user` 인덱스를 설치한다.
 - staging에서 같은 사용자 동시 `POST /api/v1/exams`, 활성 세션 재사용, 순차·순환 배정, Summary Callback 완료 전이와 선택된 `mockExamId`의 S3·Python AI 전파를 실제 MongoDB·Redis·S3·AI 연동으로 smoke test한다.
-- Jira `TMI-31` 댓글·필드·상태는 이번 작업에서 변경하지 않았다. 완료 댓글 등록이나 상태 전환은 사용자가 별도로 요청할 때만 수행한다.
+- Jira `TMI-31`은 사용자 요청에 따라 `완료`로 전환했다. 완료 댓글은 등록하지 않았고 다른 Jira 필드는 변경하지 않았다.
 - Identity를 8081, Learning Core를 JWT 모드 8080으로 기동한 뒤 `scripts/e2e/auth-integration-test.sh`를 실행한다.
 - 실제 E2E 성공 후 출력된 수동 확인 식별자로 `exam_sessions.userId`와 JWT `sub`를 폐기 가능한 로컬 DB에서 비교한다.
 - 배포 환경에서 `APP_AUTH_MODE=jwt` 전환 전 issuer·JWKS·audience와 네트워크 접근성을 확인한다.

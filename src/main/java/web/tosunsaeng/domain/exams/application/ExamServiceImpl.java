@@ -23,10 +23,12 @@ import web.tosunsaeng.global.error.code.status.ErrorStatus;
 
 import java.time.Duration;
 import java.util.Arrays;
+import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.TreeMap;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 
@@ -317,6 +319,10 @@ public class ExamServiceImpl implements ExamService {
                 .max(Integer::compare)
                 .map(max -> max + 1)
                 .orElse(1);
+        Map<Integer, ExamResult> latestResultsByRetry = findLatestResultsByRetry(examResults, questionNumber);
+        List<ExamResponseDTO.RetryScoreDTO> retryScores = buildRetryScores(latestResultsByRetry);
+        List<ExamResponseDTO.RetryFeedbackScoreDTO> retryFeedbackScores =
+                buildInitialRetryFeedbackScores(latestResultsByRetry);
 
         // 현재 클라이언트가 요청한 회차 안에서 가장 최근에 저장된 AI 채점 도큐먼트를 조회합니다.
         // 기존 null retryCount 문서는 0회차로 해석하던 호환성을 유지합니다.
@@ -346,12 +352,51 @@ public class ExamServiceImpl implements ExamService {
                 questionNumber,
                 retryCount,
                 totalRetryCount,
+                retryScores,
+                retryFeedbackScores,
                 rawQuestion,
                 targetDoc,
                 matchingAzure,
                 getDownloadUrl(examId, questionNumber, retryCount),
                 getPartNumber(questionNumber)
         );
+    }
+
+    private static Map<Integer, ExamResult> findLatestResultsByRetry(
+            List<ExamResult> examResults,
+            Integer questionNumber) {
+        Map<Integer, ExamResult> latestByRetryCount = new TreeMap<>();
+        examResults.stream()
+                .filter(result -> Objects.equals(result.getQuestionNumber(), questionNumber))
+                .sorted(Comparator.comparing(
+                        ExamResult::getId,
+                        Comparator.nullsFirst(Comparator.naturalOrder())
+                ).reversed())
+                .forEach(result -> latestByRetryCount.putIfAbsent(
+                        GradingKeys.canonicalRetryCount(result.getRetryCount()),
+                        result
+                ));
+        return latestByRetryCount;
+    }
+
+    private static List<ExamResponseDTO.RetryScoreDTO> buildRetryScores(
+            Map<Integer, ExamResult> latestResultsByRetry) {
+        return latestResultsByRetry.entrySet().stream()
+                .filter(entry -> entry.getValue().getScore() != null)
+                .map(entry -> ExamResponseDTO.RetryScoreDTO.builder()
+                        .retryCount(entry.getKey())
+                        .score(entry.getValue().getScore())
+                        .build())
+                .toList();
+    }
+
+    private static List<ExamResponseDTO.RetryFeedbackScoreDTO> buildInitialRetryFeedbackScores(
+            Map<Integer, ExamResult> latestResultsByRetry) {
+        ExamResult initialResult = latestResultsByRetry.get(0);
+        if (initialResult == null || initialResult.getFeedback() == null) {
+            return List.of();
+        }
+        return List.of(ExamConverter.toRetryFeedbackScoreDTO(0, initialResult.getFeedback()));
     }
 
     // 별도의 3rd 파티 발음 평가 데이터인 SpeechAce 분석의 원본 수록 JSON을 전용 가공 컬렉션에 영구 보존합니다.

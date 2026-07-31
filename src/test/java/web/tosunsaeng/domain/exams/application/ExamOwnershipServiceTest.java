@@ -459,6 +459,79 @@ class ExamOwnershipServiceTest {
     }
 
     @Test
+    void questionResultIncludesLatestScoreForEachRetryInRetryOrder() throws Exception {
+        stubOwnedSession();
+        ExamResult legacyRetryZero = scoredResult(
+                "000000000000000000000001", 1, null, 1.0,
+                feedbackScores(7.1, 7.2, 7.6, 7.3));
+        ExamResult latestRetryZero = scoredResult(
+                "000000000000000000000002", 1, 0, 2.0,
+                feedbackScores(8.1, 8.2, 8.6, 8.3));
+        ExamResult retryOne = scoredResult(
+                "000000000000000000000003", 1, 1, 2.0,
+                feedbackScores(8.5, 8.6, 8.7, 8.8));
+        ExamResult retryTwo = scoredResult("000000000000000000000004", 1, 2, 1.0);
+        ExamResult olderRetryThree = scoredResult("000000000000000000000005", 1, 3, 2.5);
+        ExamResult latestRetryThree = scoredResult(
+                "000000000000000000000006", 1, 3, 3.0,
+                feedbackScores(9.0, 8.8, 9.1, 8.9));
+        ExamResult otherQuestion = scoredResult("000000000000000000000007", 2, 0, 9.0);
+        ExamResult latestRetryFourWithoutScore = scoredResult(
+                "000000000000000000000009", 1, 4, null);
+        ExamResult olderRetryFourWithScore = scoredResult(
+                "000000000000000000000008", 1, 4, 4.0);
+
+        when(examResultRepository.findByExamId(EXAM_ID)).thenReturn(List.of(
+                retryTwo,
+                legacyRetryZero,
+                olderRetryThree,
+                latestRetryFourWithoutScore,
+                retryOne,
+                latestRetryThree,
+                otherQuestion,
+                latestRetryZero,
+                olderRetryFourWithScore
+        ));
+        when(examResultRepository.findFirstByExamIdAndQuestionNumberAndRetryCountInOrderByIdDesc(
+                EXAM_ID,
+                1,
+                List.of(3)
+        )).thenReturn(Optional.of(latestRetryThree));
+        when(azureResultRepository.findFirstByExamIdAndQuestionNumberAndRetryCountOrderByIdDesc(EXAM_ID, 1, 3))
+                .thenReturn(Optional.empty());
+        when(mockExamCatalogService.getRequiredExam("mock_exam_003"))
+                .thenReturn(mockExam());
+        when(s3Presigner.presignGetObject(any(GetObjectPresignRequest.class)))
+                .thenReturn(presignedGetObjectRequest);
+        when(presignedGetObjectRequest.url())
+                .thenReturn(URI.create("https://example.com/submitted-audio.wav").toURL());
+
+        ExamResponseDTO.QuestionResult result = examService.getExamQuestion(EXAM_ID, 1, 3);
+
+        List<ExamResponseDTO.RetryScoreDTO> retryScores = result.getQuestion().getRetryScores();
+        List<ExamResponseDTO.RetryFeedbackScoreDTO> retryFeedbackScores =
+                result.getQuestion().getRetryFeedbackScores();
+        assertAll(
+                () -> assertEquals(List.of(0, 1, 2, 3), retryScores.stream()
+                        .map(ExamResponseDTO.RetryScoreDTO::getRetryCount)
+                        .toList()),
+                () -> assertEquals(List.of(2.0, 2.0, 1.0, 3.0), retryScores.stream()
+                        .map(ExamResponseDTO.RetryScoreDTO::getScore)
+                        .toList()),
+                () -> assertEquals(9.0,
+                        result.getQuestion().getFeedback().getPronunciationFluencyScore()),
+                () -> assertEquals(1, retryFeedbackScores.size()),
+                () -> assertEquals(0, retryFeedbackScores.get(0).getRetryCount()),
+                () -> assertEquals(8.1, retryFeedbackScores.get(0).getPronunciationFluencyScore()),
+                () -> assertEquals(8.2, retryFeedbackScores.get(0).getContentRelevanceScore()),
+                () -> assertEquals(List.of(
+                                Map.of("accuracy_score", 8.6),
+                                Map.of("fluency_score", 8.3)
+                        ), retryFeedbackScores.get(0).getDetailedScores())
+        );
+    }
+
+    @Test
     void ownerCanPollQuestionStatusAfterOwnershipCheck() {
         stubOwnedSession();
         when(gradingService.getQuestionStatus(EXAM_ID, 1, 0)).thenReturn(ExamStatus.COMPLETED);
@@ -672,6 +745,44 @@ class ExamOwnershipServiceTest {
                         "azure_speech_result",
                         Map.of("error_counts", Map.of("omission", omissionCount))
                 ))
+                .build();
+    }
+
+    private ExamResult scoredResult(
+            String id,
+            Integer questionNumber,
+            Integer retryCount,
+            Double score) {
+        return scoredResult(id, questionNumber, retryCount, score, null);
+    }
+
+    private ExamResult scoredResult(
+            String id,
+            Integer questionNumber,
+            Integer retryCount,
+            Double score,
+            ExamResult.ItemFeedback feedback) {
+        return ExamResult.builder()
+                .id(id)
+                .examId(EXAM_ID)
+                .userId(OWNER_USER_ID)
+                .questionNumber(questionNumber)
+                .retryCount(retryCount)
+                .score(score)
+                .feedback(feedback)
+                .build();
+    }
+
+    private ExamResult.ItemFeedback feedbackScores(
+            Double pronunciationFluencyScore,
+            Double contentRelevanceScore,
+            Double accuracyScore,
+            Double fluencyScore) {
+        return ExamResult.ItemFeedback.builder()
+                .pronunciationFluencyScore(pronunciationFluencyScore)
+                .contentRelevanceScore(contentRelevanceScore)
+                .accuracyScore(accuracyScore)
+                .fluencyScore(fluencyScore)
                 .build();
     }
 

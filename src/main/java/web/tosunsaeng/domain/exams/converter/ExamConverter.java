@@ -233,6 +233,18 @@ public class ExamConverter {
                 .build();
     }
 
+    public static ExamResponseDTO.RetryFeedbackScoreDTO toRetryFeedbackScoreDTO(
+            Integer retryCount,
+            ExamResult.ItemFeedback entity) {
+        ExamResponseDTO.ItemFeedbackDTO feedback = toItemFeedbackDTO(entity);
+        return ExamResponseDTO.RetryFeedbackScoreDTO.builder()
+                .retryCount(retryCount)
+                .pronunciationFluencyScore(feedback.getPronunciationFluencyScore())
+                .contentRelevanceScore(feedback.getContentRelevanceScore())
+                .detailedScores(feedback.getDetailedScores())
+                .build();
+    }
+
     // Entity -> Res DTO 변환 헬퍼 메서드들
     public static List<ExamResponseDTO.SpokenWordDTO> toSpokenWordDTOList(List<ExamResult.SpokenWord> entities) {
         if (entities == null) return null;
@@ -310,6 +322,8 @@ public class ExamConverter {
             Integer questionNumber,
             Integer retryCount,
             Integer totalRetryCount,
+            List<ExamResponseDTO.RetryScoreDTO> retryScores,
+            List<ExamResponseDTO.RetryFeedbackScoreDTO> retryFeedbackScores,
             Question rawQuestion,
             ExamResult targetDoc,
             AzureResult matchingAzure,
@@ -336,6 +350,8 @@ public class ExamConverter {
                 .questionNumber(questionNumber)
                 .retryCount(retryCount)
                 .totalRetryCount(totalRetryCount)
+                .retryScores(retryScores)
+                .retryFeedbackScores(retryFeedbackScores)
                 .audioUrl(downloadUrl)
                 .score(targetDoc != null ? targetDoc.getScore() : null)
                 .maxScore(targetDoc != null ? targetDoc.getMaxScore() : null)

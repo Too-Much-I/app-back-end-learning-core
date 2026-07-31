@@ -94,6 +94,8 @@ public class ExamResponseDTO {
         private Integer questionNumber;
         private Integer retryCount;
         private Integer totalRetryCount;
+        private List<RetryScoreDTO> retryScores;
+        private List<RetryFeedbackScoreDTO> retryFeedbackScores;
         private String audioUrl;
         private Double score;
         private Double maxScore;
@@ -102,6 +104,20 @@ public class ExamResponseDTO {
         private AzureFeedbackDTO azureFeedback;
         private List<SpokenWordDTO> spokenWordSequence;
         private QuestionDTO questionInfo;
+    }
+
+    @Builder @Getter @NoArgsConstructor @AllArgsConstructor
+    public static class RetryScoreDTO {
+        private Integer retryCount;
+        private Double score;
+    }
+
+    @Builder @Getter @NoArgsConstructor @AllArgsConstructor
+    public static class RetryFeedbackScoreDTO {
+        private Integer retryCount;
+        private Double pronunciationFluencyScore;
+        private Double contentRelevanceScore;
+        private List<Map<String, Double>> detailedScores;
     }
 
     @Builder @Getter @Setter @NoArgsConstructor @AllArgsConstructor

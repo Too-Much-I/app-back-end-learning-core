@@ -8,6 +8,7 @@ import web.tosunsaeng.domain.exams.domain.enums.ExamStatus;
 import web.tosunsaeng.domain.exams.dto.ExamResponseDTO;
 
 import java.util.List;
+import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.assertAll;
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -103,6 +104,55 @@ class ExamResultTest {
         assertAll(
                 () -> assertTrue(responseJson.findValues("userId").isEmpty()),
                 () -> assertTrue(responseJson.findValues("user_id").isEmpty())
+        );
+    }
+
+    @Test
+    void questionResultSerializesRetryScoresAsAnArray() {
+        ExamResponseDTO.QuestionResult response = ExamResponseDTO.QuestionResult.builder()
+                .examId(EXAM_ID)
+                .question(ExamResponseDTO.PartResultDTO.builder()
+                        .questionNumber(1)
+                        .retryCount(3)
+                        .retryScores(List.of(
+                                ExamResponseDTO.RetryScoreDTO.builder()
+                                        .retryCount(0)
+                                        .score(2.0)
+                                        .build(),
+                                ExamResponseDTO.RetryScoreDTO.builder()
+                                        .retryCount(3)
+                                        .score(3.0)
+                                        .build()
+                        ))
+                        .retryFeedbackScores(List.of(
+                                ExamResponseDTO.RetryFeedbackScoreDTO.builder()
+                                        .retryCount(0)
+                                        .pronunciationFluencyScore(8.1)
+                                        .contentRelevanceScore(8.2)
+                                        .detailedScores(List.of(
+                                                Map.of("accuracy_score", 8.6),
+                                                Map.of("fluency_score", 8.3)
+                                        ))
+                                        .build()
+                        ))
+                        .build())
+                .build();
+
+        JsonNode json = new ObjectMapper().valueToTree(response);
+
+        assertAll(
+                () -> assertTrue(json.path("question").path("retryScores").isArray()),
+                () -> assertEquals(0, json.path("question").path("retryScores").get(0)
+                        .path("retryCount").asInt()),
+                () -> assertEquals(2.0, json.path("question").path("retryScores").get(0)
+                        .path("score").asDouble()),
+                () -> assertEquals(1, json.path("question").path("retryFeedbackScores").size()),
+                () -> assertEquals(0, json.path("question").path("retryFeedbackScores").get(0)
+                        .path("retryCount").asInt()),
+                () -> assertEquals(8.1, json.path("question").path("retryFeedbackScores").get(0)
+                        .path("pronunciationFluencyScore").asDouble()),
+                () -> assertEquals(8.6, json.path("question").path("retryFeedbackScores").get(0)
+                        .path("detailedScores").get(0).path("accuracy_score").asDouble())
         );
     }
 }
