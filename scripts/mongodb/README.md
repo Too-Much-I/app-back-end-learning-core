@@ -1,5 +1,88 @@
 # MongoDB maintenance scripts
 
+## Completed-history and retry-attempt read indexes
+
+`create-exam-read-indexes.js` validates and optionally creates the compound indexes used by the
+completed exam history and retry-attempt APIs. The application does not create these indexes at
+startup. The script is idempotent: an existing compatible index with the same ordered key is
+accepted when its name differs. For `exam_summaries`, a differently named longer index is also
+accepted when its leading ordered key is `{ examId: 1, _id: -1 }`. The required name with a
+different definition and indexes with incompatible options fail without writing.
+
+Hidden indexes are not compatible because the Query Planner does not use them for normal queries.
+If the required name already belongs to a hidden index, validation stops before apply. The script
+does not automatically drop the index or use `collMod` to unhide it; an administrator must inspect
+and resolve that index state explicitly.
+
+Required environment variables:
+
+- `MONGODB_URI`: secret connection URI. The script validates it but never prints it.
+- `MONGODB_DATABASE`: exact Learning Core database selected with `getSiblingDB`. Blank values and
+  MongoDB system databases are rejected.
+- `EXAM_READ_INDEXES_APPLY`: optional. Only the exact value `true` enables index creation; every
+  other value runs a dry-run.
+
+Run the default dry-run and review the selected database, collections, compatible indexes,
+missing indexes, and conflicts:
+
+```bash
+MONGODB_URI=<secret> \
+MONGODB_DATABASE=<learning-core-db> \
+node scripts/mongodb/create-exam-read-indexes.js
+```
+
+After a backup and a clean dry-run, apply explicitly:
+
+```bash
+MONGODB_URI=<secret> \
+MONGODB_DATABASE=<learning-core-db> \
+EXAM_READ_INDEXES_APPLY=true \
+node scripts/mongodb/create-exam-read-indexes.js
+```
+
+The script creates and verifies these indexes:
+
+- `exam_sessions`: `{ userId: 1, completedAt: -1, _id: -1 }`
+- `exam_summaries`: `{ examId: 1, _id: -1 }`
+  - History API가 여러 `examId`의 Summary를 batch 조회하고 각 시험의 최신 `_id` 순으로
+    정렬할 때 사용한다.
+- `question_grading_jobs`: `{ examId: 1, questionNumber: 1, retryCount: 1 }`
+- `exam_results`: `{ examId: 1, questionNumber: 1, retryCount: 1 }`
+
+Staging 또는 운영에서 명시적으로 apply한 뒤에는 실제 데이터와 대표 `examId`로 다음
+`explain("executionStats")`를 실행한다. 이 저장소의 로컬 테스트는 실제 apply나 explain을
+대체하지 않는다.
+
+```javascript
+db.exam_summaries
+  .find({
+    examId: {
+      $in: [
+        "exam-id-1",
+        "exam-id-2"
+      ]
+    }
+  })
+  .sort({
+    examId: 1,
+    _id: -1
+  })
+  .explain("executionStats")
+```
+
+확인 항목:
+
+- `IXSCAN`을 사용하고 `idx_exam_summaries_exam_id_latest`가 선택되는지
+- `COLLSCAN`이 없는지
+- blocking `SORT` stage가 없거나 Query Planner가 인덱스 정렬을 사용하는지
+- `totalDocsExamined`가 불필요하게 전체 컬렉션 크기로 증가하지 않는지
+
+Test the migration logic without connecting to MongoDB:
+
+```bash
+node --test scripts/mongodb/create-exam-read-indexes.test.js
+```
+
 ## TMI-31 exam assignment migration
 
 `tmi-31-migrate-exam-assignment.js` validates and optionally backfills the data and indexes used by

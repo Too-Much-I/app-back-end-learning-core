@@ -8,8 +8,10 @@ import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.*;
 import web.tosunsaeng.domain.exams.domain.entity.Question;
 import web.tosunsaeng.domain.exams.domain.enums.ExamStatus;
+import web.tosunsaeng.domain.exams.domain.enums.GradingJobStatus;
 import web.tosunsaeng.domain.exams.domain.enums.SummaryAction;
 
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Map;
 
@@ -65,6 +67,49 @@ public class ExamResponseDTO {
         private List<Integer> waitingQuestionNumbers;
         private List<Integer> missingSubmissionQuestionNumbers;
         private SummaryAction summaryAction;
+    }
+
+    @Schema(description = "현재 사용자의 완료 모의고사 이력")
+    @Builder @Getter @NoArgsConstructor @AllArgsConstructor
+    public static class ExamHistoryResult {
+        private int totalCount;
+        private List<ExamHistoryItem> histories;
+    }
+
+    @Schema(description = "완료 모의고사 이력 항목")
+    @Builder @Getter @NoArgsConstructor @AllArgsConstructor
+    public static class ExamHistoryItem {
+        private String examId;
+        private String title;
+        private Integer cycleNumber;
+        private LocalDateTime completedAt;
+        private Integer totalScore;
+        private String levelEstimate;
+        private boolean summaryAvailable;
+    }
+
+    @Schema(description = "시험에서 재답변한 문항과 저장된 답변 회차")
+    @Builder @Getter @NoArgsConstructor @AllArgsConstructor
+    public static class ExamRetriesResult {
+        private String examId;
+        private List<RetriedQuestionItem> questions;
+    }
+
+    @Schema(description = "retryCount 1 이상이 실제로 존재하는 문항")
+    @Builder @Getter @NoArgsConstructor @AllArgsConstructor
+    public static class RetriedQuestionItem {
+        private Integer partNumber;
+        private Integer questionNumber;
+        private int totalAttemptCount;
+        private Integer latestRetryCount;
+        private List<RetryAttemptItem> attempts;
+    }
+
+    @Schema(description = "사용자가 제출한 답변 회차와 채점 상태")
+    @Builder @Getter @NoArgsConstructor @AllArgsConstructor
+    public static class RetryAttemptItem {
+        private Integer retryCount;
+        private GradingJobStatus status;
     }
 
     @Builder @Getter @NoArgsConstructor @AllArgsConstructor
