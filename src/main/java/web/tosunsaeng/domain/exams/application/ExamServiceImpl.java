@@ -46,6 +46,7 @@ public class ExamServiceImpl implements ExamService {
     private final ExamSummaryRepository examSummaryRepository;
     private final ExamSessionRepository examSessionRepository;
     private final MockExamCatalogService mockExamCatalogService;
+    private final ModelAnswerCatalogService modelAnswerCatalogService;
     private final SpeechAceResultRepository speechAceResultRepository;
     private final AzureResultRepository azureResultRepository;
     private final CurrentUserProvider currentUserProvider;
@@ -88,6 +89,11 @@ public class ExamServiceImpl implements ExamService {
     private String getDownloadUrl(String examId, Integer questionNumber, Integer retryCount) {
         String fileKey = String.format("temp/%s/q_%d_r%d.wav", examId, questionNumber, retryCount);
         return generatePresignedGetUrl(fileKey, 5);
+    }
+
+    private String getModelAnswerAudioUrl(String mockExamId, Integer questionNumber) {
+        String fileKey = String.format("%s/part1_a%d.wav", mockExamId, questionNumber);
+        return generatePresignedGetUrl(fileKey, 60);
     }
 
     private ExamSession resolveSession(String examId) {
@@ -140,17 +146,35 @@ public class ExamServiceImpl implements ExamService {
         MockExam mockExam = assignment.mockExam();
         List<ExamResponseDTO.QuestionDTO> questionDTOs = mockExam.getQuestions().stream()
                 .filter(q -> q != null && q.getQuestionNumber() != null && q.getQuestionNumber() > 0)
-                .map(q -> {
-                    ExamResponseDTO.QuestionDTO dto = ExamConverter.toQuestionDTO(q);
-                    dto.setAudioUrl(getQuestionAudioUrl(mockExam.getMockExamId(), q.getQuestionNumber()));
-                    if (Integer.valueOf(3).equals(q.getPartNumber())) {
-                        dto.setGuideAudioUrl(getQuestionGuideAudioUrl(mockExam.getMockExamId()));
-                    }
-                    return dto;
-                })
+                .map(q -> toQuestionPrompt(mockExam.getMockExamId(), q))
                 .collect(Collectors.toList());
 
         return ExamConverter.toCreateSessionResult(examId, mockExam.getTitle(), questionDTOs);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public ExamResponseDTO.QuestionDTO getQuestionPrompt(String examId, Integer questionNumber) {
+        ExamSession examSession = requireOwnedSession(examId);
+        String mockExamId = GradingKeys.effectiveMockExamId(examSession.getMockExamId());
+        MockExam mockExam = mockExamCatalogService.getRequiredExam(mockExamId);
+
+        Question question = mockExam.getQuestions().stream()
+                .filter(candidate -> candidate != null
+                        && Objects.equals(candidate.getQuestionNumber(), questionNumber))
+                .findFirst()
+                .orElseThrow(() -> new ExamsException(ErrorStatus._QUESTION_NOT_FOUND));
+
+        return toQuestionPrompt(mockExamId, question);
+    }
+
+    private ExamResponseDTO.QuestionDTO toQuestionPrompt(String mockExamId, Question question) {
+        ExamResponseDTO.QuestionDTO dto = ExamConverter.toQuestionDTO(question);
+        dto.setAudioUrl(getQuestionAudioUrl(mockExamId, question.getQuestionNumber()));
+        if (Integer.valueOf(3).equals(question.getPartNumber())) {
+            dto.setGuideAudioUrl(getQuestionGuideAudioUrl(mockExamId));
+        }
+        return dto;
     }
 
     // 사용자가 가상으로 녹음 오디오 파일을 업로드할 수 있는 임시 S3 PutObject용 Presigned URL을 발급합니다.
@@ -326,9 +350,8 @@ public class ExamServiceImpl implements ExamService {
 
         // 현재 클라이언트가 요청한 회차 안에서 가장 최근에 저장된 AI 채점 도큐먼트를 조회합니다.
         // 기존 null retryCount 문서는 0회차로 해석하던 호환성을 유지합니다.
-        List<Integer> compatibleRetryCounts = retryCount == 0
-                ? Arrays.asList(0, null)
-                : List.of(retryCount);
+        int canonicalRetryCount = GradingKeys.canonicalRetryCount(retryCount);
+        List<Integer> compatibleRetryCounts = compatibleRetryCounts(canonicalRetryCount);
         ExamResult targetDoc = examResultRepository
                 .findFirstByExamIdAndQuestionNumberAndRetryCountInOrderByIdDesc(
                         examId,
@@ -346,6 +369,16 @@ public class ExamServiceImpl implements ExamService {
                 .findFirst()
                 .orElseThrow(() -> new ExamsException(ErrorStatus._QUESTION_NOT_FOUND));
 
+        // 기존 상태 정책상 matching ExamResult는 해당 회차의 채점 완료 증거입니다.
+        // 결과가 없는 제출 전·처리 중·실패 회차에서는 사용자/모범답안 URL과 catalog 조회를 모두 생략합니다.
+        boolean feedbackAvailable = targetDoc != null;
+        String downloadUrl = feedbackAvailable
+                ? getDownloadUrl(examId, questionNumber, canonicalRetryCount)
+                : null;
+        ExamResponseDTO.ModelAnswerResponse modelAnswer = feedbackAvailable
+                ? buildModelAnswer(mockExamId, rawQuestion)
+                : null;
+
         // 종합 응답 데이터 구조 결합 및 조립 처리를 전용 Converter 컴포넌트에 위임
         return ExamConverter.toQuestionResult(
                 examId,
@@ -357,9 +390,41 @@ public class ExamServiceImpl implements ExamService {
                 rawQuestion,
                 targetDoc,
                 matchingAzure,
-                getDownloadUrl(examId, questionNumber, retryCount),
-                getPartNumber(questionNumber)
+                downloadUrl,
+                getPartNumber(questionNumber),
+                modelAnswer
         );
+    }
+
+    private ExamResponseDTO.ModelAnswerResponse buildModelAnswer(
+            String mockExamId,
+            Question rawQuestion) {
+        if (rawQuestion == null
+                || !Integer.valueOf(1).equals(rawQuestion.getPartNumber())
+                || (!Integer.valueOf(1).equals(rawQuestion.getQuestionNumber())
+                && !Integer.valueOf(2).equals(rawQuestion.getQuestionNumber()))) {
+            return null;
+        }
+
+        return modelAnswerCatalogService
+                .findSpokenWordSequence(mockExamId, rawQuestion.getQuestionNumber())
+                .map(sequence -> ExamResponseDTO.ModelAnswerResponse.builder()
+                        .audioUrl(getModelAnswerAudioUrl(mockExamId, rawQuestion.getQuestionNumber()))
+                        .spokenWordSequence(sequence.stream()
+                                .map(word -> ExamResponseDTO.SpokenWordDTO.builder()
+                                        .index(word.index())
+                                        .segmentIndex(word.segmentIndex())
+                                        .wordIndex(word.wordIndex())
+                                        .word(word.word())
+                                        .offset(word.offset())
+                                        .duration(word.duration())
+                                        .accuracyScore(word.accuracyScore())
+                                        .pronunciationScore(word.pronunciationScore())
+                                        .errorType(word.errorType())
+                                        .build())
+                                .toList())
+                        .build())
+                .orElse(null);
     }
 
     private static Map<Integer, ExamResult> findLatestResultsByRetry(

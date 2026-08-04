@@ -94,6 +94,9 @@ class FeedbackCallbackServiceTest {
     private MockExamCatalogService mockExamCatalogService;
 
     @Mock
+    private ModelAnswerCatalogService modelAnswerCatalogService;
+
+    @Mock
     private SpeechAceResultRepository speechAceResultRepository;
 
     @Mock
@@ -122,6 +125,7 @@ class FeedbackCallbackServiceTest {
                 examSummaryRepository,
                 examSessionRepository,
                 mockExamCatalogService,
+                modelAnswerCatalogService,
                 speechAceResultRepository,
                 azureResultRepository,
                 currentUserProvider

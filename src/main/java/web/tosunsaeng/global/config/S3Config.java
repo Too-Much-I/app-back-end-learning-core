@@ -3,8 +3,8 @@ package web.tosunsaeng.global.config;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
-import software.amazon.awssdk.auth.credentials.AwsBasicCredentials;
-import software.amazon.awssdk.auth.credentials.StaticCredentialsProvider;
+import software.amazon.awssdk.auth.credentials.AwsCredentialsProvider;
+import software.amazon.awssdk.auth.credentials.DefaultCredentialsProvider;
 import software.amazon.awssdk.regions.Region;
 import software.amazon.awssdk.services.s3.S3Client;
 import software.amazon.awssdk.services.s3.presigner.S3Presigner;
@@ -12,32 +12,30 @@ import software.amazon.awssdk.services.s3.presigner.S3Presigner;
 @Configuration
 public class S3Config {
 
-    @Value("${spring.cloud.aws.credentials.access-key}")
-    private String accessKey;
+    private final Region region;
 
-    @Value("${spring.cloud.aws.credentials.secret-key}")
-    private String secretKey;
-
-    @Value("${spring.cloud.aws.region.static}")
-    private String region;
+    public S3Config(@Value("${spring.cloud.aws.region.static}") String region) {
+        this.region = Region.of(region);
+    }
 
     @Bean
-    public S3Presigner s3Presigner() {
-        AwsBasicCredentials credentials = AwsBasicCredentials.create(accessKey, secretKey);
+    public AwsCredentialsProvider awsCredentialsProvider() {
+        return DefaultCredentialsProvider.create();
+    }
 
+    @Bean
+    public S3Presigner s3Presigner(AwsCredentialsProvider awsCredentialsProvider) {
         return S3Presigner.builder()
-                .region(Region.of(region))
-                .credentialsProvider(StaticCredentialsProvider.create(credentials))
+                .region(region)
+                .credentialsProvider(awsCredentialsProvider)
                 .build();
     }
 
     @Bean
-    public S3Client s3Client() {
-        AwsBasicCredentials credentials = AwsBasicCredentials.create(accessKey, secretKey);
-
+    public S3Client s3Client(AwsCredentialsProvider awsCredentialsProvider) {
         return S3Client.builder()
-                .region(Region.of(region))
-                .credentialsProvider(StaticCredentialsProvider.create(credentials))
+                .region(region)
+                .credentialsProvider(awsCredentialsProvider)
                 .build();
     }
 }

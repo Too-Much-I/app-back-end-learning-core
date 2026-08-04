@@ -13,9 +13,6 @@ spring:
 
   cloud:
     aws:
-      credentials:
-        access-key: ${AWS_ACCESS_KEY}
-        secret-key: ${AWS_SECRET_KEY}
       region:
         static: ${AWS_REGION:ap-northeast-2}
       s3:
@@ -69,3 +66,15 @@ sentry:
     minimum-event-level: error
   traces-sample-rate: ${SENTRY_TRACES_SAMPLE_RATE:0.0}
   environment: ${spring.profiles.active:local}
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health
+  endpoint:
+    health:
+      show-details: never
+  health:
+    probes:
+      enabled: true

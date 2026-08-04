@@ -9,6 +9,8 @@ public interface ExamService {
 
     ExamResponseDTO.CreateSessionResult createExamSession();
 
+    ExamResponseDTO.QuestionDTO getQuestionPrompt(String examId, Integer questionNumber);
+
     ExamResponseDTO.UploadUrlResult getPresignedUrl(String examId, Integer questionNumber, Integer retryCount);
 
     ExamResponseDTO.SubmitResult submitAudio(String examId, Integer questionNumber, Integer retryCount);

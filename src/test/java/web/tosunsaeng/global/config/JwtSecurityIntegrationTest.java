@@ -41,6 +41,7 @@ import web.tosunsaeng.domain.exams.api.ExamRestController;
 import web.tosunsaeng.domain.exams.application.ExamServiceImpl;
 import web.tosunsaeng.domain.exams.application.ExamGradingService;
 import web.tosunsaeng.domain.exams.application.ExamSessionManager;
+import web.tosunsaeng.domain.exams.application.ModelAnswerCatalogService;
 import web.tosunsaeng.domain.exams.application.MockExamCatalogService;
 import web.tosunsaeng.domain.exams.domain.entity.ExamResult;
 import web.tosunsaeng.domain.exams.domain.entity.ExamSession;
@@ -153,6 +154,9 @@ class JwtSecurityIntegrationTest {
     private MockExamCatalogService mockExamCatalogService;
 
     @MockitoBean
+    private ModelAnswerCatalogService modelAnswerCatalogService;
+
+    @MockitoBean
     private MockExamRepository mockExamRepository;
 
     @MockitoBean
@@ -258,6 +262,15 @@ class JwtSecurityIntegrationTest {
     }
 
     @Test
+    void questionPromptWithoutTokenReturnsBaseResponse401() throws Exception {
+        expectUnauthorized(mockMvc.perform(get(
+                "/api/v1/exams/{examId}/questions/{questionNumber}/prompt",
+                "ex_prompt_security_test",
+                1
+        )));
+    }
+
+    @Test
     void validRs256TokenCreatesExamStoresSubjectAndDoesNotExposeUserId() throws Exception {
         String responseBody = mockMvc.perform(post("/api/v1/exams")
                         .header("Authorization", bearer(validToken(OWNER_USER_ID))))
@@ -294,11 +307,50 @@ class JwtSecurityIntegrationTest {
     }
 
     @Test
+    void jwtSubjectOwnerCanReadAssignedQuestionPromptWithoutUserIdExposure() throws Exception {
+        String examId = createExam(validToken(OWNER_USER_ID));
+
+        mockMvc.perform(get(
+                        "/api/v1/exams/{examId}/questions/{questionNumber}/prompt",
+                        examId,
+                        1
+                ).header("Authorization", bearer(validToken(OWNER_USER_ID))))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.isSuccess").value(true))
+                .andExpect(jsonPath("$.result.part").value(1))
+                .andExpect(jsonPath("$.result.questionNumber").value(1))
+                .andExpect(jsonPath("$.result.text").value("JWT integration test question"))
+                .andExpect(jsonPath("$.result.audioUrl").isString())
+                .andExpect(jsonPath("$..userId").doesNotExist())
+                .andExpect(jsonPath("$..user_id").doesNotExist())
+                .andExpect(jsonPath("$..mockExamId").doesNotExist());
+
+        verify(mockExamCatalogService).getRequiredExam("mock_exam_003");
+    }
+
+    @Test
     void anotherUserCannotAccessOwnedExamAndGetsBaseResponse403() throws Exception {
         String examId = createExam(validToken(OWNER_USER_ID));
 
         mockMvc.perform(get("/api/v1/exams/{examId}/status", examId)
                         .header("Authorization", bearer(validToken(OTHER_USER_ID))))
+                .andExpect(status().isForbidden())
+                .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_JSON))
+                .andExpect(jsonPath("$.isSuccess").value(false))
+                .andExpect(jsonPath("$.code").value("COMMON403"))
+                .andExpect(jsonPath("$.message").value("금지된 요청입니다."))
+                .andExpect(jsonPath("$.result").doesNotExist());
+    }
+
+    @Test
+    void anotherUserCannotReadQuestionPrompt() throws Exception {
+        String examId = createExam(validToken(OWNER_USER_ID));
+
+        mockMvc.perform(get(
+                        "/api/v1/exams/{examId}/questions/{questionNumber}/prompt",
+                        examId,
+                        1
+                ).header("Authorization", bearer(validToken(OTHER_USER_ID))))
                 .andExpect(status().isForbidden())
                 .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_JSON))
                 .andExpect(jsonPath("$.isSuccess").value(false))

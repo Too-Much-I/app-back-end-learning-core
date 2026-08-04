@@ -28,6 +28,21 @@ public class ExamRestController {
         return BaseResponse.onSuccess(SuccessStatus.OK, examService.createExamSession());
     }
 
+    @Operation(
+            summary = "시험 문항 문제 조회 API",
+            description = "JWT 사용자 소유의 시험 세션에 배정된 문제지에서 특정 문항의 Part별 문제 정보를 조회합니다."
+    )
+    @GetMapping("/{examId}/questions/{questionNumber}/prompt")
+    public BaseResponse<ExamResponseDTO.QuestionDTO> getQuestionPrompt(
+            @PathVariable("examId") String examId,
+            @PathVariable("questionNumber") Integer questionNumber
+    ) {
+        return BaseResponse.onSuccess(
+                SuccessStatus.OK,
+                examService.getQuestionPrompt(examId, questionNumber)
+        );
+    }
+
     @Operation(summary = "S3 Presigned URL 발급 API", description = "녹음된 오디오를 S3에 직접 업로드하기 위한 회차별(retryCount) 고유 주소를 발급합니다.")
     @GetMapping("/{examId}/questions/{questionNumber}/upload-url")
     public BaseResponse<ExamResponseDTO.UploadUrlResult> getUploadUrl(
@@ -68,7 +83,11 @@ public class ExamRestController {
         return BaseResponse.onSuccess(SuccessStatus.OK, examService.getExamSummary(examId));
     }
 
-    @Operation(summary = "문항별 채점 피드백 정밀 단건 조회 API", description = "특정 문항의 콕 집은 회차(retryCount) 피드백 내용과 공통 문제 정보를 조회합니다.")
+    @Operation(
+            summary = "문항별 채점 피드백 정밀 단건 조회 API",
+            description = "특정 문항의 회차별(retryCount) 피드백과 공통 문제 정보를 조회하며, "
+                    + "Part 1의 Question 1·2에는 모범답안 음성 정보를 제공합니다."
+    )
     @GetMapping("/{examId}/questions")
     public BaseResponse<ExamResponseDTO.QuestionResult> getExamQuestion(
             @PathVariable String examId,

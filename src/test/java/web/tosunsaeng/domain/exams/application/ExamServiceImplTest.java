@@ -79,6 +79,9 @@ class ExamServiceImplTest {
     private MockExamCatalogService mockExamCatalogService;
 
     @Mock
+    private ModelAnswerCatalogService modelAnswerCatalogService;
+
+    @Mock
     private SpeechAceResultRepository speechAceResultRepository;
 
     @Mock

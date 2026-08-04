@@ -1053,3 +1053,253 @@
 - 전환 후 확인: 재조회에서 상태 `완료`(ID `10003`, done category)와 resolution `완료`(ID `10000`)를 확인했다.
 - 변경 파일: 애플리케이션·테스트 코드는 수정하지 않았다. 작업 기록 규칙에 따라 `docs/codex/WORKLOG.md`에 이 항목을 append하고 `docs/codex/CURRENT_STATE.md`의 현재 Jira 상태를 갱신했다.
 - 검증: Atlassian MCP 재조회로 상태와 resolution을 확인했다. 코드 변경이 없어 Gradle은 다시 실행하지 않았으며, Git commit·push는 수행하지 않았고 Secret과 Token은 기록하지 않았다.
+
+## 2026-07-31 — AWS S3 Default Credentials Provider 전환
+
+<!-- codex-turn:019fb693-395c-70b2-b685-e59026def3bc -->
+
+- 날짜: `2026-07-31`
+- 브랜치: `chore/add-actuator-health` (HEAD `b70d03f`, 변경은 미커밋 작업 트리)
+- 작업 목적: Learning Core의 프로젝트 전용 AWS Access Key/Secret Key와 static credential 의존을 제거하고, 로컬 JVM·로컬 Docker·ECS에서 AWS SDK v2 Default Credentials Provider Chain을 사용하도록 전환한다. 이번 작업에 별도 Jira 이슈 키는 제공되지 않았고 Jira 댓글·필드·상태를 변경하지 않았다.
+- 기존 구조와 제거 사항: `S3Config`의 Access Key/Secret Key `@Value`, basic/static credential 생성과 운영·테스트 YAML의 credentials property를 제거했다. 프로젝트 전용 AWS key 환경변수는 더 이상 애플리케이션 시작 조건이나 지원 계약이 아니다. 기존 사용자 작업인 Actuator 의존성과 Health 설정은 보존했다.
+- 최종 구조: 공유 `DefaultCredentialsProvider` Bean을 `S3Client`와 `S3Presigner`에 주입했다. 기존 `AWS_REGION`, `AWS_S3_BUCKET_NAME`, S3 Object Key, Presigned URL 만료와 Upload/Download 흐름은 유지했다. AWS shared/SSO profile을 지원하도록 동일 AWS SDK 버전의 `sso` 모듈을 추가했으며 Spring Cloud AWS 자동 구성과 중복 S3 Bean은 없다.
+- 로컬 실행: JVM은 AWS CLI profile·AWS SSO·SDK 표준 환경변수를 사용할 수 있다. Docker는 non-root `app`의 `/app/.aws`에 host profile을 read-only mount하고 `AWS_PROFILE`을 지정하도록 README와 `.env.example`에 기록했다. 추적되지 않은 `.env.docker.local`에서는 AWS credential 변수 행만 값 노출 없이 제거하고 나머지 설정을 보존했다.
+- ECS 정책: 컨테이너에 AWS key를 주입하지 않고 ECS Task Role의 임시 자격 증명을 Container Credentials Provider로 사용한다. Task Execution Role과 Task Role의 차이, 현재 코드에 필요한 `s3:GetObject`와 `s3:PutObject` 최소 권한을 실제 ARN 없이 문서화했다.
+- 추가 테스트: `S3ConfigTest` 5개와 `S3ConfigurationContractTest` 4개, 총 9개를 추가했다. credential property 없이 S3 두 Bean 생성, Default Provider 사용과 static provider 배제, Region/Bucket 계약, 운영·테스트 YAML 및 `.env.example`의 key 미요구를 실제 AWS 네트워크 호출 없이 검증한다.
+- 전체 테스트 결과: 집중 테스트 9개와 `./gradlew clean test`가 성공했다. XML 기준 총 216개, failures/errors/skipped 0개이며 기존 `ExamServiceImpl` unchecked 경고 외 새 오류는 없다. `git diff --check`도 성공했다.
+- Docker 검증: `docker buildx build --platform linux/amd64 --load`가 성공했다. credential 변수 없는 env 파일과 `AWS_PROFILE=default`로 컨테이너를 실행했으며 AWS credential 파일이 없는 상태에서도 `/actuator/health`가 HTTP 200과 `UP`을 반환했다. 검증 컨테이너는 종료·정리했다.
+- 검색·보안 검증: 운영 코드와 설정에서 프로젝트 전용 AWS key 이름, static/basic credential class와 credentials property가 제거됐다. README의 제거 설명과 이를 금지하는 테스트 문자열만 남아 있으며 실제 AWS Key 패턴은 발견되지 않았다. Secret, Token, 실제 Key, URI, Profile 내용과 Presigned URL은 코드·로그·문서·이 기록에 남기지 않았다.
+- 남은 위험: 현재 host에 `~/.aws`가 없어 read-only profile mount 및 실제 AWS Profile/SSO를 사용한 Presigned Upload/Download Smoke Test는 수행하지 못했다. AWS 콘솔의 ECS Task Role 생성·연결과 실제 Bucket 정책은 제외 범위이며 배포 전 별도 검증이 필요하다.
+- Git/Jira: commit, push, PR 생성과 Jira 댓글·필드·상태 변경을 수행하지 않았다.
+
+## 2026-07-31 — AWS S3 자격 증명 전환 독립 코드 리뷰
+
+<!-- codex-turn:019fb6aa-95cc-7723-b597-521ee0b80c8f -->
+
+- 날짜: `2026-07-31`
+- 브랜치: `chore/add-actuator-health` (HEAD와 merge base 모두 `b70d03f38afc239849086fef6549bc3af47c89f6`, 변경은 미커밋 작업 트리)
+- 작업 범위: `git diff b70d03f38afc239849086fef6549bc3af47c89f6`의 tracked 변경과 신규 `.env.example`, S3 설정 테스트 2개를 함께 검토했다. 이번 리뷰에 별도 Jira 이슈 키는 제공되지 않았고 Jira 댓글·필드·상태를 변경하지 않았다.
+- 리뷰 결과 P1: Runtime에는 `software.amazon.awssdk:sso`만 있고 `ssooidc`와 `sts`가 없다. 현대식 `sso_session` profile은 `SsoOidcProfileTokenProviderFactory`, Web Identity는 `StsWebIdentityCredentialsProviderFactory`를 reflection으로 찾다가 첫 Presigned URL 또는 `HeadObject` 시점에 실패하므로 README에 명시한 두 credential source가 동작하지 않는다.
+- 리뷰 결과 P2: README의 host `~/.aws` read-only bind mount는 Dockerfile이 만든 별도 UID의 non-root `app` 사용자로 실행된다. host AWS 파일이 통상적인 owner-only 권한이면 UID가 다른 컨테이너 사용자가 읽지 못해 local Docker profile 인증이 실패하므로 UID/GID 또는 안전한 파일 소유권 전달 방식을 보완해야 한다.
+- 검증: 현재 resolved classpath를 사용한 외부 인프라 없는 Java probe에서 현대식 SSO profile은 `ssooidc` class 부재, Web Identity는 `sts` class 부재로 실패함을 확인했다. `git diff --check`는 기록 갱신 전 성공했고, 변경 구현 당시 XML은 Java 216개와 failures/errors/skipped 0개를 기록한다.
+- 테스트 제한: 정확한 `./gradlew clean test`를 실행했으나 sandbox가 사용자 Gradle wrapper distribution lock 파일 쓰기를 허용하지 않아 task 시작 전에 중단됐다. 실제 AWS, MongoDB, Redis, Python AI 서버와 Sentry는 호출하지 않았다.
+- 변경 파일과 계약: 리뷰 대상 애플리케이션·테스트 코드는 수정하지 않았고 작업 기록 규칙에 따라 `docs/codex/WORKLOG.md` 끝에 이 항목을 append하고 `docs/codex/CURRENT_STATE.md`를 갱신했다. 공개 API URL·Method·Parameter·DTO·`BaseResponse`, 실제 userId 비노출, AI/Callback `user_id=examId`, retryCount, Redis Key, S3 Object Key와 Presigned URL 형식은 변경하지 않았다.
+- 남은 조치: `ssooidc`·`sts` 의존성과 local Docker profile 파일 접근 방식을 수정한 뒤 credential resolution 단위 테스트와 `./gradlew clean test`를 다시 실행해야 한다. Git commit·push는 수행하지 않았고 Secret과 Token은 기록하지 않았다.
+
+## 2026-07-31 — AWS S3 Default Credentials 최종 리뷰 요청
+
+<!-- codex-turn:019fb6bc-3c99-7b72-88c6-a385289f390e -->
+
+- 날짜: `2026-07-31`
+- 브랜치: `chore/add-actuator-health` (HEAD와 main 모두 `b70d03f`, 변경은 미커밋 작업 트리)
+- 작업 목적: AGENTS.md와 Codex 상태·이력을 기준으로 Static Credential 제거, Default Provider, SDK 모듈, Profile/SSO, ECS, Region/Bucket, Presign, Health, Docker, 테스트와 외부 계약을 main 대비 읽기 전용 최종 리뷰한다.
+- 진행 상태: 직전 독립 리뷰의 `ssooidc`·`sts` 누락과 Docker profile UID 권한 문제를 확인한 뒤 사용자의 이어서 작업 요청으로 같은 검토를 계속했다. 애플리케이션·설정·테스트 파일은 수정하지 않았다.
+- 보안·외부 작업: Secret, Token, 실제 Key, URI와 Presigned URL을 기록하지 않았으며 Git commit·push·PR 생성과 Jira 댓글·필드·상태 변경을 수행하지 않았다. 이번 리뷰에 별도 Jira 이슈 키는 없다.
+
+## 2026-07-31 — AWS S3 Default Credentials main 기준 최종 리뷰
+
+<!-- codex-turn:019fb6d8-414d-7010-b65a-29809288045a -->
+
+- 날짜: `2026-07-31`
+- 브랜치: `chore/add-actuator-health` (HEAD, main, merge base 모두 `b70d03f38afc239849086fef6549bc3af47c89f6`, 변경은 미커밋 작업 트리)
+- 리뷰 결과: HIGH 1건, MEDIUM 1건, LOW 2건을 확정했다. HIGH는 README가 지원한다고 명시한 현대식 SSO/Web Identity/assume-role credential source에 필요한 `ssooidc`와 `sts` runtime 모듈이 없는 문제다. MEDIUM은 native Linux처럼 host UID와 image `app` UID가 다른 환경에서 owner-only AWS profile bind mount를 읽지 못하는 문서 예시다.
+- LOW 결과: `.dockerignore`가 `.aws`를 제외하지 않아 project-local profile 복사본이 build context로 전달될 수 있다. 또한 신규 S3 테스트는 Bean 생성과 `S3Client` Region만 실행하며 실제 credential resolution, `S3Presigner` Region과 credential 없는 Actuator 요청을 검증하지 않아 누락 모듈 상태에서도 모두 통과한다.
+- 정상 확인: Static Key와 static/basic credential 구현은 운영 코드·설정에서 제거됐고 하나의 Default Provider Bean이 두 S3 Bean에 주입된다. Region/Bucket과 Presign Object Key·Method·만료·소유권, ECS Task Role과 최소 S3 권한, JWT·AI·Redis·grading·Callback·시험 배정·MongoDB·외부 API/DTO 계약에는 main 대비 회귀를 확인하지 않았다. Spring의 inferred destroy lifecycle로 S3 두 Bean과 closeable Provider가 종료 대상이 된다.
+- 의존성 검증: `dependencyInsight`에서 포함된 AWS SDK 모듈은 모두 `2.29.52`였고 version 혼합은 없었다. `ssooidc`와 `sts` 조회는 runtimeClasspath에 일치하는 dependency가 없음을 각각 확인했다.
+- Docker 검증: 가짜 owner-only 파일을 사용한 현재 macOS Docker Desktop probe에서는 bind mount 파일 UID가 container `app` UID로 매핑되어 읽기에 성공했다. 이 결과는 UID를 그대로 보존하는 native Linux Docker의 실패 가능성을 제거하지 않으므로 실행 예시는 여전히 portable하지 않다.
+- 테스트와 정적 검증: `./gradlew clean test`가 성공했고 XML 기준 216개, failures/errors/skipped 0개다. `git diff --check main --`도 성공했다. 실제 AWS, Atlas, Redis, Python AI와 Sentry는 호출하지 않았다.
+- 변경 파일: 리뷰 대상 애플리케이션·설정·테스트 코드는 수정하지 않았다. 종료 기록 규칙에 따라 `docs/codex/WORKLOG.md` 끝에 이 항목을 append하고 `docs/codex/CURRENT_STATE.md`만 최신화했다.
+- 후속 조치: 같은 AWS SDK 버전의 `ssooidc`·`sts`를 추가하거나 문서 지원 범위를 축소하고, Docker UID/GID 또는 안전한 profile 복사 방식을 문서화한다. `.aws` ignore와 offline credential-resolution·Presigner Region·Health 회귀 테스트를 보강한 뒤 전체 테스트를 다시 실행한다.
+- Git/Jira/보안: commit·push·PR 생성과 Jira 댓글·필드·상태 변경을 수행하지 않았다. 별도 Jira 이슈 키는 없으며 Secret, Token, 실제 Key, URI, Profile 내용과 Presigned URL을 기록하지 않았다.
+
+## 2026-07-31 — 문항 단건 결과의 모범답안 음성 계약 확정
+
+<!-- codex-turn:019fb704-87e0-7343-95d2-190170e74d61 -->
+
+- 날짜: `2026-07-31`
+- 브랜치: `chore/add-actuator-health` (HEAD `b70d03f`, 기존 AWS/Actuator 변경과 이번 변경 모두 미커밋 작업 트리)
+- 작업 목적: 기존 문항 단건 API 계약을 유지하면서 Part 1 Question 1·2에만 모범답안 음성 URL과 단어 시퀀스를 추가하고, 최종 응답 계약 변경에 따라 `modelAnswer.text`를 완전히 제거한다. 이번 작업에 별도 Jira 이슈 키는 없으며 Jira 댓글·필드·상태를 변경하지 않았다.
+- 최종 응답 계약: `ExamResponseDTO.PartResultDTO`에 nullable `modelAnswer`를 additive로 추가했다. `ModelAnswerResponse`는 `audioUrl`, `spokenWordSequence` 두 필드만 가지며 모범답안 문장, reference/script/transcript/answer 계열 필드는 DTO·Builder·JSON·OpenAPI·README에 없다. null인 `modelAnswer`는 기존 `NON_NULL` 정책으로 필드 자체를 생략한다.
+- MongoDB 처리: MongoDB `model_answer` 데이터는 유지하며 조회·수정·삭제하지 않았다. 해당 컬렉션을 문항 단건 응답에 매핑하지 않고, 모범답안 텍스트 존재 여부를 성공 조건이나 오류 조건으로 사용하지 않는다. `questionInfo.referenceText`를 포함한 기존 문제 정보는 그대로 유지했다.
+- 오디오 URL: 소유권 확인을 통과한 `ExamSession`에서 실제 `mockExamId`를 해석하고 `{mockExamId}/part1_a{questionNumber}.wav` Key를 결정해 기존 `S3Presigner`로 60분 Presigned GET URL을 생성한다. 고정 시험지 ID, HeadObject, static credential, 새 AWS 환경변수와 URL DB 저장은 추가하지 않았다.
+- 단어 시퀀스: `mock_exam_004` q1 55개와 q2 53개 데이터를 classpath catalog로 추가했다. q1/q2를 독립 선택하고 내부 record를 응답 DTO로 변환해 index·segmentIndex·wordIndex, Long offset·duration, Double accuracyScore·pronunciationScore와 errorType을 손실 없이 유지한다. 사용자 음성 `question.spokenWordSequence`와 모범답안 음성 `question.modelAnswer.spokenWordSequence`는 별도 소스로 조립한다.
+- 적용 판정: Mongo 원본 `Question.partNumber=1`이며 `questionNumber=1` 또는 `2`일 때만 `modelAnswer`를 조립한다. retryCount가 달라도 같은 시험지·문항 metadata와 Object Key를 사용하며, 다른 Part·문항에는 null·빈 객체 대신 필드를 생략한다. metadata가 없는 다른 시험지에 `mock_exam_004` 데이터를 임의 fallback하지 않는다.
+- 추가·수정 테스트: catalog q1/q2 분리와 수치 타입, Q1/Q2 응답·S3 Key·실제 Session ID, retry 독립성, 사용자/모범답안 URL·시퀀스 분리, 기존 feedback·questionInfo 회귀, 비대상 필드 생략, DTO 필드 제한·금지 필드 비직렬화, OpenAPI 설명, 기존 URL·Query·Summary 계약을 추가 검증했다. 기존 소유권·Callback·서비스 직접 생성 테스트와 JWT WebMvc slice에는 새 의존성 Mock을 추가했으며 실제 AWS API를 호출하지 않았다.
+- 전체 테스트 결과: 집중 테스트 후 `./gradlew clean test`를 실행했고 XML 기준 Java 229개, failures/errors/skipped 0개로 성공했다. 기존 `ExamServiceImpl` unchecked 경고 외 새 컴파일 오류는 없다. `git diff --check`도 성공했다.
+- 검색·보안 검증: 문항 단건 운영 경로에는 Mongo `model_answer` 조회, 모범답안 문장 매핑과 text 직렬화가 없다. `part1_a1.wav`·`part1_a2.wav`는 실제 Session ID 기반 Key를 검증하는 테스트에서 확인했고 운영 구현은 `part1_a%d.wav` 형식이다. `mock_exam_003`은 기존 legacy fallback·기존 문서·테스트에만 남으며 신규 응답 구현은 고정값으로 사용하지 않는다. static credential과 프로젝트 전용 AWS key 문자열은 기존 금지 계약 테스트·설명에만 있고 이번 기능에 추가하지 않았다.
+- 유지 계약: 공개 API URL·Method·Path/Query·`BaseResponse`, `/summary`, 기존 feedback·azureFeedback·사용자 audioUrl·spokenWordSequence·questionInfo, JWT·Guest JWT·소유권, Redis Key/TTL, 사용자 제출 S3 Key, AI·Callback `user_id=examId`, grading retry·멱등성·시험 배정·Default Credentials·Health를 변경하지 않았다.
+- 남은 위험: 제공된 단어 시퀀스는 `mock_exam_004`만 포함한다. 다른 활성 MockExam의 Part 1 Question 1·2에도 같은 응답이 필요하면 해당 시험지의 실제 q1/q2 metadata를 별도로 추가해야 하며 다른 시험지 데이터를 재사용해서는 안 된다. 기존 미커밋 AWS 설정 리뷰에서 확인된 `ssooidc`/`sts` 모듈과 Docker UID portability 위험은 이번 범위 밖이라 수정하지 않았다.
+- 보안·외부 작업: Secret, Token, 실제 AWS 자격 증명·URI·Presigned URL을 코드·로그·문서에 기록하지 않았다. Git commit·push·PR 생성과 Jira 댓글·필드·상태 변경을 수행하지 않았다.
+
+## 2026-07-31 — AI 문항 채점 client source 전달 방식 분석
+
+<!-- codex-turn:019fb711-2576-7472-a169-8337e65e9874 -->
+
+- 날짜: `2026-07-31`
+- 브랜치: `chore/add-actuator-health` (HEAD `b70d03f`, 작업 트리의 기존 변경은 유지)
+- 작업 목적: 문제 채점 요청에서 앱과 웹 출처를 Python AI에 전달하기 위해 `submitQuestion`에 String을 추가하는 방안이 현재 멱등 Job·retry 구조와 외부 계약에 적합한지 분석한다. 이번 작업에 별도 Jira 이슈 키는 없다.
+- 현재 흐름: 공개 submit API는 `examId`, `questionNumber`, 기본값 0인 `retryCount`를 받아 소유권 확인 후 `ExamGradingService.submitQuestion`을 호출한다. 최초 요청은 결정적 `QuestionGradingJob`을 생성·claim하고 `QuestionDispatchClaim`을 거쳐 AI multipart에 `user_id=examId`, mockExam/part/question/retry와 음성만 전송한다. 시험 단위 retry와 stale recovery도 저장된 Job에서 새 Claim을 만든다.
+- 분석 결론: 현재 앱 Learning Core와 웹 POC 백엔드는 별도이므로 앱이 자유 String을 submit API로 보내게 하는 방식보다 이 백엔드가 `app` 출처를 결정해 AI outbound에 추가하는 방식이 단순하고 신뢰 가능하다. Python AI가 신규 필드를 optional로 받고 기존 웹 요청의 누락을 `web`으로 해석하면 기존 웹 POC 수정과 공개 submit API 변경을 피할 수 있다.
+- retry 주의점: `submitQuestion` 메서드 인자에만 source를 추가하면 최초 dispatch 후 시험 retry·scheduler recovery 경로에서 값이 소실된다. 동일 백엔드가 앱과 웹을 함께 처리해야 한다면 API 경계에서 optional Header를 받고 `ClientSource` enum으로 검증하며 `QuestionGradingJob`과 `QuestionDispatchClaim`에 불변 source를 저장·전파해야 한다. Job ID와 `Idempotency-Key`에는 source를 포함하지 않고 최초 저장값을 유지하는 편이 멱등성에 안전하다.
+- 계약 제안: Python과 `client_source` 같은 최종 JSON/multipart 필드명, 허용값 `app|web`, 누락 시 `web` 처리 여부를 먼저 합의한다. source는 분석·routing metadata로만 사용하고 JWT 인증, 시험 소유권, `user_id=examId`, retryCount, Redis/S3 Key와 Callback JSON에는 사용하지 않는다. 요약 AI 요청도 구분이 필요할 때만 같은 정책을 별도로 적용한다.
+- 변경·검증: 이번 turn에서는 설계 분석과 Codex 기록만 수행했으며 애플리케이션·테스트·설정은 수정하지 않았다. 코드 변경이 없어 Gradle 테스트는 다시 실행하지 않았다. Secret, Token, 실제 URI와 Presigned URL을 기록하지 않았고 Git commit·push·PR 생성 및 Jira 댓글·필드·상태 변경을 수행하지 않았다.
+
+## 2026-07-31 — 앱 문항 채점 AI 요청에 client source 추가
+
+<!-- codex-turn:019fb714-3efb-7fa2-bfec-061143a9c15a -->
+
+- 날짜: `2026-07-31`
+- 브랜치: `chore/add-actuator-health` (HEAD `b70d03f`, 기존 작업 트리 변경을 보존한 미커밋 상태)
+- 작업 목적: 앱과 웹 백엔드가 별도라는 확정에 따라 앱 Learning Core가 Python AI로 보내는 문항 채점 요청에 앱 출처를 전달한다. 이번 작업에 별도 Jira 이슈 키는 없다.
+- 구현: `GradingDispatchService.dispatchQuestion`의 기존 multipart에 `client_source=app`을 추가했다. 필드명과 값은 상수로 중앙화했으며 클라이언트 Request, Controller, `ExamService.submitAudio`, `ExamGradingService.submitQuestion`, Job과 Claim 시그니처는 변경하지 않았다.
+- retry·멱등성: 최초 submit과 시험 단위 retry·stale recovery가 같은 dispatch 메서드를 사용하므로 모든 앱 문항 AI 요청에 source가 포함된다. 결정적 Question Job ID, `Idempotency-Key`, retryCount와 기존 S3 Key는 변경하지 않았고 source를 인증·소유권에 사용하지 않는다.
+- 유지 계약: 기존 multipart의 `user_id=examId`, `mock_exam_id`, `part_number`, `question_number`, `retry_count`, `audio_file`을 그대로 유지한다. 전체 요약 AI JSON과 세 종류 Callback JSON에는 `client_source`를 추가하지 않았으며 공개 API URL·Method·Parameter·Request/Response DTO·`BaseResponse`도 변경하지 않았다.
+- 테스트: `GradingDispatchServiceTest`에서 Question Body의 `client_source=app`과 Summary Body의 `client_source` 미포함을 검증했다. 집중 테스트가 성공했고 최종 `./gradlew clean test`도 성공했다. XML 기준 Java 229개, failures/errors/skipped 0개이며 기존 `ExamServiceImpl` unchecked 경고 외 새 오류는 없다. `git diff --check`도 성공했다.
+- 문서·연동: README에 앱 문항 AI 요청의 source와 공개 submit API·Summary·Callback 비변경 범위를 기록했다. Python AI는 multipart의 `client_source=app`을 읽도록 연동해야 하며 기존 웹 POC 요청의 필드 누락을 `web`으로 해석하는 처리는 Python 측 후속 검증 사항이다.
+- 보안·외부 작업: 실제 AWS, MongoDB, Redis, Python AI와 Sentry를 호출하지 않았고 Secret, Token, 실제 URI와 Presigned URL을 기록하지 않았다. Git commit·push·PR 생성과 Jira 댓글·필드·상태 변경을 수행하지 않았다.
+
+## 2026-07-31 — ExamGradingService와 GradingDispatchService 역할 분석
+
+<!-- codex-turn:019fb718-9217-7243-bba1-645cef03c43b -->
+
+- 날짜: `2026-07-31`
+- 브랜치: `chore/add-actuator-health` (HEAD `b70d03f`, 기존 작업 트리 변경 유지)
+- 작업 목적: `ExamGradingService`와 `GradingDispatchService`가 현재 채점 흐름에서 각각 담당하는 책임과 분리 이유를 코드 기준으로 설명한다. 이번 작업에 별도 Jira 이슈 키는 없다.
+- `ExamGradingService`: 결과 선조회, retryCount 정규화, 결정적 Question/Summary Job 생성, optimistic claim, 중복 submit 멱등 처리, timeout·max attempts 기반 retry, 실패·완료 전이, 전체 상태와 Redis projection, Summary gate를 관리하는 orchestration/state-machine 계층이다. AI 점수를 직접 계산하지 않는다.
+- `GradingDispatchService`: claim된 `QuestionDispatchClaim`·`SummaryDispatchClaim`을 받아 S3 Presigned GET과 음성 다운로드, AI multipart/JSON Body와 `Idempotency-Key` 생성, Python AI HTTP 호출을 수행하는 integration/transport 계층이다. Repository·Redis·retry 정책을 소유하지 않는다.
+- 실패 경계: Dispatch가 외부 I/O 실패를 예외로 알리면 Grading이 현재 dispatch attempt와 Job 상태를 FAILED로 전이하고 전체 상태를 갱신한다. 이 분리로 retry·멱등성 상태 테스트와 실제 HTTP 계약 테스트를 독립적으로 유지한다.
+- client source 위치: `client_source=app`은 앱 전용 백엔드가 만드는 AI wire metadata이고 Job identity나 retry 판단에 쓰이지 않으므로 Dispatch에 두는 것이 현재 책임 경계에 맞다. 최초 submit과 recovery 모두 같은 Dispatch 경로를 사용한다.
+- 변경·검증: 이번 turn은 읽기 전용 코드 분석과 Codex 기록 갱신만 수행했다. 애플리케이션·테스트 코드는 수정하지 않아 Gradle 테스트를 다시 실행하지 않았다. Secret, Token, 실제 URI와 Presigned URL을 기록하지 않았고 Git commit·push·PR 생성과 Jira 댓글·필드·상태 변경을 수행하지 않았다.
+
+## 2026-07-31 — AWS Default Credentials 리뷰 finding 후속 수정
+
+<!-- codex-turn:019fb719-d36d-7c43-9d4a-174081adfb5f -->
+<!-- codex-turn:019fb71e-1b5e-7811-b15a-8325e12959dc -->
+<!-- codex-turn:019fb724-743b-7a50-9f0d-e65420bf7b16 -->
+<!-- codex-turn:019fb736-ab5e-7fb2-b0a9-8b471b0946cc -->
+<!-- codex-turn:019fb73a-5e19-74f0-ae12-c63c92eda46f -->
+
+- 날짜·범위: `2026-07-31`, 브랜치 `chore/add-actuator-health`, HEAD·main `b70d03f`. AWS Default Credentials 전환 리뷰의 누락 모듈, local Docker 권한, build context와 테스트 finding을 후속 수정했다. 별도 Jira 이슈 키는 없다.
+- AWS SDK BOM: `2.29.52` BOM 하나로 직접 버전 선언을 제거하고 `s3`, `sso`, `ssooidc`, `sts`를 선언했다. `runtimeClasspath`와 dependency insight에서 이 네 모듈 및 transitive `auth`·`profiles`를 포함한 AWS SDK가 모두 `2.29.52`로 해석되고 혼합 버전이 없음을 확인했다.
+- Credential 지원: 기존 공유 `DefaultCredentialsProvider` Bean과 이를 함께 사용하는 `S3Client`·`S3Presigner` 구조를 유지했다. 일반 Profile, IAM Identity Center의 현대식 `sso_session`, Assume Role Profile, Web Identity, ECS Container Credentials와 EC2 Instance Profile 경로에 필요한 runtime 모듈을 갖췄다.
+- local Docker: Docker Desktop for macOS의 read-only `.aws` mount 예시를 유지하고, native Linux는 host UID/GID와 image app group `999`, `HOME=/app`을 함께 지정하도록 문서화했다. 현재 Docker Desktop의 owner-only 빈 모의 Profile·SSO cache로 non-root, Java `user.home=/app`, JAR 읽기, `/tmp` 쓰기와 read-only 접근을 확인했으며 실제 native Linux host 실행 성공을 주장하지 않는다.
+- Docker 보안: `.dockerignore`에 root와 중첩 `.aws` 제외 규칙을 추가했다. linux/amd64 이미지를 새로 빌드했고 image의 `/app/.aws` 부재, 기본 non-root `app`, `SIGTERM`, JAR 읽기와 `/tmp` 쓰기를 확인했다.
+- 테스트 보강: SSO·SSOOIDC·STS·Profile·Web Identity classpath 5개, S3 Bean·공유 Provider·Client/Presigner Region·지연 credential 조회 계약 7개, credential 조회 없는 Health 1개를 추가·보강했다. 기존 설정 계약 4개를 합쳐 S3 credential 관련 17개가 성공했다.
+- 전체 검증: `git diff --check` 사전 검사, `./gradlew clean test`, runtime dependency report와 insight를 실행했다. 전체 Java 테스트는 XML 기준 237개, failures/errors/skipped 0개다. 민감 패턴 검색에서도 실제 Key, private key, 자격증명 포함 URI와 Presigned URL 서명값을 찾지 못했다.
+- Docker Health: Credential 환경변수와 Profile mount 없이 새 이미지를 실행해 `/actuator/health` HTTP 200과 `UP`을 확인했다. Health 응답은 status와 기존 probe group 이름만 포함했고 검증 컨테이너는 SIGTERM으로 종료했다.
+- 유지 계약: S3 Region·Bucket, Object Key, Presigned URL 만료·Method·서명 조건, Upload/Submit API, retryCount, Redis Key/TTL, AI·Callback `user_id=examId`, grading retry·멱등성, JWT·Guest JWT, 시험 배정과 기존 `modelAnswer` 응답을 변경하지 않았다. 기존 작업 트리의 별도 사용자 변경도 보존했다.
+- 남은 위험: 실제 AWS Profile/SSO로 S3를 호출하는 Smoke Test, 실제 native Linux Docker host, ECS Task Role과 대상 Bucket IAM 정책은 로컬 범위를 넘어 수행하지 않았다. 배포 전 해당 환경에서 별도 확인해야 한다.
+- 외부 작업·보안: Git commit·push·PR 생성과 Jira 댓글·필드·상태 변경을 수행하지 않았다. Secret, Token, 실제 Credential·Profile 내용·URI와 Presigned URL을 기록하지 않았다.
+
+## 2026-07-31 — 시험 세션 문항 prompt 조회 API 추가
+
+<!-- codex-turn:019fb749-975c-77c2-9de4-853d24e09412 -->
+
+- 날짜·범위: `2026-07-31`, 브랜치 `chore/add-actuator-health`, HEAD·main `b70d03f`. 별도 Jira 이슈 키 없이 세션에 실제 배정된 문제지의 문항을 다시 조회하는 API를 추가했다.
+- API 계약: `GET /api/v1/exams/{examId}/questions/{questionNumber}/prompt`, Request Body와 Query Parameter 없음, 기존 `BaseResponse` 안에 `QuestionDTO`를 반환한다. 기존 URL·Method·DTO는 변경하지 않은 additive API다.
+- 인증·소유권: JWT 모드에서는 기존 Bearer 인증과 검증된 JWT `sub` UUID를 사용한다. 서비스가 examId로 `ExamSession`을 찾고 `ExamSession.userId`와 현재 사용자를 비교한 뒤에만 문제지를 조회하므로 다른 사용자는 `COMMON403`으로 차단된다. local/test legacy 정책은 유지했다.
+- 시험지·문항 조회: `ExamSession.mockExamId`를 기존 호환 정책으로 해석하고 중복 안전성을 가진 `MockExamCatalogService.getRequiredExam`으로 문제지를 조회한 뒤 questionNumber가 일치하는 문항을 선택한다. Session이 없는 경우 기존 `EXAM_4004`, 문항이 없으면 기존 `EXAM_4002`를 사용한다.
+- Part별 응답: 기존 세션 생성의 `QuestionDTO`와 URL 조립 helper를 재사용해 Part, 문항 번호, 지문·참고문구·Part 안내, 이미지·표, 준비·답변 시간과 문제 음성 URL을 반환한다. Part 3은 기존 안내 음성 URL도 반환하며 내부 userId·mockExamId·Mongo ID는 노출하지 않는다.
+- 유지 계약: 문제 음성 S3 Key와 60분 만료, 세션 생성 응답, Upload/Submit API, 사용자 음성 Key, retryCount, Redis Key/TTL, Python AI `user_id=examId`, Callback JSON, grading retry·멱등성, 순차·순환 배정을 변경하지 않았다.
+- 테스트: URL과 PathVariable 계약, Session에 저장된 문제지 선택, Part 3 안내 음성, 문항 없음 시 Presign 미호출, Session 없음·타 사용자 선차단, JWT 미제공 401·소유자 200·타 사용자 403과 외부 ID 비노출을 검증했다. 집중 테스트 55개가 성공했다.
+- 전체 검증: `./gradlew clean test`가 성공했고 XML 기준 Java 245개, failures/errors/skipped 0개다. `git diff --check`도 성공했다.
+- 외부 작업·보안: Git commit·push·PR 생성과 Jira 댓글·필드·상태 변경을 수행하지 않았다. Secret, Token, 실제 Credential·URI와 Presigned URL을 기록하지 않았다.
+
+## 2026-07-31 — main 기준 누적 변경 코드 리뷰
+
+<!-- codex-turn:7d9d2dbd-1506-4369-a0d7-ec9679bc1556 -->
+
+- 날짜·범위: `2026-07-31`, 브랜치 `chore/add-actuator-health`, HEAD·main·지정 merge base `b70d03f38afc239849086fef6549bc3af47c89f6`. `git diff b70d03f38afc239849086fef6549bc3af47c89f6`의 추적 변경과 작업 트리의 신규 미추적 운영·리소스·테스트 파일을 함께 독립 리뷰했다. 별도 Jira 이슈 키는 제공되지 않았다.
+- 리뷰 결과: 수정 가치가 확실한 correctness finding을 확인하지 않았다. Actuator Health, AWS Default Credentials Provider Chain, 문항 상세의 선택적 `modelAnswer`, AI 문항 multipart의 `client_source=app`, 신규 prompt API와 관련 테스트를 변경 전 흐름 및 저장소 규칙과 대조했다.
+- 계약 확인: 기존 공개 API URL·Method·Parameter·`BaseResponse`, retryCount, Redis Key/TTL, 기존 사용자 음성 및 S3 Object Key, AI·Callback `user_id=examId`와 Callback JSON은 유지된다. 신규 prompt API는 `ExamSession.userId` 소유권 확인 뒤 Session의 `mockExamId`를 사용하며, 외부 응답에 실제 userId를 추가하지 않는다.
+- 정적 검증: `git diff --check b70d03f38afc239849086fef6549bc3af47c89f6`가 성공했다. 모델답안 catalog JSON의 q1 55개·q2 53개 엔트리에 대해 필수 필드, 연속 index, 양수 duration과 중복 여부를 확인했고 이상이 없었다. 운영 소스·설정·문서 대상 민감 패턴 검사에서도 실제 AWS Key, private key, 자격증명 포함 Mongo URI와 서명된 Presigned URL을 찾지 못했다.
+- 테스트 검증: 저장소 필수 명령 `./gradlew clean test`를 실행했으나 sandbox가 사용자 Gradle wrapper lock 쓰기를 허용하지 않아 task 시작 전에 중단됐다. writable 임시 `GRADLE_USER_HOME`과 read-only dependency cache를 사용한 offline 재시도도 sandbox의 file-lock UDP socket 제한으로 task 시작 전에 중단됐다. 현재 source보다 나중에 생성된 기존 XML은 Java 245개, failures/errors/skipped 0개이며 변경된 운영·테스트 class timestamp도 현재 source 이후임을 확인했다.
+- 변경 파일: 리뷰 대상 애플리케이션·설정·테스트는 수정하지 않았다. 종료 기록 규칙에 따라 `docs/codex/WORKLOG.md`에 이 항목만 append하고 `docs/codex/CURRENT_STATE.md`를 갱신했다.
+- 남은 환경 검증: 실제 AWS Profile/SSO, native Linux Docker와 ECS Task Role/Bucket IAM smoke test, Python AI의 `client_source=app` 수신 처리는 로컬 리뷰 범위를 넘어 수행하지 않았다. Git commit·push·PR 생성 및 Jira 댓글·필드·상태 변경도 수행하지 않았다.
+
+## 2026-07-31 — AWS Default Credentials 후속 변경 main 기준 최종 리뷰
+
+<!-- codex-turn:019fb75c-b1fe-7f01-b8e0-8979d28c7cc5 -->
+
+- 날짜·범위: `2026-07-31`, 브랜치 `chore/add-actuator-health`, HEAD·main `b70d03f38afc239849086fef6549bc3af47c89f6`. tracked diff와 신규 미추적 운영·리소스·테스트 파일을 함께 리뷰했다. 이번 리뷰에 별도 Jira 이슈 키는 없다.
+- 이전 finding 확인: AWS SDK BOM `2.29.52`가 `s3`, `sso`, `ssooidc`, `sts`와 transitive `auth`·`profiles`를 단일 버전으로 해석한다. Default Credentials Provider의 ECS Container Credentials 경로와 SSO OIDC·STS reflection factory가 runtime에 있으며, 공유 Provider를 S3Client·S3Presigner가 사용하고 Bean 생성 시 credential을 조회하지 않는다.
+- Docker·Health 확인: 기존 linux/amd64 image는 non-root `app` UID/GID `999`, `/app` mode `750`, JAR mode `644`, `/tmp` mode `1777`이다. host UID/GID와 supplementary app group, `HOME=/app` 실행에서 Java `user.home=/app`, JAR 읽기와 `/tmp` 쓰기가 유지된다. `.dockerignore`는 root·중첩 `.aws`, `.env` 계열과 key 확장자를 제외하고 runtime image는 app JAR만 복사한다. Health 통합 테스트는 credential resolve를 호출하지 않고 HTTP 200·UP과 제한된 응답 필드를 검증한다.
+- 리뷰 finding: HIGH 없음, MEDIUM 1건, LOW 없음이다. `README.md`의 macOS/native Linux 예시는 전체 SSO cache를 read-only mount하면서 현대식 `sso_session`을 지속 지원한다고 안내한다. AWS SDK `2.29.52`의 SSO OIDC provider는 만료 임박 토큰을 갱신한 뒤 같은 cache에 저장하므로 read-only mount에서는 장시간 실행 중 저장이 실패할 수 있다. host 측 SSO login 갱신 절차와 제한을 문서화하거나, host 원본은 read-only로 유지하면서 container-owned 임시 writable cache를 쓰는 안전한 방식을 설계해야 한다.
+- 검증: `./gradlew dependencies --configuration runtimeClasspath`, AWS 전체 `dependencyInsight`, fresh `./gradlew clean test --no-daemon`과 `git diff --check main --`가 성공했다. XML 기준 Java 245개, failures/errors/skipped 0개이며 S3 credential 관련 17개도 모두 성공했다. 실제 Key·private key·자격증명 포함 URI·Presigned URL signature 패턴은 발견되지 않았다.
+- 회귀 확인: 기존 S3 Region·Bucket·Object Key·Presigned URL 만료/Method, 시험 API·`BaseResponse`, JWT·Guest JWT, retryCount, Redis, grading retry·멱등성, Callback JSON과 AI `user_id=examId`에는 main 대비 회귀를 확인하지 않았다.
+- 변경·외부 작업: 리뷰 대상 애플리케이션·설정·테스트 파일은 수정하지 않았고 Codex 기록만 갱신했다. 실제 AWS Profile/SSO, native Linux host와 ECS Task Role smoke test는 수행하지 않았다. Git commit·push·PR 생성과 Jira 댓글·필드·상태 변경을 수행하지 않았으며 Secret, Token, Profile 내용과 Presigned URL을 기록하지 않았다.
+
+## 2026-08-04 — 로컬 Docker SSO read-only cache 운영 절차 보완
+
+<!-- codex-turn:019fca3a-ea29-7c21-89e9-0f050c6bb1c4 -->
+
+- 날짜·범위: `2026-08-04`, 브랜치 `chore/add-actuator-health`, HEAD·main `b70d03f`. 별도 Jira 이슈 키 없이 AWS Default Credentials 최종 리뷰의 MEDIUM finding 하나만 최소 범위로 수정했다.
+- finding 수정: macOS와 native Linux에서 host `.aws` 전체를 read-only로 mount한 컨테이너가 현대식 SSO cache를 장시간 자동 갱신한다고 보장할 수 없던 문서 문제를 해소했다. read-write mount, credential 복사, world-readable 권한과 static key 방식은 도입하지 않았다.
+- read-only SSO 정책: 각 개발 세션 전에 host AWS CLI에서 예시 Profile로 SSO 로그인하고 caller identity 검증 결과를 stdout에 내보내지 않도록 안내했다. 컨테이너는 이미 유효한 host Profile과 SSO cache를 읽기만 하며 cache를 수정하지 않는다.
+- 만료 복구: SSO session 또는 Credential 만료, Presigned URL 생성 및 S3 credential 오류가 발생하면 host에서 다시 로그인·검증하고 기존 `--rm` 컨테이너를 종료한 뒤 같은 실행 명령으로 재시작하도록 문서화했다. 실행 중 컨테이너가 재로그인 결과를 즉시 읽는다고 보장하지 않는다.
+- 실행 환경: macOS의 read-only mount를 유지했고 native Linux는 host UID/GID, image app group GID `999`, `HOME=/app`과 read-only mount를 유지했다. 일반 Shared Credentials Profile은 해당 credential 자체의 만료 정책을 따르며, IAM Identity Center SSO Profile은 host 로그인과 만료 시 재로그인·재시작 절차를 따른다.
+- ECS 영향: ECS에는 Profile mount, SSO login과 static Access Key 환경변수를 사용하지 않으며 기존 Task Role의 ECS Container Credentials 흐름을 그대로 유지한다.
+- 검증: `git diff --check`가 성공했고 `./gradlew clean test`는 XML 기준 Java 245개, failures/errors/skipped 0개로 성공했다. README에 host 로그인·credential 검증, read-only 제한, 만료 복구, 컨테이너 재시작과 ECS Task Role 설명이 있음을 확인했다.
+- 남은 위험·보안: 실제 AWS Profile/SSO S3 smoke test와 실제 native Linux host 검증은 수행하지 않았다. Secret, Token, 실제 Credential·Profile 내용·URI와 Presigned URL을 기록하지 않았고 Git commit·push·PR 생성 및 Jira 댓글·필드·상태 변경을 수행하지 않았다.
+
+## 2026-08-04 — 프론트 문항별 피드백·모범답안 응답 구조 분석
+
+<!-- codex-turn:019fca40-e1cc-77e3-995c-0fdf66c66f50 -->
+
+- 날짜·범위: `2026-08-04`, 브랜치 `chore/add-actuator-health`, HEAD `b70d03f`. 현재 미커밋 작업 트리의 Controller, 응답 DTO, Converter, Service, 모범답안 catalog와 계약 테스트를 기준으로 프론트 문항별 피드백 응답 구조를 분석했다. 별도 Jira 이슈 키는 없다.
+- 공개 계약: 프론트는 `GET /api/v1/exams/{examId}/questions?questionNumber={questionNumber}&retryCount={retryCount}`의 HTTP 200 `BaseResponse.result.question`을 받는다. `questionNumber`는 필수, `retryCount`는 선택·기본값 `0`이며 기존 URL·Method·Query·`BaseResponse`를 변경하지 않았다.
+- 피드백 구조: 요청 회차의 최신 결과는 `question.feedback`에 camelCase로 반환한다. `retryScores`는 회차별 최신 총점, `retryFeedbackScores`는 최초 응시 retry 0의 비교용 세부 점수 한 건만 담는다. `azureFeedback` 내부만 snake_case이고, PartResult의 null 선택 필드는 생략될 수 있다.
+- 텍스트 답안 구분: `feedback.correctedAnswer`는 AI Callback 값이 아니라 Session에 배정된 원본 `Question.corrected_answer`를 조회 시 덮어써 반환한다. `feedback.recommendedAnswer`는 AI Callback의 `feedback.recommended_answer`를 저장한 회차별 추천 답안이며 응답에서는 camelCase다.
+- 음성 모범답안 구분: `question.modelAnswer`에는 텍스트를 넣지 않고 `audioUrl`, `spokenWordSequence` 두 필드만 보낸다. 원본 문제가 Part 1 Question 1·2이고 해당 시험지 metadata가 있을 때만 필드를 만들며, 나머지는 `null`이 아니라 필드 자체를 생략한다. 현재 catalog는 `mock_exam_004` q1·q2만 제공한다.
+- 음성 소스: `modelAnswer.audioUrl`은 소유권 확인 후 `ExamSession.mockExamId`로 만든 `{mockExamId}/part1_a{questionNumber}.wav`의 60분 Presigned GET URL이다. 사용자 녹음 `question.audioUrl`/`question.spokenWordSequence`, 문제 출제 음성 `question.questionInfo.audioUrl`과 서로 다른 데이터이며 retryCount가 바뀌어도 모범답안 소스는 같다.
+- 변경 파일: 애플리케이션·테스트 코드는 수정하지 않았고 종료 기록을 위해 `docs/codex/WORKLOG.md`, `docs/codex/CURRENT_STATE.md`만 갱신했다. Secret, Token과 실제 URL을 기록하지 않았고 Git commit·push·PR 생성 및 Jira 변경을 수행하지 않았다.
+- 검증: `ModelAnswerResponseContractTest`, `ExamResultTest`, `ExamQuestionModelAnswerTest` 집중 테스트를 실행해 총 12개, failures/errors/skipped 0개로 성공했다. 분석 전 sandbox의 Gradle lock 권한으로 첫 실행은 task 시작 전에 중단됐고 승인된 동일 명령 재실행은 성공했다. 애플리케이션 구현 변경이 없어 `./gradlew clean test` 전체 실행은 생략했다.
+- 남은 위험·다음 확인: 이 내용은 현재 로컬 미커밋 작업 트리 기준이며 실제 배포 버전은 확인하지 않았다. 프론트는 텍스트 모범답안이 필요하면 `feedback.correctedAnswer`와 회차별 `feedback.recommendedAnswer`를 구분하고, 음성 UI는 `question.modelAnswer` 존재 여부를 검사해야 한다. `mock_exam_004` 외 시험지에도 음성 모범답안이 필요하면 시험지별 실제 q1·q2 metadata를 먼저 추가해야 한다.
+
+## 2026-08-04 — main 기준 누적 변경 코드 재리뷰
+
+<!-- codex-turn:019fca4a-f602-7e91-a6d5-0516baf51183 -->
+
+- 날짜·범위: `2026-08-04`, 브랜치 `chore/add-actuator-health`, HEAD·main·지정 merge base `b70d03f38afc239849086fef6549bc3af47c89f6`. 해당 기준 tracked diff와 신규 미추적 운영·리소스·테스트 파일을 함께 리뷰했으며, 이번 리뷰에 별도 Jira 이슈 키는 없다.
+- 리뷰 finding: P1 1건이다. `mock_exam_004` Part 1 문항 1·2의 소유자는 시험 세션 생성 직후 아직 요청 회차의 `ExamResult`가 없어도 문항 결과 API를 직접 호출해 모범답안 Presigned URL과 전체 단어 시퀀스를 받을 수 있다. 문항 제출·채점 완료 전 발음 안내가 노출되지 않도록 완료된 응시가 있을 때만 `modelAnswer`를 조립해야 한다.
+- 재현 확인: 독립 서비스 probe에서 `feedbackResultExists=false`, `modelAnswerReturned=true`를 확인했다. 원인은 `targetDoc`가 null일 수 있는 조회 직후 `buildModelAnswer`를 조건 없이 호출하는 경로다.
+- 계약 확인: 위 finding 외에는 기존 공개 API URL·Method·Parameter·`BaseResponse`, retryCount, 사용자 소유권과 외부 userId 비노출, Redis Key/TTL, 기존 사용자 음성 및 S3 Object Key, AI·Callback `user_id=examId`와 Callback JSON의 별도 회귀를 확인하지 않았다.
+- 테스트·정적 검증: 필수 `./gradlew clean test --no-daemon`은 sandbox의 사용자 Gradle lock 쓰기 제한으로 task 시작 전에 중단됐고, writable offline Gradle 재시도도 file-lock UDP socket 제한으로 시작하지 못했다. 현재 compiled classes를 직접 JUnit launcher로 실행한 결과 239개 중 229개가 성공했고, 10개 실패는 모두 sandbox가 `JwtSecurityIntegrationTest`의 localhost JWKS server bind를 거부한 환경 실패였다. `git diff --check`와 catalog JSON 구조·민감 패턴 검사는 성공했다.
+- 변경 파일: 리뷰 대상 애플리케이션·설정·테스트 코드는 수정하지 않았다. 종료 기록 규칙에 따라 `docs/codex/WORKLOG.md`에 이 항목을 append하고 `docs/codex/CURRENT_STATE.md`를 최신 리뷰 결과로 갱신했다.
+- 남은 위험·다음 확인: 모범답안 조립을 완료된 응시 이후로 제한하는 회귀 테스트를 추가한 뒤 제한 없는 환경에서 `./gradlew clean test`를 다시 실행해야 한다. 실제 AWS Profile/SSO, native Linux Docker, ECS Task Role/Bucket IAM과 Python AI의 `client_source=app` 수신은 로컬 리뷰 범위를 넘어 확인하지 않았다. Git commit·push·PR 생성 및 Jira 변경을 수행하지 않았고 Secret·Token·실제 Credential·URI·Presigned URL을 기록하지 않았다.
+
+## 2026-08-04 — AWS SSO 후속 정책 포함 main 대비 전체 변경 최종 리뷰
+
+<!-- codex-turn:019fca6b-cd6c-73d2-b60f-4d908dcf2b5d -->
+
+- 날짜·범위: `2026-08-04`, 브랜치 `chore/add-actuator-health`, HEAD·main `b70d03f38afc239849086fef6549bc3af47c89f6`. tracked diff와 신규 미추적 운영·리소스·테스트 파일을 함께 최종 리뷰했으며 별도 Jira 이슈 키는 없다.
+- 리뷰 결과: HIGH 1건, MEDIUM 없음, LOW 없음이다. `ExamServiceImpl.getExamQuestion`은 요청 회차의 `ExamResult`가 없어도 `mock_exam_004` Part 1 문항 1·2의 `modelAnswer`를 조건 없이 조립해, 세션 소유자가 제출·채점 전에 모범답안 음성과 전체 단어 시퀀스를 조회할 수 있다. 완료된 응시 증거가 있을 때만 조립하고 no-result 회귀 테스트를 추가해야 한다.
+- 이전 SSO MEDIUM 확인: README는 macOS와 native Linux 모두 host 사전 SSO 로그인과 stdout을 숨긴 credential 검증을 안내한다. 컨테이너는 host `.aws`를 read-only로 읽고 내부 token cache 자동 갱신을 보장하지 않으며, 만료 시 host 재로그인·검증 후 기존 컨테이너를 중지하고 재시작한다. read-write mount와 world-readable 권한 안내는 없다.
+- Docker·ECS 확인: Dockerfile의 기본 non-root `app`을 유지한다. 현재 linux/amd64 image에서 UID/GID `999:999`, `/app` mode `750`, JAR `644`, `/tmp` `1777`을 재확인해 native Linux의 host UID/GID·`HOME=/app`·supplementary group `999` 설명과 일치한다. ECS는 Profile mount·SSO login·static Access Key 없이 Task Role의 Container Credentials를 사용한다.
+- AWS 구성 확인: BOM `2.29.52`와 `s3`·`sso`·`ssooidc`·`sts`가 유지되고 dependency insight에서 모든 AWS SDK runtime 모듈이 `2.29.52`로 해석됐다. S3Client와 S3Presigner는 공유 Default Credentials Provider를 사용하고 Health는 credential을 resolve하지 않는다.
+- 계약 확인: 위 HIGH 외 기존 시험·S3·JWT·Guest·grading API, `BaseResponse`, retryCount, Redis Key/TTL, 기존 S3 Object Key, Callback JSON과 AI `user_id=examId`에 별도 회귀를 확인하지 않았다. 실제 Key·private key·자격증명 포함 URI·서명된 Presigned URL 패턴도 발견되지 않았다.
+- 검증: `git diff --check`, AWS runtime dependency insight와 fresh `./gradlew clean test`가 성공했다. XML 기준 Java 245개, failures/errors/skipped 0개다.
+- 변경·외부 작업: 리뷰 대상 애플리케이션·설정·테스트 파일은 수정하지 않고 종료 기록을 위해 CURRENT_STATE를 갱신하고 이 WORKLOG 항목만 append했다. Git commit·push·PR 생성과 Jira 댓글·필드·상태 변경을 수행하지 않았으며 Secret, Token, 실제 Credential·Profile 내용·URI와 Presigned URL을 기록하지 않았다.
+
+## 2026-08-04 — 채점 전 modelAnswer 노출 HIGH finding 수정
+
+<!-- codex-turn:019fca8c-aba7-7391-a3e1-809a4c367db5 -->
+
+- 날짜·범위: `2026-08-04`, 브랜치 `chore/add-actuator-health`, HEAD·main `b70d03f38afc239849086fef6549bc3af47c89f6`. 별도 Jira 이슈 키 없이 최종 리뷰의 modelAnswer HIGH finding 하나만 최소 범위로 수정했다.
+- 기존 노출: 소유자가 `mock_exam_004` Part 1 문항 1·2를 제출·채점하기 전에 문항 결과 API를 호출해도 `targetDoc` null 여부와 무관하게 `buildModelAnswer`가 실행되어 모범답안 Presigned URL과 전체 단어 시퀀스가 조립됐다.
+- 차단 정책: 요청 retryCount를 기존 canonical 규칙으로 해석하고 matching `ExamResult`가 있을 때만 결과 조회 가능 완료 증거로 인정한다. 결과가 없으면 사용자 녹음 URL과 `buildModelAnswer`를 모두 건너뛰므로 model-answer catalog 조회, 모범답안 S3 Key 조립, Presign과 단어 시퀀스 조회가 발생하지 않는다.
+- 최종 제공 조건: 기존 소유권 검증, matching canonical retry 결과, 기존 완료 증거 정책, Part 1 Question 1·2, 해당 `mockExamId` 메타데이터를 모두 만족할 때만 `modelAnswer.audioUrl`과 `spokenWordSequence`를 반환한다. `modelAnswer.text`는 추가하지 않았다.
+- 테스트: 제출 전, 존재하지 않는 retryCount, 처리 중 결과 없음의 미노출·Presigner 0회·catalog 미조회 테스트 3개를 추가했다. 기존 완료 Q1·Q2, 다른 Part 필드 생략, 타 사용자 403 선차단, feedback·retryScores·retryFeedbackScores 회귀 테스트도 유지했다. 결과 없음에 따라 미사용이 된 기존 test URL stubbing만 제거했다.
+- 검증: 관련 `ExamQuestionModelAnswerTest`와 `ExamOwnershipServiceTest` 44개가 성공했다. `git diff --check`와 fresh `./gradlew clean test`도 성공했고 XML 기준 Java 248개, failures/errors/skipped 0개다.
+- 유지 계약: 기존 문항 결과 API URL·Method·Query와 HTTP/오류 응답, `BaseResponse`, 완료 결과의 사용자 녹음·문제 출제 음성·모범답안 음성 구분, retryCount, JWT·Guest·소유권, S3 기존 Key, Redis, grading, AI/Callback 계약을 변경하지 않았다. History, Retries, Notification 기능은 수정하지 않았다.
+- 변경 파일: `ExamServiceImpl`, `ExamQuestionModelAnswerTest`, `ExamOwnershipServiceTest`, README와 Codex 상태·기록 파일이다. Git commit·push·PR 생성과 Jira 댓글·필드·상태 변경을 수행하지 않았으며 Secret, Token, 실제 Credential·URI와 Presigned URL을 기록하지 않았다.
+
+## 2026-08-04 — modelAnswer HIGH finding 수정 좁은 재검토
+
+<!-- codex-turn:019fca90-3a07-70c2-9456-9e919ba690c7 -->
+
+- 날짜·범위: `2026-08-04`, 브랜치 `chore/add-actuator-health`, HEAD `b70d03f`. 별도 Jira 이슈 키 없이 `ExamServiceImpl.getExamQuestion`, 직접 관련된 modelAnswer 테스트와 Presigned URL 생성 경로만 재검토했다.
+- 리뷰 결과: HIGH 없음, MEDIUM 없음이다. 요청한 `questionNumber`와 canonical `retryCount`의 결과가 없으면 `buildModelAnswer`, model-answer catalog 조회와 Presigned GET URL 생성이 모두 실행되지 않는다.
+- 동작 확인: 제출 전·처리 중·존재하지 않는 retry 회차에는 `modelAnswer`가 생략되고, 완료 결과가 있는 Part 1 문항 1·2에는 기존대로 반환된다. 다른 사용자 시험은 소유권 검사에서 403으로 차단되어 모범답안 조회와 Presigner가 실행되지 않는다.
+- 테스트: `ExamQuestionModelAnswerTest` 8개와 `ExamOwnershipServiceTest` 36개, 총 44개가 failures/errors/skipped 0개로 성공했다.
+- 변경·외부 작업: 애플리케이션·테스트 파일은 수정하지 않았고 Stop Hook 기록을 위해 Codex 문서만 갱신했다. Git commit·push·PR 생성과 Jira 쓰기 작업을 수행하지 않았으며 Secret과 Token을 기록하지 않았다.
