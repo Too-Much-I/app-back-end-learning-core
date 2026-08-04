@@ -613,3 +613,10 @@
 - `create-exam-read-indexes.js`의 hidden 호환 판정, 동일 이름 hidden 충돌 무쓰기, visible 인덱스 idempotency를 재검토했으며 HIGH·MEDIUM finding은 없다.
 - `hidden:true` exact/prefix 인덱스는 호환에서 제외된다. 동일 이름 hidden은 apply 전에 충돌하고 `createIndex`, `dropIndex`, `collMod`를 호출하지 않으며, `hidden:false` 또는 hidden 필드가 없는 visible exact/prefix 인덱스는 기존대로 중복 생성하지 않는다.
 - 직접 관련된 Node 테스트 19개가 failures/errors/skipped 0으로 성공했다. 실제 MongoDB 연결·apply·explain은 수행하지 않았고 리뷰 대상 코드·테스트, Git 및 Jira 상태는 변경하지 않았다.
+
+## Latest TMI-61 missing-namespace dry-run fix (2026-08-04)
+
+- 아직 없는 `exam_summaries`의 비동기 인덱스 조회가 `NamespaceNotFound`로 dry-run을 중단하던 문제를 수정했다. 조회 helper와 호출부는 `async/await`를 사용하며 `code === 26` 또는 `codeName === "NamespaceNotFound"`만 빈 인덱스 목록으로 정규화한다.
+- 누락 컬렉션의 인덱스는 dry-run 생성 예정에 포함되지만 `createCollection`, `createIndex`, `dropIndex`, `collMod` 쓰기는 발생하지 않는다. apply에서는 기존 `createIndex` 흐름을 유지하며 별도 문서 insert/delete를 사용하지 않는다.
+- 인증·네트워크·권한·명령·알 수 없는 MongoDB 오류는 숨기지 않고 전파한다. visible idempotency, hidden 비호환, 동일 이름 충돌 선차단과 자동 drop/unhide 금지 정책도 유지된다.
+- Node 테스트 8개를 추가했고 전체 MongoDB 스크립트 테스트 76개와 `git diff --check`가 성공했다. 실제 MongoDB 연결·apply·explain, Git commit·push·PR과 Jira `TMI-61` 쓰기 작업은 수행하지 않았다.

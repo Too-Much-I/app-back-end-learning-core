@@ -141,9 +141,9 @@ function inspectIndexes(indexesByCollection) {
     return {errors, indexesToCreate, compatibleIndexes};
 }
 
-function currentIndexes(collection) {
+async function listIndexesOrEmpty(collection) {
     try {
-        return collection.getIndexes();
+        return await collection.getIndexes();
     } catch (error) {
         if (error && (error.code === 26 || error.codeName === "NamespaceNotFound")) {
             return [];
@@ -152,11 +152,15 @@ function currentIndexes(collection) {
     }
 }
 
-function readIndexes(database) {
-    return Object.fromEntries(INDEX_SPECS.map(spec => [
-        spec.collection,
-        currentIndexes(database.getCollection(spec.collection))
-    ]));
+async function readIndexes(database) {
+    const entries = [];
+    for (const spec of INDEX_SPECS) {
+        entries.push([
+            spec.collection,
+            await listIndexesOrEmpty(database.getCollection(spec.collection))
+        ]);
+    }
+    return Object.fromEntries(entries);
 }
 
 function output(line) {
@@ -191,7 +195,7 @@ function applyIndexPlan(database, inspection, applyChanges) {
     });
 }
 
-function runMongoMigration() {
+async function runMongoMigration() {
     const mongodbUri = environmentValue("MONGODB_URI");
     const databaseName = resolveTargetDatabaseName(
         mongodbUri,
@@ -199,7 +203,7 @@ function runMongoMigration() {
     );
     const applyChanges = environmentValue(APPLY_ENV) === "true";
     const targetDatabase = connect(mongodbUri).getSiblingDB(databaseName);
-    const inspection = inspectIndexes(readIndexes(targetDatabase));
+    const inspection = inspectIndexes(await readIndexes(targetDatabase));
     printPlan(databaseName, applyChanges, inspection);
 
     if (inspection.errors.length > 0) {
@@ -213,7 +217,7 @@ function runMongoMigration() {
 
     applyIndexPlan(targetDatabase, inspection, true);
 
-    const finalInspection = inspectIndexes(readIndexes(targetDatabase));
+    const finalInspection = inspectIndexes(await readIndexes(targetDatabase));
     if (finalInspection.errors.length > 0 || finalInspection.indexesToCreate.length > 0) {
         output("Exam read index final verification failed.");
         quit(3);
@@ -253,14 +257,18 @@ function runNodeCli() {
 
 const mongoshPayload = environmentValue(PAYLOAD_ENV) === "true";
 if (mongoshPayload) {
-    runMongoMigration();
+    runMongoMigration().catch(error => {
+        throw error;
+    });
 } else if (typeof module !== "undefined") {
     module.exports = {
         INDEX_SPECS,
         applyIndexPlan,
         inspectIndexes,
+        listIndexesOrEmpty,
         orderedKeyEquals,
         orderedKeyHasPrefix,
+        readIndexes,
         resolveTargetDatabaseName,
         validateDatabaseName
     };
