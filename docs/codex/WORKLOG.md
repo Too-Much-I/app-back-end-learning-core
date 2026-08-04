@@ -1407,3 +1407,14 @@
 - `hidden:false` 또는 hidden 필드가 없는 동일 Key 인덱스와 다른 이름의 visible exact/prefix 인덱스는 기존대로 호환되어 중복 생성되지 않는다.
 - 검증: `node --test scripts/mongodb/create-exam-read-indexes.test.js` 19개가 failures/errors/skipped 0으로 성공했다. 실제 MongoDB 연결·apply·explain은 수행하지 않았다.
 - 변경·외부 작업: 리뷰 대상 코드와 테스트는 수정하지 않았고 필수 Codex 기록 문서만 갱신했다. Git commit·push·PR 및 Jira `TMI-61` 댓글·필드·상태 변경은 수행하지 않았으며 Secret·Token을 기록하지 않았다.
+
+## 2026-08-04 — TMI-61 존재하지 않는 컬렉션 Dry-run 보정
+
+<!-- codex-turn:019fcbab-e395-73b1-9913-6a00da7755d0 -->
+
+- 범위·원인: Jira `TMI-61` read-index dry-run에서 아직 생성되지 않은 `exam_summaries`에 대한 비동기 `getIndexes()` 실패가 동기 `try/catch` 밖에서 발생해 `NamespaceNotFound`로 중단되던 문제만 최소 수정했다.
+- 처리 방식: 인덱스 조회 helper와 호출부를 `async/await`로 변경하고 MongoDB 오류의 `code === 26` 또는 `codeName === "NamespaceNotFound"`인 경우에만 기존 인덱스를 빈 배열로 처리한다. 인증 실패, 네트워크 오류, 권한·명령 오류와 알 수 없는 MongoDB 오류는 원래 오류 객체를 그대로 전파한다.
+- dry-run/apply: 컬렉션이 없으면 해당 인덱스를 생성 예정 계획에 포함한다. dry-run은 `createCollection`, `createIndex`, `dropIndex`, `collMod`를 호출하지 않으며, apply는 별도 빈 문서나 명시적 컬렉션 생성 없이 기존 `createIndex` 경로를 사용한다. 실제 MongoDB apply는 수행하지 않았다.
+- 회귀 정책: visible 인덱스 idempotency, hidden 인덱스 비호환, 동일 이름·다른 정의 충돌의 전체 쓰기 전 차단과 자동 drop/unhide 금지를 유지했다.
+- 테스트·검증: NamespaceNotFound 두 표현, 누락 Summary 계획, dry-run 무쓰기, apply createIndex, 인증·네트워크·알 수 없는 오류 전파에 대한 Node 테스트 8개를 추가했다. `node --test scripts/mongodb/*.test.js` 전체 76개와 `git diff --check`가 성공했다.
+- 외부 작업·보안: Java·Repository·공개 API는 변경하지 않았고 실제 DB 연결·apply·explain, Git commit·push·PR 및 Jira 댓글·필드·상태 변경을 수행하지 않았다. Secret과 Token을 조회하거나 기록하지 않았다.

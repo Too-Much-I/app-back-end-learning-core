@@ -10,8 +10,10 @@ const {
     INDEX_SPECS,
     applyIndexPlan,
     inspectIndexes,
+    listIndexesOrEmpty,
     orderedKeyEquals,
     orderedKeyHasPrefix,
+    readIndexes,
     resolveTargetDatabaseName,
     validateDatabaseName
 } = require(migrationPath);
@@ -24,13 +26,18 @@ const SUMMARY_INDEX = {
 
 function recordingDatabase() {
     const calls = [];
+    const createCollectionCalls = [];
     const dropCalls = [];
     const collModCalls = [];
     return {
         calls,
+        createCollectionCalls,
         dropCalls,
         collModCalls,
         database: {
+            createCollection(collection) {
+                createCollectionCalls.push(collection);
+            },
             getCollection(collection) {
                 return {
                     createIndex(key, options) {
@@ -46,6 +53,31 @@ function recordingDatabase() {
             }
         }
     };
+}
+
+function indexReadingDatabase(indexesByCollection, errorsByCollection = {}) {
+    return {
+        getCollection(collection) {
+            return {
+                async getIndexes() {
+                    if (Object.prototype.hasOwnProperty.call(errorsByCollection, collection)) {
+                        throw errorsByCollection[collection];
+                    }
+                    return indexesByCollection[collection] ?? [];
+                }
+            };
+        }
+    };
+}
+
+async function inspectionWithMissingSummary(error) {
+    const existingIndexes = Object.fromEntries(
+        INDEX_SPECS
+            .filter(spec => spec.collection !== "exam_summaries")
+            .map(spec => [spec.collection, [{name: spec.name, key: spec.key}]])
+    );
+    const database = indexReadingDatabase(existingIndexes, {exam_summaries: error});
+    return inspectIndexes(await readIndexes(database));
 }
 
 test("exam read index specs preserve required compound field order", () => {
@@ -86,6 +118,123 @@ test("dry-run never calls createIndex", () => {
 
     assert.deepEqual(created, []);
     assert.deepEqual(recorder.calls, []);
+});
+
+test("listIndexes code 26 is treated as an empty index list", async () => {
+    const namespaceNotFound = Object.assign(new Error("synthetic missing namespace"), {code: 26});
+
+    const indexes = await listIndexesOrEmpty({
+        async getIndexes() {
+            throw namespaceNotFound;
+        }
+    });
+
+    assert.deepEqual(indexes, []);
+});
+
+test("listIndexes NamespaceNotFound codeName is treated as an empty index list", async () => {
+    const namespaceNotFound = Object.assign(
+        new Error("synthetic missing namespace"),
+        {codeName: "NamespaceNotFound"}
+    );
+
+    const indexes = await listIndexesOrEmpty({
+        async getIndexes() {
+            throw namespaceNotFound;
+        }
+    });
+
+    assert.deepEqual(indexes, []);
+});
+
+test("a missing exam_summaries collection remains in the dry-run creation plan", async () => {
+    const inspection = await inspectionWithMissingSummary(
+        Object.assign(new Error("synthetic missing namespace"), {code: 26})
+    );
+
+    assert.deepEqual(inspection.errors, []);
+    assert.deepEqual(inspection.indexesToCreate, [SUMMARY_INDEX]);
+    assert.equal(inspection.compatibleIndexes.length, 3);
+});
+
+test("dry-run with a missing collection performs no index or collection writes", async () => {
+    const inspection = await inspectionWithMissingSummary(
+        Object.assign(new Error("synthetic missing namespace"), {code: 26})
+    );
+    const recorder = recordingDatabase();
+
+    const created = applyIndexPlan(recorder.database, inspection, false);
+
+    assert.deepEqual(created, []);
+    assert.deepEqual(recorder.createCollectionCalls, []);
+    assert.deepEqual(recorder.calls, []);
+    assert.deepEqual(recorder.dropCalls, []);
+    assert.deepEqual(recorder.collModCalls, []);
+});
+
+test("apply creates the required index for a missing collection through createIndex", async () => {
+    const inspection = await inspectionWithMissingSummary(
+        Object.assign(new Error("synthetic missing namespace"), {code: 26})
+    );
+    const recorder = recordingDatabase();
+
+    const created = applyIndexPlan(recorder.database, inspection, true);
+
+    assert.deepEqual(created, [SUMMARY_INDEX.name]);
+    assert.deepEqual(recorder.createCollectionCalls, []);
+    assert.deepEqual(recorder.calls, [{
+        collection: SUMMARY_INDEX.collection,
+        key: SUMMARY_INDEX.key,
+        options: {name: SUMMARY_INDEX.name}
+    }]);
+});
+
+test("authentication errors from listIndexes are propagated unchanged", async () => {
+    const authenticationFailure = Object.assign(
+        new Error("synthetic authentication failure"),
+        {code: 18, codeName: "AuthenticationFailed"}
+    );
+
+    await assert.rejects(
+        () => listIndexesOrEmpty({
+            async getIndexes() {
+                throw authenticationFailure;
+            }
+        }),
+        error => error === authenticationFailure
+    );
+});
+
+test("network errors from listIndexes are propagated unchanged", async () => {
+    const networkFailure = Object.assign(
+        new Error("synthetic network failure"),
+        {name: "MongoNetworkError"}
+    );
+
+    await assert.rejects(
+        () => listIndexesOrEmpty({
+            async getIndexes() {
+                throw networkFailure;
+            }
+        }),
+        error => error === networkFailure
+    );
+});
+
+test("unknown MongoDB errors from listIndexes are propagated unchanged", async () => {
+    const unknownFailure = Object.assign(
+        new Error("synthetic unknown MongoDB failure"),
+        {code: 99999, codeName: "SyntheticFailure"}
+    );
+
+    await assert.rejects(
+        () => listIndexesOrEmpty({
+            async getIndexes() {
+                throw unknownFailure;
+            }
+        }),
+        error => error === unknownFailure
+    );
 });
 
 test("apply creates only the missing summary index when the other three already exist", () => {
