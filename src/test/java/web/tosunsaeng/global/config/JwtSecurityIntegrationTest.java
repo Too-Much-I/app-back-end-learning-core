@@ -38,6 +38,7 @@ import software.amazon.awssdk.services.s3.presigner.S3Presigner;
 import software.amazon.awssdk.services.s3.presigner.model.GetObjectPresignRequest;
 import software.amazon.awssdk.services.s3.presigner.model.PresignedGetObjectRequest;
 import web.tosunsaeng.domain.exams.api.ExamRestController;
+import web.tosunsaeng.domain.exams.application.ExamReadService;
 import web.tosunsaeng.domain.exams.application.ExamServiceImpl;
 import web.tosunsaeng.domain.exams.application.ExamGradingService;
 import web.tosunsaeng.domain.exams.application.ExamSessionManager;
@@ -45,9 +46,12 @@ import web.tosunsaeng.domain.exams.application.ModelAnswerCatalogService;
 import web.tosunsaeng.domain.exams.application.MockExamCatalogService;
 import web.tosunsaeng.domain.exams.domain.entity.ExamResult;
 import web.tosunsaeng.domain.exams.domain.entity.ExamSession;
+import web.tosunsaeng.domain.exams.domain.entity.ExamSummary;
 import web.tosunsaeng.domain.exams.domain.entity.MockExam;
 import web.tosunsaeng.domain.exams.domain.entity.Question;
+import web.tosunsaeng.domain.exams.domain.entity.QuestionGradingJob;
 import web.tosunsaeng.domain.exams.domain.enums.ExamStatus;
+import web.tosunsaeng.domain.exams.domain.enums.GradingJobStatus;
 import web.tosunsaeng.domain.exams.domain.repository.AzureResultRepository;
 import web.tosunsaeng.domain.exams.domain.repository.ExamResultRepository;
 import web.tosunsaeng.domain.exams.domain.repository.ExamSessionRepository;
@@ -83,6 +87,7 @@ import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyCollection;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
@@ -100,6 +105,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
         SecurityErrorResponseHandler.class,
         JwtCurrentUserProvider.class,
         ExamServiceImpl.class,
+        ExamReadService.class,
         GlobalExceptionAdvice.class
 })
 class JwtSecurityIntegrationTest {
@@ -268,6 +274,126 @@ class JwtSecurityIntegrationTest {
                 "ex_prompt_security_test",
                 1
         )));
+    }
+
+    @Test
+    void examHistoryWithoutTokenReturnsBaseResponse401() throws Exception {
+        expectUnauthorized(mockMvc.perform(get("/api/v1/exams/history")));
+    }
+
+    @Test
+    void examRetriesWithoutTokenReturnsBaseResponse401() throws Exception {
+        expectUnauthorized(mockMvc.perform(get(
+                "/api/v1/exams/{examId}/retries",
+                "ex_retries_security_test"
+        )));
+    }
+
+    @Test
+    void validTokenHistoryUsesJwtSubjectAndDoesNotExposeInternalIds() throws Exception {
+        LocalDateTime completedAt = LocalDateTime.of(2026, 8, 4, 9, 30);
+        when(examSessionRepository.findCompletedByUserId(OWNER_USER_ID)).thenReturn(List.of(
+                ExamSession.builder()
+                        .examId("ex_history_security_test")
+                        .userId(OWNER_USER_ID)
+                        .mockExamId("mock_exam_004")
+                        .cycleNumber(2)
+                        .active(null)
+                        .completedAt(completedAt)
+                        .build()
+        ));
+        when(mockExamRepository.findTitlesByMockExamIdIn(anyCollection())).thenReturn(List.of(
+                MockExam.builder()
+                        .mockExamId("mock_exam_004")
+                        .title("JWT history test exam")
+                        .build()
+        ));
+        when(examSummaryRepository.findHistoryCandidatesByExamIdIn(anyCollection())).thenReturn(List.of(
+                ExamSummary.builder()
+                        .id("summary:ex_history_security_test:v1")
+                        .examId("ex_history_security_test")
+                        .totalScore(145)
+                        .levelEstimate("Advanced High")
+                        .build()
+        ));
+        when(examResultRepository.findLegacySummaryCandidatesByExamIdIn(anyCollection()))
+                .thenReturn(List.of());
+
+        mockMvc.perform(get("/api/v1/exams/history")
+                        .header("Authorization", bearer(validToken(OWNER_USER_ID))))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.result.totalCount").value(1))
+                .andExpect(jsonPath("$.result.histories[0].examId").value("ex_history_security_test"))
+                .andExpect(jsonPath("$.result.histories[0].title").value("JWT history test exam"))
+                .andExpect(jsonPath("$.result.histories[0].totalScore").value(145))
+                .andExpect(jsonPath("$..userId").doesNotExist())
+                .andExpect(jsonPath("$..user_id").doesNotExist())
+                .andExpect(jsonPath("$..mockExamId").doesNotExist());
+
+        verify(examSessionRepository).findCompletedByUserId(OWNER_USER_ID);
+    }
+
+    @Test
+    void ownerCanReadRetriesWithJwtSubject() throws Exception {
+        String examId = "ex_retries_security_test";
+        sessions.put(examId, ExamSession.builder()
+                .examId(examId)
+                .userId(OWNER_USER_ID)
+                .build());
+        when(examResultRepository.findQuestionAttemptsByExamId(examId)).thenReturn(List.of(
+                ExamResult.builder()
+                        .id("feedback:ex_retries_security_test:1:0")
+                        .examId(examId)
+                        .questionNumber(1)
+                        .retryCount(0)
+                        .build()
+        ));
+        when(questionGradingJobRepository.findAttemptsByExamId(examId)).thenReturn(List.of(
+                QuestionGradingJob.builder()
+                        .jobId("question:ex_retries_security_test:1:1")
+                        .examId(examId)
+                        .questionNumber(1)
+                        .retryCount(1)
+                        .dispatchAttempt(34)
+                        .status(GradingJobStatus.PROCESSING)
+                        .build()
+        ));
+
+        mockMvc.perform(get("/api/v1/exams/{examId}/retries", examId)
+                        .header("Authorization", bearer(validToken(OWNER_USER_ID))))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.result.examId").value(examId))
+                .andExpect(jsonPath("$.result.questions[0].attempts[0].retryCount").value(0))
+                .andExpect(jsonPath("$.result.questions[0].attempts[0].status").value("COMPLETED"))
+                .andExpect(jsonPath("$.result.questions[0].attempts[1].retryCount").value(1))
+                .andExpect(jsonPath("$.result.questions[0].attempts[1].status").value("PROCESSING"))
+                .andExpect(jsonPath("$..dispatchAttempt").doesNotExist());
+    }
+
+    @Test
+    void anotherUserCannotReadRetries() throws Exception {
+        String examId = "ex_other_retries_security_test";
+        sessions.put(examId, ExamSession.builder()
+                .examId(examId)
+                .userId(OWNER_USER_ID)
+                .build());
+
+        mockMvc.perform(get("/api/v1/exams/{examId}/retries", examId)
+                        .header("Authorization", bearer(validToken(OTHER_USER_ID))))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.isSuccess").value(false))
+                .andExpect(jsonPath("$.code").value("COMMON403"))
+                .andExpect(jsonPath("$.result").doesNotExist());
+    }
+
+    @Test
+    void missingExamRetriesKeepsExistingNotFoundResponse() throws Exception {
+        mockMvc.perform(get("/api/v1/exams/{examId}/retries", "ex_missing_retries")
+                        .header("Authorization", bearer(validToken(OWNER_USER_ID))))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.isSuccess").value(false))
+                .andExpect(jsonPath("$.code").value("EXAM_4004"))
+                .andExpect(jsonPath("$.result").doesNotExist());
     }
 
     @Test

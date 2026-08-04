@@ -38,4 +38,14 @@ public final class GradingKeys {
     public static String effectiveMockExamId(String mockExamId) {
         return mockExamId == null || mockExamId.isBlank() ? LEGACY_MOCK_EXAM_ID : mockExamId;
     }
+
+    public static int partNumberForQuestion(Integer questionNumber) {
+        if (questionNumber == null) return 1;
+        if (questionNumber == 0) return 0;
+        if (questionNumber >= 1 && questionNumber <= 2) return 1;
+        if (questionNumber >= 3 && questionNumber <= 4) return 2;
+        if (questionNumber >= 5 && questionNumber <= 7) return 3;
+        if (questionNumber >= 8 && questionNumber <= 10) return 4;
+        return 5;
+    }
 }

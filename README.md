@@ -87,6 +87,27 @@ Startup 검증은 설정 형식만 확인하며 JWKS endpoint로 네트워크 �
 
 앱 Learning Core가 Python AI로 보내는 문항 채점 multipart에는 요청 출처를 나타내는 `client_source=app`을 추가한다. 앱과 웹 백엔드가 분리되어 있으므로 클라이언트가 이 값을 전달하지 않으며, 공개 submit API와 시험 단위 retry Job 계약은 변경하지 않는다. 전체 요약 요청과 AI Callback JSON에는 이 필드를 추가하지 않는다.
 
+## 완료 시험 이력과 재답변 회차 조회
+
+JWT 모드에서 다음 사용자용 GET API는 Bearer Access Token이 필요하며, 사용자 ID는 Token의 UUID
+`sub`에서만 가져온다. 요청이나 응답에 `userId`를 추가하지 않는다. 로컬·테스트 Legacy 모드의 기존
+무인증 호환 정책은 그대로 유지한다.
+
+- `GET /api/v1/exams/history`: 현재 사용자의 `completedAt`이 존재하는 `ExamSession`만
+  `completedAt` 내림차순, `examId` 내림차순으로 반환한다. `active=false`만으로 완료를 판정하지
+  않는다. 신규 `exam_summaries`의 최신 문서를 우선하고, 없으면 `exam_results.totalScore`가 있는
+  Legacy 종합 문서를 사용한다. 종합 결과가 없는 완료 시험은 점수·레벨을 `null`,
+  `summaryAvailable=false`로 반환한다.
+- `GET /api/v1/exams/{examId}/retries`: 사용자 소유 시험의 `question_grading_jobs`와 문항별
+  Legacy `exam_results` 회차를 합쳐, `retryCount >= 1`이 실제로 존재하는 문항만 반환한다. 해당
+  문항의 저장된 최초 회차는 비교를 위해 포함하지만 존재하지 않는 0회차는 만들지 않는다. Job이
+  없는 Legacy 결과 회차는 `COMPLETED`이고, Job과 결과가 겹치면 Job 상태가 우선한다.
+
+History가 없으면 `histories: []`, 재답변 문항이 없으면 `questions: []`인 200 응답이다. Retries는
+점수, 피드백, Transcript, 음성 URL을 반환하지 않는다. 선택한 회차의 상세 피드백은 기존
+`GET /api/v1/exams/{examId}/questions?questionNumber={questionNumber}&retryCount={retryCount}`로
+조회한다. `dispatchAttempt`는 AI 재전송 횟수이며 사용자 답변 회차인 `retryCount`로 사용하지 않는다.
+
 ## AWS S3 인증
 
 Learning Core는 AWS SDK v2의 `DefaultCredentialsProvider`를 사용한다. 프로젝트 전용 `AWS_ACCESS_KEY`, `AWS_SECRET_KEY` 설정은 사용하지 않으며, Region과 Bucket의 기존 설정 계약인 `AWS_REGION`, `AWS_S3_BUCKET_NAME`은 유지한다. `S3Client`와 `S3Presigner`는 같은 Default Credentials Provider Chain을 사용한다.

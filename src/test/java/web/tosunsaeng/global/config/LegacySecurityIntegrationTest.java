@@ -13,6 +13,7 @@ import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 import web.tosunsaeng.domain.exams.api.ExamRestController;
+import web.tosunsaeng.domain.exams.application.ExamReadService;
 import web.tosunsaeng.domain.exams.application.ExamService;
 import web.tosunsaeng.domain.exams.domain.repository.AzureResultRepository;
 import web.tosunsaeng.domain.exams.domain.repository.ExamResultRepository;
@@ -63,6 +64,9 @@ class LegacySecurityIntegrationTest {
 
     @MockitoBean
     private ExamService examService;
+
+    @MockitoBean
+    private ExamReadService examReadService;
 
     @MockitoBean
     private ExamResultRepository examResultRepository;

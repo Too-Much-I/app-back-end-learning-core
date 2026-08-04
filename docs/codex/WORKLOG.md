@@ -1303,3 +1303,107 @@
 - 동작 확인: 제출 전·처리 중·존재하지 않는 retry 회차에는 `modelAnswer`가 생략되고, 완료 결과가 있는 Part 1 문항 1·2에는 기존대로 반환된다. 다른 사용자 시험은 소유권 검사에서 403으로 차단되어 모범답안 조회와 Presigner가 실행되지 않는다.
 - 테스트: `ExamQuestionModelAnswerTest` 8개와 `ExamOwnershipServiceTest` 36개, 총 44개가 failures/errors/skipped 0개로 성공했다.
 - 변경·외부 작업: 애플리케이션·테스트 파일은 수정하지 않았고 Stop Hook 기록을 위해 Codex 문서만 갱신했다. Git commit·push·PR 생성과 Jira 쓰기 작업을 수행하지 않았으며 Secret과 Token을 기록하지 않았다.
+
+## 2026-08-04 — 완료 시험 이력 및 재답변 회차 조회 API 구현
+
+<!-- codex-turn:019fcaa6-742a-73a2-8ce0-df7043707e1e -->
+
+- 날짜·범위: `2026-08-04`, 브랜치 `feat/exam-history-retries`, HEAD `20be0c2`. 완료 모의고사 전체 이력용 `GET /api/v1/exams/history`와 특정 시험의 재답변 문항·저장 회차 목록용 `GET /api/v1/exams/{examId}/retries`를 additive로 구현했다.
+- Jira: 사용자가 이슈 등록을 명시적으로 요청했지만 현재 세션에 Jira/Atlassian connector와 이슈 생성 도구가 없어 이슈를 만들지 못했다. 키를 임의 생성하거나 자격증명을 찾지 않았고 Jira 댓글·필드·상태는 변경하지 않았다.
+- JWT sub·소유권: 두 API 모두 기존 JWT 모드의 Bearer 보호 범위에 속하며 현재 사용자 ID는 검증된 JWT `sub` UUID에서만 얻는다. History 요청에 userId를 받지 않고, Retries는 Session을 먼저 조회해 `ExamSession.userId`와 현재 사용자를 비교하며 기존 404 `EXAM_4004`와 403 `COMMON403`을 유지한다. local/test Legacy Guest 호환은 변경하지 않았다.
+- History 완료 기준: `exam_sessions`에서 현재 사용자이고 `completedAt`이 존재하는 Session만 완료로 본다. `active=false` 단독 판정은 사용하지 않아 completedAt 없는 inactive Session은 제외하고, active null/missing Legacy 완료 Session은 포함한다. `completedAt DESC`, 동일 시각 `examId DESC`로 결정적 정렬한다.
+- History 결합·응답: Session의 MockExam title, cycleNumber와 완료 시각을 제공하고 신규 `exam_summaries`의 `_id DESC` 최신 문서를 우선한다. 신규 Summary가 없을 때만 `exam_results.totalScore != null` 최신 Legacy 종합 문서를 사용한다. 모든 컬렉션을 batch 조회해 시험별 N+1을 만들지 않았고 Summary가 없는 완료 시험은 null score/level과 `summaryAvailable=false`로 계속 반환한다. 내부 userId와 mockExamId는 노출하지 않는다.
+- Retries 기준 데이터: `question_grading_jobs`의 examId, questionNumber, retryCount, 기존 `PENDING`/`PROCESSING`/`COMPLETED`/`FAILED` status를 1차 기준으로 사용한다. `dispatchAttempt`는 AI 재전송 횟수이고 사용자 retryCount와 다르므로 조회 projection·응답·결합 Key에 사용하지 않았다.
+- Legacy 회차 fallback: 같은 examId의 문항별 `exam_results`를 한 번에 조회해 questionNumber와 canonical retryCount로 합쳤다. null retryCount는 0, 결과만 있는 회차는 `COMPLETED`, Job과 결과가 중복되면 Job status 우선이다. 중복을 제거하고 retryCount 1 이상이 실제로 있는 문항만 포함하며, 저장된 최초 0회차는 비교용으로 포함하지만 존재하지 않는 0회차는 만들지 않는다. questions와 attempts는 오름차순이다.
+- 빈 목록·정보 최소화: 완료 이력이 없으면 200과 `histories=[]`, 재답변 문항이 없으면 200과 `questions=[]`다. Retries에는 상세 score, feedback, Transcript, audio URL, S3 Key, failureReason, AI payload를 포함하지 않고 회차 선택 후 기존 문항 단건 API를 사용한다.
+- MongoDB 인덱스: 기존 TMI-31 migration과 운영 정책을 확인한 뒤 별도 `create-exam-read-indexes.js`를 추가했다. 기본 dry-run, 명시적 database 선택, URI 비출력, exact ordered-key 검사와 명시적 apply를 사용하며 호환 인덱스는 중복 생성하지 않고 충돌은 fail-closed한다. 세 인덱스는 `exam_sessions {userId:1, completedAt:-1, _id:-1}`, `question_grading_jobs {examId:1, questionNumber:1, retryCount:1}`, `exam_results {examId:1, questionNumber:1, retryCount:1}`다. 실제 DB apply는 수행하지 않았다.
+- 추가 테스트: History/Retries 서비스 6개, batch Repository 계약 3개, Controller·OpenAPI mapping 계약 3개, JWT 인증·sub·소유권 응답 6개, Mongo index migration 7개로 총 25개를 추가했다. `/history` 정적 경로, `/{examId}/retries`, 기존 endpoint mapping, 신규/Legacy Summary 우선순위, active/completedAt 조합, deterministic sorting, 모든 Job 상태, null retry, dedupe, no synthetic 0, dispatchAttempt 미사용과 상세 데이터 미노출을 검증했다.
+- 검증 결과: 신규 Java 집중 테스트 37개가 성공했다. 저장소 필수 `./gradlew clean test`는 전체 Java 266개, failures/errors/skipped 0으로 성공했고 MongoDB 스크립트 전체 `node --test scripts/mongodb/*.test.js`는 56개, failures 0으로 성공했다. `git diff --check`도 성공했다.
+- 회귀·보안: 기존 시험 생성, 문항 단건 피드백, Summary, status, question status, submit, grading retry와 `BaseResponse`, retryCount·dispatchAttempt, 멱등성, Redis Key/TTL, S3, Default Credentials, ECS Task Role, AI/Callback `user_id=examId`, Callback JSON, 순차·순환 배정, modelAnswer `audioUrl`·`spokenWordSequence`, Health 계약을 유지했다. Secret, Token, 실제 URI, AWS Credential, Presigned URL은 코드·로그·문서에 기록하지 않았다.
+- 외부 작업·남은 위험: Git commit·push·PR 생성은 하지 않았다. 운영 MongoDB의 실제 explain과 인덱스 dry-run/apply, 혼합 BSON `_id` 타입 중복 Summary 정렬과 staging Bearer smoke test는 로컬 Mock 기반 검증 범위 밖이다.
+
+## 2026-08-04 — History/Retries Jira 이슈 생성 재시도
+
+<!-- codex-turn:019fcb06-9409-7053-955f-9f3e7dd028eb -->
+
+- 요청·범위: 사용자가 완료 시험 History 및 재답변 회차 조회 구현에 대한 Jira 이슈 생성을 다시 요청해, 외부 Jira 쓰기 수단만 재확인했다.
+- 재탐색 결과: 현재 세션의 전체 도구 목록에 Jira/Atlassian connector, 이슈 생성 도구와 lazy tool search가 없었다. 로컬 실행 환경에도 `jira`, `acli`, `atlas` CLI가 설치되어 있지 않았다.
+- 처리 결과: 인증정보를 요구하지 않는 이슈 생성 경로가 없어 Jira 이슈를 생성하지 못했으며 이슈 키도 없다. 키를 임의 생성하거나 Secret·Token·환경 자격증명을 찾지 않았다.
+- 변경·보안: Jira 댓글·필드·상태를 변경하지 않았고 Git commit·push·PR도 수행하지 않았다. 애플리케이션·테스트·migration 코드는 변경하지 않았으며 `docs/codex/CURRENT_STATE.md` 갱신과 이 WORKLOG append만 수행했다.
+- 검증 정책: 코드 변경이 없는 connector 가용성 재확인 작업이므로 Gradle·Node 테스트는 다시 실행하지 않았다. 기존 직전 전체 검증 결과는 Java 266개와 MongoDB 스크립트 56개 모두 성공 상태다.
+
+## 2026-08-04 — TMI-61 완료 시험 History/Retries Jira 이슈 생성
+
+<!-- codex-turn:019fcb07-e3a0-7433-be0a-102822598fca -->
+
+- 요청·결과: 사용자 요청에 따라 `TMI` 프로젝트에 [`TMI-61`](https://to-teacher.atlassian.net/browse/TMI-61) `[Learning Core] 완료 시험 이력 및 재답변 회차 조회 API`를 `작업` 타입으로 생성했다.
+- 설명 범위: JWT `sub` 기반 사용자 식별, `ExamSession.completedAt` 완료 기준, 신규/Legacy Summary batch 결합과 신규 우선 fallback, `question_grading_jobs` 우선 및 `exam_results` Legacy fallback, 사용자 `retryCount`·Job 상태 제공, `dispatchAttempt`·상세 피드백 비노출, 소유권·기존 계약 유지와 테스트 완료 조건을 기록했다.
+- Jira 검증: 생성 응답과 읽기 전용 상세 재조회로 이슈 키·제목·설명·프로젝트·유형을 확인했다. 기본 상태는 `해야 할 일`, 기본 우선순위는 `Medium`, 담당자는 미지정이고 라벨은 비어 있다.
+- 변경 범위: Jira/PR 완료 댓글 초안은 등록하지 않았고 상태 전환·담당자·라벨·다른 이슈는 변경하지 않았다. 애플리케이션·테스트·migration 코드는 수정하지 않았으며 종료 기록을 위해 `docs/codex/WORKLOG.md`와 `docs/codex/CURRENT_STATE.md`만 갱신했다.
+- 테스트·위험: Jira 생성과 문서 기록만 수행해 Gradle·Node 테스트는 다시 실행하지 않았다. 직전 구현에서 성공한 Java 266개와 MongoDB 스크립트 56개는 기존 결과이며 이번 turn의 재실행 결과가 아니다. 이슈는 아직 `해야 할 일` 상태이므로 완료 댓글 등록이나 상태 전환이 필요하면 별도 요청으로 처리해야 한다.
+- 보안·Git: Secret과 Token을 조회하거나 기록하지 않았고 Git commit·push·PR 생성은 수행하지 않았다. 기존 공개 API·`BaseResponse`, 사용자 소유권, `retryCount`, Redis/S3 및 AI/Callback 계약은 변경하지 않았다.
+
+## 2026-08-04 — TMI-61 History/Retries 지정 범위 코드 리뷰
+
+<!-- codex-turn:019fcb0a-333c-7203-8268-dd6738bababa -->
+
+- 범위: Jira `TMI-61`의 `GET /api/v1/exams/history`, `GET /api/v1/exams/{examId}/retries`에 한해 `ExamRestController`, `ExamReadService`, 신규 응답 DTO, 관련 Repository, `create-exam-read-indexes.js`와 관련 서비스·계약·보안·Node 테스트를 검토했다.
+- 결과: HIGH 없음, MEDIUM 1건이다. History의 신규 Summary batch query는 `exam_summaries`에서 `examId IN (...)`과 `{examId:1, _id:-1}` 정렬을 사용하지만 인덱스 스크립트는 `exam_sessions`, `question_grading_jobs`, `exam_results`만 다룬다. 전역 collection scan과 blocking sort 위험이 있으므로 `exam_summaries` query shape용 인덱스와 검증을 추가해야 한다.
+- 요구사항 확인: completedAt이 있는 현재 사용자 Session만 포함하고 `completedAt DESC`, 동일 시각 `examId DESC`로 정렬한다. MockExam·신규 Summary·Legacy Summary는 고정 개수 batch 조회하며 Summary가 없어도 null score/level과 `summaryAvailable=false`로 목록을 유지한다.
+- Retries 확인: Session 소유권을 선검증해 타 사용자는 `COMMON403`이고 attempt 조회를 실행하지 않는다. 결과는 `(questionNumber, canonical retryCount)` Key로 dedupe하며 Job이 Legacy Result보다 우선하고 `dispatchAttempt`는 projection·결합·응답에 사용하지 않는다. retryCount 1 이상이 없는 문항은 제외하고 빈 결과는 200과 빈 배열이다.
+- 계약 확인: 기존 `GET /{examId}/questions`와 `GET /{examId}/summary` URL·Method·Parameter·응답 DTO 및 `BaseResponse`는 변경되지 않았다. 신규 DTO에도 실제 userId, mockExamId, 상세 피드백, Transcript, S3/음성 정보가 노출되지 않는다.
+- 검증: 관련 Java 6개 클래스 총 40개와 Node 인덱스 테스트 7개가 failures/errors/skipped 0개로 성공했고 `git diff --check`도 성공했다. 첫 Gradle 실행은 sandbox의 사용자 Gradle cache lock 권한으로 task 시작 전에 중단됐고 승인된 동일 명령은 성공했다. 실제 MongoDB `explain`과 인덱스 dry-run/apply는 수행하지 않았다.
+- 변경·보안: 사용자 요청에 따라 애플리케이션·테스트·인덱스 스크립트는 수정하지 않았다. 저장소 필수 기록을 위해 `docs/codex/WORKLOG.md`와 `docs/codex/CURRENT_STATE.md`만 갱신했다. Secret·Token을 기록하지 않았고 Git commit·push·PR 및 Jira 댓글·필드·상태 변경은 수행하지 않았다.
+
+## 2026-08-04 — TMI-61 History/Retries 리뷰 Stop Hook 기록 보완
+
+<!-- codex-turn:019fcb0a-333c-7d23-b3df-374490ab245a -->
+
+- Stop Hook 요청에 따라 현재 turn의 Jira `TMI-61` History/Retries 지정 범위 리뷰 기록을 append했다. 과거 WORKLOG 항목은 수정하거나 삭제하지 않았다.
+- 리뷰 결과는 HIGH 없음, MEDIUM 1건으로 유지한다. `exam_summaries`의 `examId IN (...)`, `{examId:1, _id:-1}` History batch query를 지원하는 인덱스가 `create-exam-read-indexes.js`에 없어 데이터 증가 시 collection scan과 blocking sort 위험이 있다.
+- 확인 항목 1~10은 모두 충족했고 관련 Java 40개, Node 7개와 `git diff --check`가 성공했다. 실제 MongoDB `explain`과 인덱스 dry-run/apply는 수행하지 않았다.
+- 애플리케이션·테스트·인덱스 스크립트, 공개 API 계약과 Jira 댓글·필드·상태는 변경하지 않았다. Stop Hook 기록을 위해 `docs/codex/WORKLOG.md`와 `docs/codex/CURRENT_STATE.md`만 갱신했으며 Secret·Token을 기록하지 않고 Git commit·push·PR도 수행하지 않았다.
+
+## 2026-08-04 — TMI-61 Summary batch 인덱스 MEDIUM 수정
+
+<!-- codex-turn:019fcb1b-c5ae-7aa2-a073-4048c528fd03 -->
+
+- 범위·결과: Jira `TMI-61` History/Retries targeted review에서 확인한 MEDIUM 하나만 수정했다. `ExamSummaryRepository.findHistoryCandidatesByExamIdIn`의 여러 `examId` batch 조회와 `{examId:1, _id:-1}` 정렬에 맞춰 `exam_summaries` 인덱스 `idx_exam_summaries_exam_id_latest`, Key `{examId:1, _id:-1}`를 선언형 read-index 계획에 추가했다.
+- 스크립트 정책: 기본 dry-run, `EXAM_READ_INDEXES_APPLY=true`의 명시적 apply, 모든 충돌의 쓰기 전 검사, idempotent 실행, apply 후 인덱스 재검증과 애플리케이션 자동 적용 금지를 유지했다. 실제 문서 읽기·수정 없이 인덱스 metadata만 검사하고 누락 인덱스만 생성한다.
+- 호환·충돌: 같은 이름·같은 Key, 다른 이름·같은 Key는 재생성하지 않는다. 다른 이름의 더 긴 인덱스는 `{examId:1, _id:-1}`가 leading ordered prefix이고 기존 incompatible option이 없을 때만 호환으로 인정한다. 확정 이름의 다른 정의는 쓰기 전 오류이며 `{examId:-1, _id:-1}`, `{_id:-1, examId:1}`, `{examId:1}`은 호환으로 취급하지 않는다.
+- Node 테스트: Summary 인덱스 계획·이름·정확한 Key, dry-run createIndex 0회, apply에서 누락 Summary 인덱스만 생성, 동일 정의 idempotency, 다른 이름 동일 Key 중복 방지, 긴 prefix 호환, 동일 이름 다른 Key 충돌 무쓰기, 역방향·순서 불일치·짧은 Key 배제와 기존 세 컬렉션 계획 회귀를 추가했다. 실제 MongoDB에는 연결하지 않았다.
+- 문서: `scripts/mongodb/README.md`에 Summary 인덱스 용도와 Staging/운영 apply 후 실행할 `explain("executionStats")` 예시를 추가했다. IXSCAN과 선택 인덱스, COLLSCAN·blocking SORT 부재, `totalDocsExamined`를 확인하도록 했으며 실제 apply나 explain 성공으로 기록하지 않았다.
+- 검증: `git diff --check`, `node --test scripts/mongodb/*.test.js` 전체 63개, `./gradlew test --tests '*ExamRead*' --tests '*JwtSecurityIntegrationTest*' --tests '*LegacySecurityIntegrationTest*'` Java 37개가 failures/errors/skipped 0개로 성공했다. Java 운영 코드를 변경하지 않아 전체 `clean test`는 PR 직전 통합 검증으로 남겼다.
+- 계약·외부 작업: History/Retries URL·Method·완료 판정·정렬·Summary fallback, Repository 메서드, DTO, Bearer 인증, 소유권, 문항 단건·Summary API, retryCount, dispatchAttempt, modelAnswer와 MongoDB 문서 구조는 변경하지 않았다. 실제 DB apply·explain, Git commit·push·PR 및 Jira 댓글·필드·상태 변경은 수행하지 않았고 Secret·Token을 기록하지 않았다.
+
+## 2026-08-04 — TMI-61 Summary 인덱스 좁은 재검토
+
+<!-- codex-turn:019fcb26-5bb4-7882-912b-5a8f9acc0f61 -->
+
+- 범위: Jira `TMI-61`의 `ExamSummaryRepository`, `scripts/mongodb/create-exam-read-indexes.js`, `scripts/mongodb/create-exam-read-indexes.test.js`만 검토했다. 결과는 HIGH 없음, MEDIUM 1건이다.
+- MEDIUM finding: `hasIncompatibleOptions`는 unique, sparse, partial, collation만 거부하고 `hidden:true`를 거부하지 않는다. 따라서 정확한 `{examId:1, _id:-1}` 또는 호환되는 긴 prefix 인덱스가 hidden이어도 compatible로 분류되어 생성과 최종 검증을 건너뛴다. MongoDB Query Planner는 hidden 인덱스를 사용하지 않으므로 스크립트 성공 뒤에도 History query가 COLLSCAN과 blocking SORT에 남을 수 있다.
+- 확인 결과: `idx_exam_summaries_exam_id_latest`, Key `{examId:1, _id:-1}`는 Repository의 `examId IN (...)`, `{examId:1, _id:-1}` 정렬과 일치한다. 기본 dry-run, 명시 apply, 동일/다른 이름 idempotency, 확정 이름의 다른 Key 충돌 시 apply 무쓰기와 기존 `exam_sessions`, `question_grading_jobs`, `exam_results` 계획은 유지된다.
+- 검증: `node --test scripts/mongodb/create-exam-read-indexes.test.js` 14개와 `git diff --check`가 성공했다. 별도 Node probe는 `{name:"hidden_summary", key:{examId:1,_id:-1}, hidden:true}`가 오류 없이 compatible로 분류되고 Summary 생성 계획에서 제외되는 것을 재현했다. 실제 MongoDB 연결·apply·explain은 수행하지 않았다.
+- 변경·외부 작업: 리뷰 대상 Repository·스크립트·테스트는 수정하지 않고 종료 규칙에 따라 Codex 기록 문서만 갱신했다. Git commit·push·PR 및 Jira 댓글·필드·상태 변경은 수행하지 않았고 Secret·Token을 기록하지 않았다.
+
+## 2026-08-04 — TMI-61 hidden 인덱스 MEDIUM 수정
+
+<!-- codex-turn:019fcb29-8c09-7d42-929b-a1a59179cfff -->
+
+- 범위·결과: Jira `TMI-61`의 read-index 스크립트에서 hidden 인덱스를 usable compatible index로 오판하던 targeted review MEDIUM 하나만 수정했다. `hasIncompatibleOptions`에 `index.hidden === true` 판정을 추가했다.
+- 다른 이름 hidden 정책: 정확한 `{examId:1, _id:-1}` 또는 `{examId:1, _id:-1, ...}` compatible prefix가 `hidden:true`이면 호환·생성 생략 근거로 사용하지 않고 visible 목표 인덱스를 생성 계획에 남긴다. `hidden:false`와 hidden 필드 누락은 기존 visible 인덱스 정책을 유지한다.
+- 동일 이름 hidden 정책: `idx_exam_summaries_exam_id_latest`와 같은 이름의 hidden 인덱스는 컬렉션 이름, 인덱스 이름, expected/actual Key, `hidden=true`, 자동 drop/unhide 미수행을 포함한 충돌 메시지로 apply 전에 실패한다. 하나라도 오류가 있으면 `applyIndexPlan`은 createIndex를 수행하지 않는다.
+- 무변경 보장: 스크립트에 `dropIndex`나 `collMod` 호출을 추가하지 않았고 기존 인덱스를 자동 수정·unhide·삭제하지 않는다. 기본 dry-run, 명시 apply, visible exact/prefix idempotency, unique/sparse/partial/collation 비호환 정책과 기존 `exam_sessions`, `exam_summaries`, `question_grading_jobs`, `exam_results` 계획은 유지했다.
+- Node 테스트: exact hidden과 prefix hidden 배제·visible 생성 계획, same-name hidden 상세 충돌, createIndex/dropIndex/collMod 0회, `hidden:false`와 hidden 필드 누락 호환, 다른 이름 visible 동일 Key 중복 방지, 기존 네 옵션 충돌과 네 컬렉션 계획 회귀를 추가·유지했다. read-index 19개와 전체 MongoDB 스크립트 68개가 failures 0으로 성공했다.
+- 검증·외부 작업: `git diff --check`가 성공했다. Java 운영 코드·Repository·API 계약을 변경하지 않아 Java 테스트는 재실행하지 않았다. 실제 MongoDB 연결·apply·explain, Git commit·push·PR 및 Jira 댓글·필드·상태 변경은 수행하지 않았고 Secret·Token을 기록하지 않았다.
+
+## 2026-08-04 — TMI-61 hidden 인덱스 수정 후 targeted review
+
+<!-- codex-turn:019fcb2e-34e7-7812-9337-203286aca41a -->
+
+- 범위: `scripts/mongodb/create-exam-read-indexes.js`와 직접 관련된 Node 테스트에서 hidden 호환 판정, 동일 이름 hidden 충돌의 무쓰기 보장, visible 인덱스 idempotency만 재검토했다.
+- 결과: HIGH·MEDIUM finding은 없다. `hidden:true`는 `hasIncompatibleOptions`에서 거부되며 다른 이름의 exact/prefix hidden 인덱스는 생성 생략 근거가 되지 않는다.
+- 동일 이름 hidden 인덱스는 상세 충돌을 계획에 기록하고 `applyIndexPlan`이 오류 존재 시 즉시 빈 결과를 반환한다. `createIndex`, `dropIndex`, `collMod` 호출 없이 실패하며 자동 drop/unhide도 수행하지 않는다.
+- `hidden:false` 또는 hidden 필드가 없는 동일 Key 인덱스와 다른 이름의 visible exact/prefix 인덱스는 기존대로 호환되어 중복 생성되지 않는다.
+- 검증: `node --test scripts/mongodb/create-exam-read-indexes.test.js` 19개가 failures/errors/skipped 0으로 성공했다. 실제 MongoDB 연결·apply·explain은 수행하지 않았다.
+- 변경·외부 작업: 리뷰 대상 코드와 테스트는 수정하지 않았고 필수 Codex 기록 문서만 갱신했다. Git commit·push·PR 및 Jira `TMI-61` 댓글·필드·상태 변경은 수행하지 않았으며 Secret·Token을 기록하지 않았다.

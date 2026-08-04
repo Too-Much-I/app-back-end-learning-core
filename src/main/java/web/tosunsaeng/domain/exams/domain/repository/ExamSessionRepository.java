@@ -10,6 +10,12 @@ import java.util.List;
 
 public interface ExamSessionRepository extends MongoRepository<ExamSession, String> {
 
+    @Query(
+            value = "{ 'userId': ?0, 'completedAt': { '$exists': true, '$ne': null } }",
+            sort = "{ 'completedAt': -1, '_id': -1 }"
+    )
+    List<ExamSession> findCompletedByUserId(String userId);
+
     // Runtime compatibility decides whether a null/missing active candidate is truly in progress.
     @Query(
             value = "{ 'userId': ?0, '$or': ["

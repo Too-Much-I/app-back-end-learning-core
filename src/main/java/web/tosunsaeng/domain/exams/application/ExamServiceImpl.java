@@ -116,13 +116,7 @@ public class ExamServiceImpl implements ExamService {
 
     // 문항 번호를 토대로 토익스피킹 파트(Part) 번호를 계산합니다.
     private Integer getPartNumber(Integer questionNumber) {
-        if (questionNumber == null) return 1;
-        if (questionNumber == 0) return 0;
-        if (questionNumber >= 1 && questionNumber <= 2) return 1;
-        if (questionNumber >= 3 && questionNumber <= 4) return 2;
-        if (questionNumber >= 5 && questionNumber <= 7) return 3;
-        if (questionNumber >= 8 && questionNumber <= 10) return 4;
-        return 5;
+        return GradingKeys.partNumberForQuestion(questionNumber);
     }
 
     // --- 3. 핵심 비즈니스 로직 구현체 ---

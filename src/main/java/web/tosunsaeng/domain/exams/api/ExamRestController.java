@@ -5,6 +5,7 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.web.bind.annotation.*;
+import web.tosunsaeng.domain.exams.application.ExamReadService;
 import web.tosunsaeng.domain.exams.application.ExamService;
 import web.tosunsaeng.domain.exams.dto.ExamRequestDTO;
 import web.tosunsaeng.domain.exams.dto.ExamResponseDTO;
@@ -21,11 +22,34 @@ import java.util.Map;
 public class ExamRestController {
 
     private final ExamService examService;
+    private final ExamReadService examReadService;
 
     @Operation(summary = "모의고사 세션 생성 API", description = "체험 시작 시 새로운 세션을 발급하고 문제를 반환합니다.")
     @PostMapping("")
     public BaseResponse<ExamResponseDTO.CreateSessionResult> createSession() {
         return BaseResponse.onSuccess(SuccessStatus.OK, examService.createExamSession());
+    }
+
+    @Operation(
+            summary = "현재 사용자의 완료 모의고사 이력 조회 API",
+            description = "Bearer 인증 사용자의 completedAt이 기록된 완료 시험만 최신순으로 반환합니다. "
+                    + "종합 결과가 없는 완료 시험도 포함하며, 이력이 없으면 200과 빈 histories 배열을 반환합니다."
+    )
+    @GetMapping("/history")
+    public BaseResponse<ExamResponseDTO.ExamHistoryResult> getExamHistory() {
+        return BaseResponse.onSuccess(SuccessStatus.OK, examReadService.getExamHistory());
+    }
+
+    @Operation(
+            summary = "시험의 재답변 문항 및 회차 조회 API",
+            description = "Bearer 인증 사용자 소유 시험에서 retryCount 1 이상이 실제로 존재하는 문항만 반환하고, "
+                    + "저장된 최초 회차도 비교를 위해 함께 제공합니다. 상세 피드백은 기존 문항 단건 API로 조회하며, "
+                    + "재답변 문항이 없으면 200과 빈 questions 배열을 반환합니다."
+    )
+    @GetMapping("/{examId}/retries")
+    public BaseResponse<ExamResponseDTO.ExamRetriesResult> getExamRetries(
+            @PathVariable("examId") String examId) {
+        return BaseResponse.onSuccess(SuccessStatus.OK, examReadService.getExamRetries(examId));
     }
 
     @Operation(
