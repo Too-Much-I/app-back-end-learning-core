@@ -328,7 +328,8 @@ public class ExamConverter {
             ExamResult targetDoc,
             AzureResult matchingAzure,
             String downloadUrl,
-            Integer calculatedPartNumber
+            Integer calculatedPartNumber,
+            ExamResponseDTO.ModelAnswerResponse modelAnswer
     ) {
         ExamResponseDTO.QuestionDTO questionInfoDto = ExamConverter.toQuestionDTO(rawQuestion);
 
@@ -360,6 +361,7 @@ public class ExamConverter {
 
                 .spokenWordSequence(targetDoc != null ? toSpokenWordDTOList(targetDoc.getSpokenWordSequence()) : null)
                 .azureFeedback(matchingAzure != null ? toAzureFeedbackDTO(matchingAzure) : null)
+                .modelAnswer(modelAnswer)
                 .build();
 
         return ExamResponseDTO.QuestionResult.builder()

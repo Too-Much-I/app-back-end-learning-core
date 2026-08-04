@@ -23,6 +23,8 @@ import java.util.Map;
 public class GradingDispatchService {
 
     static final String IDEMPOTENCY_KEY_HEADER = "Idempotency-Key";
+    static final String CLIENT_SOURCE_FIELD = "client_source";
+    static final String APP_CLIENT_SOURCE = "app";
     private static final String AI_SERVER_URL = "http://ai-server:8000/evaluations";
 
     private final S3Presigner s3Presigner;
@@ -53,6 +55,7 @@ public class GradingDispatchService {
         body.add("part_number", partNumber(claim.questionNumber()));
         body.add("question_number", claim.questionNumber());
         body.add("retry_count", claim.retryCount());
+        body.add(CLIENT_SOURCE_FIELD, APP_CLIENT_SOURCE);
         body.add("audio_file", audioResource);
 
         HttpHeaders headers = new HttpHeaders();

@@ -4,6 +4,7 @@ import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.databind.PropertyNamingStrategies;
 import com.fasterxml.jackson.databind.annotation.JsonNaming;
+import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.*;
 import web.tosunsaeng.domain.exams.domain.entity.Question;
 import web.tosunsaeng.domain.exams.domain.enums.ExamStatus;
@@ -103,7 +104,19 @@ public class ExamResponseDTO {
         private ItemFeedbackDTO feedback;
         private AzureFeedbackDTO azureFeedback;
         private List<SpokenWordDTO> spokenWordSequence;
+        @Schema(description = "Part 1의 Question 1·2에서만 제공되는 모범답안 음성 정보")
+        private ModelAnswerResponse modelAnswer;
         private QuestionDTO questionInfo;
+    }
+
+    @Schema(description = "Part 1의 Question 1·2에서만 제공되는 모범답안 음성 정보")
+    @Builder @Getter @NoArgsConstructor @AllArgsConstructor
+    public static class ModelAnswerResponse {
+        @Schema(description = "모범답안 음성의 임시 Presigned GET URL")
+        private String audioUrl;
+
+        @Schema(description = "모범답안 음성의 단어별 타이밍 및 발음 점수")
+        private List<SpokenWordDTO> spokenWordSequence;
     }
 
     @Builder @Getter @NoArgsConstructor @AllArgsConstructor
