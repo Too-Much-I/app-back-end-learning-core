@@ -84,6 +84,7 @@ class GradingDispatchServiceTest {
                 () -> assertEquals(2, body.getFirst("part_number")),
                 () -> assertEquals(4, body.getFirst("question_number")),
                 () -> assertEquals(2, body.getFirst("retry_count")),
+                () -> assertEquals("app", body.getFirst("client_source")),
                 () -> assertInstanceOf(ByteArrayResource.class, body.getFirst("audio_file")),
                 () -> assertEquals(
                         "question:" + EXAM_ID + ":4:2",
@@ -112,6 +113,7 @@ class GradingDispatchServiceTest {
                 () -> assertEquals(0, body.get("question_number")),
                 () -> assertEquals(0, body.get("part_number")),
                 () -> assertNull(body.get("retry_count")),
+                () -> assertNull(body.get("client_source")),
                 () -> assertEquals(
                         "summary:" + EXAM_ID + ":v1",
                         requestCaptor.getValue().getHeaders().getFirst("Idempotency-Key")

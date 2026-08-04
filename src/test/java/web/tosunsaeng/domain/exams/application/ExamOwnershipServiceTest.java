@@ -60,6 +60,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
@@ -103,6 +104,9 @@ class ExamOwnershipServiceTest {
     private MockExamCatalogService mockExamCatalogService;
 
     @Mock
+    private ModelAnswerCatalogService modelAnswerCatalogService;
+
+    @Mock
     private SpeechAceResultRepository speechAceResultRepository;
 
     @Mock
@@ -131,6 +135,7 @@ class ExamOwnershipServiceTest {
                 examSummaryRepository,
                 examSessionRepository,
                 mockExamCatalogService,
+                modelAnswerCatalogService,
                 speechAceResultRepository,
                 azureResultRepository,
                 currentUserProvider
@@ -183,6 +188,83 @@ class ExamOwnershipServiceTest {
                 () -> assertEquals(60, result.getProgressPercent())
         );
         verify(gradingService).calculateAndCacheOverallStatus(EXAM_ID);
+    }
+
+    @Test
+    void ownerCanReadPartSpecificPromptFromSessionAssignedMockExam() throws Exception {
+        ExamSession selectedSession = ExamSession.builder()
+                .examId(EXAM_ID)
+                .userId(OWNER_USER_ID)
+                .mockExamId("mock_exam_002")
+                .active(true)
+                .build();
+        Question question = Question.builder()
+                .partNumber(3)
+                .questionNumber(5)
+                .question("Answer the following questions.")
+                .partIntroText("Respond to questions 5 through 7.")
+                .imageUrl("question-image-placeholder")
+                .prepTimeSec(3)
+                .speakTimeSec(15)
+                .build();
+        MockExam selectedPaper = MockExam.builder()
+                .mockExamId("mock_exam_002")
+                .questions(List.of(question))
+                .build();
+
+        when(examSessionRepository.findById(EXAM_ID)).thenReturn(Optional.of(selectedSession));
+        when(currentUserProvider.getCurrentUserId()).thenReturn(OWNER_USER_ID);
+        when(mockExamCatalogService.getRequiredExam("mock_exam_002")).thenReturn(selectedPaper);
+        when(s3Presigner.presignGetObject(any(GetObjectPresignRequest.class)))
+                .thenReturn(presignedGetObjectRequest);
+        when(presignedGetObjectRequest.url()).thenReturn(
+                URI.create("https://example.com/question-audio").toURL(),
+                URI.create("https://example.com/guide-audio").toURL()
+        );
+
+        ExamResponseDTO.QuestionDTO result = examService.getQuestionPrompt(EXAM_ID, 5);
+
+        assertAll(
+                () -> assertEquals(3, result.getPart()),
+                () -> assertEquals(5, result.getQuestionNumber()),
+                () -> assertEquals("Answer the following questions.", result.getText()),
+                () -> assertEquals("Respond to questions 5 through 7.", result.getPartIntroText()),
+                () -> assertEquals("question-image-placeholder", result.getImageUrl()),
+                () -> assertEquals(3, result.getPrepTimeSec()),
+                () -> assertEquals(15, result.getSpeakTimeSec()),
+                () -> assertEquals("https://example.com/question-audio", result.getAudioUrl()),
+                () -> assertEquals("https://example.com/guide-audio", result.getGuideAudioUrl())
+        );
+
+        ArgumentCaptor<GetObjectPresignRequest> requestCaptor =
+                ArgumentCaptor.forClass(GetObjectPresignRequest.class);
+        verify(s3Presigner, times(2)).presignGetObject(requestCaptor.capture());
+        assertEquals(
+                List.of(
+                        "questions/mock_exam_002/q_5.wav",
+                        "questions/mock_exam_002/part3_intro.wav"
+                ),
+                requestCaptor.getAllValues().stream()
+                        .map(request -> request.getObjectRequest().key())
+                        .toList()
+        );
+        verify(mockExamCatalogService).getRequiredExam("mock_exam_002");
+        verify(mockExamCatalogService, never()).getRequiredExam("mock_exam_003");
+    }
+
+    @Test
+    void missingPromptQuestionFailsBeforeCreatingPresignedUrls() {
+        stubOwnedSession();
+        when(mockExamCatalogService.getRequiredExam("mock_exam_003")).thenReturn(mockExam());
+
+        ExamsException exception = assertThrows(
+                ExamsException.class,
+                () -> examService.getQuestionPrompt(EXAM_ID, 2)
+        );
+
+        assertSame(ErrorStatus._QUESTION_NOT_FOUND, exception.getCode());
+        verify(mockExamCatalogService).getRequiredExam("mock_exam_003");
+        verifyNoInteractions(s3Presigner);
     }
 
     @Test
@@ -344,10 +426,6 @@ class ExamOwnershipServiceTest {
                 .build();
         when(mockExamCatalogService.getRequiredExam("mock_exam_002"))
                 .thenReturn(selectedPaper);
-        when(s3Presigner.presignGetObject(any(GetObjectPresignRequest.class)))
-                .thenReturn(presignedGetObjectRequest);
-        when(presignedGetObjectRequest.url())
-                .thenReturn(URI.create("https://example.com/submitted-audio.wav").toURL());
 
         ExamResponseDTO.QuestionResult result = examService.getExamQuestion(EXAM_ID, 1, 0);
 
@@ -568,6 +646,7 @@ class ExamOwnershipServiceTest {
                 azureResultRepository,
                 speechAceResultRepository,
                 mockExamCatalogService,
+                modelAnswerCatalogService,
                 gradingService
         );
     }
@@ -594,6 +673,7 @@ class ExamOwnershipServiceTest {
                 azureResultRepository,
                 speechAceResultRepository,
                 mockExamCatalogService,
+                modelAnswerCatalogService,
                 gradingService
         );
     }
@@ -729,10 +809,6 @@ class ExamOwnershipServiceTest {
         )).thenReturn(Optional.empty());
         when(mockExamCatalogService.getRequiredExam("mock_exam_003"))
                 .thenReturn(mockExam());
-        when(s3Presigner.presignGetObject(any(GetObjectPresignRequest.class)))
-                .thenReturn(presignedGetObjectRequest);
-        when(presignedGetObjectRequest.url())
-                .thenReturn(URI.create("https://example.com/submitted-audio.wav").toURL());
     }
 
     private AzureResult legacyAzure(String id, Integer retryCount, int omissionCount) {
@@ -813,6 +889,7 @@ class ExamOwnershipServiceTest {
             case SUBMIT_AUDIO -> examService.submitAudio(EXAM_ID, 1, 0);
             case RETRY_GRADING -> examService.retryGrading(EXAM_ID);
             case EXAM_STATUS -> examService.getExamStatus(EXAM_ID);
+            case QUESTION_PROMPT -> examService.getQuestionPrompt(EXAM_ID, 1);
             case EXAM_SUMMARY -> examService.getExamSummary(EXAM_ID);
             case QUESTION_RESULT -> examService.getExamQuestion(EXAM_ID, 1, 0);
             case QUESTION_STATUS -> examService.getQuestionProcessingStatus(EXAM_ID, 1, 0);
@@ -824,6 +901,7 @@ class ExamOwnershipServiceTest {
         SUBMIT_AUDIO,
         RETRY_GRADING,
         EXAM_STATUS,
+        QUESTION_PROMPT,
         EXAM_SUMMARY,
         QUESTION_RESULT,
         QUESTION_STATUS
