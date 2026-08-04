@@ -18,6 +18,7 @@ import web.tosunsaeng.domain.exams.domain.repository.SpeechAceResultRepository;
 import web.tosunsaeng.domain.exams.dto.ExamRequestDTO;
 import web.tosunsaeng.domain.exams.dto.ExamResponseDTO;
 import web.tosunsaeng.domain.exams.exception.ExamsException;
+import web.tosunsaeng.domain.notifications.application.ExamCompletionNotificationService;
 import web.tosunsaeng.global.auth.CurrentUserProvider;
 import web.tosunsaeng.global.error.code.status.ErrorStatus;
 
@@ -50,6 +51,7 @@ public class ExamServiceImpl implements ExamService {
     private final SpeechAceResultRepository speechAceResultRepository;
     private final AzureResultRepository azureResultRepository;
     private final CurrentUserProvider currentUserProvider;
+    private final ExamCompletionNotificationService completionNotificationService;
 
     @Value("${spring.cloud.aws.s3.bucket}")
     private String bucketName;
@@ -229,26 +231,8 @@ public class ExamServiceImpl implements ExamService {
 
         // 종합 결과도 결정적 ID와 legacy 논리 결과 확인으로 멱등 저장합니다.
         if (req.getTotalScore() != null) {
-            String resultId = GradingKeys.summaryJobId(examId);
-            boolean alreadyStored = examSummaryRepository.existsById(resultId)
-                    || examSummaryRepository.existsByExamId(examId)
-                    || examResultRepository.findFirstByExamIdAndTotalScoreIsNotNullOrderByIdDesc(examId).isPresent();
-            if (!alreadyStored) {
-                try {
-                    ExamSummary summary = ExamConverter.toExamSummary(
-                            req,
-                            examSession.getUserId(),
-                            resultId,
-                            mockExamId
-                    );
-                    examSummaryRepository.insert(summary);
-                    log.info("AI 종합 피드백 영구 데이터 적재 완료: examId={}", examId);
-                } catch (DuplicateKeyException duplicateCallback) {
-                    log.info("중복 AI 종합 피드백 Callback 멱등 처리: examId={}", examId);
-                }
-            }
-            examSessionManager.completeIfIncomplete(examId);
-            gradingService.completeSummary(examId);
+            completionNotificationService.completeSummaryCallback(req, examSession, mockExamId);
+            log.info("AI 종합 피드백 완료 상태 반영: examId={}", examId);
             gradingService.calculateAndCacheOverallStatus(examId);
             return;
         }
@@ -278,6 +262,7 @@ public class ExamServiceImpl implements ExamService {
 
         gradingService.completeQuestion(examId, req.getQuestionNumber(), retryCount);
         gradingService.ensureSummaryStartedIfReady(examId);
+        completionNotificationService.reconcileAfterQuestionCompletion(examId);
     }
 
     // 특정 시험 세션의 AI 총합 진단 레코드와 파트별 획득 점수의 누적 가산 합산 값을 연산하여 성적표 리포트를 반환합니다.

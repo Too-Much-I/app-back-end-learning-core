@@ -16,6 +16,9 @@ spring:
         bucket: test-learning-core-bucket
 
 app:
+  notification:
+    push:
+      enabled: false
   auth:
     mode: legacy
     legacy-user-id: 00000000-0000-0000-0000-000000000001

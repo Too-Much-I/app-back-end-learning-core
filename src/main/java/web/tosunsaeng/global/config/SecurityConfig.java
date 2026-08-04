@@ -29,6 +29,8 @@ import java.util.List;
 @Import(AuthConfiguration.class)
 public class SecurityConfig {
 
+    private static final String NOTIFICATION_DEVICE_ENDPOINTS = "/api/v1/notifications/devices/**";
+
     private static final String[] PUBLIC_ENDPOINTS = {
             "/api/v1/exams/callback/**",
             "/swagger-ui/**",
@@ -45,9 +47,16 @@ public class SecurityConfig {
     @ConditionalOnProperty(prefix = "app.auth", name = "mode", havingValue = "legacy", matchIfMissing = true)
     public SecurityFilterChain legacySecurityFilterChain(
             HttpSecurity http,
-            AuthStartupValidator authStartupValidator) throws Exception {
+            AuthStartupValidator authStartupValidator,
+            SecurityErrorResponseHandler errorHandler) throws Exception {
         configureCommonSecurity(http);
-        http.authorizeHttpRequests(auth -> auth.anyRequest().permitAll());
+        http
+                .authorizeHttpRequests(auth -> auth
+                        .requestMatchers(NOTIFICATION_DEVICE_ENDPOINTS).authenticated()
+                        .anyRequest().permitAll())
+                .exceptionHandling(exceptions -> exceptions
+                        .authenticationEntryPoint(errorHandler)
+                        .accessDeniedHandler(errorHandler));
         return http.build();
     }
 
@@ -61,6 +70,7 @@ public class SecurityConfig {
         http
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers(PUBLIC_ENDPOINTS).permitAll()
+                        .requestMatchers(NOTIFICATION_DEVICE_ENDPOINTS).authenticated()
                         .anyRequest().authenticated())
                 .exceptionHandling(exceptions -> exceptions
                         .authenticationEntryPoint(errorHandler)

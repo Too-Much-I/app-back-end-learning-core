@@ -28,6 +28,7 @@ import web.tosunsaeng.domain.exams.domain.repository.ExamSummaryRepository;
 import web.tosunsaeng.domain.exams.domain.repository.SpeechAceResultRepository;
 import web.tosunsaeng.domain.exams.dto.ExamResponseDTO;
 import web.tosunsaeng.global.auth.CurrentUserProvider;
+import web.tosunsaeng.domain.notifications.application.ExamCompletionNotificationService;
 
 import java.net.URI;
 import java.time.LocalDateTime;
@@ -95,6 +96,9 @@ class ExamServiceImplTest {
 
     @Mock
     private ExamSessionManager examSessionManager;
+
+    @Mock
+    private ExamCompletionNotificationService completionNotificationService;
 
     @InjectMocks
     private ExamServiceImpl examService;

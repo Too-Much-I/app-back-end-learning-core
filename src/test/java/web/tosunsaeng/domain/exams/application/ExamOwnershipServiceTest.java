@@ -38,6 +38,7 @@ import web.tosunsaeng.domain.exams.dto.ExamRequestDTO;
 import web.tosunsaeng.domain.exams.dto.ExamResponseDTO;
 import web.tosunsaeng.domain.exams.exception.ExamsException;
 import web.tosunsaeng.global.auth.CurrentUserProvider;
+import web.tosunsaeng.domain.notifications.application.ExamCompletionNotificationService;
 import web.tosunsaeng.global.error.code.status.ErrorStatus;
 
 import java.net.URI;
@@ -121,6 +122,9 @@ class ExamOwnershipServiceTest {
     @Mock
     private ExamSessionManager examSessionManager;
 
+    @Mock
+    private ExamCompletionNotificationService completionNotificationService;
+
     private final ObjectMapper objectMapper = new ObjectMapper();
     private ExamServiceImpl examService;
 
@@ -138,7 +142,8 @@ class ExamOwnershipServiceTest {
                 modelAnswerCatalogService,
                 speechAceResultRepository,
                 azureResultRepository,
-                currentUserProvider
+                currentUserProvider,
+                completionNotificationService
         );
         ReflectionTestUtils.setField(examService, "bucketName", "test-learning-core-bucket");
     }

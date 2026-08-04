@@ -27,9 +27,13 @@ import web.tosunsaeng.domain.exams.domain.repository.SummaryGradingJobRepository
 import web.tosunsaeng.domain.exams.dto.ExamResponseDTO;
 import web.tosunsaeng.domain.exams.domain.enums.ExamStatus;
 import web.tosunsaeng.domain.exams.domain.enums.SummaryAction;
+import web.tosunsaeng.domain.notifications.domain.repository.NotificationDeliveryRepository;
+import web.tosunsaeng.domain.notifications.domain.repository.NotificationDeviceRepository;
+import web.tosunsaeng.domain.notifications.domain.repository.NotificationOutboxRepository;
 import web.tosunsaeng.global.auth.CurrentUserProvider;
 import web.tosunsaeng.global.auth.JwtCurrentUserProvider;
 import web.tosunsaeng.global.auth.LegacyCurrentUserProvider;
+import web.tosunsaeng.global.config.security.SecurityErrorResponseHandler;
 
 import java.util.List;
 import java.util.Set;
@@ -45,7 +49,11 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 @ActiveProfiles("test")
 @WebMvcTest(ExamRestController.class)
-@Import({SecurityConfig.class, LegacyCurrentUserProvider.class})
+@Import({
+        SecurityConfig.class,
+        SecurityErrorResponseHandler.class,
+        LegacyCurrentUserProvider.class
+})
 class LegacySecurityIntegrationTest {
 
     private static final String LEGACY_USER_ID = "00000000-0000-0000-0000-000000000001";
@@ -94,6 +102,15 @@ class LegacySecurityIntegrationTest {
 
     @MockitoBean
     private SummaryGradingJobRepository summaryGradingJobRepository;
+
+    @MockitoBean
+    private NotificationDeviceRepository notificationDeviceRepository;
+
+    @MockitoBean
+    private NotificationOutboxRepository notificationOutboxRepository;
+
+    @MockitoBean
+    private NotificationDeliveryRepository notificationDeliveryRepository;
 
     @BeforeEach
     void setUp() {

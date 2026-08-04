@@ -23,6 +23,53 @@ const INDEX_SPECS = [
         collection: "exam_results",
         name: "idx_exam_results_exam_question_retry",
         key: {examId: 1, questionNumber: 1, retryCount: 1}
+    },
+    {
+        collection: "notification_devices",
+        name: "uniq_notification_devices_user_installation",
+        key: {userId: 1, installationIdHash: 1},
+        options: {unique: true}
+    },
+    {
+        collection: "notification_devices",
+        name: "uniq_notification_devices_enabled_expo_token",
+        key: {expoPushTokenHash: 1},
+        options: {
+            unique: true,
+            partialFilterExpression: {enabled: true}
+        }
+    },
+    {
+        collection: "notification_devices",
+        name: "idx_notification_devices_user_enabled",
+        key: {userId: 1, enabled: 1}
+    },
+    {
+        collection: "notification_outbox",
+        name: "uniq_notification_outbox_event_key",
+        key: {eventKey: 1},
+        options: {unique: true}
+    },
+    {
+        collection: "notification_outbox",
+        name: "idx_notification_outbox_claim",
+        key: {status: 1, nextAttemptAt: 1, leaseUntil: 1}
+    },
+    {
+        collection: "notification_deliveries",
+        name: "uniq_notification_deliveries_notification_device",
+        key: {notificationId: 1, deviceId: 1},
+        options: {unique: true}
+    },
+    {
+        collection: "notification_deliveries",
+        name: "idx_notification_deliveries_claim",
+        key: {status: 1, nextAttemptAt: 1, leaseUntil: 1}
+    },
+    {
+        collection: "notification_deliveries",
+        name: "idx_notification_deliveries_receipt",
+        key: {status: 1, ticketReceivedAt: 1}
     }
 ];
 
@@ -78,10 +125,25 @@ function orderedKeyHasPrefix(candidate, requiredPrefix) {
             field === candidateEntries[index][0] && direction === candidateEntries[index][1]);
 }
 
-function hasIncompatibleOptions(index) {
-    return index.unique === true
+function documentEquals(left, right) {
+    if (left === undefined || right === undefined) {
+        return left === right;
+    }
+    if (left === null || right === null || typeof left !== "object" || typeof right !== "object") {
+        return left === right;
+    }
+    const leftEntries = Object.entries(left);
+    const rightEntries = Object.entries(right);
+    return leftEntries.length === rightEntries.length
+        && leftEntries.every(([key, value], index) =>
+            key === rightEntries[index][0] && documentEquals(value, rightEntries[index][1]));
+}
+
+function hasIncompatibleOptions(index, spec) {
+    const expected = spec.options ?? {};
+    return (index.unique === true) !== (expected.unique === true)
         || index.sparse === true
-        || index.partialFilterExpression !== undefined
+        || !documentEquals(index.partialFilterExpression, expected.partialFilterExpression)
         || index.collation !== undefined
         || index.hidden === true;
 }
@@ -106,24 +168,20 @@ function inspectIndexes(indexesByCollection) {
             orderedKeyEquals(index.key, spec.key)
             || (spec.collection === "exam_summaries"
                 && orderedKeyHasPrefix(index.key, spec.key)));
-        const compatibleKey = keyCandidates.find(index => !hasIncompatibleOptions(index));
+        const compatibleKey = keyCandidates.find(index => !hasIncompatibleOptions(index, spec));
         const incompatibleVisibleKey = keyCandidates.find(index =>
-            index.hidden !== true && hasIncompatibleOptions(index));
+            index.hidden !== true && hasIncompatibleOptions(index, spec));
 
         if (sameName && sameName.hidden === true) {
             errors.push(hiddenIndexConflictMessage(spec, sameName));
             continue;
         }
         if (sameName && (!orderedKeyEquals(sameName.key, spec.key)
-                || hasIncompatibleOptions(sameName))) {
+                || hasIncompatibleOptions(sameName, spec))) {
             errors.push(`${spec.collection}.${spec.name} exists with an incompatible definition`);
             continue;
         }
         if (compatibleKey) {
-            if (hasIncompatibleOptions(compatibleKey)) {
-                errors.push(`${spec.collection} has the required key with incompatible options`);
-                continue;
-            }
             compatibleIndexes.push({
                 collection: spec.collection,
                 requiredName: spec.name,
@@ -153,9 +211,9 @@ function currentIndexes(collection) {
 }
 
 function readIndexes(database) {
-    return Object.fromEntries(INDEX_SPECS.map(spec => [
-        spec.collection,
-        currentIndexes(database.getCollection(spec.collection))
+    return Object.fromEntries([...new Set(INDEX_SPECS.map(spec => spec.collection))].map(collection => [
+        collection,
+        currentIndexes(database.getCollection(collection))
     ]));
 }
 
@@ -170,7 +228,7 @@ function output(line) {
 function printPlan(databaseName, applyChanges, inspection) {
     output(`Exam read index mode: ${applyChanges ? "APPLY" : "DRY-RUN"}`);
     output(`Target database: ${databaseName}`);
-    output(`Target collections: ${INDEX_SPECS.map(spec => spec.collection).join(", ")}`);
+    output(`Target collections: ${[...new Set(INDEX_SPECS.map(spec => spec.collection))].join(", ")}`);
     output(`Compatible existing indexes: ${inspection.compatibleIndexes.length}`);
     output(`Indexes to create: ${inspection.indexesToCreate.length}`);
     for (const spec of inspection.indexesToCreate) {
@@ -186,7 +244,10 @@ function applyIndexPlan(database, inspection, applyChanges) {
         return [];
     }
     return inspection.indexesToCreate.map(spec => {
-        database.getCollection(spec.collection).createIndex(spec.key, {name: spec.name});
+        database.getCollection(spec.collection).createIndex(
+            spec.key,
+            {name: spec.name, ...(spec.options ?? {})}
+        );
         return spec.name;
     });
 }
@@ -258,6 +319,7 @@ if (mongoshPayload) {
     module.exports = {
         INDEX_SPECS,
         applyIndexPlan,
+        documentEquals,
         inspectIndexes,
         orderedKeyEquals,
         orderedKeyHasPrefix,

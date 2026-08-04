@@ -24,6 +24,24 @@ spring:
       max-request-size: 10MB
 
 app:
+  notification:
+    push:
+      enabled: ${PUSH_NOTIFICATIONS_ENABLED:false}
+      provider: ${PUSH_PROVIDER:expo}
+      expo:
+        send-url: ${EXPO_PUSH_SEND_URL:https://exp.host/--/api/v2/push/send}
+        receipt-url: ${EXPO_PUSH_RECEIPT_URL:https://exp.host/--/api/v2/push/getReceipts}
+        access-token: ${EXPO_PUSH_ACCESS_TOKEN:}
+        access-token-required: ${EXPO_PUSH_ACCESS_TOKEN_REQUIRED:false}
+      worker-delay: ${PUSH_WORKER_DELAY_MS:5000}
+      receipt-delay: ${PUSH_RECEIPT_DELAY_SECONDS:900}s
+      lease-duration: ${PUSH_LEASE_DURATION_SECONDS:120}s
+      max-attempts: ${PUSH_MAX_ATTEMPTS:5}
+      initial-backoff: ${PUSH_INITIAL_BACKOFF_SECONDS:30}s
+      max-backoff: ${PUSH_MAX_BACKOFF_SECONDS:1800}s
+      batch-size: ${PUSH_BATCH_SIZE:100}
+      connect-timeout: ${PUSH_CONNECT_TIMEOUT:PT3S}
+      read-timeout: ${PUSH_READ_TIMEOUT:PT10S}
   grading:
     pending-timeout: ${GRADING_PENDING_TIMEOUT:PT1M}
     processing-timeout: ${GRADING_PROCESSING_TIMEOUT:PT3M}

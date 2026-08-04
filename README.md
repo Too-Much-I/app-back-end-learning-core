@@ -108,6 +108,122 @@ History가 없으면 `histories: []`, 재답변 문항이 없으면 `questions: 
 `GET /api/v1/exams/{examId}/questions?questionNumber={questionNumber}&retryCount={retryCount}`로
 조회한다. `dispatchAttempt`는 AI 재전송 횟수이며 사용자 답변 회차인 `retryCount`로 사용하지 않는다.
 
+## 채점 완료 Expo Push 알림
+
+TMI-63은 Expo 앱이 발급한 `ExpoPushToken`을 Learning Core에 등록하고, 시험 전체 채점 완료
+후 Expo Push Service로 결과 확인 알림을 발송한다. Learning Core는 FCM이나 APNs를 직접
+호출하지 않는다.
+
+```text
+Expo 앱 → ExpoPushToken 발급 → Device API 등록
+→ Learning Core Outbox/Delivery Worker → Expo Push API → FCM/APNs → 앱
+```
+
+신규 Device API는 JWT Bearer 인증이 필수이고 사용자 ID는 Access Token의 UUID `sub`에서만
+가져온다. Guest Access Token도 같은 방식으로 동작한다. 기존 시험 API의 로컬 Legacy 호환은
+유지하지만, 신규 Device 경로는 Legacy 무인증 요청을 허용하지 않는다.
+
+```http
+PUT /api/v1/notifications/devices
+Authorization: Bearer {accessToken}
+Content-Type: application/json
+```
+
+```json
+{
+  "installationId": "550e8400-e29b-41d4-a716-446655440000",
+  "platform": "IOS",
+  "expoPushToken": "ExponentPushToken[placeholder]"
+}
+```
+
+`platform`은 `IOS` 또는 `ANDROID`다. `installationId`는 UUIDv4만 허용하며 canonical lowercase
+UUID를 SHA-256 Base64URL(no padding) Hash로 변환해 저장한다. 원본 installationId와 userId를
+Body에서 받지 않는다. 같은 사용자는 앱 설치 동안 같은 installationId를 계속 사용하고,
+ExpoPushToken 또는 플랫폼이 변경되면 PUT을 다시 호출한다. 비활성 Device의 재등록은 다시
+활성화한다.
+
+```http
+DELETE /api/v1/notifications/devices/{installationId}
+Authorization: Bearer {accessToken}
+```
+
+DELETE는 사용자 소유 Device만 `enabled=false`와 `disabledAt`으로 Soft Delete하며 반복 호출도
+멱등적으로 성공한다. Device 응답에는 ExpoPushToken, Token Hash, installationId Hash, userId를
+반환하지 않는다.
+
+ExpoPushToken 원문은 발송을 위해 전용 `notification_devices` 컬렉션에만 저장한다. 별도
+application-level 암호화 기능은 현재 저장소에 없으므로 MongoDB Atlas encryption at rest를
+전제로 하며 API 응답, 애플리케이션 로그, 예외 메시지, Outbox 및 Delivery에는 복사하지 않는다.
+
+알림 Outbox는 다음 네 완료 증거가 모두 존재할 때 Summary 완료 MongoDB Transaction 안에서
+생성한다.
+
+1. 배정된 모든 필수 문항의 최초 응시 채점 완료
+2. `ExamSummary` 저장 완료
+3. `ExamSession.completedAt` 설정 완료
+4. `SummaryGradingJob` 상태 `COMPLETED`
+
+Event Key는 `EXAM_GRADING_COMPLETED:{examId}`이고 unique index로 시험당 한 번만 생성한다.
+Summary 저장, Session 완료, Summary Job 완료, Outbox 저장은 전용 Mongo
+`TransactionOperations`에서 함께 실행한다. 이 경로를 배포하는 MongoDB는 Transaction을
+지원하는 Atlas 또는 replica set이어야 한다. Expo HTTP 요청은 Transaction 밖의 Scheduler에서만
+실행하며 Provider 실패가 시험 결과나 완료 상태를 되돌리지 않는다.
+
+Outbox와 Device별 Delivery는 `findAndModify`로 Lease와 `attemptCount`를 한 번에 갱신해 여러
+ECS Task가 원자적으로 Claim한다. Worker가 종료되면 만료된 Lease를 다음 Task가 회수한다.
+동일 `(notificationId, deviceId)` Delivery는 unique다. Ticket `status=ok`는
+`TICKET_RECEIVED`이며 최종 성공이 아니다. 설정된 지연 후 Receipt `status=ok`를 확인해야
+`SENT`가 된다. `DeviceNotRegistered`는 발송 당시 Token Hash가 현재 Hash와 일치할 때만 Device를
+비활성화한다. 429, 5xx, timeout, `MessageRateExceeded`는 exponential backoff 후 재시도하고,
+영구 오류 또는 최대 시도 초과는 정규화된 내부 오류 코드로 종료한다. Provider 응답 원문은 DB에
+저장하지 않는다.
+
+채점 완료 Payload는 다음 라우팅 정보만 포함한다.
+
+```json
+{
+  "to": "ExponentPushToken[placeholder]",
+  "sound": "default",
+  "channelId": "grading",
+  "title": "채점이 완료됐어요",
+  "body": "모의고사 결과와 피드백을 확인해 보세요.",
+  "data": {
+    "type": "EXAM_GRADING_COMPLETED",
+    "notificationId": "notification-id",
+    "examId": "exam-id",
+    "deepLink": "/exams/exam-id/summary"
+  }
+}
+```
+
+프론트는 알림 클릭 시 `examId`로 Summary 화면을 열고 `notificationId`로 중복 처리를 방지한다.
+Expo Access Token은 백엔드 전용 설정이며 프론트에 전달하지 않는다. Android 원격 Push는 Expo
+Go가 아니라 Development Build에서 검증해야 한다.
+
+기본 설정은 외부 네트워크를 사용하지 않는다.
+
+```text
+PUSH_NOTIFICATIONS_ENABLED=false
+```
+
+활성화할 때 사용하는 환경설정은 다음과 같다. 실제 Access Token은 Secret 저장소에서 주입하고
+Git, 문서, 로그에 값을 남기지 않는다.
+
+- `PUSH_NOTIFICATIONS_ENABLED`
+- `PUSH_PROVIDER` (`expo`)
+- `EXPO_PUSH_SEND_URL`, `EXPO_PUSH_RECEIPT_URL`
+- `EXPO_PUSH_ACCESS_TOKEN`, `EXPO_PUSH_ACCESS_TOKEN_REQUIRED`
+- `PUSH_WORKER_DELAY_MS`, `PUSH_RECEIPT_DELAY_SECONDS`
+- `PUSH_LEASE_DURATION_SECONDS`, `PUSH_MAX_ATTEMPTS`
+- `PUSH_INITIAL_BACKOFF_SECONDS`, `PUSH_MAX_BACKOFF_SECONDS`
+- `PUSH_BATCH_SIZE` (최대 100)
+- `PUSH_CONNECT_TIMEOUT`, `PUSH_READ_TIMEOUT`
+
+Push 비활성화 시 Disabled Adapter가 등록되고 Expo HTTP Client와 Worker는 기동하지 않는다.
+`/actuator/health`는 Expo API를 호출하지 않으며 Expo Access Token 없이도 local/test Context가
+기동해야 한다.
+
 ## AWS S3 인증
 
 Learning Core는 AWS SDK v2의 `DefaultCredentialsProvider`를 사용한다. 프로젝트 전용 `AWS_ACCESS_KEY`, `AWS_SECRET_KEY` 설정은 사용하지 않으며, Region과 Bucket의 기존 설정 계약인 `AWS_REGION`, `AWS_S3_BUCKET_NAME`은 유지한다. `S3Client`와 `S3Presigner`는 같은 Default Credentials Provider Chain을 사용한다.

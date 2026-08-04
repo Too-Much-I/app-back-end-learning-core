@@ -1,9 +1,9 @@
 # MongoDB maintenance scripts
 
-## Completed-history and retry-attempt read indexes
+## Exam read and notification worker indexes
 
 `create-exam-read-indexes.js` validates and optionally creates the compound indexes used by the
-completed exam history and retry-attempt APIs. The application does not create these indexes at
+completed exam history, retry-attempt APIs, and TMI-63 notification workers. The application does not create these indexes at
 startup. The script is idempotent: an existing compatible index with the same ordered key is
 accepted when its name differs. For `exam_summaries`, a differently named longer index is also
 accepted when its leading ordered key is `{ examId: 1, _id: -1 }`. The required name with a
@@ -48,6 +48,29 @@ The script creates and verifies these indexes:
     정렬할 때 사용한다.
 - `question_grading_jobs`: `{ examId: 1, questionNumber: 1, retryCount: 1 }`
 - `exam_results`: `{ examId: 1, questionNumber: 1, retryCount: 1 }`
+- `notification_devices`
+  - `uniq_notification_devices_user_installation`:
+    `{ userId: 1, installationIdHash: 1 }`, unique
+  - `uniq_notification_devices_enabled_expo_token`:
+    `{ expoPushTokenHash: 1 }`, unique, partial `{ enabled: true }`
+  - `idx_notification_devices_user_enabled`: `{ userId: 1, enabled: 1 }`
+- `notification_outbox`
+  - `uniq_notification_outbox_event_key`: `{ eventKey: 1 }`, unique
+  - `idx_notification_outbox_claim`: `{ status: 1, nextAttemptAt: 1, leaseUntil: 1 }`
+- `notification_deliveries`
+  - `uniq_notification_deliveries_notification_device`:
+    `{ notificationId: 1, deviceId: 1 }`, unique
+  - `idx_notification_deliveries_claim`: `{ status: 1, nextAttemptAt: 1, leaseUntil: 1 }`
+  - `idx_notification_deliveries_receipt`: `{ status: 1, ticketReceivedAt: 1 }`
+
+Notification indexes preserve the same dry-run/apply and conflict policy as the four existing exam
+read indexes. Required `unique` and `partialFilterExpression` options must match exactly. A
+same-key visible index with different options or the required name with a different definition
+stops the complete plan before any `createIndex` call. Hidden indexes are never accepted as a
+usable claim or uniqueness index, and the script never drops or unhides them automatically.
+
+No TMI-63 notification index has been applied to staging or production by this repository change.
+Run and review the default dry-run against the exact target database before an explicit apply.
 
 Staging 또는 운영에서 명시적으로 apply한 뒤에는 실제 데이터와 대표 `examId`로 다음
 `explain("executionStats")`를 실행한다. 이 저장소의 로컬 테스트는 실제 apply나 explain을

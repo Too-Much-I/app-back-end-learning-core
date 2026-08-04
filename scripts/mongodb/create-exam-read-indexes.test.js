@@ -22,6 +22,66 @@ const SUMMARY_INDEX = {
     key: {examId: 1, _id: -1}
 };
 
+const NOTIFICATION_INDEXES = [
+    {
+        collection: "notification_devices",
+        name: "uniq_notification_devices_user_installation",
+        key: {userId: 1, installationIdHash: 1},
+        options: {unique: true}
+    },
+    {
+        collection: "notification_devices",
+        name: "uniq_notification_devices_enabled_expo_token",
+        key: {expoPushTokenHash: 1},
+        options: {unique: true, partialFilterExpression: {enabled: true}}
+    },
+    {
+        collection: "notification_devices",
+        name: "idx_notification_devices_user_enabled",
+        key: {userId: 1, enabled: 1}
+    },
+    {
+        collection: "notification_outbox",
+        name: "uniq_notification_outbox_event_key",
+        key: {eventKey: 1},
+        options: {unique: true}
+    },
+    {
+        collection: "notification_outbox",
+        name: "idx_notification_outbox_claim",
+        key: {status: 1, nextAttemptAt: 1, leaseUntil: 1}
+    },
+    {
+        collection: "notification_deliveries",
+        name: "uniq_notification_deliveries_notification_device",
+        key: {notificationId: 1, deviceId: 1},
+        options: {unique: true}
+    },
+    {
+        collection: "notification_deliveries",
+        name: "idx_notification_deliveries_claim",
+        key: {status: 1, nextAttemptAt: 1, leaseUntil: 1}
+    },
+    {
+        collection: "notification_deliveries",
+        name: "idx_notification_deliveries_receipt",
+        key: {status: 1, ticketReceivedAt: 1}
+    }
+];
+
+function existingIndexes(specs = INDEX_SPECS, rename = false) {
+    const result = {};
+    for (const spec of specs) {
+        result[spec.collection] ??= [];
+        result[spec.collection].push({
+            name: rename ? `existing_${spec.name}` : spec.name,
+            key: spec.key,
+            ...(spec.options ?? {})
+        });
+    }
+    return result;
+}
+
 function recordingDatabase() {
     const calls = [];
     const dropCalls = [];
@@ -48,7 +108,7 @@ function recordingDatabase() {
     };
 }
 
-test("exam read index specs preserve required compound field order", () => {
+test("existing four exam read index specs preserve required compound field order", () => {
     assert.deepEqual(INDEX_SPECS, [
         {
             collection: "exam_sessions",
@@ -65,15 +125,29 @@ test("exam read index specs preserve required compound field order", () => {
             collection: "exam_results",
             name: "idx_exam_results_exam_question_retry",
             key: {examId: 1, questionNumber: 1, retryCount: 1}
-        }
+        },
+        ...NOTIFICATION_INDEXES
     ]);
+});
+
+test("notification device, outbox, and delivery index plans are exact", () => {
+    assert.deepEqual(INDEX_SPECS.slice(4), NOTIFICATION_INDEXES);
+    assert.deepEqual(
+        INDEX_SPECS.find(spec => spec.name === "uniq_notification_devices_enabled_expo_token"),
+        {
+            collection: "notification_devices",
+            name: "uniq_notification_devices_enabled_expo_token",
+            key: {expoPushTokenHash: 1},
+            options: {unique: true, partialFilterExpression: {enabled: true}}
+        }
+    );
 });
 
 test("dry-run plans all missing indexes without requiring apply", () => {
     const inspection = inspectIndexes({});
 
     assert.deepEqual(inspection.errors, []);
-    assert.equal(inspection.indexesToCreate.length, 4);
+    assert.equal(inspection.indexesToCreate.length, 12);
     assert.deepEqual(inspection.indexesToCreate[1], SUMMARY_INDEX);
     assert.deepEqual(inspection.compatibleIndexes, []);
 });
@@ -88,19 +162,16 @@ test("dry-run never calls createIndex", () => {
     assert.deepEqual(recorder.calls, []);
 });
 
-test("apply creates only the missing summary index when the other three already exist", () => {
-    const existingThree = Object.fromEntries(
-        INDEX_SPECS
-            .filter(spec => spec.collection !== "exam_summaries")
-            .map(spec => [spec.collection, [{name: spec.name, key: spec.key}]])
-    );
-    const inspection = inspectIndexes(existingThree);
+test("apply creates only the missing summary index when all other plans already exist", () => {
+    const inspection = inspectIndexes(existingIndexes(
+        INDEX_SPECS.filter(spec => spec.collection !== "exam_summaries")
+    ));
     const recorder = recordingDatabase();
 
     const created = applyIndexPlan(recorder.database, inspection, true);
 
     assert.deepEqual(inspection.indexesToCreate, [SUMMARY_INDEX]);
-    assert.equal(inspection.compatibleIndexes.length, 3);
+    assert.equal(inspection.compatibleIndexes.length, 11);
     assert.deepEqual(created, [SUMMARY_INDEX.name]);
     assert.deepEqual(recorder.calls, [{
         collection: "exam_summaries",
@@ -110,16 +181,76 @@ test("apply creates only the missing summary index when the other three already 
 });
 
 test("compatible indexes are idempotent even when an existing name differs", () => {
-    const indexesByCollection = Object.fromEntries(INDEX_SPECS.map(spec => [
-        spec.collection,
-        [{name: `existing_${spec.name}`, key: spec.key}]
-    ]));
+    const indexesByCollection = existingIndexes(INDEX_SPECS, true);
 
     const inspection = inspectIndexes(indexesByCollection);
 
     assert.deepEqual(inspection.errors, []);
     assert.deepEqual(inspection.indexesToCreate, []);
-    assert.equal(inspection.compatibleIndexes.length, 4);
+    assert.equal(inspection.compatibleIndexes.length, 12);
+});
+
+test("apply preserves required unique and partial options for notification indexes", () => {
+    const inspection = inspectIndexes({});
+    const recorder = recordingDatabase();
+
+    applyIndexPlan(recorder.database, inspection, true);
+
+    assert.deepEqual(
+        recorder.calls.filter(call => call.collection.startsWith("notification_")),
+        NOTIFICATION_INDEXES.map(spec => ({
+            collection: spec.collection,
+            key: spec.key,
+            options: {name: spec.name, ...(spec.options ?? {})}
+        }))
+    );
+});
+
+test("notification indexes are idempotent only with matching required options", () => {
+    const matching = inspectIndexes(existingIndexes(NOTIFICATION_INDEXES, true));
+    assert.deepEqual(matching.errors, []);
+    assert.equal(
+        matching.indexesToCreate.some(spec => spec.collection.startsWith("notification_")),
+        false
+    );
+
+    const incompatible = existingIndexes(NOTIFICATION_INDEXES);
+    incompatible.notification_devices = incompatible.notification_devices.map(index =>
+        index.name === "uniq_notification_devices_enabled_expo_token"
+            ? {...index, partialFilterExpression: {enabled: false}}
+            : index);
+    const inspection = inspectIndexes(incompatible);
+    const recorder = recordingDatabase();
+    const created = applyIndexPlan(recorder.database, inspection, true);
+
+    assert.equal(inspection.errors.length, 1);
+    assert.match(inspection.errors[0], /notification_devices/);
+    assert.deepEqual(created, []);
+    assert.deepEqual(recorder.calls, []);
+});
+
+test("same-name hidden notification index blocks every apply write", () => {
+    const target = NOTIFICATION_INDEXES.find(spec =>
+        spec.name === "uniq_notification_outbox_event_key");
+    const inspection = inspectIndexes({
+        notification_outbox: [{
+            name: target.name,
+            key: target.key,
+            unique: true,
+            hidden: true
+        }]
+    });
+    const recorder = recordingDatabase();
+
+    const created = applyIndexPlan(recorder.database, inspection, true);
+
+    assert.equal(inspection.errors.length, 1);
+    assert.match(inspection.errors[0], /notification_outbox/);
+    assert.match(inspection.errors[0], /hidden=true/);
+    assert.deepEqual(created, []);
+    assert.deepEqual(recorder.calls, []);
+    assert.deepEqual(recorder.dropCalls, []);
+    assert.deepEqual(recorder.collModCalls, []);
 });
 
 test("an existing exact summary index without a hidden field is idempotent", () => {
@@ -319,7 +450,8 @@ test("reverse, reordered, and short summary keys are not compatible", () => {
 });
 
 test("same name, reordered key, and incompatible options fail closed", () => {
-    const inspection = inspectIndexes({
+    const indexes = {
+        ...existingIndexes(NOTIFICATION_INDEXES),
         exam_sessions: [{
             name: "idx_exam_sessions_user_completed_desc",
             key: {completedAt: -1, userId: 1, _id: -1}
@@ -338,7 +470,8 @@ test("same name, reordered key, and incompatible options fail closed", () => {
             key: {examId: 1, questionNumber: 1, retryCount: 1},
             unique: true
         }]
-    });
+    };
+    const inspection = inspectIndexes(indexes);
 
     assert.equal(inspection.errors.length, 4);
     assert.deepEqual(inspection.indexesToCreate, []);

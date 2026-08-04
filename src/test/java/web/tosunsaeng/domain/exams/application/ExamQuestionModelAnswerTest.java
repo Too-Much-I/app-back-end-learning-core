@@ -27,6 +27,7 @@ import web.tosunsaeng.domain.exams.domain.repository.ExamSummaryRepository;
 import web.tosunsaeng.domain.exams.domain.repository.SpeechAceResultRepository;
 import web.tosunsaeng.domain.exams.dto.ExamResponseDTO;
 import web.tosunsaeng.global.auth.CurrentUserProvider;
+import web.tosunsaeng.domain.notifications.application.ExamCompletionNotificationService;
 
 import java.net.URI;
 import java.util.Arrays;
@@ -76,6 +77,9 @@ class ExamQuestionModelAnswerTest {
     private ExamSessionManager examSessionManager;
 
     @Mock
+    private ExamCompletionNotificationService completionNotificationService;
+
+    @Mock
     private ExamResultRepository examResultRepository;
 
     @Mock
@@ -115,7 +119,8 @@ class ExamQuestionModelAnswerTest {
                 modelAnswerCatalogService,
                 speechAceResultRepository,
                 azureResultRepository,
-                currentUserProvider
+                currentUserProvider,
+                completionNotificationService
         );
         ReflectionTestUtils.setField(examService, "bucketName", "test-learning-core-bucket");
 

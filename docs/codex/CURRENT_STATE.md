@@ -613,3 +613,23 @@
 - `create-exam-read-indexes.js`의 hidden 호환 판정, 동일 이름 hidden 충돌 무쓰기, visible 인덱스 idempotency를 재검토했으며 HIGH·MEDIUM finding은 없다.
 - `hidden:true` exact/prefix 인덱스는 호환에서 제외된다. 동일 이름 hidden은 apply 전에 충돌하고 `createIndex`, `dropIndex`, `collMod`를 호출하지 않으며, `hidden:false` 또는 hidden 필드가 없는 visible exact/prefix 인덱스는 기존대로 중복 생성하지 않는다.
 - 직접 관련된 Node 테스트 19개가 failures/errors/skipped 0으로 성공했다. 실제 MongoDB 연결·apply·explain은 수행하지 않았고 리뷰 대상 코드·테스트, Git 및 Jira 상태는 변경하지 않았다.
+
+## Latest Push notification Jira issue (2026-08-04)
+
+- 사용자 확인에 따라 Jira [`TMI-63`](https://to-teacher.atlassian.net/browse/TMI-63) `채점 완료 Push 알림 및 디바이스 토큰 관리 구현`을 `TMI` 프로젝트의 `작업` 타입으로 생성했다.
+- 설명에는 채점·Summary·Session·Summary Job 완료 조건, JWT/Guest Device API, Transactional Outbox/Lease, 멱등성, Provider 재시도·device 비활성화, disabled 환경과 완료 조건을 기록했다.
+- 생성 후 재조회에서 상태 `해야 할 일`, 우선순위 `Medium`, 담당자 미지정, 빈 라벨을 확인했다. 댓글·상태·기타 필드는 추가 변경하지 않았다.
+- 애플리케이션·테스트·설정과 Git 상태는 변경하지 않았고 코드 변경이 없어 테스트를 실행하지 않았다. 실제 Push Token이나 Credential을 조회·기록하지 않았다.
+
+## Latest TMI-63 Expo grading-completed Push implementation (2026-08-04)
+
+- Jira `TMI-63` 구현은 Expo Push Device 등록·갱신/비활성화 API, Notification Outbox, Device별 Delivery, Ticket/Receipt Adapter·Worker와 Lease/Backoff/Finalizer까지 준비된 상태다. 리마인드, 알림 목록·읽음, 마케팅·관리자 Push와 프론트 변경은 포함하지 않는다.
+- 신규 API는 JWT `sub`/Guest JWT만 사용한다. `PUT /api/v1/notifications/devices`는 UUIDv4 installationId와 `IOS|ANDROID`, `expoPushToken`을 받고 `(userId, installationIdHash)`로 Upsert한다. 동일 installation의 동시 최초 insert 충돌은 소유 Device 재조회 후 갱신으로 수렴하고 다른 Token unique 충돌은 안전하게 거부한다. `DELETE /api/v1/notifications/devices/{installationId}`는 소유자 조건 Soft Delete이며 반복 호출도 성공한다. 기존 시험 API의 local/test Legacy 호환은 유지하지만 신규 Device API는 무인증 Legacy 요청을 허용하지 않는다.
+- installationId 원문은 저장하지 않고 canonical lowercase UUID의 SHA-256 Base64URL Hash만 저장한다. ExpoPushToken 원문은 발송용 전용 Device 문서에만 저장하며 응답·로그·예외·Outbox·Delivery에 노출하지 않는다. 별도 application encryption은 없어 Atlas encryption at rest가 운영 전제다.
+- Summary Callback은 전용 Mongo Transaction 안에서 ExamSummary 저장, Session 완료, Summary Job 완료와 조건부 Outbox 생성을 처리한다. 모든 필수 최초 응시 문항, Summary, `completedAt`, Summary Job COMPLETED 네 증거가 있어야 eventKey `EXAM_GRADING_COMPLETED:{examId}` Outbox를 한 번 생성한다. 외부 Expo 호출은 Transaction 밖이다.
+- Outbox·Ticket·Receipt는 Mongo `findAndModify`로 상태/attempt/Lease를 원자 Claim하고 stale attempt 결과를 무시한다. Delivery는 `(notificationId, deviceId)` unique이며 Token 원문을 복사하지 않는다. Ticket `ok`는 `TICKET_RECEIVED`, Receipt `ok`만 `SENT`다. Retryable 오류는 exponential backoff, 영구/최대 시도 오류는 정규화 FAILED다.
+- `DeviceNotRegistered` 또는 로컬 invalid Token은 발송 당시 Token Hash와 현재 Device Hash가 일치할 때만 Device를 비활성화한다. 하나 이상 SENT이고 모든 Delivery가 최종 상태면 Outbox COMPLETED, Device 없음은 SKIPPED_NO_DEVICE, 전부 실패는 FAILED다.
+- Push 기본값은 disabled다. disabled Context에는 Disabled Adapter만 있고 Expo HTTP Client/Worker가 없으며 Docker `linux/amd64` 빌드와 disabled 컨테이너 Health HTTP 200/UP가 성공했다. 실제 Expo API/Development Build Smoke Test는 수행하지 않았다.
+- Mongo index migration에는 Device 3개, Outbox 2개, Delivery 3개가 추가됐다. 기본 dry-run, 명시 apply, unique/partial 옵션 비교, idempotency, 충돌 선차단, hidden 비호환과 자동 drop/unhide 금지를 유지한다. 실제 운영/Staging DB apply와 explain은 수행하지 않았다.
+- 검증은 Java 전체 316개, MongoDB Node 전체 72개와 `git diff --check`가 모두 성공했다. TMI-63 신규 Java 테스트는 50개, 신규 Node 계획 테스트는 4개다. Git commit·push·PR과 Jira 댓글·필드·상태 변경은 수행하지 않았다.
+- 배포 전 Atlas/replica set Transaction 지원과 신규 인덱스 apply, 여러 ECS Task Lease/at-least-once 경계, 실제 Expo Ticket/Receipt 및 Android Development Build deepLink를 staging에서 확인해야 한다.

@@ -30,6 +30,7 @@ import web.tosunsaeng.domain.exams.domain.repository.ExamSummaryRepository;
 import web.tosunsaeng.domain.exams.domain.repository.SpeechAceResultRepository;
 import web.tosunsaeng.domain.exams.dto.ExamRequestDTO;
 import web.tosunsaeng.domain.exams.exception.ExamsException;
+import web.tosunsaeng.domain.notifications.application.ExamCompletionNotificationService;
 import web.tosunsaeng.global.auth.CurrentUserProvider;
 import web.tosunsaeng.global.error.code.status.ErrorStatus;
 
@@ -111,6 +112,9 @@ class FeedbackCallbackServiceTest {
     @Mock
     private ExamSessionManager examSessionManager;
 
+    @Mock
+    private ExamCompletionNotificationService completionNotificationService;
+
     private final ObjectMapper objectMapper = new ObjectMapper();
     private ExamServiceImpl examService;
 
@@ -128,7 +132,8 @@ class FeedbackCallbackServiceTest {
                 modelAnswerCatalogService,
                 speechAceResultRepository,
                 azureResultRepository,
-                currentUserProvider
+                currentUserProvider,
+                completionNotificationService
         );
         ReflectionTestUtils.setField(examService, "bucketName", "test-learning-core-bucket");
     }
@@ -248,6 +253,7 @@ class FeedbackCallbackServiceTest {
         );
         verify(gradingService).completeQuestion(EXAM_ID, 4, 2);
         verify(gradingService).ensureSummaryStartedIfReady(EXAM_ID);
+        verify(completionNotificationService).reconcileAfterQuestionCompletion(EXAM_ID);
         verify(examSessionManager, never()).completeIfIncomplete(any());
         verifyNoInteractions(examSummaryRepository, currentUserProvider, redisTemplate, restTemplate);
     }
@@ -273,30 +279,22 @@ class FeedbackCallbackServiceTest {
         when(examSessionRepository.findById(EXAM_ID)).thenReturn(Optional.of(examSession()));
         examService.updateExamResult(req);
 
-        ArgumentCaptor<ExamSummary> summaryCaptor = ArgumentCaptor.forClass(ExamSummary.class);
-        InOrder callbackOrder = inOrder(examSessionRepository, examSummaryRepository, examSessionManager);
+        ArgumentCaptor<ExamSession> sessionCaptor = ArgumentCaptor.forClass(ExamSession.class);
+        InOrder callbackOrder = inOrder(examSessionRepository, completionNotificationService);
         callbackOrder.verify(examSessionRepository).findById(EXAM_ID);
-        callbackOrder.verify(examSummaryRepository).insert(summaryCaptor.capture());
-        callbackOrder.verify(examSessionManager).completeIfIncomplete(EXAM_ID);
+        callbackOrder.verify(completionNotificationService)
+                .completeSummaryCallback(eq(req), sessionCaptor.capture(), eq("mock_exam_003"));
 
-        ExamSummary savedSummary = summaryCaptor.getValue();
+        ExamSession delegatedSession = sessionCaptor.getValue();
         assertAll(
-                () -> assertEquals(EXAM_ID, savedSummary.getExamId()),
-                () -> assertEquals("summary:" + EXAM_ID + ":v1", savedSummary.getId()),
-                () -> assertEquals(USER_ID, savedSummary.getUserId()),
-                () -> assertNotEquals(savedSummary.getExamId(), savedSummary.getUserId()),
-                () -> assertEquals("mock_exam_003", savedSummary.getMockExamId()),
-                () -> assertEquals(170, savedSummary.getTotalScore()),
-                () -> assertEquals("Advanced Mid", savedSummary.getLevelEstimate()),
-                () -> assertEquals("test overall summary", savedSummary.getSummary()),
-                () -> assertEquals("test overall feedback", savedSummary.getOverallFeedback()),
-                () -> assertEquals(Map.of("part1", "test part feedback"), savedSummary.getPartFeedback()),
-                () -> assertEquals(List.of("test strength"), savedSummary.getStrengths()),
-                () -> assertEquals(List.of("test weakness"), savedSummary.getWeaknesses()),
-                () -> assertEquals(List.of("test practice"), savedSummary.getRecommendedPractice())
+                () -> assertEquals(EXAM_ID, delegatedSession.getExamId()),
+                () -> assertEquals(USER_ID, delegatedSession.getUserId()),
+                () -> assertNotEquals(delegatedSession.getExamId(), delegatedSession.getUserId()),
+                () -> assertEquals(170, req.getTotalScore()),
+                () -> assertEquals("test overall summary", req.getSummary())
         );
-        verify(gradingService).completeSummary(EXAM_ID);
         verify(gradingService).calculateAndCacheOverallStatus(EXAM_ID);
+        verifyNoInteractions(examSummaryRepository, examSessionManager);
         verifyNoInteractions(currentUserProvider, restTemplate);
     }
 
@@ -312,7 +310,8 @@ class FeedbackCallbackServiceTest {
                 """, ExamRequestDTO.AiResultReq.class);
         when(examSessionRepository.findById(EXAM_ID)).thenReturn(Optional.of(examSession()));
         doThrow(new IllegalStateException("synthetic summary storage failure"))
-                .when(examSummaryRepository).insert(any(ExamSummary.class));
+                .when(completionNotificationService)
+                .completeSummaryCallback(eq(req), any(ExamSession.class), eq("mock_exam_003"));
 
         assertThrows(IllegalStateException.class, () -> examService.updateExamResult(req));
 
@@ -476,15 +475,12 @@ class FeedbackCallbackServiceTest {
                 }
                 """, ExamRequestDTO.AiResultReq.class);
         when(examSessionRepository.findById(EXAM_ID)).thenReturn(Optional.of(examSession()));
-        when(examSummaryRepository.existsById("summary:" + EXAM_ID + ":v1"))
-                .thenReturn(false, true);
-
         examService.updateExamResult(req);
         examService.updateExamResult(req);
 
-        verify(examSummaryRepository, times(1)).insert(any(ExamSummary.class));
-        verify(examSessionManager, times(2)).completeIfIncomplete(EXAM_ID);
-        verify(gradingService, times(2)).completeSummary(EXAM_ID);
+        verify(completionNotificationService, times(2))
+                .completeSummaryCallback(eq(req), any(ExamSession.class), eq("mock_exam_003"));
+        verifyNoInteractions(examSummaryRepository, examSessionManager);
         verify(gradingService, times(2)).calculateAndCacheOverallStatus(EXAM_ID);
     }
 

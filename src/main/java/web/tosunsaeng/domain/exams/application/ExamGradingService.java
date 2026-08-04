@@ -277,6 +277,11 @@ public class ExamGradingService {
         calculateAndCacheOverallStatus(examId, questionNumbers);
     }
 
+    public boolean areAllRequiredQuestionsComplete(String examId) {
+        List<Integer> questionNumbers = expectedQuestionNumbers(examId);
+        return allQuestionsComplete(examId, questionNumbers);
+    }
+
     public ExamStatus calculateAndCacheOverallStatus(String examId) {
         return calculateAndCacheOverallStatus(examId, expectedQuestionNumbers(examId));
     }

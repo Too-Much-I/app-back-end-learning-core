@@ -21,7 +21,11 @@ public enum SuccessStatus implements BaseCode {
     RECIPE_INFO(HttpStatus.OK, "RECIPE_201", "성공적으로 레시피의 상세 정보를 조회했습니다."),
     RECIPE_FIND(HttpStatus.OK, "RECIPE_202", "성공적으로 레시피를 검색했습니다."),
     RECIPE_SCRAP(HttpStatus.OK, "RECIPE_203", "성공적으로 레피시를 찜했습니다."),
-    RECIPE_DELETE_SCRAP(HttpStatus.OK, "RECIPE_204", "성공적으로 레피시 찜을 취소했습니다.");
+    RECIPE_DELETE_SCRAP(HttpStatus.OK, "RECIPE_204", "성공적으로 레피시 찜을 취소했습니다."),
+
+    // Notifications
+    NOTIFICATION_DEVICE_REGISTERED(HttpStatus.OK, "COMMON_200", "알림 기기가 등록되었습니다."),
+    NOTIFICATION_DEVICE_DISABLED(HttpStatus.OK, "COMMON_200", "알림 기기가 비활성화되었습니다.");
 
     private final HttpStatus httpStatus;
     private final String code;

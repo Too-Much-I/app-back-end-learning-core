@@ -24,7 +24,29 @@ public enum ErrorStatus implements BaseErrorCode {
     _EXAM_SESSION_CONFIGURATION_ERROR(HttpStatus.INTERNAL_SERVER_ERROR, "EXAM_5002", "모의고사 세션 데이터 설정이 올바르지 않습니다."),
     _AI_SERVER_CONNECTION_ERROR(HttpStatus.INTERNAL_SERVER_ERROR, "EXAM_4001", "AI 채점 서버와 통신할 수 없습니다. 잠시 후 다시 시도해주세요."),
     _QUESTION_NOT_FOUND(HttpStatus.NOT_FOUND, "EXAM_4002", "해당 문제를 찾을 수 없습니다."),
-    _AI_SERVER_PROCESSING_NOW(HttpStatus.BAD_REQUEST, "EXAM_4006", "현재 채점이 진행 중입니다. 잠시 후 다시 시도해 주세요.");
+    _AI_SERVER_PROCESSING_NOW(HttpStatus.BAD_REQUEST, "EXAM_4006", "현재 채점이 진행 중입니다. 잠시 후 다시 시도해 주세요."),
+
+    // Notifications
+    _NOTIFICATION_DEVICE_INVALID_REQUEST(
+            HttpStatus.BAD_REQUEST,
+            "NOTIFICATION_4001",
+            "알림 기기 등록 정보가 올바르지 않습니다."
+    ),
+    _NOTIFICATION_DEVICE_CONFLICT(
+            HttpStatus.CONFLICT,
+            "NOTIFICATION_4002",
+            "알림 기기 정보를 등록할 수 없습니다."
+    ),
+    _NOTIFICATION_CONFIGURATION_ERROR(
+            HttpStatus.INTERNAL_SERVER_ERROR,
+            "NOTIFICATION_5001",
+            "Push 알림 설정이 올바르지 않습니다."
+    ),
+    _NOTIFICATION_DEVICE_STORAGE_ERROR(
+            HttpStatus.INTERNAL_SERVER_ERROR,
+            "NOTIFICATION_5002",
+            "알림 기기 정보를 처리할 수 없습니다."
+    );
 
     private final HttpStatus httpStatus;
     private final String code;

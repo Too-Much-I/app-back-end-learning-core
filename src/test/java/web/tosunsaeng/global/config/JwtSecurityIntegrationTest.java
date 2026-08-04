@@ -66,6 +66,10 @@ import web.tosunsaeng.global.auth.JwtCurrentUserProvider;
 import web.tosunsaeng.global.auth.LegacyCurrentUserProvider;
 import web.tosunsaeng.global.config.security.SecurityErrorResponseHandler;
 import web.tosunsaeng.global.exception.GlobalExceptionAdvice;
+import web.tosunsaeng.domain.notifications.application.ExamCompletionNotificationService;
+import web.tosunsaeng.domain.notifications.domain.repository.NotificationDeliveryRepository;
+import web.tosunsaeng.domain.notifications.domain.repository.NotificationDeviceRepository;
+import web.tosunsaeng.domain.notifications.domain.repository.NotificationOutboxRepository;
 
 import java.io.IOException;
 import java.net.InetSocketAddress;
@@ -179,6 +183,18 @@ class JwtSecurityIntegrationTest {
 
     @MockitoBean
     private SummaryGradingJobRepository summaryGradingJobRepository;
+
+    @MockitoBean
+    private ExamCompletionNotificationService completionNotificationService;
+
+    @MockitoBean
+    private NotificationDeviceRepository notificationDeviceRepository;
+
+    @MockitoBean
+    private NotificationOutboxRepository notificationOutboxRepository;
+
+    @MockitoBean
+    private NotificationDeliveryRepository notificationDeliveryRepository;
 
     private final Map<String, ExamSession> sessions = new ConcurrentHashMap<>();
     private ValueOperations<String, Object> valueOperations;
