@@ -17,6 +17,7 @@ import web.tosunsaeng.domain.exams.domain.repository.SummaryGradingJobRepository
 import web.tosunsaeng.global.config.GradingProperties;
 
 import java.time.Clock;
+import java.net.URI;
 import java.time.Duration;
 import java.time.Instant;
 import java.time.ZoneId;
@@ -60,6 +61,7 @@ class SummaryDispatchSchedulerTest {
             Duration.ofMinutes(1),
             Duration.ofMinutes(3),
             3,
+            URI.create("http://test-ai:8000"),
             Duration.ofSeconds(3),
             Duration.ofSeconds(30),
             2,

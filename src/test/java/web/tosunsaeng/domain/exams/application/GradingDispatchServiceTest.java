@@ -14,7 +14,10 @@ import org.springframework.web.client.RestTemplate;
 import software.amazon.awssdk.services.s3.presigner.S3Presigner;
 import software.amazon.awssdk.services.s3.presigner.model.GetObjectPresignRequest;
 import software.amazon.awssdk.services.s3.presigner.model.PresignedGetObjectRequest;
+import web.tosunsaeng.global.config.GradingProperties;
+
 import java.net.URI;
+import java.time.Duration;
 import java.time.Instant;
 import java.util.Map;
 
@@ -32,7 +35,18 @@ import static org.mockito.Mockito.when;
 class GradingDispatchServiceTest {
 
     private static final String EXAM_ID = "ex_dispatch_001";
-    private static final String AI_SERVER_URL = "http://ai-server:8000/evaluations";
+    private static final URI AI_SERVER_URL = URI.create("http://configured-ai:8123");
+    private static final URI AI_EVALUATION_URL = URI.create("http://configured-ai:8123/evaluations");
+    private static final GradingProperties GRADING_PROPERTIES = new GradingProperties(
+            Duration.ofMinutes(1),
+            Duration.ofMinutes(3),
+            3,
+            AI_SERVER_URL,
+            Duration.ofSeconds(3),
+            Duration.ofSeconds(30),
+            2,
+            100
+    );
 
     @Mock
     private S3Presigner s3Presigner;
@@ -47,7 +61,7 @@ class GradingDispatchServiceTest {
 
     @BeforeEach
     void setUp() throws Exception {
-        service = new GradingDispatchService(s3Presigner, restTemplate);
+        service = new GradingDispatchService(s3Presigner, restTemplate, GRADING_PROPERTIES);
         ReflectionTestUtils.setField(service, "bucketName", "test-learning-core-bucket");
     }
 
@@ -74,7 +88,7 @@ class GradingDispatchServiceTest {
         service.dispatchQuestion(claim);
 
         ArgumentCaptor<HttpEntity> requestCaptor = ArgumentCaptor.forClass(HttpEntity.class);
-        verify(restTemplate).postForEntity(eq(AI_SERVER_URL), requestCaptor.capture(), eq(String.class));
+        verify(restTemplate).postForEntity(eq(AI_EVALUATION_URL), requestCaptor.capture(), eq(String.class));
         MultiValueMap<String, Object> body = (MultiValueMap<String, Object>)
                 assertInstanceOf(MultiValueMap.class, requestCaptor.getValue().getBody());
         assertAll(
@@ -105,7 +119,7 @@ class GradingDispatchServiceTest {
         ));
 
         ArgumentCaptor<HttpEntity> requestCaptor = ArgumentCaptor.forClass(HttpEntity.class);
-        verify(restTemplate).postForEntity(eq(AI_SERVER_URL), requestCaptor.capture(), eq(String.class));
+        verify(restTemplate).postForEntity(eq(AI_EVALUATION_URL), requestCaptor.capture(), eq(String.class));
         Map<?, ?> body = assertInstanceOf(Map.class, requestCaptor.getValue().getBody());
         assertAll(
                 () -> assertEquals(EXAM_ID, body.get("user_id")),
@@ -118,6 +132,14 @@ class GradingDispatchServiceTest {
                         "summary:" + EXAM_ID + ":v1",
                         requestCaptor.getValue().getHeaders().getFirst("Idempotency-Key")
                 )
+        );
+    }
+
+    @Test
+    void evaluationPathIsAppendedOnceWhenConfiguredBaseUrlHasTrailingSlash() {
+        assertEquals(
+                URI.create("http://configured-ai:8123/evaluations"),
+                GradingDispatchService.aiEvaluationUri(URI.create("http://configured-ai:8123/"))
         );
     }
 }

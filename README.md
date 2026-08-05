@@ -144,6 +144,7 @@ Default Chain이 지원하는 AWS 표준 환경변수도 사용할 수 있지만
 ### 로컬 Docker — Docker Desktop for macOS
 
 `.env.example`을 참고해 Git에서 제외된 `.env.docker.local`을 준비한다. 이 파일에는 `AWS_REGION`, `AWS_S3_BUCKET_NAME`, MongoDB, Redis, Identity, AI 서버 등 실행 설정만 두고 AWS Access Key나 Secret Key는 넣지 않는다.
+`AI_SERVER_URL`에는 AI 서버의 base URL만 지정하며 Learning Core가 기존 `/evaluations` 경로를 붙인다.
 
 Dockerfile의 non-root `app` 사용자 홈은 `/app`이므로 host의 AWS profile 디렉터리를 read-only로 mount한다. IAM Identity Center SSO Profile을 사용할 때는 각 개발 세션을 시작하기 전에 host에서 로그인하고 Credential을 검증한다.
 

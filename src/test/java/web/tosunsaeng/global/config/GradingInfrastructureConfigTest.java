@@ -7,6 +7,7 @@ import org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor;
 import org.springframework.test.util.ReflectionTestUtils;
 import org.springframework.web.client.RestTemplate;
 
+import java.net.URI;
 import java.time.Duration;
 
 import static org.junit.jupiter.api.Assertions.assertAll;
@@ -19,6 +20,7 @@ class GradingInfrastructureConfigTest {
             Duration.ofMinutes(1),
             Duration.ofMinutes(3),
             3,
+            URI.create("http://test-ai:8000"),
             Duration.ofSeconds(4),
             Duration.ofSeconds(31),
             2,

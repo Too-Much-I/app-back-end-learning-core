@@ -4,6 +4,7 @@ import jakarta.validation.Validation;
 import jakarta.validation.Validator;
 import org.junit.jupiter.api.Test;
 
+import java.net.URI;
 import java.time.Duration;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -19,6 +20,7 @@ class GradingPropertiesTest {
                 Duration.ofMinutes(1),
                 Duration.ofMinutes(3),
                 3,
+                URI.create("http://test-ai:8000"),
                 Duration.ofSeconds(3),
                 Duration.ofSeconds(30),
                 2,
@@ -34,12 +36,13 @@ class GradingPropertiesTest {
                 Duration.ZERO,
                 Duration.ofSeconds(-1),
                 0,
+                URI.create("ftp://test-ai:8000"),
                 Duration.ZERO,
                 Duration.ofSeconds(-1),
                 0,
                 0
         );
 
-        assertEquals(7, validator.validate(properties).size());
+        assertEquals(8, validator.validate(properties).size());
     }
 }

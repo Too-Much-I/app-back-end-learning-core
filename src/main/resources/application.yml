@@ -28,6 +28,7 @@ app:
     pending-timeout: ${GRADING_PENDING_TIMEOUT:PT1M}
     processing-timeout: ${GRADING_PROCESSING_TIMEOUT:PT3M}
     max-dispatch-attempts: ${GRADING_MAX_DISPATCH_ATTEMPTS:3}
+    ai-server-url: ${AI_SERVER_URL:http://tosunsaeng-ai:8000}
     ai-connect-timeout: ${GRADING_AI_CONNECT_TIMEOUT:PT3S}
     ai-read-timeout: ${GRADING_AI_READ_TIMEOUT:PT30S}
     summary-dispatch-threads: ${GRADING_SUMMARY_DISPATCH_THREADS:2}

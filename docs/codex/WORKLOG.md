@@ -1418,3 +1418,38 @@
 - 회귀 정책: visible 인덱스 idempotency, hidden 인덱스 비호환, 동일 이름·다른 정의 충돌의 전체 쓰기 전 차단과 자동 drop/unhide 금지를 유지했다.
 - 테스트·검증: NamespaceNotFound 두 표현, 누락 Summary 계획, dry-run 무쓰기, apply createIndex, 인증·네트워크·알 수 없는 오류 전파에 대한 Node 테스트 8개를 추가했다. `node --test scripts/mongodb/*.test.js` 전체 76개와 `git diff --check`가 성공했다.
 - 외부 작업·보안: Java·Repository·공개 API는 변경하지 않았고 실제 DB 연결·apply·explain, Git commit·push·PR 및 Jira 댓글·필드·상태 변경을 수행하지 않았다. Secret과 Token을 조회하거나 기록하지 않았다.
+
+## 2026-08-04 — Learning Core AWS Secrets Manager 대상 설정 분류
+
+<!-- codex-turn:019fcbe0-bce2-7290-9c85-1d207f951d44 -->
+
+- 범위: 현재 체크아웃된 Learning Core의 tracked `.env.example`, Spring 설정, 인증·S3 구성과 운영 문서를 읽어 AWS Secrets Manager 대상 환경변수 이름을 분류했다. 실제 로컬·운영 환경변수, Secret 값, Token, 자격증명 파일은 조회하지 않았다. 별도 Jira 이슈 키는 없다.
+- Secrets Manager 대상: 자격증명이 포함되는 `MONGODB_URI`는 필수 대상이다. 서버 오류 수집 권한 성격의 `SENTRY_DSN`은 보호 저장을 권장한다. 현재 checkout에 선언되지 않은 Expo Push 또는 Redis 인증이 도입되는 경우에만 각각의 Provider Access Token과 Redis AUTH 값도 추가 대상이다.
+- Secrets Manager 비대상: `MONGODB_DATABASE`, Redis host/port, AWS Region·S3 Bucket, Identity issuer·JWKS URL·audience, profile/auth mode, prefix·timeout·thread·port·sampling 값은 일반 구성으로 분류했다. Learning Core는 JWT Private Key나 공유 JWT Secret을 보관하지 않는다.
+- AWS 인증: 장기 AWS Access Key/Secret Key를 Secrets Manager에서 애플리케이션 환경변수로 주입하지 않고 ECS Task Role의 임시 자격증명을 사용하는 현재 정책을 유지해야 한다. ECS agent의 Secret 주입 권한은 Task Execution Role, 런타임 S3 권한은 Task Role로 분리한다.
+- 결과·외부 작업: 분석 및 문서 기록만 수행해 애플리케이션·설정·테스트 코드는 변경하지 않았고 테스트를 재실행하지 않았다. AWS Secrets Manager 생성·갱신·조회, Git commit·push·PR 및 Jira 쓰기 작업은 수행하지 않았다.
+
+## 2026-08-05 — AI 서버 주소 환경변수 여부 확인
+
+<!-- codex-turn:019fd0b9-296a-7a02-b364-9927ad30d47f -->
+
+- 범위·결과: 현재 `main`의 AI 채점 전송 구현과 Spring 설정·환경변수 예시를 읽기 전용으로 확인했다. 별도 Jira 이슈 키는 없다.
+- AI 주소: 문항·Summary 전송에 사용하는 AI endpoint는 `GradingDispatchService`의 정적 상수로 고정되어 있으며 환경변수나 Spring property로 바인딩되지 않는다. `.env.example`에도 AI 주소 환경변수는 없다.
+- 환경변수 적용 범위: AI 연동 설정 중 환경변수로 처리되는 것은 현재 연결 timeout과 읽기 timeout이며, endpoint 자체는 환경별로 교체할 수 없는 상태다.
+- 변경·검증: 사용자 요청은 현황 확인이므로 애플리케이션·설정·테스트 코드는 수정하지 않았고 테스트를 재실행하지 않았다. 필수 Codex 기록만 갱신했으며 실제 Secret·Token·실행 환경값은 조회하거나 기록하지 않았다. Git commit·push·PR 및 Jira 쓰기 작업도 수행하지 않았다.
+
+## 2026-08-05 — AI 서버 base URL 환경변수화
+
+- 범위·결과: 고정 AI endpoint를 `AI_SERVER_URL` 환경변수 기반의 `app.grading.ai-server-url` 설정으로 전환했다. 별도 Jira 이슈 키는 없다.
+- 설정: 환경변수는 AI 서버 base URL을 받으며 기본값과 `.env.example` 예시는 `http://tosunsaeng-ai:8000`이다. `GradingProperties`는 이를 `URI`로 바인딩하고 absolute HTTP(S), host 존재, user-info/query/fragment 부재를 검증한다.
+- 계약 유지: `GradingDispatchService`는 base URL의 trailing slash 유무와 관계없이 기존 `/evaluations` 경로를 정확히 한 번 결합한다. 문항 multipart와 Summary JSON, `user_id=examId`, `mock_exam_id`, `Idempotency-Key`와 `client_source` 계약은 변경하지 않았다.
+- 문서·테스트: `.env.example`과 README에 base URL 계약을 기록하고, 설정된 다른 host 사용·문항/Summary endpoint·trailing slash·URL 검증 테스트를 추가·보완했다. 관련 집중 테스트와 `./gradlew clean test` 전체 Java 267개가 failures/errors/skipped 0으로 성공했으며 `git diff --check`도 성공했다.
+- 외부 작업: 실제 AI 서버·S3·MongoDB·Redis를 호출하지 않았고 실제 Secret·Token을 조회하거나 기록하지 않았다. Git commit·push·PR 및 Jira 쓰기 작업도 수행하지 않았다.
+
+## 2026-08-05 — AI 서버 URL 환경변수화 Stop Hook 기록 보완
+
+<!-- codex-turn:019fd0ba-79ae-7472-af1a-57b2481c1a74 -->
+
+- 현재 turn에서 고정 AI endpoint를 `AI_SERVER_URL` 기반 base URL 설정으로 전환하고 기존 `/evaluations` 경로, AI 요청 body·header 계약을 유지한 작업 기록을 보완했다. 별도 Jira 이슈 키는 없다.
+- `.env.example`의 base URL 예시, URI 검증, trailing slash 처리와 관련 테스트를 포함하며 전체 Java 267개와 `git diff --check` 성공 상태는 동일하다.
+- 실제 외부 시스템 호출, Git commit·push·PR 및 Jira 쓰기는 수행하지 않았고 Secret과 Token을 조회하거나 기록하지 않았다.

@@ -620,3 +620,25 @@
 - 누락 컬렉션의 인덱스는 dry-run 생성 예정에 포함되지만 `createCollection`, `createIndex`, `dropIndex`, `collMod` 쓰기는 발생하지 않는다. apply에서는 기존 `createIndex` 흐름을 유지하며 별도 문서 insert/delete를 사용하지 않는다.
 - 인증·네트워크·권한·명령·알 수 없는 MongoDB 오류는 숨기지 않고 전파한다. visible idempotency, hidden 비호환, 동일 이름 충돌 선차단과 자동 drop/unhide 금지 정책도 유지된다.
 - Node 테스트 8개를 추가했고 전체 MongoDB 스크립트 테스트 76개와 `git diff --check`가 성공했다. 실제 MongoDB 연결·apply·explain, Git commit·push·PR과 Jira `TMI-61` 쓰기 작업은 수행하지 않았다.
+
+## Latest AWS Secrets Manager configuration inventory (2026-08-04)
+
+- 현재 tracked Learning Core 설정 기준으로 `MONGODB_URI`는 자격증명을 포함하므로 AWS Secrets Manager 필수 대상이고, `SENTRY_DSN`은 보호 저장 권장 대상이다. 실제 값이나 실행 환경 Secret은 조회하지 않았다.
+- 현재 checkout에는 Expo Access Token과 Redis password 설정이 없다. 해당 인증 기능이 배포될 때만 Provider Access Token 또는 Redis AUTH 값을 Secrets Manager 대상으로 추가해야 하며, 먼저 애플리케이션 설정 바인딩을 확인해야 한다.
+- MongoDB database 이름, Redis host/port, AWS Region·S3 Bucket, Identity issuer·JWKS URL·audience, profile/auth mode와 각종 prefix·timeout·thread·port·sampling 값은 비밀값이 아닌 일반 구성이다.
+- AWS 장기 Access Key/Secret Key는 Secrets Manager 주입 대상이 아니라 ECS Task Role로 대체한다. Learning Core에는 Identity RSA Private Key나 공유 JWT Secret을 저장하지 않는다.
+- 별도 Jira 이슈 키는 없고 코드·테스트 변경이나 AWS/Git/Jira 쓰기 작업은 수행하지 않았다.
+
+## Latest AI endpoint configuration check (2026-08-05)
+
+- 현재 `main`의 AI 채점 endpoint는 `GradingDispatchService` 정적 상수로 고정되어 있고 환경변수 또는 Spring property로 처리되지 않는다. 문항과 Summary 전송이 같은 고정 주소를 사용한다.
+- 환경변수로 조정 가능한 AI 관련 값은 연결 timeout과 읽기 timeout뿐이며 `.env.example`에는 AI 주소 항목이 없다.
+- 현황 확인만 수행해 코드·설정·테스트를 변경하거나 테스트를 재실행하지 않았다. 별도 Jira 이슈 키와 Git/Jira 쓰기 작업은 없고 실제 Secret·Token·실행 환경값은 조회하지 않았다.
+
+## Latest AI server URL environment configuration (2026-08-05)
+
+- AI 서버 주소는 더 이상 `GradingDispatchService` 상수로 고정되지 않는다. `app.grading.ai-server-url`이 `AI_SERVER_URL`을 읽고 기본값과 `.env.example` 예시는 `http://tosunsaeng-ai:8000`이다.
+- 환경변수는 base URL 계약이며 서비스가 기존 `/evaluations`를 한 번만 붙인다. `GradingProperties`는 URI와 HTTP(S) base URL 조건을 기동 시 검증한다.
+- 문항·Summary의 AI 요청 body·header, `user_id=examId`, `mock_exam_id`, `client_source`, `Idempotency-Key`와 endpoint path는 유지했다.
+- 관련 집중 테스트와 전체 `./gradlew clean test` Java 267개가 failures/errors/skipped 0으로 성공했고 `git diff --check`도 성공했다. 실제 AI 호출, Git commit·push·PR 및 Jira 쓰기는 수행하지 않았다.
+- Stop Hook 요구에 따라 현재 turn marker를 포함한 append-only WORKLOG 보완 기록을 추가했으며 구현·검증 결과에는 변경이 없다.

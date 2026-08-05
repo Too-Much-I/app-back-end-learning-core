@@ -13,6 +13,8 @@ import org.springframework.web.client.RestTemplate;
 import software.amazon.awssdk.services.s3.model.GetObjectRequest;
 import software.amazon.awssdk.services.s3.presigner.S3Presigner;
 import software.amazon.awssdk.services.s3.presigner.model.GetObjectPresignRequest;
+import web.tosunsaeng.global.config.GradingProperties;
+
 import java.net.URI;
 import java.time.Duration;
 import java.util.HashMap;
@@ -25,10 +27,11 @@ public class GradingDispatchService {
     static final String IDEMPOTENCY_KEY_HEADER = "Idempotency-Key";
     static final String CLIENT_SOURCE_FIELD = "client_source";
     static final String APP_CLIENT_SOURCE = "app";
-    private static final String AI_SERVER_URL = "http://ai-server:8000/evaluations";
+    private static final String EVALUATIONS_PATH = "evaluations";
 
     private final S3Presigner s3Presigner;
     private final RestTemplate restTemplate;
+    private final GradingProperties gradingProperties;
 
     @Value("${spring.cloud.aws.s3.bucket}")
     private String bucketName;
@@ -63,7 +66,7 @@ public class GradingDispatchService {
         headers.set(IDEMPOTENCY_KEY_HEADER, claim.jobId());
 
         restTemplate.postForEntity(
-                AI_SERVER_URL,
+                aiEvaluationUri(gradingProperties.aiServerUrl()),
                 new HttpEntity<>(body, headers),
                 String.class
         );
@@ -81,10 +84,16 @@ public class GradingDispatchService {
         headers.set(IDEMPOTENCY_KEY_HEADER, claim.jobId());
 
         restTemplate.postForEntity(
-                AI_SERVER_URL,
+                aiEvaluationUri(gradingProperties.aiServerUrl()),
                 new HttpEntity<>(body, headers),
                 String.class
         );
+    }
+
+    static URI aiEvaluationUri(URI aiServerUrl) {
+        String baseUrl = aiServerUrl.toString();
+        URI directoryUri = URI.create(baseUrl.endsWith("/") ? baseUrl : baseUrl + "/");
+        return directoryUri.resolve(EVALUATIONS_PATH);
     }
 
     private String generatePresignedGetUrl(String fileKey, Duration duration) {

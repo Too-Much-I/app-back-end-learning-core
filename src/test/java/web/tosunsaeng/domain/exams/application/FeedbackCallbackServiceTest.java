@@ -64,7 +64,6 @@ class FeedbackCallbackServiceTest {
 
     private static final String EXAM_ID = "ex_callback_001";
     private static final String USER_ID = "00000000-0000-0000-0000-000000000042";
-    private static final String AI_SERVER_URL = "http://ai-server:8000/evaluations";
 
     @Mock
     private RedisTemplate<String, Object> redisTemplate;

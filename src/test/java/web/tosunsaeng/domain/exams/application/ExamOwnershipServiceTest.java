@@ -71,7 +71,6 @@ class ExamOwnershipServiceTest {
     private static final String EXAM_ID = "ex_ownership_001";
     private static final String OWNER_USER_ID = "00000000-0000-0000-0000-000000000001";
     private static final String OTHER_USER_ID = "00000000-0000-0000-0000-000000000002";
-    private static final String AI_SERVER_URL = "http://ai-server:8000/evaluations";
 
     @Mock
     private RedisTemplate<String, Object> redisTemplate;
