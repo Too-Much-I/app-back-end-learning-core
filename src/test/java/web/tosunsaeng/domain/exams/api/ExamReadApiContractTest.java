@@ -27,6 +27,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -114,6 +115,38 @@ class ExamReadApiContractTest {
 
         verify(examReadService).getExamRetries("ex_retries");
         verifyNoInteractions(examService);
+    }
+
+    @Test
+    void createSessionResponseExposesPartFourTableImageWithoutTableContext() throws Exception {
+        String storedTableImageUrl = "https://cdn.example.com/mock-exam/001/part4/q8.png";
+        when(examService.createExamSession()).thenReturn(
+                ExamResponseDTO.CreateSessionResult.builder()
+                        .examId("ex_part4")
+                        .title("Part 4 mock exam")
+                        .questions(List.of(ExamResponseDTO.QuestionDTO.builder()
+                                .part(4)
+                                .questionNumber(8)
+                                .text("Part 4 question")
+                                .audioUrl("https://example.com/question-audio")
+                                .tableImageUrl(storedTableImageUrl)
+                                .build()))
+                        .build()
+        );
+
+        mockMvc.perform(post("/api/v1/exams"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.result.questions[0].part").value(4))
+                .andExpect(jsonPath("$.result.questions[0].questionNumber").value(8))
+                .andExpect(jsonPath("$.result.questions[0].text").value("Part 4 question"))
+                .andExpect(jsonPath("$.result.questions[0].audioUrl")
+                        .value("https://example.com/question-audio"))
+                .andExpect(jsonPath("$.result.questions[0].tableImageUrl")
+                        .value(storedTableImageUrl))
+                .andExpect(jsonPath("$.result.questions[0].tableContext").doesNotExist());
+
+        verify(examService).createExamSession();
+        verifyNoInteractions(examReadService);
     }
 
     @Test

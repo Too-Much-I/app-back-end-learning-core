@@ -1612,3 +1612,44 @@
 - AI 회귀: Part 4 답변 submit의 기존 multipart `part_number`, S3 음성, `Idempotency-Key` 계약을 유지했고 프론트 표시용 table image/context를 AI payload에 새로 포함하지 않았다. 실제 MongoDB·S3·AI 호출은 수행하지 않았다.
 - 테스트: snake_case Mongo 매핑, camelCase JSON, URL 무변환, 상세 필드 미노출, URL 누락 세 경우, 다른 Part 6개 회귀와 Part 4 AI dispatch 계약을 검증했다. 집중 테스트와 `./gradlew clean test`가 성공했고 XML 기준 Java 286개, failures/errors/skipped 0개다. `git diff --check`도 성공했다.
 - 외부 작업: Secret·Token·Credential을 조회하거나 기록하지 않았고 Git commit·push·PR 및 Jira 쓰기 작업은 수행하지 않았다.
+
+## 2026-08-06 — Part 4 문제 전달 경로 확인
+
+<!-- codex-turn:019fd633-1da2-7de3-8fb8-2098f66aada6 -->
+
+- 범위·결과: 별도 Jira 이슈 키 없이 Part 4 문제가 현재 각 공개 API에서 어떤 DTO로 전달되는지 Controller, Service, Converter를 읽기 전용으로 확인했다.
+- 채점 결과 단건 `GET /api/v1/exams/{examId}/questions?questionNumber={number}&retryCount={optional}`에서는 Part 4 원본의 Mongo `table_image_url`을 `question.questionInfo.tableImageUrl`로 가공 없이 전달하며, `questionInfo`에는 part·questionNumber·tableImageUrl만 포함한다. 외부 채점 결과·상태 필드는 기존 `PartResultDTO` 위치에 그대로 유지된다.
+- 시험 생성 `POST /api/v1/exams`와 문제 전용 `GET /api/v1/exams/{examId}/questions/{questionNumber}/prompt`는 별도 `toQuestionPrompt` 경로에서 기존 공통 `toQuestionDTO`를 사용한다. 이 경로는 현재 tableContext를 반환하고 tableImageUrl을 채우지 않으므로, 방금 적용한 URL-only 정책은 채점 결과 단건 API에만 적용돼 있다.
+- 현재 문항 번호 매핑에서 Part 4는 Question 8~10이다. Part 판정용 문항 번호 매핑과 catalog의 `part_number`가 불일치하면 외부 partNumber와 questionInfo.part가 달라질 수 있으므로 catalog 정합성을 유지해야 한다.
+- 이번 확인에서는 코드·테스트를 수정하거나 재실행하지 않았다. 실제 MongoDB·S3·AI 및 Secret·Token·Credential에 접근하지 않았고 Git·Jira 쓰기 작업도 수행하지 않았다.
+
+## 2026-08-06 — 배포 후 Part 4 기존 tableContext 응답 원인 확인
+
+<!-- codex-turn:019fd63e-f6b8-7253-91d7-06e2829a68bd -->
+
+- 범위·결과: 별도 Jira 이슈 키 없이 배포 환경에서 Part 4 Question 8~10이 text, audioUrl, tableContext 형태로 반환된 원인을 현재 Controller·Service·Converter 경로와 대조했다.
+- 해당 형태는 여러 문항과 문제 음성 URL을 함께 조립하는 `POST /api/v1/exams`의 세션 생성 응답이다. `createExamSession`은 각 문항을 `toQuestionPrompt`로 보내고, 이 메서드는 기존 공통 `ExamConverter.toQuestionDTO`를 사용하므로 text·audioUrl·tableContext를 채우며 tableImageUrl은 채우지 않는다.
+- 직전 URL-only 구현은 `ExamConverter.toQuestionResult` 내부의 Part 4 전용 `toQuestionInfoDTO`에만 적용된다. 따라서 `GET /api/v1/exams/{examId}/questions?questionNumber={number}&retryCount={optional}`에서는 tableImageUrl만 포함되지만 세션 생성 및 prompt API에는 적용되지 않는다.
+- 결론: 새 코드가 실행되지 않은 현상이 아니라 서로 다른 변환 경로의 범위 차이다. 실제 시험 시작 화면에서도 이미지 URL만 사용하려면 세션 생성과 `GET /api/v1/exams/{examId}/questions/{questionNumber}/prompt`의 Part 4 변환을 별도 승인 범위로 함께 변경해야 한다.
+- 사용자가 제시한 Presigned URL, 임시 자격 정보와 서명 값은 작업 기록에 복사하지 않았다. 이번 확인에서는 애플리케이션·테스트·외부 시스템을 변경하지 않았고 Git·Jira 쓰기 작업도 수행하지 않았다.
+
+## 2026-08-06 — 시험 시작 Part 4 tableImageUrl 응답 적용
+
+<!-- codex-turn:019fd641-0450-7ac3-8ee9-cf5e484f4f3f -->
+
+- 범위·결과: 별도 Jira 이슈 키 없이 `POST /api/v1/exams`의 `result.questions` 배열에 포함되는 Part 4 문항을 table image 기반 응답으로 변경했다. 기존 `GET /api/v1/exams/{examId}/questions` 단건 결과 API와 별도 prompt API 계약은 변경하지 않았다.
+- 변환: 세션 생성 전용 `ExamConverter.toCreateSessionQuestionDTO`를 추가했다. Part 4는 기존 text와 발급된 audioUrl을 유지하고 Mongo `table_image_url`에서 매핑된 Java `tableImageUrl`을 가공 없이 전달하며, DTO의 tableContext를 null로 만들어 NON_NULL JSON 직렬화에서 제외한다.
+- 범위 격리: Part 1·2·3·5·6·7은 기존 `toQuestionDTO` 결과를 그대로 유지한다. `Question.tableContext`와 `TableItem` 내부 모델 및 Mongo `table_context` 매핑은 삭제하거나 변경하지 않아 AI·내부 데이터 흐름에 영향을 주지 않는다.
+- 서비스: `createExamSession`만 세션 생성 전용 변환을 사용하고 공통 오디오 URL 조립을 재사용한다. `GET /api/v1/exams/{examId}/questions/{questionNumber}/prompt`는 기존 `toQuestionDTO` 경로를 계속 사용한다.
+- 테스트: Part 4 DB 모델 값과 세션 DTO URL의 정확한 동일성, tableContext 미노출, text·audioUrl 유지, 실제 POST BaseResponse JSON, Part 1·2·3·5·6·7의 기존 tableContext 유지와 기존 Mongo snake_case 매핑을 검증했다. 테스트 메서드 3개를 추가했고 parameterized 실행을 포함해 전체 테스트는 286개에서 295개로 증가했다.
+- 검증: 집중 테스트와 `./gradlew clean test`가 성공했으며 XML 기준 tests/failures/errors/skipped는 295/0/0/0이다. `git diff --check`도 성공했다. 기존 unchecked 경고 외 신규 경고는 확인되지 않았다.
+- 외부 작업: 실제 MongoDB·S3·AI를 호출하지 않았고 사용자 제공 Presigned URL·임시 자격 정보·Secret·Token을 코드·테스트·문서에 기록하지 않았다. Git commit·push·PR 및 Jira 쓰기 작업도 수행하지 않았다.
+
+## 2026-08-06 — Part 4 시험 시작 응답 기록 동기화
+
+<!-- codex-turn:019fd641-0450-7732-8c1b-6375b0b28a15 -->
+
+- 범위·결과: 별도 Jira 이슈 키 없이 현재 turn의 작업 기록 누락 hook을 처리했다. 과거 WORKLOG 항목은 수정하거나 삭제하지 않고 이 항목을 파일 끝에 append했다.
+- 현재 구현 상태: `POST /api/v1/exams`의 Part 4 문항은 text·audioUrl을 유지하고 DB `table_image_url`의 원본 값을 `tableImageUrl`로 반환하며 tableContext는 프론트 JSON에서 제외한다. Part 1·2·3·5·6·7, 기존 문항 단건 API와 AI 내부 모델은 유지된다.
+- 검증 상태: 직전 전체 `./gradlew clean test` 결과는 Java 295개, failures/errors/skipped 0개이고 `git diff --check`가 성공했다. 이번 기록 동기화에서는 애플리케이션·테스트 코드를 변경하거나 테스트를 다시 실행하지 않았다.
+- 외부 작업: 실제 외부 시스템을 호출하지 않았고 Secret·Token·Credential을 기록하지 않았다. Git commit·push·PR 및 Jira 쓰기 작업도 수행하지 않았다.

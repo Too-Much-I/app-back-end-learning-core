@@ -37,6 +37,7 @@ import java.util.concurrent.TimeUnit;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.inOrder;
@@ -175,6 +176,61 @@ class ExamServiceImplTest {
                 mockExamCatalogService,
                 speechAceResultRepository,
                 azureResultRepository
+        );
+    }
+
+    @Test
+    void createExamSessionPartFourReturnsStoredTableImageUrlWithoutTableContext() throws Exception {
+        String storedTableImageUrl = "https://cdn.example.com/mock-exam/001/part4/q8.png";
+        Question.TableContext internalTableContext = Question.TableContext.builder()
+                .title("Legacy structured table")
+                .items(List.of(Question.TableItem.builder().note("Internal data").build()))
+                .build();
+        Question partFourQuestion = Question.builder()
+                .partNumber(4)
+                .questionNumber(8)
+                .question("Part 4 question")
+                .tableImageUrl(storedTableImageUrl)
+                .tableContext(internalTableContext)
+                .build();
+        MockExam mockExam = MockExam.builder()
+                .mockExamId("mock_exam_001")
+                .title("Part 4 mock exam")
+                .questions(List.of(partFourQuestion))
+                .build();
+        ExamSession session = ExamSession.builder()
+                .examId("ex_part4_session")
+                .userId(LEGACY_USER_ID)
+                .mockExamId("mock_exam_001")
+                .active(true)
+                .build();
+        when(examSessionManager.startNew(LEGACY_USER_ID))
+                .thenReturn(new ExamSessionManager.Assignment(session, mockExam, true));
+        when(presignedGetObjectRequest.url())
+                .thenReturn(URI.create("https://example.com/questions/mock_exam_001/q_8.wav").toURL());
+
+        ExamResponseDTO.CreateSessionResult result = examService.createExamSession();
+
+        ExamResponseDTO.QuestionDTO responseQuestion = result.getQuestions().getFirst();
+        JsonNode responseJson = new ObjectMapper().valueToTree(responseQuestion);
+        assertEquals(4, responseQuestion.getPart());
+        assertEquals(8, responseQuestion.getQuestionNumber());
+        assertEquals("Part 4 question", responseQuestion.getText());
+        assertEquals(storedTableImageUrl, responseQuestion.getTableImageUrl());
+        assertEquals(
+                "https://example.com/questions/mock_exam_001/q_8.wav",
+                responseQuestion.getAudioUrl()
+        );
+        assertNull(responseQuestion.getTableContext());
+        assertEquals(storedTableImageUrl, responseJson.get("tableImageUrl").asText());
+        assertFalse(responseJson.has("tableContext"));
+
+        ArgumentCaptor<GetObjectPresignRequest> requestCaptor =
+                ArgumentCaptor.forClass(GetObjectPresignRequest.class);
+        verify(s3Presigner).presignGetObject(requestCaptor.capture());
+        assertEquals(
+                "questions/mock_exam_001/q_8.wav",
+                requestCaptor.getValue().getObjectRequest().key()
         );
     }
 

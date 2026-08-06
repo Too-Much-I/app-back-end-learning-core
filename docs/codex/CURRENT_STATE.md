@@ -758,3 +758,27 @@
 - Part 4 단건 응답에서는 기존 text, referenceText, partIntroText, audioUrl, guideAudioUrl, imageUrl, tableContext, prepTimeSec, speakTimeSec를 노출하지 않는다. DB·내부 `tableContext`, 세션·prompt 변환, Part 1·2·3·5·6·7과 Summary API는 유지한다.
 - Part 4 URL이 null·빈 문자열·공백이면 기존 카탈로그 설정 오류 `EXAM_5001`로 처리하며 임의 URL이나 Presigned URL을 생성하지 않는다.
 - Part 4 AI submit multipart와 `Idempotency-Key`는 변경하지 않았다. 집중 테스트와 전체 `./gradlew clean test`가 성공했고 Java 286개, failures/errors/skipped 0개이며 `git diff --check`도 성공했다. 실제 MongoDB·S3·AI, Git 및 Jira 쓰기 작업은 수행하지 않았다.
+
+## Latest Part 4 delivery-path clarification (2026-08-06)
+
+- URL-only Part 4 변경은 채점 결과 단건 `GET /api/v1/exams/{examId}/questions?questionNumber={number}&retryCount={optional}`의 `questionInfo`에 적용된다. 이 응답은 part, questionNumber, tableImageUrl만 포함한다.
+- 초기 문제를 전달하는 `POST /api/v1/exams`와 `GET /api/v1/exams/{examId}/questions/{questionNumber}/prompt`는 아직 기존 공통 변환을 사용해 tableContext를 전달하며 tableImageUrl은 채우지 않는다. 프론트가 어느 API로 문제를 렌더링하는지에 따라 후속 범위 확인이 필요하다.
+- 현재 문항 번호 규칙에서 Part 4는 Question 8~10이다. 이번 확인은 읽기 전용이며 코드·테스트·외부 시스템과 Git·Jira를 변경하지 않았다.
+
+## Latest deployed Part 4 response diagnosis (2026-08-06)
+
+- 배포 후 관찰된 Part 4의 text·audioUrl·tableContext 배열은 `POST /api/v1/exams` 세션 생성 응답이다. 이 경로는 `createExamSession` → `toQuestionPrompt` → 기존 `toQuestionDTO`를 사용하므로 현재 동작과 일치한다.
+- tableImageUrl-only 변경은 채점 결과 단건 `GET /api/v1/exams/{examId}/questions?questionNumber={number}&retryCount={optional}`의 `questionInfo` 변환에만 적용되어 있다. 세션 생성과 문제 prompt API에는 아직 적용되지 않았다.
+- 실제 시험 문제 표시 경로도 이미지 URL 방식으로 바꾸려면 세션 생성 및 prompt의 Part 4 변환까지 후속 변경해야 한다. 사용자 제공 Presigned URL과 임시 자격·서명 값은 문서에 기록하지 않았으며 이번 진단에서는 코드·테스트·외부 시스템을 변경하지 않았다.
+
+## Latest POST exam Part 4 table image response (2026-08-06)
+
+- `POST /api/v1/exams`의 `result.questions`에서 Part 4는 기존 text·audioUrl을 유지하면서 DB `table_image_url`의 원본 값을 camelCase `tableImageUrl`로 반환하고 tableContext는 JSON에 노출하지 않는다.
+- 세션 생성 전용 변환만 추가했으므로 Part 1·2·3·5·6·7, 기존 채점 결과 단건 `GET /api/v1/exams/{examId}/questions`, Summary·AI 계약은 유지된다. 내부 `Question.tableContext`와 Mongo 매핑도 보존한다.
+- 별도 prompt `GET /api/v1/exams/{examId}/questions/{questionNumber}/prompt`는 이번 명시 범위 밖이라 기존 tableContext 변환을 유지한다.
+- 집중 테스트와 전체 `./gradlew clean test`가 성공했다. Java 295개, failures/errors/skipped 0개이며 `git diff --check`도 성공했다. 실제 외부 시스템과 Git·Jira 쓰기 작업은 수행하지 않았다.
+
+## Latest Codex record synchronization (2026-08-06)
+
+- 현재 turn hook 요구에 따라 Part 4 시험 시작 응답 구현 상태를 WORKLOG 끝에 append하고 CURRENT_STATE를 동기화했다. 구현 및 검증 결과는 직전 상태와 동일하며 애플리케이션·테스트 코드는 추가 변경하지 않았다.
+- 별도 Jira 이슈 키가 없고 Secret·Token·Credential 및 사용자 제공 임시 URL 값은 기록하지 않았다. Git·Jira 쓰기 작업과 외부 시스템 호출도 수행하지 않았다.

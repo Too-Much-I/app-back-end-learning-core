@@ -174,7 +174,7 @@ public class ExamServiceImpl implements ExamService {
         MockExam mockExam = assignment.mockExam();
         List<ExamResponseDTO.QuestionDTO> questionDTOs = mockExam.getQuestions().stream()
                 .filter(q -> q != null && q.getQuestionNumber() != null && q.getQuestionNumber() > 0)
-                .map(q -> toQuestionPrompt(mockExam.getMockExamId(), q))
+                .map(q -> toCreateSessionQuestion(mockExam.getMockExamId(), q))
                 .collect(Collectors.toList());
 
         return ExamConverter.toCreateSessionResult(examId, mockExam.getTitle(), questionDTOs);
@@ -196,8 +196,20 @@ public class ExamServiceImpl implements ExamService {
         return toQuestionPrompt(mockExamId, question);
     }
 
+    private ExamResponseDTO.QuestionDTO toCreateSessionQuestion(String mockExamId, Question question) {
+        ExamResponseDTO.QuestionDTO dto = ExamConverter.toCreateSessionQuestionDTO(question);
+        return addQuestionAudioUrls(mockExamId, question, dto);
+    }
+
     private ExamResponseDTO.QuestionDTO toQuestionPrompt(String mockExamId, Question question) {
         ExamResponseDTO.QuestionDTO dto = ExamConverter.toQuestionDTO(question);
+        return addQuestionAudioUrls(mockExamId, question, dto);
+    }
+
+    private ExamResponseDTO.QuestionDTO addQuestionAudioUrls(
+            String mockExamId,
+            Question question,
+            ExamResponseDTO.QuestionDTO dto) {
         dto.setAudioUrl(getQuestionAudioUrl(mockExamId, question.getQuestionNumber()));
         if (Integer.valueOf(3).equals(question.getPartNumber())) {
             dto.setGuideAudioUrl(getQuestionGuideAudioUrl(mockExamId));

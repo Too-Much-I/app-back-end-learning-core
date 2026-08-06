@@ -42,6 +42,15 @@ public class ExamConverter {
                 .build();
     }
 
+    public static ExamResponseDTO.QuestionDTO toCreateSessionQuestionDTO(Question question) {
+        ExamResponseDTO.QuestionDTO dto = toQuestionDTO(question);
+        if (Integer.valueOf(4).equals(question.getPartNumber())) {
+            dto.setTableImageUrl(question.getTableImageUrl());
+            dto.setTableContext(null);
+        }
+        return dto;
+    }
+
     private static ExamResponseDTO.QuestionDTO toQuestionInfoDTO(Question question) {
         if (question != null && Integer.valueOf(4).equals(question.getPartNumber())) {
             return ExamResponseDTO.QuestionDTO.builder()
