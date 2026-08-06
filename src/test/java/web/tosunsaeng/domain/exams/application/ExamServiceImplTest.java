@@ -41,6 +41,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.lenient;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
@@ -125,7 +126,7 @@ class ExamServiceImplTest {
                 .cycleNumber(1)
                 .active(true)
                 .build();
-        when(examSessionManager.findOrCreate(LEGACY_USER_ID))
+        when(examSessionManager.startNew(LEGACY_USER_ID))
                 .thenReturn(new ExamSessionManager.Assignment(assignedSession, mockExam, true));
 
         when(s3Presigner.presignGetObject(any(GetObjectPresignRequest.class)))
@@ -148,7 +149,7 @@ class ExamServiceImplTest {
                 examSessionRepository
         );
         creationOrder.verify(currentUserProvider).getCurrentUserId();
-        creationOrder.verify(examSessionManager).findOrCreate(LEGACY_USER_ID);
+        creationOrder.verify(examSessionManager).startNew(LEGACY_USER_ID);
         creationOrder.verify(valueOperations)
                 .set(expectedRedisKey, ExamStatus.PENDING.name(), 1, TimeUnit.HOURS);
         creationOrder.verify(s3Presigner).presignGetObject(any(GetObjectPresignRequest.class));
@@ -178,7 +179,7 @@ class ExamServiceImplTest {
     }
 
     @Test
-    void reusableSessionKeepsExamIdAndRefreshesSelectedPaperPresignedUrls() throws Exception {
+    void consecutiveStartsReturnDifferentExamIdsAndInitializeEachRedisStatus() throws Exception {
         Question selectedQuestion = Question.builder()
                 .partNumber(1)
                 .questionNumber(1)
@@ -189,16 +190,24 @@ class ExamServiceImplTest {
                 .title("Selected paper")
                 .questions(List.of(selectedQuestion))
                 .build();
-        ExamSession existing = ExamSession.builder()
-                .examId("ex_existing_002")
+        ExamSession firstSession = ExamSession.builder()
+                .examId("ex_new_first_002")
                 .userId(LEGACY_USER_ID)
                 .mockExamId("mock_exam_002")
                 .cycleNumber(1)
                 .active(true)
                 .build();
-        when(examSessionManager.findOrCreate(LEGACY_USER_ID))
-                .thenReturn(new ExamSessionManager.Assignment(existing, selectedPaper, false));
-        when(redisTemplate.hasKey("exam:status:ex_existing_002")).thenReturn(true);
+        ExamSession secondSession = ExamSession.builder()
+                .examId("ex_new_second_002")
+                .userId(LEGACY_USER_ID)
+                .mockExamId("mock_exam_002")
+                .cycleNumber(1)
+                .active(true)
+                .build();
+        when(examSessionManager.startNew(LEGACY_USER_ID)).thenReturn(
+                new ExamSessionManager.Assignment(firstSession, selectedPaper, true),
+                new ExamSessionManager.Assignment(secondSession, selectedPaper, true)
+        );
 
         when(presignedGetObjectRequest.url()).thenReturn(
                 URI.create("https://example.com/first.wav").toURL(),
@@ -211,8 +220,9 @@ class ExamServiceImplTest {
         ArgumentCaptor<GetObjectPresignRequest> requestCaptor =
                 ArgumentCaptor.forClass(GetObjectPresignRequest.class);
         verify(s3Presigner, times(2)).presignGetObject(requestCaptor.capture());
-        assertEquals("ex_existing_002", first.getExamId());
-        assertEquals(first.getExamId(), second.getExamId());
+        assertEquals("ex_new_first_002", first.getExamId());
+        assertEquals("ex_new_second_002", second.getExamId());
+        assertFalse(first.getExamId().equals(second.getExamId()));
         assertEquals("https://example.com/first.wav", first.getQuestions().getFirst().getAudioUrl());
         assertEquals("https://example.com/second.wav", second.getQuestions().getFirst().getAudioUrl());
         assertEquals(List.of(
@@ -221,31 +231,27 @@ class ExamServiceImplTest {
                 ), requestCaptor.getAllValues().stream()
                         .map(request -> request.getObjectRequest().key())
                         .toList());
-        verify(examSessionManager, times(2)).findOrCreate(LEGACY_USER_ID);
+        verify(examSessionManager, times(2)).startNew(LEGACY_USER_ID);
+        verify(valueOperations).set(
+                "exam:status:ex_new_first_002", ExamStatus.PENDING.name(), 1, TimeUnit.HOURS);
+        verify(valueOperations).set(
+                "exam:status:ex_new_second_002", ExamStatus.PENDING.name(), 1, TimeUnit.HOURS);
         verifyNoInteractions(examSessionRepository, mockExamCatalogService);
     }
 
     @Test
-    void reusableSessionRecoversMissingRedisStatusFromMongoState() {
-        when(examSessionManager.findOrCreate(LEGACY_USER_ID))
-                .thenReturn(new ExamSessionManager.Assignment(
-                        assignedSession,
-                        MockExam.builder()
-                                .mockExamId("mock_exam_003")
-                                .questions(List.of(Question.builder()
-                                        .partNumber(1)
-                                        .questionNumber(1)
-                                        .build()))
-                                .build(),
-                        false
-                ));
-        when(redisTemplate.hasKey("exam:status:" + assignedSession.getExamId())).thenReturn(false);
-        when(gradingService.calculateAndCacheOverallStatus(assignedSession.getExamId()))
-                .thenReturn(ExamStatus.PROCESSING);
+    void newSessionDoesNotReuseOrRecoverPreviousRedisState() {
 
         examService.createExamSession();
 
-        verify(gradingService).calculateAndCacheOverallStatus(assignedSession.getExamId());
+        verify(redisTemplate, never()).hasKey(any());
+        verify(gradingService, never()).calculateAndCacheOverallStatus(any());
+        verify(valueOperations).set(
+                "exam:status:" + assignedSession.getExamId(),
+                ExamStatus.PENDING.name(),
+                1,
+                TimeUnit.HOURS
+        );
     }
 
     @Test
@@ -263,7 +269,7 @@ class ExamServiceImplTest {
                 .mockExamId("mock_exam_002")
                 .active(true)
                 .build();
-        when(examSessionManager.findOrCreate(LEGACY_USER_ID))
+        when(examSessionManager.startNew(LEGACY_USER_ID))
                 .thenReturn(new ExamSessionManager.Assignment(selectedSession, selectedPaper, true));
 
         examService.createExamSession();

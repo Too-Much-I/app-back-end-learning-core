@@ -1,11 +1,14 @@
 package web.tosunsaeng.domain.exams.application;
 
+import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.EnumSource;
+import org.junit.jupiter.params.provider.NullSource;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.ArgumentCaptor;
 import org.mockito.InOrder;
 import org.mockito.Mock;
@@ -26,6 +29,7 @@ import web.tosunsaeng.domain.exams.domain.entity.ExamSummary;
 import web.tosunsaeng.domain.exams.domain.entity.MockExam;
 import web.tosunsaeng.domain.exams.domain.entity.Question;
 import web.tosunsaeng.domain.exams.domain.entity.SpeechAceResult;
+import web.tosunsaeng.domain.exams.domain.enums.ExamSessionStatus;
 import web.tosunsaeng.domain.exams.domain.enums.ExamStatus;
 import web.tosunsaeng.domain.exams.domain.repository.AzureResultRepository;
 import web.tosunsaeng.domain.exams.domain.repository.ExamResultRepository;
@@ -47,6 +51,7 @@ import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.assertAll;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
@@ -429,6 +434,122 @@ class ExamOwnershipServiceTest {
     }
 
     @Test
+    void partFourQuestionInfoReturnsStoredTableImageUrlWithoutTableDetails() {
+        String storedUrl = "https://cdn.example.com/mock-exam/001/part4/q8.png";
+        Question.TableContext tableContext = Question.TableContext.builder()
+                .title("Conference Schedule")
+                .location("Convention Center")
+                .date("August 6")
+                .fee("$20")
+                .items(List.of(Question.TableItem.builder()
+                        .time("10:00")
+                        .sessionTitle("Opening Session")
+                        .speaker("Speaker")
+                        .note("Bring identification")
+                        .build()))
+                .build();
+        Question partFour = Question.builder()
+                .partNumber(4)
+                .questionNumber(8)
+                .question("Legacy table question text")
+                .referenceText("Legacy reference")
+                .partIntroText("Legacy introduction")
+                .audioUrl("legacy-question-audio")
+                .guideAudioUrl("legacy-guide-audio")
+                .imageUrl("legacy-image")
+                .tableImageUrl(storedUrl)
+                .tableContext(tableContext)
+                .prepTimeSec(30)
+                .speakTimeSec(15)
+                .build();
+        stubQuestionResultPaper(partFour);
+
+        ExamResponseDTO.QuestionResult result = examService.getExamQuestion(EXAM_ID, 8, 0);
+
+        ExamResponseDTO.QuestionDTO questionInfo = result.getQuestion().getQuestionInfo();
+        JsonNode questionInfoJson = objectMapper.valueToTree(questionInfo);
+        assertAll(
+                () -> assertEquals(4, questionInfo.getPart()),
+                () -> assertEquals(8, questionInfo.getQuestionNumber()),
+                () -> assertEquals(storedUrl, questionInfo.getTableImageUrl()),
+                () -> assertEquals(3, questionInfoJson.size()),
+                () -> assertEquals(storedUrl, questionInfoJson.get("tableImageUrl").asText()),
+                () -> assertFalse(questionInfoJson.has("table_image_url")),
+                () -> assertFalse(questionInfoJson.has("text")),
+                () -> assertFalse(questionInfoJson.has("referenceText")),
+                () -> assertFalse(questionInfoJson.has("partIntroText")),
+                () -> assertFalse(questionInfoJson.has("audioUrl")),
+                () -> assertFalse(questionInfoJson.has("guideAudioUrl")),
+                () -> assertFalse(questionInfoJson.has("imageUrl")),
+                () -> assertFalse(questionInfoJson.has("tableContext")),
+                () -> assertFalse(questionInfoJson.has("prepTimeSec")),
+                () -> assertFalse(questionInfoJson.has("speakTimeSec"))
+        );
+    }
+
+    @ParameterizedTest
+    @NullSource
+    @ValueSource(strings = {"", "   "})
+    void partFourQuestionWithoutTableImageUrlUsesCatalogConfigurationError(String tableImageUrl) {
+        Question partFour = Question.builder()
+                .partNumber(4)
+                .questionNumber(8)
+                .tableImageUrl(tableImageUrl)
+                .tableContext(Question.TableContext.builder().title("Legacy table").build())
+                .build();
+        stubQuestionResultPaper(partFour);
+
+        ExamsException exception = assertThrows(
+                ExamsException.class,
+                () -> examService.getExamQuestion(EXAM_ID, 8, 0)
+        );
+
+        assertSame(ErrorStatus._EXAM_CATALOG_CONFIGURATION_ERROR, exception.getCode());
+        verifyNoInteractions(s3Presigner);
+    }
+
+    @ParameterizedTest
+    @ValueSource(ints = {1, 2, 3, 5, 6, 7})
+    void nonPartFourQuestionInfoKeepsExistingFields(int partNumber) {
+        Question.TableContext existingTableContext = Question.TableContext.builder()
+                .title("Existing context")
+                .build();
+        Question question = Question.builder()
+                .partNumber(partNumber)
+                .questionNumber(partNumber)
+                .question("Existing text")
+                .referenceText("Existing reference")
+                .partIntroText("Existing introduction")
+                .audioUrl("existing-audio")
+                .guideAudioUrl("existing-guide")
+                .imageUrl("existing-image")
+                .tableContext(existingTableContext)
+                .prepTimeSec(30)
+                .speakTimeSec(45)
+                .build();
+        stubQuestionResultPaper(question);
+
+        ExamResponseDTO.QuestionResult result =
+                examService.getExamQuestion(EXAM_ID, partNumber, 0);
+
+        ExamResponseDTO.QuestionDTO questionInfo = result.getQuestion().getQuestionInfo();
+        assertAll(
+                () -> assertEquals(partNumber, questionInfo.getPart()),
+                () -> assertEquals(partNumber, questionInfo.getQuestionNumber()),
+                () -> assertEquals("Existing text", questionInfo.getText()),
+                () -> assertEquals("Existing reference", questionInfo.getReferenceText()),
+                () -> assertEquals("Existing introduction", questionInfo.getPartIntroText()),
+                () -> assertEquals("existing-audio", questionInfo.getAudioUrl()),
+                () -> assertEquals("existing-guide", questionInfo.getGuideAudioUrl()),
+                () -> assertEquals("existing-image", questionInfo.getImageUrl()),
+                () -> assertSame(existingTableContext, questionInfo.getTableContext()),
+                () -> assertEquals(30, questionInfo.getPrepTimeSec()),
+                () -> assertEquals(45, questionInfo.getSpeakTimeSec()),
+                () -> assertNull(questionInfo.getTableImageUrl())
+        );
+    }
+
+    @Test
     void retryZeroQuestionReadReturnsLegacyAzureWithNullRetryCount() throws Exception {
         stubEmptyQuestionRead(0);
         AzureResult legacyNull = legacyAzure("legacy-null", null, 7);
@@ -620,6 +741,45 @@ class ExamOwnershipServiceTest {
         verify(gradingService).getQuestionStatus(EXAM_ID, 1, 0);
     }
 
+    @Test
+    void ownerCannotRetryAbandonedExam() {
+        when(examSessionRepository.findById(EXAM_ID)).thenReturn(Optional.of(ExamSession.builder()
+                .examId(EXAM_ID)
+                .userId(OWNER_USER_ID)
+                .active(false)
+                .status(ExamSessionStatus.ABANDONED)
+                .build()));
+        when(currentUserProvider.getCurrentUserId()).thenReturn(OWNER_USER_ID);
+
+        ExamsException exception = assertThrows(
+                ExamsException.class,
+                () -> examService.retryGrading(EXAM_ID)
+        );
+
+        assertSame(ErrorStatus._EXAM_ABANDONED, exception.getCode());
+        verify(gradingService, never()).retryExam(EXAM_ID);
+    }
+
+    @Test
+    void ownerCannotRetryCompletedExam() {
+        when(examSessionRepository.findById(EXAM_ID)).thenReturn(Optional.of(ExamSession.builder()
+                .examId(EXAM_ID)
+                .userId(OWNER_USER_ID)
+                .active(false)
+                .status(ExamSessionStatus.COMPLETED)
+                .completedAt(LocalDateTime.of(2026, 7, 23, 13, 0))
+                .build()));
+        when(currentUserProvider.getCurrentUserId()).thenReturn(OWNER_USER_ID);
+
+        ExamsException exception = assertThrows(
+                ExamsException.class,
+                () -> examService.retryGrading(EXAM_ID)
+        );
+
+        assertSame(ErrorStatus._EXAM_ALREADY_COMPLETED, exception.getCode());
+        verify(gradingService, never()).retryExam(EXAM_ID);
+    }
+
     @ParameterizedTest
     @EnumSource(UserExamApi.class)
     void missingSessionIsRejectedBeforeAnyDownstreamOperation(UserExamApi api) {
@@ -750,6 +910,8 @@ class ExamOwnershipServiceTest {
                   "speechace_result": {"score": 90}
                 }
                 """, ExamRequestDTO.SpeechAceReq.class);
+        when(examSessionRepository.findById(EXAM_ID))
+                .thenReturn(Optional.of(sessionFor(OWNER_USER_ID)));
 
         examService.saveSpeechAceResult(request);
 
@@ -760,7 +922,8 @@ class ExamOwnershipServiceTest {
                 () -> assertEquals(1, resultCaptor.getValue().getQuestionNumber()),
                 () -> assertEquals(0, resultCaptor.getValue().getRetryCount())
         );
-        verifyNoInteractions(currentUserProvider, examSessionRepository);
+        verify(examSessionRepository).findById(EXAM_ID);
+        verifyNoInteractions(currentUserProvider);
     }
 
     @Test
@@ -773,6 +936,8 @@ class ExamOwnershipServiceTest {
                 ),
                 "azure_speech_result", Map.of("recognition_status", "Success")
         );
+        when(examSessionRepository.findById(EXAM_ID))
+                .thenReturn(Optional.of(sessionFor(OWNER_USER_ID)));
 
         examService.processAzureCallback(rawPayload);
 
@@ -784,7 +949,8 @@ class ExamOwnershipServiceTest {
                 () -> assertEquals(0, resultCaptor.getValue().getRetryCount()),
                 () -> assertSame(rawPayload, resultCaptor.getValue().getRawData())
         );
-        verifyNoInteractions(currentUserProvider, examSessionRepository);
+        verify(examSessionRepository).findById(EXAM_ID);
+        verifyNoInteractions(currentUserProvider);
     }
 
     private void stubOwnedSession() {
@@ -803,6 +969,25 @@ class ExamOwnershipServiceTest {
         )).thenReturn(Optional.empty());
         when(mockExamCatalogService.getRequiredExam("mock_exam_003"))
                 .thenReturn(mockExam());
+    }
+
+    private void stubQuestionResultPaper(Question question) {
+        stubOwnedSession();
+        when(examResultRepository.findByExamId(EXAM_ID)).thenReturn(List.of());
+        when(examResultRepository.findFirstByExamIdAndQuestionNumberAndRetryCountInOrderByIdDesc(
+                EXAM_ID,
+                question.getQuestionNumber(),
+                Arrays.asList(0, null)
+        )).thenReturn(Optional.empty());
+        when(azureResultRepository.findFirstByExamIdAndQuestionNumberAndRetryCountOrderByIdDesc(
+                EXAM_ID,
+                question.getQuestionNumber(),
+                0
+        )).thenReturn(Optional.empty());
+        when(mockExamCatalogService.getRequiredExam("mock_exam_003")).thenReturn(MockExam.builder()
+                .mockExamId("mock_exam_003")
+                .questions(List.of(question))
+                .build());
     }
 
     private AzureResult legacyAzure(String id, Integer retryCount, int omissionCount) {

@@ -112,6 +112,44 @@ public class ExamServiceImpl implements ExamService {
         return examSession;
     }
 
+    private ExamSession requireOwnedNotAbandonedSession(String examId) {
+        ExamSession examSession = requireOwnedSession(examId);
+        if (examSession.isAbandoned()) {
+            throw new ExamsException(ErrorStatus._EXAM_ABANDONED);
+        }
+        return examSession;
+    }
+
+    private ExamSession requireOwnedInProgressSession(String examId) {
+        ExamSession examSession = requireOwnedNotAbandonedSession(examId);
+        requireInProgressSession(examSession);
+        return examSession;
+    }
+
+    private static void requireInProgressSession(ExamSession examSession) {
+        if (examSession.isAbandoned()) {
+            throw new ExamsException(ErrorStatus._EXAM_ABANDONED);
+        }
+        if (examSession.isCompleted()) {
+            throw new ExamsException(ErrorStatus._EXAM_ALREADY_COMPLETED);
+        }
+    }
+
+    private boolean ignoreAbandonedCallback(
+            ExamSession examSession,
+            Integer questionNumber,
+            Integer retryCount,
+            String jobId) {
+        if (!examSession.isAbandoned()) {
+            return false;
+        }
+        log.info(
+                "ABANDONED 시험 Callback 무시: examId={}, questionNumber={}, retryCount={}, jobId={}",
+                examSession.getExamId(), questionNumber, retryCount, jobId
+        );
+        return true;
+    }
+
     // --- 2. 유틸리티 메서드: 토익스피킹 파트 판별 ---
 
     // 문항 번호를 토대로 토익스피킹 파트(Part) 번호를 계산합니다.
@@ -125,17 +163,13 @@ public class ExamServiceImpl implements ExamService {
     @Override
     public ExamResponseDTO.CreateSessionResult createExamSession() {
         String userId = currentUserProvider.getCurrentUserId();
-        ExamSessionManager.Assignment assignment = examSessionManager.findOrCreate(userId);
+        ExamSessionManager.Assignment assignment = examSessionManager.startNew(userId);
         String examId = assignment.session().getExamId();
         String redisKey = "exam:status:" + examId;
 
-        if (assignment.created()) {
-            redisTemplate.opsForValue().set(redisKey, ExamStatus.PENDING.name(), 1, TimeUnit.HOURS);
-            log.info("정규 모의고사 세션 생성 완료: examId={}, mockExamId={}",
-                    examId, assignment.mockExam().getMockExamId());
-        } else if (!Boolean.TRUE.equals(redisTemplate.hasKey(redisKey))) {
-            gradingService.calculateAndCacheOverallStatus(examId);
-        }
+        redisTemplate.opsForValue().set(redisKey, ExamStatus.PENDING.name(), 1, TimeUnit.HOURS);
+        log.info("정규 모의고사 세션 생성 완료: examId={}, mockExamId={}",
+                examId, assignment.mockExam().getMockExamId());
 
         MockExam mockExam = assignment.mockExam();
         List<ExamResponseDTO.QuestionDTO> questionDTOs = mockExam.getQuestions().stream()
@@ -174,7 +208,7 @@ public class ExamServiceImpl implements ExamService {
     // 사용자가 가상으로 녹음 오디오 파일을 업로드할 수 있는 임시 S3 PutObject용 Presigned URL을 발급합니다.
     @Override
     public ExamResponseDTO.UploadUrlResult getPresignedUrl(String examId, Integer questionNumber, Integer retryCount) {
-        requireOwnedSession(examId);
+        requireOwnedNotAbandonedSession(examId);
 
         String fileKey = String.format("temp/%s/q_%d_r%d.wav", examId, questionNumber, retryCount);
 
@@ -201,14 +235,14 @@ public class ExamServiceImpl implements ExamService {
     // 기존 submit 계약은 유지하고 결정적 Job을 생성한 최초 요청만 AI 채점을 시작합니다.
     @Override
     public ExamResponseDTO.SubmitResult submitAudio(String examId, Integer questionNumber, Integer retryCount) {
-        requireOwnedSession(examId);
+        requireOwnedNotAbandonedSession(examId);
         ExamStatus status = gradingService.submitQuestion(examId, questionNumber, retryCount);
         return ExamConverter.toSubmitResult(status);
     }
 
     @Override
     public ExamResponseDTO.GradingRetryResult retryGrading(String examId) {
-        requireOwnedSession(examId);
+        requireOwnedInProgressSession(examId);
         return gradingService.retryExam(examId);
     }
 
@@ -225,6 +259,17 @@ public class ExamServiceImpl implements ExamService {
     public void updateExamResult(ExamRequestDTO.AiResultReq req) {
         String examId = req.getExamId();
         ExamSession examSession = resolveSession(examId);
+        int retryCount = GradingKeys.canonicalRetryCount(req.getRetryCount());
+        String callbackJobId = req.getTotalScore() != null
+                ? GradingKeys.summaryJobId(examId)
+                : GradingKeys.questionJobId(examId, req.getQuestionNumber(), retryCount);
+        if (ignoreAbandonedCallback(
+                examSession,
+                req.getQuestionNumber(),
+                retryCount,
+                callbackJobId)) {
+            return;
+        }
         String mockExamId = GradingKeys.effectiveMockExamId(examSession.getMockExamId());
 
         // 종합 결과도 결정적 ID와 legacy 논리 결과 확인으로 멱등 저장합니다.
@@ -253,7 +298,6 @@ public class ExamServiceImpl implements ExamService {
             return;
         }
 
-        int retryCount = GradingKeys.canonicalRetryCount(req.getRetryCount());
         boolean alreadyStored = examResultRepository.existsByExamIdAndQuestionNumberAndRetryCountIn(
                 examId,
                 req.getQuestionNumber(),
@@ -362,6 +406,7 @@ public class ExamServiceImpl implements ExamService {
                 .filter(q -> q.getQuestionNumber() != null && q.getQuestionNumber().equals(questionNumber))
                 .findFirst()
                 .orElseThrow(() -> new ExamsException(ErrorStatus._QUESTION_NOT_FOUND));
+        requirePartFourTableImageUrl(rawQuestion);
 
         // 기존 상태 정책상 matching ExamResult는 해당 회차의 채점 완료 증거입니다.
         // 결과가 없는 제출 전·처리 중·실패 회차에서는 사용자/모범답안 URL과 catalog 조회를 모두 생략합니다.
@@ -388,6 +433,14 @@ public class ExamServiceImpl implements ExamService {
                 getPartNumber(questionNumber),
                 modelAnswer
         );
+    }
+
+    private static void requirePartFourTableImageUrl(Question question) {
+        if (question != null
+                && Integer.valueOf(4).equals(question.getPartNumber())
+                && (question.getTableImageUrl() == null || question.getTableImageUrl().isBlank())) {
+            throw new ExamsException(ErrorStatus._EXAM_CATALOG_CONFIGURATION_ERROR);
+        }
     }
 
     private ExamResponseDTO.ModelAnswerResponse buildModelAnswer(
@@ -462,6 +515,13 @@ public class ExamServiceImpl implements ExamService {
     @Override
     public void saveSpeechAceResult(ExamRequestDTO.SpeechAceReq req) {
         int retryCount = GradingKeys.canonicalRetryCount(req.getRetryCount());
+        ExamSession examSession = resolveSession(req.getExamId());
+        String jobId = GradingKeys.questionJobId(
+                req.getExamId(), req.getQuestionNumber(), retryCount);
+        if (ignoreAbandonedCallback(
+                examSession, req.getQuestionNumber(), retryCount, jobId)) {
+            return;
+        }
         if (speechAceResultRepository.existsByExamIdAndQuestionNumberAndRetryCountIn(
                 req.getExamId(),
                 req.getQuestionNumber(),
@@ -495,6 +555,12 @@ public class ExamServiceImpl implements ExamService {
         String examId = (String) metadata.get("user_id");
         Integer questionNumber = (Integer) metadata.get("question_number");
         Integer retryCount = metadata.get("retry_count") != null ? (Integer) metadata.get("retry_count") : 0;
+
+        ExamSession examSession = resolveSession(examId);
+        String jobId = GradingKeys.questionJobId(examId, questionNumber, retryCount);
+        if (ignoreAbandonedCallback(examSession, questionNumber, retryCount, jobId)) {
+            return;
+        }
 
         log.info("Azure 음성인식 분석 원본 수신 및 저장 시작: examId={}, questionNumber={}, retryCount={}", examId, questionNumber, retryCount);
 

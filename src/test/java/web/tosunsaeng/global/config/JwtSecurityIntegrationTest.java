@@ -225,7 +225,7 @@ class JwtSecurityIntegrationTest {
                 .title("JWT integration test exam")
                 .questions(List.of(question))
                 .build();
-        when(examSessionManager.findOrCreate(anyString())).thenAnswer(invocation -> {
+        when(examSessionManager.startNew(anyString())).thenAnswer(invocation -> {
             String userId = invocation.getArgument(0);
             String examId = "ex_" + UUID.randomUUID().toString().replace("-", "").substring(0, 10)
                     + "_0729_0600";

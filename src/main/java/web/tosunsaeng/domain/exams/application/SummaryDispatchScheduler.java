@@ -6,6 +6,7 @@ import org.springframework.core.task.TaskExecutor;
 import org.springframework.core.task.TaskRejectedException;
 import org.springframework.dao.OptimisticLockingFailureException;
 import org.springframework.stereotype.Component;
+import web.tosunsaeng.domain.exams.domain.entity.ExamSession;
 import web.tosunsaeng.domain.exams.domain.entity.SummaryGradingJob;
 import web.tosunsaeng.domain.exams.domain.enums.GradingJobStatus;
 import web.tosunsaeng.domain.exams.domain.repository.ExamSessionRepository;
@@ -22,6 +23,7 @@ import java.util.Optional;
 public class SummaryDispatchScheduler {
 
     static final String SUMMARY_DISPATCH_FAILED = "SUMMARY_DISPATCH_FAILED";
+    static final String EXAM_ABANDONED = "EXAM_ABANDONED";
 
     private final TaskExecutor taskExecutor;
     private final SummaryGradingJobRepository summaryJobRepository;
@@ -70,6 +72,9 @@ public class SummaryDispatchScheduler {
         }
 
         SummaryGradingJob job = existing.get();
+        if (!isSessionInProgress(job.getExamId())) {
+            return;
+        }
         Instant now = clock.instant();
         if (!isEligible(job, mode, now)
                 || job.getDispatchAttempt() >= properties.maxDispatchAttempts()) {
@@ -85,6 +90,15 @@ public class SummaryDispatchScheduler {
         }
 
         SummaryDispatchClaim claim = SummaryDispatchClaim.from(claimed, resolveMockExamId(claimed));
+        if (!isSessionInProgress(claim.examId())) {
+            summaryJobRepository.failClaimedAttempt(
+                    claim.jobId(),
+                    claim.dispatchAttempt(),
+                    clock.instant(),
+                    EXAM_ABANDONED
+            );
+            return;
+        }
         try {
             dispatchService.dispatchSummary(claim);
         } catch (RuntimeException dispatchFailure) {
@@ -119,6 +133,12 @@ public class SummaryDispatchScheduler {
         return examSessionRepository.findById(job.getExamId())
                 .map(session -> GradingKeys.effectiveMockExamId(session.getMockExamId()))
                 .orElse(GradingKeys.LEGACY_MOCK_EXAM_ID);
+    }
+
+    private boolean isSessionInProgress(String examId) {
+        return examSessionRepository.findById(examId)
+                .map(ExamSession::isInProgress)
+                .orElse(false);
     }
 
     private static boolean timedOut(Instant startedAt, Duration timeout, Instant now) {

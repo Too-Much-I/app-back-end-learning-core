@@ -10,6 +10,7 @@ import org.springframework.stereotype.Service;
 import software.amazon.awssdk.services.s3.S3Client;
 import software.amazon.awssdk.services.s3.model.HeadObjectRequest;
 import software.amazon.awssdk.services.s3.model.S3Exception;
+import web.tosunsaeng.domain.exams.domain.entity.ExamSession;
 import web.tosunsaeng.domain.exams.domain.entity.MockExam;
 import web.tosunsaeng.domain.exams.domain.entity.ExamResult;
 import web.tosunsaeng.domain.exams.domain.entity.QuestionGradingJob;
@@ -50,6 +51,7 @@ public class ExamGradingService {
     private static final int CALLBACK_COMPLETION_RETRIES = 5;
     private static final String QUESTION_DISPATCH_FAILED = "QUESTION_DISPATCH_FAILED";
     private static final String MAX_DISPATCH_ATTEMPTS = "MAX_DISPATCH_ATTEMPTS";
+    private static final String EXAM_ABANDONED = "EXAM_ABANDONED";
     private static final int MAX_FAILURE_LOG_MESSAGE_LENGTH = 500;
     private static final Pattern URI_IN_MESSAGE = Pattern.compile("(?i)https?://\\S+");
     private static final Pattern SENSITIVE_VALUE_IN_MESSAGE = Pattern.compile(
@@ -73,6 +75,7 @@ public class ExamGradingService {
     private String bucketName;
 
     public ExamStatus submitQuestion(String examId, Integer questionNumber, Integer retryCount) {
+        requireNotAbandonedSession(examId);
         int canonicalRetryCount = GradingKeys.canonicalRetryCount(retryCount);
         String mockExamId = resolveMockExamId(examId);
         String jobId = GradingKeys.questionJobId(examId, questionNumber, canonicalRetryCount);
@@ -136,6 +139,10 @@ public class ExamGradingService {
         }
 
         QuestionDispatchClaim claim = QuestionDispatchClaim.from(claimed);
+        if (!canProcessSession(examId)) {
+            failQuestionClaim(claim, EXAM_ABANDONED);
+            throw new ExamsException(ErrorStatus._EXAM_ABANDONED);
+        }
         log.info(
                 "AI 전송 호출 직전: jobId={}, fileKey={}, attempt={}",
                 claim.jobId(), claim.fileKey(), claimed.getDispatchAttempt()
@@ -155,6 +162,7 @@ public class ExamGradingService {
     }
 
     public ExamResponseDTO.GradingRetryResult retryExam(String examId) {
+        requireInProgressSession(examId);
         List<Integer> questionNumbers = expectedQuestionNumbers(examId);
         List<Integer> retried = new ArrayList<>();
         List<Integer> waiting = new ArrayList<>();
@@ -193,6 +201,9 @@ public class ExamGradingService {
     }
 
     public void completeQuestion(String examId, Integer questionNumber, Integer retryCount) {
+        if (!canProcessSession(examId)) {
+            return;
+        }
         int canonicalRetryCount = GradingKeys.canonicalRetryCount(retryCount);
         String mockExamId = resolveMockExamId(examId);
         String jobId = GradingKeys.questionJobId(examId, questionNumber, canonicalRetryCount);
@@ -233,6 +244,9 @@ public class ExamGradingService {
     }
 
     public void completeSummary(String examId) {
+        if (!canProcessSession(examId)) {
+            return;
+        }
         String jobId = GradingKeys.summaryJobId(examId);
         String mockExamId = resolveMockExamId(examId);
 
@@ -264,6 +278,9 @@ public class ExamGradingService {
     }
 
     public void ensureSummaryStartedIfReady(String examId) {
+        if (!canProcessSession(examId)) {
+            return;
+        }
         List<Integer> questionNumbers = expectedQuestionNumbers(examId);
         if (!allQuestionsComplete(examId, questionNumbers)) {
             calculateAndCacheOverallStatus(examId, questionNumbers);
@@ -381,6 +398,9 @@ public class ExamGradingService {
     }
 
     private DispatchOutcome claimAndDispatchQuestion(QuestionGradingJob job, boolean initialDispatch) {
+        if (!canProcessSession(job.getExamId())) {
+            return DispatchOutcome.FAILED;
+        }
         if (!initialDispatch && job.getDispatchAttempt() >= properties.maxDispatchAttempts()) {
             markAttemptLimitReached(job);
             return DispatchOutcome.FAILED;
@@ -395,6 +415,10 @@ public class ExamGradingService {
         }
 
         QuestionDispatchClaim claim = QuestionDispatchClaim.from(claimed, resolveMockExamId(claimed));
+        if (!canProcessSession(claim.examId())) {
+            failQuestionClaim(claim, EXAM_ABANDONED);
+            return DispatchOutcome.FAILED;
+        }
         log.info(
                 "AI 전송 호출 직전: jobId={}, fileKey={}, attempt={}",
                 claim.jobId(), claim.fileKey(), claimed.getDispatchAttempt()
@@ -455,6 +479,29 @@ public class ExamGradingService {
         } catch (OptimisticLockingFailureException concurrentUpdate) {
             // A concurrent retry or callback owns the newer state.
         }
+    }
+
+    private ExamSession requireInProgressSession(String examId) {
+        ExamSession session = requireNotAbandonedSession(examId);
+        if (session.isCompleted()) {
+            throw new ExamsException(ErrorStatus._EXAM_ALREADY_COMPLETED);
+        }
+        return session;
+    }
+
+    private ExamSession requireNotAbandonedSession(String examId) {
+        ExamSession session = examSessionRepository.findById(examId)
+                .orElseThrow(() -> new ExamsException(ErrorStatus._EXAM_NOT_FOUND));
+        if (session.isAbandoned()) {
+            throw new ExamsException(ErrorStatus._EXAM_ABANDONED);
+        }
+        return session;
+    }
+
+    private boolean canProcessSession(String examId) {
+        return examSessionRepository.findById(examId)
+                .map(session -> !session.isAbandoned())
+                .orElse(false);
     }
 
     private SummaryAction retrySummaryIfEligible(String examId) {

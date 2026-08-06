@@ -20,6 +20,8 @@ public enum ErrorStatus implements BaseErrorCode {
     // Exams
     _EXAM_NOT_FOUND(HttpStatus.NOT_FOUND, "EXAM_4004", "해당 모의고사 세션을 찾을 수 없습니다."),
     _EXAM_PAPER_NOT_FOUND(HttpStatus.NOT_FOUND, "EXAM_4005", "해당 문제지를 찾을 수 없습니다."),
+    _EXAM_ABANDONED(HttpStatus.CONFLICT, "EXAM_4007", "새 시험 시작으로 종료된 시험입니다."),
+    _EXAM_ALREADY_COMPLETED(HttpStatus.CONFLICT, "EXAM_4008", "이미 완료된 시험입니다."),
     _EXAM_CATALOG_CONFIGURATION_ERROR(HttpStatus.INTERNAL_SERVER_ERROR, "EXAM_5001", "모의고사 카탈로그 설정이 올바르지 않습니다."),
     _EXAM_SESSION_CONFIGURATION_ERROR(HttpStatus.INTERNAL_SERVER_ERROR, "EXAM_5002", "모의고사 세션 데이터 설정이 올바르지 않습니다."),
     _AI_SERVER_CONNECTION_ERROR(HttpStatus.INTERNAL_SERVER_ERROR, "EXAM_4001", "AI 채점 서버와 통신할 수 없습니다. 잠시 후 다시 시도해주세요."),

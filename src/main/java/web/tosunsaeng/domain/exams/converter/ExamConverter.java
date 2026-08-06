@@ -42,6 +42,17 @@ public class ExamConverter {
                 .build();
     }
 
+    private static ExamResponseDTO.QuestionDTO toQuestionInfoDTO(Question question) {
+        if (question != null && Integer.valueOf(4).equals(question.getPartNumber())) {
+            return ExamResponseDTO.QuestionDTO.builder()
+                    .part(question.getPartNumber())
+                    .questionNumber(question.getQuestionNumber())
+                    .tableImageUrl(question.getTableImageUrl())
+                    .build();
+        }
+        return toQuestionDTO(question);
+    }
+
     public static ExamResponseDTO.UploadUrlResult toUploadUrlResult(String uploadUrl, String fileKey, Integer expiresIn) {
         return ExamResponseDTO.UploadUrlResult.builder()
                 .uploadUrl(uploadUrl)
@@ -331,7 +342,7 @@ public class ExamConverter {
             Integer calculatedPartNumber,
             ExamResponseDTO.ModelAnswerResponse modelAnswer
     ) {
-        ExamResponseDTO.QuestionDTO questionInfoDto = ExamConverter.toQuestionDTO(rawQuestion);
+        ExamResponseDTO.QuestionDTO questionInfoDto = toQuestionInfoDTO(rawQuestion);
 
         ExamResponseDTO.ItemFeedbackDTO feedbackDto = (targetDoc != null && targetDoc.getFeedback() != null)
                 ? toItemFeedbackDTO(targetDoc.getFeedback())

@@ -31,6 +31,9 @@ public class Question {
     @Field("image_url")
     private String imageUrl;
 
+    @Field("table_image_url")
+    private String tableImageUrl;
+
     @Field("reference_text")
     private String referenceText;
 

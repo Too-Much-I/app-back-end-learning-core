@@ -26,6 +26,7 @@ import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.assertAll;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
@@ -117,6 +118,48 @@ class GradingDispatchServiceTest {
                 () -> assertTrue(output.getOut().contains(
                         "AI multipart POST 완료: jobId=question:" + EXAM_ID
                                 + ":4:2, status=200 OK"))
+        );
+    }
+
+    @Test
+    @SuppressWarnings({"rawtypes", "unchecked"})
+    void partFourQuestionDispatchKeepsExistingAiContract() throws Exception {
+        when(s3Presigner.presignGetObject(any(GetObjectPresignRequest.class)))
+                .thenReturn(presignedGetObjectRequest);
+        when(presignedGetObjectRequest.url())
+                .thenReturn(URI.create("https://example.com/test-audio.wav").toURL());
+        when(restTemplate.getForObject(any(URI.class), eq(byte[].class)))
+                .thenReturn(new byte[]{1, 2, 3});
+        when(restTemplate.postForEntity(eq(AI_EVALUATION_URL), any(HttpEntity.class), eq(String.class)))
+                .thenReturn(ResponseEntity.ok("accepted"));
+        QuestionDispatchClaim claim = new QuestionDispatchClaim(
+                "question:" + EXAM_ID + ":8:0",
+                1,
+                Instant.parse("2026-07-28T00:00:00Z"),
+                EXAM_ID,
+                8,
+                0,
+                "temp/" + EXAM_ID + "/q_8_r0.wav",
+                "mock_exam_002"
+        );
+
+        service.dispatchQuestion(claim);
+
+        ArgumentCaptor<HttpEntity> requestCaptor = ArgumentCaptor.forClass(HttpEntity.class);
+        verify(restTemplate).postForEntity(
+                eq(AI_EVALUATION_URL), requestCaptor.capture(), eq(String.class));
+        MultiValueMap<String, Object> body = (MultiValueMap<String, Object>)
+                assertInstanceOf(MultiValueMap.class, requestCaptor.getValue().getBody());
+        assertAll(
+                () -> assertEquals(4, body.getFirst("part_number")),
+                () -> assertEquals(8, body.getFirst("question_number")),
+                () -> assertEquals(0, body.getFirst("retry_count")),
+                () -> assertFalse(body.containsKey("table_image_url")),
+                () -> assertFalse(body.containsKey("table_context")),
+                () -> assertEquals(
+                        "question:" + EXAM_ID + ":8:0",
+                        requestCaptor.getValue().getHeaders().getFirst("Idempotency-Key")
+                )
         );
     }
 

@@ -1,5 +1,6 @@
 package web.tosunsaeng.domain.exams.application;
 
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
@@ -11,6 +12,7 @@ import org.springframework.dao.OptimisticLockingFailureException;
 import org.springframework.web.client.ResourceAccessException;
 import web.tosunsaeng.domain.exams.domain.entity.ExamSession;
 import web.tosunsaeng.domain.exams.domain.entity.SummaryGradingJob;
+import web.tosunsaeng.domain.exams.domain.enums.ExamSessionStatus;
 import web.tosunsaeng.domain.exams.domain.enums.GradingJobStatus;
 import web.tosunsaeng.domain.exams.domain.repository.ExamSessionRepository;
 import web.tosunsaeng.domain.exams.domain.repository.SummaryGradingJobRepository;
@@ -77,6 +79,12 @@ class SummaryDispatchSchedulerTest {
     @Mock
     private GradingDispatchService dispatchService;
 
+    @BeforeEach
+    void setUp() {
+        lenient().when(examSessionRepository.findById(EXAM_ID))
+                .thenReturn(Optional.of(inProgressSession()));
+    }
+
     @Test
     void duplicatePendingTasksDispatchSummaryOnlyOnce() {
         CapturingTaskExecutor taskExecutor = new CapturingTaskExecutor();
@@ -124,19 +132,63 @@ class SummaryDispatchSchedulerTest {
     }
 
     @Test
-    void legacySummaryJobWithoutSessionUsesLegacyFallback() {
+    void summaryJobWithoutSessionIsNotDispatched() {
         CapturingTaskExecutor taskExecutor = new CapturingTaskExecutor();
-        installRepositoryStore(SummaryGradingJob.pending(JOB_ID, EXAM_ID, NOW));
+        AtomicReference<SummaryGradingJob> store = installRepositoryStore(
+                SummaryGradingJob.pending(JOB_ID, EXAM_ID, NOW));
         when(examSessionRepository.findById(EXAM_ID)).thenReturn(Optional.empty());
         SummaryDispatchScheduler scheduler = scheduler(taskExecutor);
 
         assertTrue(scheduler.schedulePending(JOB_ID));
         taskExecutor.runAll();
 
-        ArgumentCaptor<SummaryDispatchClaim> claimCaptor =
-                ArgumentCaptor.forClass(SummaryDispatchClaim.class);
-        verify(dispatchService).dispatchSummary(claimCaptor.capture());
-        assertEquals(GradingKeys.LEGACY_MOCK_EXAM_ID, claimCaptor.getValue().mockExamId());
+        assertAll(
+                () -> assertEquals(GradingJobStatus.PENDING, store.get().getStatus()),
+                () -> assertEquals(0, store.get().getDispatchAttempt())
+        );
+        verify(dispatchService, never()).dispatchSummary(any());
+    }
+
+    @Test
+    void abandonedSummaryJobIsNotDispatched() {
+        CapturingTaskExecutor taskExecutor = new CapturingTaskExecutor();
+        AtomicReference<SummaryGradingJob> store = installRepositoryStore(
+                SummaryGradingJob.pending(JOB_ID, EXAM_ID, NOW));
+        when(examSessionRepository.findById(EXAM_ID)).thenReturn(Optional.of(abandonedSession()));
+        SummaryDispatchScheduler scheduler = scheduler(taskExecutor);
+
+        assertTrue(scheduler.schedulePending(JOB_ID));
+        taskExecutor.runAll();
+
+        assertAll(
+                () -> assertEquals(GradingJobStatus.PENDING, store.get().getStatus()),
+                () -> assertEquals(0, store.get().getDispatchAttempt())
+        );
+        verify(dispatchService, never()).dispatchSummary(any());
+    }
+
+    @Test
+    void abandonmentAfterClaimFailsClaimWithoutDispatch() {
+        CapturingTaskExecutor taskExecutor = new CapturingTaskExecutor();
+        AtomicReference<SummaryGradingJob> store = installRepositoryStore(
+                SummaryGradingJob.pending(JOB_ID, EXAM_ID, "mock_exam_002", NOW));
+        when(examSessionRepository.findById(EXAM_ID)).thenReturn(
+                Optional.of(inProgressSession()),
+                Optional.of(abandonedSession())
+        );
+        SummaryDispatchScheduler scheduler = scheduler(taskExecutor);
+
+        assertTrue(scheduler.schedulePending(JOB_ID));
+        taskExecutor.runAll();
+
+        assertAll(
+                () -> assertEquals(GradingJobStatus.FAILED, store.get().getStatus()),
+                () -> assertEquals(1, store.get().getDispatchAttempt()),
+                () -> assertEquals(SummaryDispatchScheduler.EXAM_ABANDONED, store.get().getFailureReason())
+        );
+        verify(summaryJobRepository).failClaimedAttempt(
+                JOB_ID, 1, NOW, SummaryDispatchScheduler.EXAM_ABANDONED);
+        verify(dispatchService, never()).dispatchSummary(any());
     }
 
     @Test
@@ -259,6 +311,24 @@ class SummaryDispatchSchedulerTest {
 
     private SummaryDispatchScheduler scheduler(TaskExecutor taskExecutor) {
         return scheduler(taskExecutor, Clock.fixed(NOW, ZoneOffset.UTC));
+    }
+
+    private static ExamSession inProgressSession() {
+        return ExamSession.builder()
+                .examId(EXAM_ID)
+                .mockExamId("mock_exam_002")
+                .active(true)
+                .status(ExamSessionStatus.IN_PROGRESS)
+                .build();
+    }
+
+    private static ExamSession abandonedSession() {
+        return ExamSession.builder()
+                .examId(EXAM_ID)
+                .mockExamId("mock_exam_002")
+                .active(false)
+                .status(ExamSessionStatus.ABANDONED)
+                .build();
     }
 
     private SummaryDispatchScheduler scheduler(TaskExecutor taskExecutor, Clock clock) {

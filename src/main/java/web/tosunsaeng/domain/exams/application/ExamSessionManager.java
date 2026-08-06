@@ -6,6 +6,7 @@ import org.springframework.dao.DuplicateKeyException;
 import org.springframework.stereotype.Service;
 import web.tosunsaeng.domain.exams.domain.entity.ExamSession;
 import web.tosunsaeng.domain.exams.domain.entity.MockExam;
+import web.tosunsaeng.domain.exams.domain.enums.ExamSessionStatus;
 import web.tosunsaeng.domain.exams.domain.repository.ExamSessionCompletionQuery;
 import web.tosunsaeng.domain.exams.domain.repository.ExamSessionRepository;
 
@@ -17,7 +18,6 @@ import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Optional;
 import java.util.UUID;
 
 @Slf4j
@@ -34,15 +34,14 @@ public class ExamSessionManager {
     private final MockExamCatalogService mockExamCatalogService;
     private final Clock clock;
 
-    public Assignment findOrCreate(String userId) {
-        return findOrCreate(userId, 1);
+    public Assignment startNew(String userId) {
+        log.info("새 시험 시작 요청: userId={}", userId);
+        return startNew(userId, 1);
     }
 
-    private Assignment findOrCreate(String userId, int attempt) {
-        Optional<ExamSession> reusable = findReusableSession(userId);
-        if (reusable.isPresent()) {
-            return existingAssignment(reusable.get());
-        }
+    private Assignment startNew(String userId, int attempt) {
+        List<String> abandonedExamIds = abandonInProgressSessions(userId);
+        log.info("기존 시험 종료: userId={}, abandonedExamIds={}", userId, abandonedExamIds);
 
         List<MockExamCatalogService.CatalogExam> catalog = mockExamCatalogService.findAssignableExams();
         Map<String, Long> completionCounts = completionCounts(userId);
@@ -62,19 +61,17 @@ public class ExamSessionManager {
                 .mockExamId(selected.mockExam().getMockExamId())
                 .cycleNumber(Math.toIntExact(completionCount + 1))
                 .active(true)
+                .status(ExamSessionStatus.IN_PROGRESS)
                 .completedAt(null)
                 .build();
 
         try {
             ExamSession inserted = examSessionRepository.insert(newSession);
+            log.info("새 시험 생성 완료: userId={}, newExamId={}", userId, inserted.getExamId());
             return new Assignment(inserted, selected.mockExam(), true);
         } catch (DuplicateKeyException concurrentCreation) {
-            Optional<ExamSession> concurrentSession = findReusableSession(userId);
-            if (concurrentSession.isPresent()) {
-                return existingAssignment(concurrentSession.get());
-            }
             if (attempt < CREATE_ATTEMPTS) {
-                return findOrCreate(userId, attempt + 1);
+                return startNew(userId, attempt + 1);
             }
             throw concurrentCreation;
         }
@@ -85,20 +82,30 @@ public class ExamSessionManager {
         return examSessionRepository.completeIfIncomplete(examId, completedAt) == 1;
     }
 
-    private Assignment existingAssignment(ExamSession session) {
-        String mockExamId = GradingKeys.effectiveMockExamId(session.getMockExamId());
-        MockExam mockExam = mockExamCatalogService.getRequiredExam(mockExamId);
-        return new Assignment(session, mockExam, false);
+    private List<String> abandonInProgressSessions(String userId) {
+        List<String> abandonedExamIds = new ArrayList<>();
+        for (ExamSession candidate : findInProgressSessions(userId)) {
+            if (examSessionRepository.abandonIfInProgress(candidate.getExamId()) == 1) {
+                abandonedExamIds.add(candidate.getExamId());
+            }
+        }
+        return List.copyOf(abandonedExamIds);
     }
 
-    private Optional<ExamSession> findReusableSession(String userId) {
+    private List<ExamSession> findInProgressSessions(String userId) {
         List<ExamSession> candidates = examSessionRepository.findActiveOrLegacyCandidatesByUserId(userId);
         if (candidates == null || candidates.isEmpty()) {
-            return Optional.empty();
+            return List.of();
         }
 
         List<ExamSession> reusable = new ArrayList<>();
         for (ExamSession candidate : candidates) {
+            if (candidate.getStatus() != null) {
+                if (candidate.isInProgress() && candidate.getCompletedAt() == null) {
+                    reusable.add(candidate);
+                }
+                continue;
+            }
             if (Boolean.FALSE.equals(candidate.getActive())) {
                 continue;
             }
@@ -145,13 +152,10 @@ public class ExamSessionManager {
             }
         }
 
-        if (reusable.isEmpty()) {
-            return Optional.empty();
-        }
         if (reusable.size() > 1) {
-            log.warn("Multiple reusable legacy ExamSessions exist for one user; reusing the newest session");
+            log.warn("Multiple in-progress ExamSessions exist for one user; all will be abandoned");
         }
-        return Optional.of(reusable.getFirst());
+        return List.copyOf(reusable);
     }
 
     private static boolean isLegacyExplicitActive(ExamSession session) {

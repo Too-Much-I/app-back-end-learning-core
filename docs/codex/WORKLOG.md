@@ -1546,3 +1546,69 @@
 - 계약 유지: Question Job 생성·중복·FAILED·retry·dispatch 상태 전이, 최대 시도, S3 Key, AI multipart 필드·`Idempotency-Key`, endpoint와 공개 API·DTO·응답 계약은 변경하지 않았다.
 - 테스트: 신규·중복 Job 로그, 호출 직전·성공·실패 로그, Presigned URL·서명 미노출, 실제 AI multipart 시작·완료 URI/크기/status 로그를 `CapturedOutput`으로 검증했다. 집중 테스트와 `./gradlew clean test`가 성공했고 XML 기준 Java 268개, failures/errors/skipped 0개다. `git diff --check`도 성공했다.
 - 외부 작업: 실제 AI·AWS·MongoDB·ECS를 호출하지 않았고 실제 Secret·Token·Credential·Presigned URL을 기록하지 않았다. Git commit·push·PR 및 Jira 쓰기 작업도 수행하지 않았다.
+
+## 2026-08-06 — 문제 전용 조회 API 확인
+
+<!-- codex-turn:019fd5b9-5717-75e0-91b6-595628d6d7a5 -->
+
+- 범위·결과: 특정 시험 문항의 문제 정보만 반환하는 Controller, 서비스와 `QuestionDTO` 계약을 읽기 전용으로 확인했다. 별도 Jira 이슈 키는 없다.
+- 전용 API는 `GET /api/v1/exams/{examId}/questions/{questionNumber}/prompt`다. JWT 모드에서는 Bearer 인증과 `ExamSession.userId` 소유권 검증을 수행하며 Session의 실제 `mockExamId` 문제를 조회한다.
+- 응답은 part, questionNumber, text, referenceText, partIntroText, image/table, 준비·답변 시간과 60분 출제 음성 Presigned GET URL을 포함한다. Part 3은 guideAudioUrl도 제공하며 채점 상태·점수·피드백·retryCount·사용자 녹음은 포함하지 않는다.
+- 세션 생성 `POST /api/v1/exams`도 전체 문제 목록을 반환하지만, 특정 문항만 다시 조회할 때는 prompt API가 해당 목적의 계약이다. 기존 문항 결과 `GET /api/v1/exams/{examId}/questions`와는 별도다.
+- 애플리케이션·테스트 코드는 변경하지 않았고 테스트를 재실행하지 않았다. 실제 S3·Secret·Token·Credential에 접근하지 않았으며 Git·Jira 쓰기 작업도 수행하지 않았다.
+
+## 2026-08-06 — 항상 신규 시험 세션 생성 및 ABANDONED 생명주기
+
+<!-- codex-turn:019fd5df-0ca6-7372-bd99-1ef61669ffe2 -->
+
+- 범위·결과: 별도 Jira 이슈 키 없이 `POST /api/v1/exams`가 진행 중 Session을 재사용하지 않고 매 요청마다 새 `examId`의 `IN_PROGRESS` Session을 생성하도록 변경했다. 같은 사용자의 기존 `IN_PROGRESS` Session은 데이터·Job·결과·S3 객체를 복사하거나 삭제하지 않고 모두 `ABANDONED`, `active=false`로 조건부 전이한다.
+- 상태·호환성: 내부 `ExamSessionStatus`에 `IN_PROGRESS`, `COMPLETED`, `ABANDONED`를 추가했다. 신규·완료 업데이트는 status와 기존 active/completedAt을 함께 유지하고, status가 없는 기존 문서는 completedAt과 active를 이용한 legacy 해석 및 완료 증거 backfill을 계속 지원한다. 외부 DTO에는 status나 userId를 추가하지 않았다.
+- 동시성: 기존 운영 필수 partial unique 인덱스 `uniq_exam_sessions_active_user`의 `{userId:1}`, partial `{active:true}`를 동시 생성 직렬화 경계로 유지했다. 기존 Session을 조건부 ABANDON한 뒤 insert하며, 동시 insert Duplicate Key가 발생하면 새로 활성화된 Session까지 다시 조건부 종료하고 새 ID 생성·insert를 재시도한다. 동시 시작 테스트에서 각 요청은 서로 다른 ID를 만들고 최종 `IN_PROGRESS` Session은 한 개만 남음을 검증했다.
+- Callback·재시도: Feedback/Summary, SpeechAce, Azure Callback은 Session을 먼저 조회하고 `ABANDONED`이면 결과 저장, Question/Summary Job 완료, Session 완료와 Summary trigger를 수행하지 않는 멱등 no-op으로 처리하며 exam/question/retry/job 식별 로그를 남긴다. Summary 비동기 dispatch도 시작 전과 claim 후 Session을 다시 검사한다. 시험 단위 `grading/retry`는 `IN_PROGRESS`만 허용하고 `ABANDONED`는 `EXAM_4007`, `COMPLETED`는 `EXAM_4008`의 409 비즈니스 오류로 차단한다.
+- 기존 계약 유지: 새 시험의 최초 submit은 새 examId 기반 `retryCount=0` Job으로 시작하고 과거 Job·결과를 상속하지 않는다. 동일 examId/question/retryCount submit 멱등성, 사용자 주도 재답변의 같은 examId·증가된 retryCount, 완료 시험 재답변, AI `user_id=examId`, S3 Key, Summary·문항 단건 API와 BaseResponse 계약은 유지했다.
+- 테스트: 세션 최초·교체·완료 보존·다중 비정상 활성 데이터·legacy·동시 시작, 새 retry 0, ABANDONED/활성 Callback, ABANDONED/COMPLETED grading retry 차단, 완료 시험 사용자 재답변, Summary dispatch race와 Repository annotation 계약을 추가·갱신했다. `git diff --check`와 `./gradlew clean test`가 성공했으며 XML 기준 Java 272개, failures/errors/skipped 0개다.
+- 외부 작업: 실제 MongoDB·Redis·S3·AI 서버를 호출하거나 운영 인덱스를 변경하지 않았고 Secret·Token·Credential을 조회하거나 기록하지 않았다. Git commit·push·PR 및 Jira 쓰기 작업도 수행하지 않았다.
+
+## 2026-08-06 — Question submit PENDING·PROCESSING 전이 확인
+
+<!-- codex-turn:019fd5fe-ae4a-7f20-a8d4-26893600946e -->
+
+- 범위·결과: 별도 Jira 이슈 키 없이 문항 submit의 `QuestionGradingJob` 생성, claim, AI 동기 HTTP 호출과 응답 상태 변환을 읽기 전용으로 확인했다.
+- 최초 submit은 MongoDB에 `PENDING`, `dispatchAttempt=0`, `pendingAt`의 Job을 먼저 insert한다. 같은 HTTP 요청 안에서 즉시 optimistic-lock claim을 수행해 `PROCESSING`, `dispatchAttempt=1`, `processingStartedAt`으로 저장한 다음 AI `/evaluations`를 호출한다.
+- 정상 경로의 submit 응답은 AI endpoint가 2xx를 반환한 뒤 `PROCESSING`으로 반환된다. 따라서 PENDING은 아직 claim되지 않은 대기 상태이고, 별도 초기 dispatch queue/worker가 없는 현재 구조에서는 매우 짧은 내부 상태라 일반 클라이언트 응답에서 보이지 않는다.
+- AI 호출 실패는 claim된 Job을 `FAILED`로 전이하고 API 오류를 반환한다. PROCESSING 저장 뒤 프로세스가 종료되는 경우에는 timeout 이후 기존 grading retry가 복구하는 구조다.
+- 판단: 현재 상태 의미에는 PROCESSING 응답이 일관된다. submit에서 PENDING을 사용자에게 반환하려면 단순 응답값 변경이 아니라 insert 후 즉시 반환하고 별도 Worker가 원자적으로 claim·dispatch하도록 구조를 바꿔야 한다. 이번 확인에서는 코드와 테스트를 변경하거나 재실행하지 않았다.
+- 외부 작업: 실제 AI·MongoDB·Redis·S3를 호출하지 않았고 Secret·Token·Credential을 조회하거나 기록하지 않았다. Git commit·push·PR 및 Jira 쓰기 작업도 수행하지 않았다.
+
+## 2026-08-06 — 채점 상태 용어 의미 확인
+
+<!-- codex-turn:019fd601-83d8-7f03-86e0-00b88c958a2a -->
+
+- 범위·결과: 별도 Jira 이슈 키 없이 사용자가 기대한 `PENDING=AI 채점 시작 대기`, `PROCESSING=AI가 실제 채점 계산 중` 의미와 현재 Learning Core 구현의 의미를 비교했다.
+- 현재 `PENDING`은 Learning Core가 Question Job을 만들었지만 아직 dispatch claim하지 않은 매우 짧은 내부 대기 상태다. `PROCESSING`은 Learning Core가 dispatch를 claim한 순간부터 AI HTTP 요청과 Callback 대기 전체를 포함하며, AI가 내부 계산을 실제 시작했음을 보장하지 않는다.
+- Learning Core가 받는 현재 신호는 outbound HTTP 성공과 최종 Callback뿐이므로 AI 내부 queue와 실제 계산 시작을 구분할 수 없다. 정확한 구분에는 AI의 accepted/started 상태 계약 또는 별도 상태 Callback이 필요하다.
+- 이번 확인에서는 애플리케이션·테스트 코드를 변경하거나 테스트를 재실행하지 않았다. 실제 외부 시스템 호출, Secret·Token·Credential 조회·기록, Git commit·push·PR 및 Jira 쓰기 작업도 수행하지 않았다.
+- 추가 확인: 시험 단위 grading retry는 FAILED를 즉시, PENDING은 기본 1분 timeout 이후, PROCESSING은 기본 3분 timeout 이후 재전송 대상으로 판정하며 최대 dispatch 횟수 기본값은 3이다. Summary Job도 같은 PENDING/PROCESSING timeout 판정을 사용한다.
+- 프론트는 오래된 PROCESSING도 복구 UI 대상으로 포함할 수 있지만 같은 submit을 반복하지 않고 기존 `POST /api/v1/exams/{examId}/grading/retry`를 호출해야 한다. 실제 eligibility와 원자적 claim은 설정값·Job timestamp·attempt를 아는 백엔드 판단을 따른다.
+
+## 2026-08-06 — 장기 PROCESSING 프론트 재시도 기준 확인
+
+<!-- codex-turn:019fd603-9452-7782-882c-55e07902878e -->
+
+- 범위·결과: 별도 Jira 이슈 키 없이 현재 Question/Summary Job의 retry eligibility와 프론트 복구 호출 방식을 읽기 전용으로 확인했다.
+- FAILED는 즉시, PENDING은 기본 1분 timeout 이후, PROCESSING은 기본 3분 timeout 이후 시험 단위 grading retry 대상이며 최대 dispatch 시도 기본값은 3이다. 따라서 프론트 복구 UI에는 장기 PROCESSING도 포함하는 것이 현재 상태 의미와 일치한다.
+- 동일 submit 재호출은 결정적 기존 Job 상태만 반환하고 재전송하지 않는다. 프론트는 `POST /api/v1/exams/{examId}/grading/retry`를 사용하고 실제 timeout·attempt eligibility와 원자적 claim은 백엔드 응답을 기준으로 처리해야 한다.
+- PROCESSING은 AI 실제 계산뿐 아니라 outbound 및 Callback 대기도 포함하므로 너무 짧은 프론트 timeout은 중복 전송 가능성을 높인다. 재전송은 동일 Idempotency-Key를 사용하지만 AI 서버의 멱등 처리도 함께 보장되어야 한다.
+- 애플리케이션·테스트 코드는 변경하거나 재실행하지 않았다. 실제 외부 시스템 호출, Secret·Token·Credential 조회·기록, Git commit·push·PR 및 Jira 쓰기 작업도 수행하지 않았다.
+
+## 2026-08-06 — Part 4 문항 조회 tableImageUrl 응답 전환
+
+<!-- codex-turn:019fd605-1277-7e01-9d2a-ef505e75d8c3 -->
+
+- 범위·결과: 별도 Jira 이슈 키 없이 문항 단건 `GET /api/v1/exams/{examId}/questions?questionNumber={number}&retryCount={optional}`의 Part 4 `questionInfo`를 DB 이미지 URL 중심으로 최소 변경했다. 전체 문항 목록 API로 바꾸지 않았고 Summary API도 변경하지 않았다.
+- DB·응답 매핑: MongoDB의 `table_image_url`을 `Question.tableImageUrl`에 `@Field("table_image_url")`로 매핑하고 API에는 camelCase `tableImageUrl`로 그대로 전달한다. URL 결합·재작성·인코딩·Presigned URL 생성과 기본값 주입은 수행하지 않는다.
+- 응답 단순화: Part 4 단건 `questionInfo`는 `part`, `questionNumber`, `tableImageUrl`만 직렬화한다. 기존 text, referenceText, partIntroText, audioUrl, guideAudioUrl, imageUrl, tableContext, prepTimeSec, speakTimeSec는 이 응답에서 제외하되 기존 `tableContext` 모델과 저장 데이터는 세션·prompt·내부 호환을 위해 삭제하지 않았다. Part 1·2·3·5·6·7은 기존 변환을 유지한다.
+- 누락 정책: Part 4의 `table_image_url`이 null·빈 문자열·공백이면 임의 URL이나 NPE 대신 기존 카탈로그 설정 오류 `EXAM_5001`을 반환한다.
+- AI 회귀: Part 4 답변 submit의 기존 multipart `part_number`, S3 음성, `Idempotency-Key` 계약을 유지했고 프론트 표시용 table image/context를 AI payload에 새로 포함하지 않았다. 실제 MongoDB·S3·AI 호출은 수행하지 않았다.
+- 테스트: snake_case Mongo 매핑, camelCase JSON, URL 무변환, 상세 필드 미노출, URL 누락 세 경우, 다른 Part 6개 회귀와 Part 4 AI dispatch 계약을 검증했다. 집중 테스트와 `./gradlew clean test`가 성공했고 XML 기준 Java 286개, failures/errors/skipped 0개다. `git diff --check`도 성공했다.
+- 외부 작업: Secret·Token·Credential을 조회하거나 기록하지 않았고 Git commit·push·PR 및 Jira 쓰기 작업은 수행하지 않았다.

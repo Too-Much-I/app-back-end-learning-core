@@ -9,6 +9,8 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.InOrder;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.boot.test.system.CapturedOutput;
+import org.springframework.boot.test.system.OutputCaptureExtension;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.data.redis.core.ValueOperations;
 import org.springframework.test.util.ReflectionTestUtils;
@@ -18,6 +20,7 @@ import software.amazon.awssdk.services.s3.presigner.model.PresignedGetObjectRequ
 import web.tosunsaeng.domain.exams.domain.entity.ExamResult;
 import web.tosunsaeng.domain.exams.domain.entity.ExamSession;
 import web.tosunsaeng.domain.exams.domain.entity.ExamSummary;
+import web.tosunsaeng.domain.exams.domain.enums.ExamSessionStatus;
 import web.tosunsaeng.domain.exams.domain.repository.AzureResultRepository;
 import web.tosunsaeng.domain.exams.domain.repository.ExamResultRepository;
 import web.tosunsaeng.domain.exams.domain.repository.ExamSessionRepository;
@@ -44,13 +47,14 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
-@ExtendWith(MockitoExtension.class)
+@ExtendWith({MockitoExtension.class, OutputCaptureExtension.class})
 class FeedbackCallbackServiceTest {
 
     private static final String EXAM_ID = "ex_callback_001";
@@ -121,6 +125,8 @@ class FeedbackCallbackServiceTest {
                 currentUserProvider
         );
         ReflectionTestUtils.setField(examService, "bucketName", "test-learning-core-bucket");
+        lenient().when(examSessionRepository.findById(EXAM_ID))
+                .thenReturn(Optional.of(examSession()));
     }
 
     @Test
@@ -478,11 +484,97 @@ class FeedbackCallbackServiceTest {
         verify(gradingService, times(2)).calculateAndCacheOverallStatus(EXAM_ID);
     }
 
+    @Test
+    void abandonedQuestionCallbackIsIdempotentNoOp(CapturedOutput output) throws Exception {
+        ExamRequestDTO.AiResultReq req = objectMapper.readValue("""
+                {
+                  "user_id": "ex_callback_001",
+                  "question_number": 4,
+                  "retry_count": 2,
+                  "score": 8.0
+                }
+                """, ExamRequestDTO.AiResultReq.class);
+        when(examSessionRepository.findById(EXAM_ID)).thenReturn(Optional.of(abandonedSession()));
+
+        examService.updateExamResult(req);
+        examService.updateExamResult(req);
+
+        assertTrue(output.getOut().contains(
+                "ABANDONED 시험 Callback 무시: examId=" + EXAM_ID
+                        + ", questionNumber=4, retryCount=2, jobId=question:"
+                        + EXAM_ID + ":4:2"));
+        verify(examSessionRepository, times(2)).findById(EXAM_ID);
+        verifyNoInteractions(
+                examResultRepository,
+                examSummaryRepository,
+                gradingService,
+                examSessionManager
+        );
+    }
+
+    @Test
+    void abandonedSummaryCallbackDoesNotStoreOrCompleteExam() throws Exception {
+        ExamRequestDTO.AiResultReq req = objectMapper.readValue("""
+                {
+                  "user_id": "ex_callback_001",
+                  "suggested_total_score": 170,
+                  "question_number": 0
+                }
+                """, ExamRequestDTO.AiResultReq.class);
+        when(examSessionRepository.findById(EXAM_ID)).thenReturn(Optional.of(abandonedSession()));
+
+        examService.updateExamResult(req);
+
+        verifyNoInteractions(
+                examResultRepository,
+                examSummaryRepository,
+                gradingService,
+                examSessionManager
+        );
+    }
+
+    @Test
+    void abandonedSpeechAceAndAzureCallbacksDoNotStoreResults() throws Exception {
+        ExamRequestDTO.SpeechAceReq speechAceReq = objectMapper.readValue("""
+                {
+                  "user_id": "ex_callback_001",
+                  "question_number": 4,
+                  "retry_count": 0,
+                  "speechace_result": {"score": 90}
+                }
+                """, ExamRequestDTO.SpeechAceReq.class);
+        Map<String, Object> azurePayload = Map.of(
+                "metadata", Map.of(
+                        "user_id", EXAM_ID,
+                        "question_number", 4,
+                        "retry_count", 0
+                )
+        );
+        when(examSessionRepository.findById(EXAM_ID)).thenReturn(Optional.of(abandonedSession()));
+
+        examService.saveSpeechAceResult(speechAceReq);
+        examService.processAzureCallback(azurePayload);
+
+        verifyNoInteractions(speechAceResultRepository, azureResultRepository);
+    }
+
     private ExamSession examSession() {
         return ExamSession.builder()
                 .examId(EXAM_ID)
                 .userId(USER_ID)
                 .createdAt(LocalDateTime.of(2026, 7, 23, 12, 0))
+                .active(true)
+                .status(ExamSessionStatus.IN_PROGRESS)
+                .build();
+    }
+
+    private ExamSession abandonedSession() {
+        return ExamSession.builder()
+                .examId(EXAM_ID)
+                .userId(USER_ID)
+                .createdAt(LocalDateTime.of(2026, 7, 23, 12, 0))
+                .active(false)
+                .status(ExamSessionStatus.ABANDONED)
                 .build();
     }
 }

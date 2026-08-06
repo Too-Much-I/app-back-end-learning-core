@@ -26,6 +26,7 @@ import web.tosunsaeng.domain.exams.domain.entity.ExamSession;
 import web.tosunsaeng.domain.exams.domain.entity.Question;
 import web.tosunsaeng.domain.exams.domain.entity.QuestionGradingJob;
 import web.tosunsaeng.domain.exams.domain.entity.SummaryGradingJob;
+import web.tosunsaeng.domain.exams.domain.enums.ExamSessionStatus;
 import web.tosunsaeng.domain.exams.domain.enums.ExamStatus;
 import web.tosunsaeng.domain.exams.domain.enums.GradingJobStatus;
 import web.tosunsaeng.domain.exams.domain.enums.SummaryAction;
@@ -37,6 +38,7 @@ import web.tosunsaeng.domain.exams.domain.repository.SummaryGradingJobRepository
 import web.tosunsaeng.domain.exams.dto.ExamResponseDTO;
 import web.tosunsaeng.domain.exams.exception.ExamsException;
 import web.tosunsaeng.global.config.GradingProperties;
+import web.tosunsaeng.global.error.code.status.ErrorStatus;
 
 import java.time.Clock;
 import java.net.URI;
@@ -63,6 +65,7 @@ import static org.junit.jupiter.api.Assertions.assertAll;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
@@ -176,6 +179,7 @@ class ExamGradingServiceTest {
                 () -> assertEquals(1, stored.getDispatchAttempt()),
                 () -> assertEquals(NOW, stored.getProcessingStartedAt()),
                 () -> assertEquals(NOW, stored.getLastDispatchedAt()),
+                () -> assertEquals(0, stored.getRetryCount()),
                 () -> assertEquals("temp/" + EXAM_ID + "/q_1_r0.wav", stored.getFileKey()),
                 () -> assertTrue(output.getOut().contains(
                         "채점 submit 시작: jobId=question:" + EXAM_ID + ":1:0")),
@@ -267,6 +271,75 @@ class ExamGradingServiceTest {
 
         assertEquals(List.of(1), result.getRetriedQuestionNumbers());
         assertEquals(SummaryAction.NOT_READY, result.getSummaryAction());
+        verify(dispatchService).dispatchQuestion(any(QuestionDispatchClaim.class));
+    }
+
+    @Test
+    void abandonedExamRetryIsRejectedWithoutDispatch() {
+        when(examSessionRepository.findById(EXAM_ID)).thenReturn(Optional.of(ExamSession.builder()
+                .examId(EXAM_ID)
+                .active(false)
+                .status(ExamSessionStatus.ABANDONED)
+                .build()));
+        putQuestion(questionJob(1, 0, GradingJobStatus.FAILED, 1, NOW.minusSeconds(600)));
+
+        ExamsException exception = assertThrows(ExamsException.class, () -> service.retryExam(EXAM_ID));
+
+        assertSame(ErrorStatus._EXAM_ABANDONED, exception.getCode());
+        verify(dispatchService, never()).dispatchQuestion(any());
+        verify(s3Client, never()).headObject(any(HeadObjectRequest.class));
+    }
+
+    @Test
+    void completedExamRetryIsRejectedWithoutDispatch() {
+        when(examSessionRepository.findById(EXAM_ID)).thenReturn(Optional.of(ExamSession.builder()
+                .examId(EXAM_ID)
+                .active(false)
+                .status(ExamSessionStatus.COMPLETED)
+                .build()));
+        putQuestion(questionJob(1, 0, GradingJobStatus.FAILED, 1, NOW.minusSeconds(600)));
+
+        ExamsException exception = assertThrows(ExamsException.class, () -> service.retryExam(EXAM_ID));
+
+        assertSame(ErrorStatus._EXAM_ALREADY_COMPLETED, exception.getCode());
+        verify(dispatchService, never()).dispatchQuestion(any());
+        verify(s3Client, never()).headObject(any(HeadObjectRequest.class));
+    }
+
+    @Test
+    void abandonedExamSubmitDoesNotCreateOrDispatchJob() {
+        when(examSessionRepository.findById(EXAM_ID)).thenReturn(Optional.of(ExamSession.builder()
+                .examId(EXAM_ID)
+                .active(false)
+                .status(ExamSessionStatus.ABANDONED)
+                .build()));
+
+        ExamsException exception = assertThrows(
+                ExamsException.class,
+                () -> service.submitQuestion(EXAM_ID, 1, 0)
+        );
+
+        assertSame(ErrorStatus._EXAM_ABANDONED, exception.getCode());
+        assertTrue(questionJobs.isEmpty());
+        verify(dispatchService, never()).dispatchQuestion(any());
+    }
+
+    @Test
+    void completedExamStillAllowsUserRerecordSubmitWithNewRetryCount() {
+        when(examSessionRepository.findById(EXAM_ID)).thenReturn(Optional.of(ExamSession.builder()
+                .examId(EXAM_ID)
+                .mockExamId(GradingKeys.LEGACY_MOCK_EXAM_ID)
+                .active(false)
+                .status(ExamSessionStatus.COMPLETED)
+                .build()));
+
+        ExamStatus status = service.submitQuestion(EXAM_ID, 1, 1);
+
+        assertAll(
+                () -> assertEquals(ExamStatus.PROCESSING, status),
+                () -> assertEquals(1, storedQuestion(1, 1).getRetryCount()),
+                () -> assertEquals("question:" + EXAM_ID + ":1:1", storedQuestion(1, 1).getJobId())
+        );
         verify(dispatchService).dispatchQuestion(any(QuestionDispatchClaim.class));
     }
 

@@ -16,10 +16,14 @@ public interface ExamSessionRepository extends MongoRepository<ExamSession, Stri
     )
     List<ExamSession> findCompletedByUserId(String userId);
 
-    // Runtime compatibility decides whether a null/missing active candidate is truly in progress.
+    // Runtime compatibility decides whether a null/missing legacy status candidate is truly in progress.
     @Query(
             value = "{ 'userId': ?0, '$or': ["
-                    + "{ 'active': true }, { 'active': null }, { 'active': { '$exists': false } }] }",
+                    + "{ 'status': 'IN_PROGRESS' },"
+                    + "{ '$and': ["
+                    + "{ '$or': [ { 'status': null }, { 'status': { '$exists': false } } ] },"
+                    + "{ '$or': [ { 'active': true }, { 'active': null },"
+                    + "{ 'active': { '$exists': false } } ] } ] } ] }",
             sort = "{ 'createdAt': -1, '_id': -1 }"
     )
     List<ExamSession> findActiveOrLegacyCandidatesByUserId(String userId);
@@ -27,26 +31,39 @@ public interface ExamSessionRepository extends MongoRepository<ExamSession, Stri
     @Query("{ '_id': ?0, '$and': ["
             + "{ '$or': [ { 'active': null }, { 'active': { '$exists': false } } ] },"
             + "{ '$or': [ { 'completedAt': null }, { 'completedAt': { '$exists': false } } ] } ] }")
-    @Update("{ '$set': { 'completedAt': ?1, 'active': false } }")
+    @Update("{ '$set': { 'completedAt': ?1, 'active': false, 'status': 'COMPLETED' } }")
     long backfillLegacyCompletionIfUnchanged(String examId, LocalDateTime completedAt);
 
     @Query("{ '_id': ?0, 'active': true, '$and': ["
             + "{ '$or': [ { 'cycleNumber': null }, { 'cycleNumber': { '$exists': false } } ] },"
             + "{ '$or': [ { 'completedAt': null }, { 'completedAt': { '$exists': false } } ] } ] }")
-    @Update("{ '$set': { 'completedAt': ?1, 'active': false } }")
+    @Update("{ '$set': { 'completedAt': ?1, 'active': false, 'status': 'COMPLETED' } }")
     long backfillLegacyActiveCompletionIfUnchanged(String examId, LocalDateTime completedAt);
 
     @Query("{ '_id': ?0, 'completedAt': { '$exists': true, '$ne': null },"
             + "'$or': [ { 'active': null }, { 'active': { '$exists': false } } ] }")
-    @Update("{ '$set': { 'active': false } }")
+    @Update("{ '$set': { 'active': false, 'status': 'COMPLETED' } }")
     long deactivateLegacyCompletedSessionIfUnchanged(String examId);
 
     @Query("{ '_id': ?0, 'active': true, 'completedAt': { '$exists': true, '$ne': null },"
             + "'$or': [ { 'cycleNumber': null }, { 'cycleNumber': { '$exists': false } } ] }")
-    @Update("{ '$set': { 'active': false } }")
+    @Update("{ '$set': { 'active': false, 'status': 'COMPLETED' } }")
     long deactivateLegacyActiveCompletedSessionIfUnchanged(String examId);
 
-    @Query("{ '_id': ?0, 'completedAt': null }")
-    @Update("{ '$set': { 'completedAt': ?1, 'active': false } }")
+    @Query("{ '_id': ?0, 'completedAt': null, '$or': ["
+            + "{ 'status': 'IN_PROGRESS' }, { 'status': null }, { 'status': { '$exists': false } }] }")
+    @Update("{ '$set': { 'completedAt': ?1, 'active': false, 'status': 'COMPLETED' } }")
     long completeIfIncomplete(String examId, LocalDateTime completedAt);
+
+    @Query("{ '_id': ?0, '$and': ["
+            + "{ '$or': [ { 'completedAt': null },"
+            + "{ 'completedAt': { '$exists': false } } ] },"
+            + "{ '$or': ["
+            + "{ 'status': 'IN_PROGRESS' },"
+            + "{ '$and': ["
+            + "{ '$or': [ { 'status': null }, { 'status': { '$exists': false } } ] },"
+            + "{ '$or': [ { 'active': true }, { 'active': null },"
+            + "{ 'active': { '$exists': false } } ] } ] } ] } ] }")
+    @Update("{ '$set': { 'status': 'ABANDONED', 'active': false } }")
+    long abandonIfInProgress(String examId);
 }

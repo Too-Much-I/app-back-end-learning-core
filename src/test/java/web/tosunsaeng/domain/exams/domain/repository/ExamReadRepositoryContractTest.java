@@ -2,8 +2,10 @@ package web.tosunsaeng.domain.exams.domain.repository;
 
 import org.junit.jupiter.api.Test;
 import org.springframework.data.mongodb.repository.Query;
+import org.springframework.data.mongodb.repository.Update;
 
 import java.lang.reflect.Method;
+import java.time.LocalDateTime;
 import java.util.Collection;
 
 import static org.junit.jupiter.api.Assertions.assertAll;
@@ -88,9 +90,51 @@ class ExamReadRepositoryContractTest {
         );
     }
 
+    @Test
+    void sessionLifecycleQueriesUseExplicitStatusAndConditionalUpdates() throws Exception {
+        Query candidates = query(
+                ExamSessionRepository.class,
+                "findActiveOrLegacyCandidatesByUserId",
+                String.class
+        );
+        Query abandon = query(
+                ExamSessionRepository.class,
+                "abandonIfInProgress",
+                String.class
+        );
+        Update abandonUpdate = update(
+                ExamSessionRepository.class,
+                "abandonIfInProgress",
+                String.class
+        );
+        Update completeUpdate = update(
+                ExamSessionRepository.class,
+                "completeIfIncomplete",
+                String.class,
+                LocalDateTime.class
+        );
+
+        assertAll(
+                () -> assertTrue(candidates.value().contains("'status': 'IN_PROGRESS'")),
+                () -> assertEquals("{ 'createdAt': -1, '_id': -1 }", candidates.sort()),
+                () -> assertTrue(abandon.value().contains("'status': 'IN_PROGRESS'")),
+                () -> assertTrue(abandon.value().contains("'completedAt'")),
+                () -> assertTrue(abandonUpdate.value().contains("'status': 'ABANDONED'")),
+                () -> assertTrue(abandonUpdate.value().contains("'active': false")),
+                () -> assertTrue(completeUpdate.value().contains("'status': 'COMPLETED'")),
+                () -> assertTrue(completeUpdate.value().contains("'active': false"))
+        );
+    }
+
     private static Query query(Class<?> repository, String name, Class<?>... parameterTypes)
             throws NoSuchMethodException {
         Method method = repository.getMethod(name, parameterTypes);
         return method.getAnnotation(Query.class);
+    }
+
+    private static Update update(Class<?> repository, String name, Class<?>... parameterTypes)
+            throws NoSuchMethodException {
+        Method method = repository.getMethod(name, parameterTypes);
+        return method.getAnnotation(Update.class);
     }
 }
