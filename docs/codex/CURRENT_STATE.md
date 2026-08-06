@@ -2,12 +2,12 @@
 
 ## Last updated
 
-- 2026-08-04
+- 2026-08-06
 
 ## Current branch
 
-- `feat/exam-history-retries`
-- HEAD는 `20be0c2`이며 History/Retries 구현과 테스트·문서·인덱스 스크립트는 미커밋 상태다.
+- `main`
+- 확인 시점 HEAD는 `52634a9`이며 이번 분석에서는 애플리케이션·설정·테스트 코드를 변경하지 않았다.
 - 기존 사용자 작업인 Actuator 의존성·Health 설정을 보존한 상태에서 AWS S3 자격 증명 구성을 Default Credentials Provider Chain으로 전환한 미커밋 변경이 작업 트리에 있다.
 - `S3Config`의 프로젝트 전용 Access Key/Secret Key 주입과 static credential 생성을 제거했다. `S3Client`와 `S3Presigner`는 공유 `DefaultCredentialsProvider`를 사용하며 기존 Region·Bucket property, Object Key와 Presigned URL 동작은 유지한다.
 - `application.yml`과 test profile에서 static credentials 설정을 제거했고 credential 없는 `.env.example`, 로컬 profile/Docker/ECS Task Role 문서를 추가했다. AWS SDK는 BOM `2.29.52`로 `s3`, `sso`, `ssooidc`, `sts`를 함께 관리해 일반 Profile, 현대식 `sso_session`, Assume Role와 Web Identity 경로를 지원한다.
@@ -642,3 +642,72 @@
 - 문항·Summary의 AI 요청 body·header, `user_id=examId`, `mock_exam_id`, `client_source`, `Idempotency-Key`와 endpoint path는 유지했다.
 - 관련 집중 테스트와 전체 `./gradlew clean test` Java 267개가 failures/errors/skipped 0으로 성공했고 `git diff --check`도 성공했다. 실제 AI 호출, Git commit·push·PR 및 Jira 쓰기는 수행하지 않았다.
 - Stop Hook 요구에 따라 현재 turn marker를 포함한 append-only WORKLOG 보완 기록을 추가했으며 구현·검증 결과에는 변경이 없다.
+
+## Latest exam-session audio URL inspection (2026-08-06)
+
+- `POST /api/v1/exams`가 반환하는 각 문제의 `audioUrl`은 `questions/{mockExamId}/q_{questionNumber}.wav`를 대상으로 생성한 60분 S3 Presigned GET URL이다.
+- Part 3 문항에는 `questions/{mockExamId}/part3_intro.wav`의 60분 `guideAudioUrl`도 포함된다. 실제 URL 문자열은 실행 환경의 Bucket·Region과 서명에 따라 달라진다.
+- 사용자 녹음용 Presigned PUT URL은 세션 생성과 분리되어 기존 upload-url API에서 `temp/{examId}/q_{questionNumber}_r{retryCount}.wav` Key로 발급된다.
+- 별도 Jira 이슈 키와 애플리케이션·테스트 변경은 없다. 실제 S3·Secret·Credential·Token·Presigned URL 접근 또는 발급, Git/Jira 쓰기 작업은 수행하지 않았다.
+
+## Latest exam-session issuance logging inspection (2026-08-06)
+
+- `POST /api/v1/exams`에서 `ExamSessionManager`가 새 문서를 insert해 `assignment.created() == true`인 경우에만 `ExamServiceImpl`이 세션 생성 완료 INFO 로그를 출력한다.
+- 진행 중 활성 세션 재사용 또는 동시 생성 충돌 후 기존 세션 선택은 `created=false`이므로 현재 세션 발행 로그가 없다. 별도 HTTP access log 설정도 확인되지 않았다.
+- 기본 Spring 로깅에서는 신규 생성 INFO 로그가 보이지만 배포 환경이 INFO를 차단하도록 별도 override하면 수집되지 않을 수 있다.
+- 별도 Jira 이슈 키 및 애플리케이션·테스트 변경은 없다. Secret·Token·Credential 접근과 Git/Jira 쓰기 작업도 수행하지 않았다.
+
+## Latest ECS logging diagnosis (2026-08-06)
+
+- Learning Core 이미지는 커스텀 파일 appender 없이 `java -jar /app/app.jar`로 실행되므로 Spring 기본 기동·INFO 로그는 컨테이너 stdout/stderr에 기록된다.
+- CloudWatch에 기동 로그까지 전혀 없다면 ECS Container Definition의 `awslogs` `logConfiguration`, 정확한 Region·Log Group·최신 stream, Task Execution Role의 CloudWatch Logs 권한과 Task Definition revision을 우선 확인해야 한다. 저장소에는 실제 Task Definition/IaC가 없다.
+- 현재 로컬 AWS CLI에는 자격 증명이 없어 ECS와 CloudWatch의 실제 설정을 읽기 전용으로도 확인하지 못했다. AWS 쓰기는 수행하지 않았다.
+- 세션 생성 로그만 없는 경우에는 진행 중 세션 재사용 분기와 미활성 HTTP access log가 원인이 될 수 있다. Task Definition의 `LOGGING_LEVEL_ROOT=OFF` 또는 외부 `LOGGING_CONFIG` override도 실제 배포 설정에서 확인이 필요하다.
+- 별도 Jira 이슈 키와 코드·테스트 변경은 없다. 실제 Secret·Token·Credential 값은 조회하거나 기록하지 않았다.
+
+## Latest grading-after-upload diagnosis (2026-08-06)
+
+- Presigned PUT은 앱에서 S3로 직접 수행되며 Learning Core에 업로드 완료 이벤트가 전달되지 않는다. 채점은 동일 식별자와 회차의 별도 `POST /api/v1/exams/{examId}/questions/{questionNumber}/submit` 호출로만 시작된다.
+- submit은 결정적 Question Job을 PROCESSING으로 claim한 뒤 S3 객체를 Presigned GET으로 다운로드하고 `AI_SERVER_URL`의 `/evaluations`에 multipart POST한다. Put 성공만으로 S3 Get 권한·Key 일치와 AI 연결은 검증되지 않는다.
+- ECS에서 `AI_SERVER_URL` 미주입 시 기본값 `http://tosunsaeng-ai:8000`을 사용한다. 해당 이름이 ECS Service Connect/Cloud Map 또는 실제 Task 통신 경로로 해석되지 않으면 dispatch가 실패한다. Task Role의 `s3:GetObject` 누락도 같은 증상을 만든다.
+- dispatch 예외는 Job의 `failureReason=QUESTION_DISPATCH_FAILED`와 API `EXAM_4001`로 정규화되지만 원래 예외를 로그로 남기지 않는다. submit·S3 fetch·AI outbound에도 정상 흐름 로그가 없어 현재 관측성만으로 S3와 AI 실패를 구분할 수 없다.
+- submit 응답이 없으면 앱 호출 누락, 401/403이면 인증·소유권, 500 `EXAM_4001`이면 S3 GET/AI 연결, 200 `PROCESSING` 뒤 정체면 AI 처리·Callback을 우선 확인한다. 실패 원인 수정 후 동일 submit은 기존 Job을 자동 재전송하지 않으므로 grading retry 경로를 사용해야 한다.
+- 별도 Jira 이슈 키와 코드·테스트 변경은 없다. 실제 AWS·MongoDB·AI·Secret·Token·Credential 접근 및 Git/Jira 쓰기 작업은 수행하지 않았다.
+
+## Latest AI grading outbound logging inspection (2026-08-06)
+
+- 문항 submit, S3 음성 재다운로드, AI `/evaluations` 요청 직전과 성공 응답에는 현재 INFO 로그가 없다. `GradingDispatchService`에는 logger가 선언되어 있지 않다.
+- outbound RuntimeException은 Question Job을 `FAILED`와 `QUESTION_DISPATCH_FAILED`로 기록하고 `EXAM_4001`로 변환되지만 원래 예외와 S3/AI 실패 단계는 로그에 남지 않는다.
+- AI Feedback Callback이 실제 도달했을 때만 Controller가 exam·문항·회차 식별 정보를 INFO로 기록한다. outbound와 inbound 관측성은 비대칭이다.
+- 별도 Jira 이슈 키와 코드·테스트 변경은 없다. 실제 외부 시스템·Secret·Token·Credential 접근 및 Git/Jira 쓰기 작업은 수행하지 않았다.
+
+## Latest FAILED Question Job resubmission behavior (2026-08-06)
+
+- 동일 `examId + questionNumber + retryCount` submit은 결정적 Job ID를 재사용한다. 기존 Job insert가 Duplicate Key이면 기존 상태를 반환하고 dispatch하지 않으므로 FAILED Job의 같은 submit 재호출은 HTTP 200과 `result.status=FAILED`가 된다.
+- 최초 dispatch 실패가 발생한 원 요청은 Job을 `FAILED/QUESTION_DISPATCH_FAILED`로 전이하고 500 `EXAM_4001`을 반환한다. 이후 같은 submit부터는 중복 Job 상태 조회 경로다.
+- 시험 단위 `POST /api/v1/exams/{examId}/grading/retry`는 최초 응시 `retryCount=0` FAILED Job만 즉시 재시도하며 dispatchAttempt가 설정된 최대 횟수 미만일 때 AI에 다시 보낸다. 기본 최대 횟수는 3회다.
+- `retryCount>0` 사용자 재답변 Job은 이 시험 단위 복구 API 대상이 아니다. 새로운 retryCount submit은 새로운 답변 Job이며 기존 FAILED Job 재전송과는 다르다.
+- 별도 Jira 이슈 키와 코드·테스트 변경은 없다. 실제 외부 시스템·Secret·Token·Credential 접근 및 Git/Jira 쓰기 작업은 수행하지 않았다.
+
+## Latest question submit payload inspection (2026-08-06)
+
+- 앱 submit은 Body 없이 `POST /api/v1/exams/{examId}/questions/{questionNumber}/submit?retryCount={retryCount}`를 호출한다. JWT 모드에서는 Bearer 인증이 필요하며 retryCount 기본값은 0이다.
+- Learning Core는 `temp/{examId}/q_{questionNumber}_r{retryCount}.wav`의 음성을 읽고 AI multipart에 `user_id=examId`, Session `mock_exam_id`, 파생 `part_number`, `question_number`, canonical `retry_count`, `client_source=app`, `audio_file`을 보낸다. 실제 사용자 ID는 보내지 않는다.
+- AI endpoint는 `${AI_SERVER_URL}/evaluations`, multipart 파일명은 `q_{questionNumber}_r{retryCount}.webm`, `Idempotency-Key`는 `question:{examId}:{questionNumber}:{retryCount}`다.
+- 별도 Jira 이슈 키와 코드·테스트 변경은 없다. 실제 외부 시스템·Secret·Token·Credential 접근 및 Git/Jira 쓰기 작업은 수행하지 않았다.
+
+## Latest AI request recognition diagnosis (2026-08-06)
+
+- `AI_SERVER_URL`은 base URL이어야 하며 Learning Core가 `/evaluations`를 붙인다. 배포 값에 이미 해당 path가 있으면 `/evaluations/evaluations`로 전송될 수 있고 현재 URI 검증은 이 오설정을 차단하지 않는다.
+- 기존 웹 POC 대비 앱 문항 요청의 주요 wire 차이는 `client_source=app`, Session의 실제 `mock_exam_id`, `Idempotency-Key`와 환경변수 endpoint다. 웹 요청만 정상이라면 AI의 이 값 처리 여부를 우선 대조해야 한다.
+- S3 Key `.wav`의 bytes를 multipart 파일명 `.webm`으로 보내는 기존 동작도 AI가 확장자·Content-Type을 엄격히 검증하는 경우 확인 대상이다.
+- submit이 200 `PROCESSING`이면 AI HTTP endpoint가 2xx를 반환했으므로 AI 내부 분기·Callback 문제이고, 500 `EXAM_4001` 또는 FAILED이면 path, multipart validation, AI 4xx/5xx 또는 전송 문제다. Learning Core는 현재 원본 AI 응답 오류를 로그에 남기지 않는다.
+- Python 채점 서버 소스와 실제 ECS/AI 요청·응답은 확인하지 못했다. 별도 Jira 이슈 키와 코드·테스트 변경은 없으며 외부 시스템·Secret·Token·Credential 접근 및 Git/Jira 쓰기 작업도 수행하지 않았다.
+
+## Latest question grading diagnostic logging (2026-08-06)
+
+- 별도 Jira 이슈 키 없이 Question submit과 AI outbound 진단 로그를 추가했다. submit job/exam/question/retry, 신규·기존 Job과 status/dispatchAttempt, AI 호출 전 job/fileKey/attempt와 성공·실패를 기록한다.
+- `GradingDispatchService`는 실제 `${AI_SERVER_URL}/evaluations` URI, jobId, fileKey, audio byte size와 반환 HTTP status를 INFO로 기록하며 최초 submit과 grading retry outbound 모두 추적 가능하다.
+- dispatch 실패는 jobId·예외 타입·안전한 메시지를 ERROR로 기록한다. Presigned URL·서명·Token 가능성이 있는 URI 및 민감 값은 치환하고 메시지를 단일 행 500자로 제한하며 원본 Throwable stacktrace는 로그에 출력하지 않는다.
+- 기존 Job idempotency, FAILED/retry 상태 전이, S3·AI payload와 `Idempotency-Key`, 공개 API·DTO·응답은 변경하지 않았다.
+- 로그 내용과 Presigned URL 비노출 집중 테스트 및 전체 `./gradlew clean test`가 성공했다. Java 268개, failures/errors/skipped 0개이며 `git diff --check`도 성공했다. 실제 AI·AWS·MongoDB·ECS 및 Git/Jira 쓰기 작업은 수행하지 않았다.

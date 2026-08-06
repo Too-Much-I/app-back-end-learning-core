@@ -12,6 +12,8 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.dao.DuplicateKeyException;
 import org.springframework.dao.OptimisticLockingFailureException;
+import org.springframework.boot.test.system.CapturedOutput;
+import org.springframework.boot.test.system.OutputCaptureExtension;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.data.redis.core.ValueOperations;
 import org.springframework.test.util.ReflectionTestUtils;
@@ -33,6 +35,7 @@ import web.tosunsaeng.domain.exams.domain.repository.ExamSummaryRepository;
 import web.tosunsaeng.domain.exams.domain.repository.QuestionGradingJobRepository;
 import web.tosunsaeng.domain.exams.domain.repository.SummaryGradingJobRepository;
 import web.tosunsaeng.domain.exams.dto.ExamResponseDTO;
+import web.tosunsaeng.domain.exams.exception.ExamsException;
 import web.tosunsaeng.global.config.GradingProperties;
 
 import java.time.Clock;
@@ -58,6 +61,7 @@ import java.util.concurrent.atomic.AtomicReference;
 
 import static org.junit.jupiter.api.Assertions.assertAll;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -73,7 +77,7 @@ import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
-@ExtendWith(MockitoExtension.class)
+@ExtendWith({MockitoExtension.class, OutputCaptureExtension.class})
 class ExamGradingServiceTest {
 
     private static final String EXAM_ID = "ex_grading_001";
@@ -162,7 +166,7 @@ class ExamGradingServiceTest {
     }
 
     @Test
-    void firstSubmitCreatesProcessingJobAndDispatchesOnce() {
+    void firstSubmitCreatesProcessingJobAndDispatchesOnce(CapturedOutput output) {
         ExamStatus status = service.submitQuestion(EXAM_ID, 1, 0);
 
         QuestionGradingJob stored = storedQuestion(1, 0);
@@ -172,7 +176,15 @@ class ExamGradingServiceTest {
                 () -> assertEquals(1, stored.getDispatchAttempt()),
                 () -> assertEquals(NOW, stored.getProcessingStartedAt()),
                 () -> assertEquals(NOW, stored.getLastDispatchedAt()),
-                () -> assertEquals("temp/" + EXAM_ID + "/q_1_r0.wav", stored.getFileKey())
+                () -> assertEquals("temp/" + EXAM_ID + "/q_1_r0.wav", stored.getFileKey()),
+                () -> assertTrue(output.getOut().contains(
+                        "채점 submit 시작: jobId=question:" + EXAM_ID + ":1:0")),
+                () -> assertTrue(output.getOut().contains(
+                        "신규 채점 Job 생성: jobId=question:" + EXAM_ID + ":1:0")),
+                () -> assertTrue(output.getOut().contains(
+                        "AI 전송 호출 직전: jobId=question:" + EXAM_ID + ":1:0")),
+                () -> assertTrue(output.getOut().contains(
+                        "AI 전송 성공: jobId=question:" + EXAM_ID + ":1:0"))
         );
         verify(dispatchService).dispatchQuestion(any(QuestionDispatchClaim.class));
     }
@@ -194,12 +206,35 @@ class ExamGradingServiceTest {
     }
 
     @Test
-    void repeatedSubmitDoesNotDispatchAgain() {
+    void repeatedSubmitDoesNotDispatchAgain(CapturedOutput output) {
         service.submitQuestion(EXAM_ID, 1, 0);
         ExamStatus repeatedStatus = service.submitQuestion(EXAM_ID, 1, 0);
 
-        assertEquals(ExamStatus.PROCESSING, repeatedStatus);
+        assertAll(
+                () -> assertEquals(ExamStatus.PROCESSING, repeatedStatus),
+                () -> assertTrue(output.getOut().contains(
+                        "기존 채점 Job 반환: jobId=question:" + EXAM_ID
+                                + ":1:0, status=PROCESSING, dispatchAttempt=1"))
+        );
         verify(dispatchService, times(1)).dispatchQuestion(any(QuestionDispatchClaim.class));
+    }
+
+    @Test
+    void dispatchFailureLogRedactsPresignedUrl(CapturedOutput output) {
+        doThrow(new RuntimeException(
+                "GET https://example.com/audio.wav?X-Amz-Signature=should-not-be-logged failed"
+        )).when(dispatchService).dispatchQuestion(any(QuestionDispatchClaim.class));
+
+        assertThrows(ExamsException.class, () -> service.submitQuestion(EXAM_ID, 1, 0));
+
+        assertAll(
+                () -> assertTrue(output.getOut().contains(
+                        "AI 전송 실패: jobId=question:" + EXAM_ID + ":1:0")),
+                () -> assertTrue(output.getOut().contains("type=java.lang.RuntimeException")),
+                () -> assertTrue(output.getOut().contains("message=GET [redacted-uri]")),
+                () -> assertFalse(output.getOut().contains("X-Amz-Signature")),
+                () -> assertFalse(output.getOut().contains("should-not-be-logged"))
+        );
     }
 
     @Test

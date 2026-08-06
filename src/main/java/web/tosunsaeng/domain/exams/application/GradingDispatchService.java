@@ -1,6 +1,7 @@
 package web.tosunsaeng.domain.exams.application;
 
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.io.ByteArrayResource;
 import org.springframework.http.HttpEntity;
@@ -20,6 +21,7 @@ import java.time.Duration;
 import java.util.HashMap;
 import java.util.Map;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class GradingDispatchService {
@@ -65,10 +67,19 @@ public class GradingDispatchService {
         headers.setContentType(MediaType.MULTIPART_FORM_DATA);
         headers.set(IDEMPOTENCY_KEY_HEADER, claim.jobId());
 
-        restTemplate.postForEntity(
-                aiEvaluationUri(gradingProperties.aiServerUrl()),
+        URI evaluationUri = aiEvaluationUri(gradingProperties.aiServerUrl());
+        log.info(
+                "AI multipart POST 시작: jobId={}, uri={}, fileKey={}, audioSize={}",
+                claim.jobId(), evaluationUri, claim.fileKey(), audioBytes.length
+        );
+        var response = restTemplate.postForEntity(
+                evaluationUri,
                 new HttpEntity<>(body, headers),
                 String.class
+        );
+        log.info(
+                "AI multipart POST 완료: jobId={}, status={}",
+                claim.jobId(), response.getStatusCode()
         );
     }
 

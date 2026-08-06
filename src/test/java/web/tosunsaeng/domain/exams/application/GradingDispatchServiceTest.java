@@ -6,8 +6,11 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.boot.test.system.CapturedOutput;
+import org.springframework.boot.test.system.OutputCaptureExtension;
 import org.springframework.core.io.ByteArrayResource;
 import org.springframework.http.HttpEntity;
+import org.springframework.http.ResponseEntity;
 import org.springframework.test.util.ReflectionTestUtils;
 import org.springframework.util.MultiValueMap;
 import org.springframework.web.client.RestTemplate;
@@ -26,12 +29,13 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
-@ExtendWith(MockitoExtension.class)
+@ExtendWith({MockitoExtension.class, OutputCaptureExtension.class})
 class GradingDispatchServiceTest {
 
     private static final String EXAM_ID = "ex_dispatch_001";
@@ -67,13 +71,15 @@ class GradingDispatchServiceTest {
 
     @Test
     @SuppressWarnings({"rawtypes", "unchecked"})
-    void questionDispatchKeepsMultipartContractAndUsesStableIdempotencyKey() throws Exception {
+    void questionDispatchKeepsMultipartContractAndUsesStableIdempotencyKey(CapturedOutput output) throws Exception {
         when(s3Presigner.presignGetObject(any(GetObjectPresignRequest.class)))
                 .thenReturn(presignedGetObjectRequest);
         when(presignedGetObjectRequest.url())
                 .thenReturn(URI.create("https://example.com/test-audio.wav").toURL());
         when(restTemplate.getForObject(any(URI.class), eq(byte[].class)))
                 .thenReturn(new byte[]{1, 2, 3});
+        when(restTemplate.postForEntity(eq(AI_EVALUATION_URL), any(HttpEntity.class), eq(String.class)))
+                .thenReturn(ResponseEntity.ok("accepted"));
         QuestionDispatchClaim claim = new QuestionDispatchClaim(
                 "question:" + EXAM_ID + ":4:2",
                 1,
@@ -103,7 +109,14 @@ class GradingDispatchServiceTest {
                 () -> assertEquals(
                         "question:" + EXAM_ID + ":4:2",
                         requestCaptor.getValue().getHeaders().getFirst("Idempotency-Key")
-                )
+                ),
+                () -> assertTrue(output.getOut().contains(
+                        "AI multipart POST 시작: jobId=question:" + EXAM_ID
+                                + ":4:2, uri=" + AI_EVALUATION_URL
+                                + ", fileKey=temp/" + EXAM_ID + "/q_4_r2.wav, audioSize=3")),
+                () -> assertTrue(output.getOut().contains(
+                        "AI multipart POST 완료: jobId=question:" + EXAM_ID
+                                + ":4:2, status=200 OK"))
         );
     }
 

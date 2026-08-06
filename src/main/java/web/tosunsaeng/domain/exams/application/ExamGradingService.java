@@ -39,6 +39,7 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Function;
+import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
 @Slf4j
@@ -49,6 +50,11 @@ public class ExamGradingService {
     private static final int CALLBACK_COMPLETION_RETRIES = 5;
     private static final String QUESTION_DISPATCH_FAILED = "QUESTION_DISPATCH_FAILED";
     private static final String MAX_DISPATCH_ATTEMPTS = "MAX_DISPATCH_ATTEMPTS";
+    private static final int MAX_FAILURE_LOG_MESSAGE_LENGTH = 500;
+    private static final Pattern URI_IN_MESSAGE = Pattern.compile("(?i)https?://\\S+");
+    private static final Pattern SENSITIVE_VALUE_IN_MESSAGE = Pattern.compile(
+            "(?i)(authorization|token|secret|signature|credential)\\s*[=:]\\s*[^\\s,;&]+"
+    );
 
     private final QuestionGradingJobRepository questionJobRepository;
     private final SummaryGradingJobRepository summaryJobRepository;
@@ -70,6 +76,10 @@ public class ExamGradingService {
         int canonicalRetryCount = GradingKeys.canonicalRetryCount(retryCount);
         String mockExamId = resolveMockExamId(examId);
         String jobId = GradingKeys.questionJobId(examId, questionNumber, canonicalRetryCount);
+        log.info(
+                "채점 submit 시작: jobId={}, examId={}, questionNumber={}, retryCount={}",
+                jobId, examId, questionNumber, canonicalRetryCount
+        );
         if (hasQuestionResult(examId, questionNumber, canonicalRetryCount)) {
             completeQuestion(examId, questionNumber, canonicalRetryCount);
             calculateAndCacheOverallStatus(examId);
@@ -90,10 +100,19 @@ public class ExamGradingService {
         QuestionGradingJob inserted;
         try {
             inserted = questionJobRepository.insert(pending);
+            log.info("신규 채점 Job 생성: jobId={}", jobId);
         } catch (DuplicateKeyException duplicate) {
-            ExamStatus status = questionJobRepository.findById(jobId)
-                    .map(job -> toExamStatus(job.getStatus()))
-                    .orElse(ExamStatus.PENDING);
+            QuestionGradingJob existing = questionJobRepository.findById(jobId)
+                    .orElse(null);
+            log.info(
+                    "기존 채점 Job 반환: jobId={}, status={}, dispatchAttempt={}",
+                    jobId,
+                    existing == null ? null : existing.getStatus(),
+                    existing == null ? null : existing.getDispatchAttempt()
+            );
+            ExamStatus status = existing == null
+                    ? ExamStatus.PENDING
+                    : toExamStatus(existing.getStatus());
             calculateAndCacheOverallStatus(examId);
             return status;
         }
@@ -117,9 +136,15 @@ public class ExamGradingService {
         }
 
         QuestionDispatchClaim claim = QuestionDispatchClaim.from(claimed);
+        log.info(
+                "AI 전송 호출 직전: jobId={}, fileKey={}, attempt={}",
+                claim.jobId(), claim.fileKey(), claimed.getDispatchAttempt()
+        );
         try {
             dispatchService.dispatchQuestion(claim);
+            log.info("AI 전송 성공: jobId={}", claim.jobId());
         } catch (RuntimeException dispatchFailure) {
+            logDispatchFailure(claim.jobId(), dispatchFailure);
             failQuestionClaim(claim, QUESTION_DISPATCH_FAILED);
             calculateAndCacheOverallStatus(examId);
             throw new ExamsException(ErrorStatus._AI_SERVER_CONNECTION_ERROR);
@@ -370,13 +395,41 @@ public class ExamGradingService {
         }
 
         QuestionDispatchClaim claim = QuestionDispatchClaim.from(claimed, resolveMockExamId(claimed));
+        log.info(
+                "AI 전송 호출 직전: jobId={}, fileKey={}, attempt={}",
+                claim.jobId(), claim.fileKey(), claimed.getDispatchAttempt()
+        );
         try {
             dispatchService.dispatchQuestion(claim);
+            log.info("AI 전송 성공: jobId={}", claim.jobId());
             return DispatchOutcome.DISPATCHED;
         } catch (RuntimeException dispatchFailure) {
+            logDispatchFailure(claim.jobId(), dispatchFailure);
             failQuestionClaim(claim, QUESTION_DISPATCH_FAILED);
             return DispatchOutcome.FAILED;
         }
+    }
+
+    private void logDispatchFailure(String jobId, RuntimeException dispatchFailure) {
+        log.error(
+                "AI 전송 실패: jobId={}, type={}, message={}",
+                jobId,
+                dispatchFailure.getClass().getName(),
+                safeFailureMessage(dispatchFailure)
+        );
+    }
+
+    private static String safeFailureMessage(RuntimeException failure) {
+        String message = failure.getMessage();
+        if (message == null || message.isBlank()) {
+            return null;
+        }
+        String singleLine = message.replace('\n', ' ').replace('\r', ' ');
+        String sanitized = URI_IN_MESSAGE.matcher(singleLine).replaceAll("[redacted-uri]");
+        sanitized = SENSITIVE_VALUE_IN_MESSAGE.matcher(sanitized).replaceAll("$1=[redacted]");
+        return sanitized.length() <= MAX_FAILURE_LOG_MESSAGE_LENGTH
+                ? sanitized
+                : sanitized.substring(0, MAX_FAILURE_LOG_MESSAGE_LENGTH) + "...";
     }
 
     private void failQuestionClaim(QuestionDispatchClaim claim, String reason) {
