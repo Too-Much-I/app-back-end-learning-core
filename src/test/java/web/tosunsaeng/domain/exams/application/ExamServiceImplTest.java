@@ -27,17 +27,21 @@ import web.tosunsaeng.domain.exams.domain.repository.ExamSessionRepository;
 import web.tosunsaeng.domain.exams.domain.repository.ExamSummaryRepository;
 import web.tosunsaeng.domain.exams.domain.repository.SpeechAceResultRepository;
 import web.tosunsaeng.domain.exams.dto.ExamResponseDTO;
+import web.tosunsaeng.domain.exams.exception.ExamsException;
 import web.tosunsaeng.global.auth.CurrentUserProvider;
+import web.tosunsaeng.global.error.code.status.ErrorStatus;
 
 import java.net.URI;
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.TimeUnit;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.inOrder;
@@ -130,9 +134,9 @@ class ExamServiceImplTest {
         when(examSessionManager.startNew(LEGACY_USER_ID))
                 .thenReturn(new ExamSessionManager.Assignment(assignedSession, mockExam, true));
 
-        when(s3Presigner.presignGetObject(any(GetObjectPresignRequest.class)))
+        lenient().when(s3Presigner.presignGetObject(any(GetObjectPresignRequest.class)))
                 .thenReturn(presignedGetObjectRequest);
-        when(presignedGetObjectRequest.url())
+        lenient().when(presignedGetObjectRequest.url())
                 .thenReturn(URI.create("https://example.com/questions/mock_exam_003/q_1.wav").toURL());
     }
 
@@ -180,18 +184,21 @@ class ExamServiceImplTest {
     }
 
     @Test
-    void createExamSessionPartFourReturnsStoredTableImageUrlWithoutTableContext() throws Exception {
+    void createExamSessionPartFourReturnsStoredOpaqueTableContextWithoutTableImage() throws Exception {
         String storedTableImageUrl = "https://cdn.example.com/mock-exam/001/part4/q8.png";
-        Question.TableContext internalTableContext = Question.TableContext.builder()
-                .title("Legacy structured table")
-                .items(List.of(Question.TableItem.builder().note("Internal data").build()))
-                .build();
+        Map<String, Object> storedTableContext = Map.of(
+                "person_name", "Maya Bennett",
+                "work_experience", List.of(Map.of(
+                        "section_name", "Work Experience",
+                        "details", List.of("Kitchen Assistant", "Safety Trainer")
+                ))
+        );
         Question partFourQuestion = Question.builder()
                 .partNumber(4)
                 .questionNumber(8)
                 .question("Part 4 question")
                 .tableImageUrl(storedTableImageUrl)
-                .tableContext(internalTableContext)
+                .tableContext(storedTableContext)
                 .build();
         MockExam mockExam = MockExam.builder()
                 .mockExamId("mock_exam_001")
@@ -216,14 +223,16 @@ class ExamServiceImplTest {
         assertEquals(4, responseQuestion.getPart());
         assertEquals(8, responseQuestion.getQuestionNumber());
         assertEquals("Part 4 question", responseQuestion.getText());
-        assertEquals(storedTableImageUrl, responseQuestion.getTableImageUrl());
         assertEquals(
                 "https://example.com/questions/mock_exam_001/q_8.wav",
                 responseQuestion.getAudioUrl()
         );
-        assertNull(responseQuestion.getTableContext());
-        assertEquals(storedTableImageUrl, responseJson.get("tableImageUrl").asText());
-        assertFalse(responseJson.has("tableContext"));
+        assertEquals(storedTableContext, responseQuestion.getTableContext());
+        assertEquals(
+                new ObjectMapper().valueToTree(storedTableContext),
+                responseJson.get("tableContext")
+        );
+        assertFalse(responseJson.has("tableImageUrl"));
 
         ArgumentCaptor<GetObjectPresignRequest> requestCaptor =
                 ArgumentCaptor.forClass(GetObjectPresignRequest.class);
@@ -232,6 +241,36 @@ class ExamServiceImplTest {
                 "questions/mock_exam_001/q_8.wav",
                 requestCaptor.getValue().getObjectRequest().key()
         );
+    }
+
+    @Test
+    void createExamSessionPartFourWithoutTableContextUsesCatalogConfigurationError() {
+        Question partFourQuestion = Question.builder()
+                .partNumber(4)
+                .questionNumber(8)
+                .tableImageUrl("https://cdn.example.com/legacy-table-image.png")
+                .build();
+        MockExam mockExam = MockExam.builder()
+                .mockExamId("mock_exam_001")
+                .title("Part 4 mock exam")
+                .questions(List.of(partFourQuestion))
+                .build();
+        ExamSession session = ExamSession.builder()
+                .examId("ex_part4_missing_context")
+                .userId(LEGACY_USER_ID)
+                .mockExamId("mock_exam_001")
+                .active(true)
+                .build();
+        when(examSessionManager.startNew(LEGACY_USER_ID))
+                .thenReturn(new ExamSessionManager.Assignment(session, mockExam, true));
+
+        ExamsException exception = assertThrows(
+                ExamsException.class,
+                () -> examService.createExamSession()
+        );
+
+        assertEquals(ErrorStatus._EXAM_CATALOG_CONFIGURATION_ERROR, exception.getCode());
+        verifyNoInteractions(s3Presigner);
     }
 
     @Test

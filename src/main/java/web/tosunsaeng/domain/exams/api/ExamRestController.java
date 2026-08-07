@@ -45,7 +45,8 @@ public class ExamRestController {
     @Operation(
             summary = "시험의 재답변 문항 및 회차 조회 API",
             description = "Bearer 인증 사용자 소유 시험에서 retryCount 1 이상이 실제로 존재하는 문항만 반환하고, "
-                    + "저장된 최초 회차도 비교를 위해 함께 제공합니다. 상세 피드백은 기존 문항 단건 API로 조회하며, "
+                    + "저장된 최초 회차도 비교를 위해 함께 제공합니다. 회차별 상태·점수·완료 시각을 제공하고, "
+                    + "상세 피드백은 기존 문항 단건 API로 조회하며, "
                     + "재답변 문항이 없으면 200과 빈 questions 배열을 반환합니다."
     )
     @GetMapping("/{examId}/retries")

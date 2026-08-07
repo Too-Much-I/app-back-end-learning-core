@@ -18,6 +18,7 @@ import web.tosunsaeng.domain.exams.exception.ExamsException;
 import web.tosunsaeng.global.auth.CurrentUserProvider;
 import web.tosunsaeng.global.error.code.status.ErrorStatus;
 
+import java.time.Instant;
 import java.util.Collection;
 import java.util.Comparator;
 import java.util.HashMap;
@@ -117,7 +118,7 @@ public class ExamReadService {
     public ExamResponseDTO.ExamRetriesResult getExamRetries(String examId) {
         requireOwnedSession(examId);
 
-        Map<AttemptKey, GradingJobStatus> attemptsByKey = new HashMap<>();
+        Map<AttemptKey, RetryAttemptMetadata> attemptsByKey = new HashMap<>();
         safeList(examResultRepository.findQuestionAttemptsByExamId(examId)).stream()
                 .filter(Objects::nonNull)
                 .filter(result -> result.getQuestionNumber() != null)
@@ -126,10 +127,14 @@ public class ExamReadService {
                                 result.getQuestionNumber(),
                                 GradingKeys.canonicalRetryCount(result.getRetryCount())
                         ),
-                        GradingJobStatus.COMPLETED
+                        new RetryAttemptMetadata(
+                                GradingJobStatus.COMPLETED,
+                                result.getScore(),
+                                null
+                        )
                 ));
 
-        Map<AttemptKey, GradingJobStatus> jobAttemptsByKey = new HashMap<>();
+        Map<AttemptKey, RetryAttemptMetadata> jobAttemptsByKey = new HashMap<>();
         safeList(questionGradingJobRepository.findAttemptsByExamId(examId)).stream()
                 .filter(Objects::nonNull)
                 .filter(job -> job.getQuestionNumber() != null)
@@ -138,11 +143,23 @@ public class ExamReadService {
                                 job.getQuestionNumber(),
                                 GradingKeys.canonicalRetryCount(job.getRetryCount())
                         ),
-                        job.getStatus()
+                        new RetryAttemptMetadata(
+                                job.getStatus(),
+                                null,
+                                job.getCompletedAt()
+                        )
                 ));
-        attemptsByKey.putAll(jobAttemptsByKey);
+        jobAttemptsByKey.forEach((attemptKey, jobAttempt) -> attemptsByKey.merge(
+                attemptKey,
+                jobAttempt,
+                (resultAttempt, currentJobAttempt) -> new RetryAttemptMetadata(
+                        currentJobAttempt.status(),
+                        resultAttempt.score(),
+                        currentJobAttempt.completedAt()
+                )
+        ));
 
-        Map<Integer, List<Map.Entry<AttemptKey, GradingJobStatus>>> attemptsByQuestion =
+        Map<Integer, List<Map.Entry<AttemptKey, RetryAttemptMetadata>>> attemptsByQuestion =
                 attemptsByKey.entrySet().stream()
                         .collect(Collectors.groupingBy(entry -> entry.getKey().questionNumber()));
         List<ExamResponseDTO.RetriedQuestionItem> questions = attemptsByQuestion.entrySet().stream()
@@ -252,12 +269,14 @@ public class ExamReadService {
 
     private ExamResponseDTO.RetriedQuestionItem toRetriedQuestion(
             Integer questionNumber,
-            Collection<Map.Entry<AttemptKey, GradingJobStatus>> storedAttempts) {
+            Collection<Map.Entry<AttemptKey, RetryAttemptMetadata>> storedAttempts) {
         List<ExamResponseDTO.RetryAttemptItem> attempts = storedAttempts.stream()
                 .sorted(Comparator.comparingInt(entry -> entry.getKey().retryCount()))
                 .map(entry -> ExamResponseDTO.RetryAttemptItem.builder()
                         .retryCount(entry.getKey().retryCount())
-                        .status(entry.getValue())
+                        .status(entry.getValue().status())
+                        .score(entry.getValue().score())
+                        .completedAt(entry.getValue().completedAt())
                         .build())
                 .toList();
 
@@ -293,5 +312,11 @@ public class ExamReadService {
     }
 
     private record AttemptKey(Integer questionNumber, int retryCount) {
+    }
+
+    private record RetryAttemptMetadata(
+            GradingJobStatus status,
+            Double score,
+            Instant completedAt) {
     }
 }

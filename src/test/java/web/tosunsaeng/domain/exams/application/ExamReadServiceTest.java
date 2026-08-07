@@ -311,7 +311,7 @@ class ExamReadServiceTest {
 
         JsonNode json = objectMapper.valueToTree(result);
         for (String forbiddenField : List.of(
-                "dispatchAttempt", "failureReason", "score", "feedback", "transcript",
+                "dispatchAttempt", "failureReason", "feedback", "transcript",
                 "audioUrl", "fileKey", "userId", "user_id"
         )) {
             assertFalse(json.toString().contains(forbiddenField));
@@ -322,6 +322,39 @@ class ExamReadServiceTest {
         assertFalse(json.toString().contains("99"));
         verify(examResultRepository).findQuestionAttemptsByExamId(EXAM_ID);
         verify(questionGradingJobRepository).findAttemptsByExamId(EXAM_ID);
+    }
+
+    @Test
+    void retriesExposeResultScoreAndJobCompletedAtPerAttempt() {
+        Instant firstCompletedAt = Instant.parse("2026-08-01T12:10:00Z");
+        Instant retryCompletedAt = Instant.parse("2026-08-01T12:20:00Z");
+        when(examSessionRepository.findById(EXAM_ID)).thenReturn(Optional.of(
+                session(EXAM_ID, USER_ID, "mock_exam_004", 1, true, null)
+        ));
+        when(examResultRepository.findQuestionAttemptsByExamId(EXAM_ID)).thenReturn(List.of(
+                result("result-q1-r0", 1, 0, 2.1),
+                result("result-q1-r1", 1, 1, 2.6),
+                result("result-q1-r2-legacy", 1, 2, 2.9)
+        ));
+        when(questionGradingJobRepository.findAttemptsByExamId(EXAM_ID)).thenReturn(List.of(
+                job("job-q1-r0", 1, 0, GradingJobStatus.COMPLETED, 1, firstCompletedAt),
+                job("job-q1-r1", 1, 1, GradingJobStatus.COMPLETED, 1, retryCompletedAt)
+        ));
+
+        ExamResponseDTO.RetriedQuestionItem question = examReadService
+                .getExamRetries(EXAM_ID)
+                .getQuestions()
+                .getFirst();
+
+        assertAll(
+                () -> assertEquals(List.of(2.1, 2.6, 2.9), question.getAttempts().stream()
+                        .map(ExamResponseDTO.RetryAttemptItem::getScore).toList()),
+                () -> assertEquals(firstCompletedAt, question.getAttempts().get(0).getCompletedAt()),
+                () -> assertEquals(retryCompletedAt, question.getAttempts().get(1).getCompletedAt()),
+                () -> assertNull(question.getAttempts().get(2).getCompletedAt()),
+                () -> assertTrue(question.getAttempts().stream()
+                        .allMatch(attempt -> attempt.getStatus() == GradingJobStatus.COMPLETED))
+        );
     }
 
     @Test
@@ -431,15 +464,32 @@ class ExamReadServiceTest {
 
     private static ExamResult result(
             String id,
+            Integer questionNumber,
+            Integer retryCount,
+            Double score) {
+        return result(id, EXAM_ID, questionNumber, retryCount, score);
+    }
+
+    private static ExamResult result(
+            String id,
             String examId,
             Integer questionNumber,
             Integer retryCount) {
+        return result(id, examId, questionNumber, retryCount, 9.5);
+    }
+
+    private static ExamResult result(
+            String id,
+            String examId,
+            Integer questionNumber,
+            Integer retryCount,
+            Double score) {
         return ExamResult.builder()
                 .id(id)
                 .examId(examId)
                 .questionNumber(questionNumber)
                 .retryCount(retryCount)
-                .score(9.5)
+                .score(score)
                 .transcript("not exposed")
                 .feedback(ExamResult.ItemFeedback.builder().summary("not exposed").build())
                 .build();
@@ -456,11 +506,32 @@ class ExamReadServiceTest {
 
     private static QuestionGradingJob job(
             String id,
+            Integer questionNumber,
+            Integer retryCount,
+            GradingJobStatus status,
+            int dispatchAttempt,
+            Instant completedAt) {
+        return job(id, EXAM_ID, questionNumber, retryCount, status, dispatchAttempt, completedAt);
+    }
+
+    private static QuestionGradingJob job(
+            String id,
             String examId,
             Integer questionNumber,
             Integer retryCount,
             GradingJobStatus status,
             int dispatchAttempt) {
+        return job(id, examId, questionNumber, retryCount, status, dispatchAttempt, null);
+    }
+
+    private static QuestionGradingJob job(
+            String id,
+            String examId,
+            Integer questionNumber,
+            Integer retryCount,
+            GradingJobStatus status,
+            int dispatchAttempt,
+            Instant completedAt) {
         return QuestionGradingJob.builder()
                 .jobId(id)
                 .examId(examId)
@@ -471,6 +542,7 @@ class ExamReadServiceTest {
                 .fileKey("not-exposed")
                 .failureReason("not-exposed")
                 .pendingAt(Instant.EPOCH)
+                .completedAt(completedAt)
                 .build();
     }
 }

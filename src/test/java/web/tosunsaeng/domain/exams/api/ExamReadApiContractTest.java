@@ -17,9 +17,11 @@ import web.tosunsaeng.domain.exams.domain.enums.GradingJobStatus;
 import web.tosunsaeng.domain.exams.dto.ExamResponseDTO;
 
 import java.lang.reflect.Method;
+import java.time.Instant;
 import java.time.LocalDateTime;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
 
@@ -109,10 +111,13 @@ class ExamReadApiContractTest {
                                         ExamResponseDTO.RetryAttemptItem.builder()
                                                 .retryCount(0)
                                                 .status(GradingJobStatus.COMPLETED)
+                                                .score(2.1)
+                                                .completedAt(Instant.parse("2026-08-01T12:10:00Z"))
                                                 .build(),
                                         ExamResponseDTO.RetryAttemptItem.builder()
                                                 .retryCount(1)
                                                 .status(GradingJobStatus.PROCESSING)
+                                                .score(2.6)
                                                 .build()
                                 ))
                                 .build()))
@@ -124,6 +129,9 @@ class ExamReadApiContractTest {
                 .andExpect(jsonPath("$.result.examId").value("ex_retries"))
                 .andExpect(jsonPath("$.result.questions[0].partNumber").value(1))
                 .andExpect(jsonPath("$.result.questions[0].attempts[0].retryCount").value(0))
+                .andExpect(jsonPath("$.result.questions[0].attempts[0].score").value(2.1))
+                .andExpect(jsonPath("$.result.questions[0].attempts[0].completedAt")
+                        .value("2026-08-01T12:10:00Z"))
                 .andExpect(jsonPath("$.result.questions[0].attempts[1].status").value("PROCESSING"))
                 .andExpect(jsonPath("$..feedback").doesNotExist())
                 .andExpect(jsonPath("$..audioUrl").doesNotExist())
@@ -135,8 +143,8 @@ class ExamReadApiContractTest {
     }
 
     @Test
-    void createSessionResponseExposesPartFourTableImageWithoutTableContext() throws Exception {
-        String storedTableImageUrl = "https://cdn.example.com/mock-exam/001/part4/q8.png";
+    void createSessionResponseExposesStoredOpaquePartFourTableContext() throws Exception {
+        Map<String, Object> storedTableContext = partFourTableContext();
         when(examService.createExamSession()).thenReturn(
                 ExamResponseDTO.CreateSessionResult.builder()
                         .examId("ex_part4")
@@ -146,7 +154,7 @@ class ExamReadApiContractTest {
                                 .questionNumber(8)
                                 .text("Part 4 question")
                                 .audioUrl("https://example.com/question-audio")
-                                .tableImageUrl(storedTableImageUrl)
+                                .tableContext(storedTableContext)
                                 .build()))
                         .build()
         );
@@ -158,11 +166,85 @@ class ExamReadApiContractTest {
                 .andExpect(jsonPath("$.result.questions[0].text").value("Part 4 question"))
                 .andExpect(jsonPath("$.result.questions[0].audioUrl")
                         .value("https://example.com/question-audio"))
-                .andExpect(jsonPath("$.result.questions[0].tableImageUrl")
-                        .value(storedTableImageUrl))
-                .andExpect(jsonPath("$.result.questions[0].tableContext").doesNotExist());
+                .andExpect(jsonPath("$.result.questions[0].tableContext.resume_owner")
+                        .value("Maya Bennett"))
+                .andExpect(jsonPath(
+                        "$.result.questions[0].tableContext.education_history[0].graduation_year"
+                ).value(2022))
+                .andExpect(jsonPath("$.result.questions[0].tableContext.title").doesNotExist())
+                .andExpect(jsonPath("$.result.questions[0].tableImageUrl").doesNotExist());
 
         verify(examService).createExamSession();
+        verifyNoInteractions(examReadService);
+    }
+
+    @Test
+    void promptResponseExposesStoredOpaquePartFourTableContext() throws Exception {
+        Map<String, Object> storedTableContext = partFourTableContext();
+        when(examService.getQuestionPrompt("ex_part4", 8)).thenReturn(
+                ExamResponseDTO.QuestionDTO.builder()
+                        .part(4)
+                        .questionNumber(8)
+                        .text("Part 4 question")
+                        .tableContext(storedTableContext)
+                        .build()
+        );
+
+        mockMvc.perform(get(
+                        "/api/v1/exams/{examId}/questions/{questionNumber}/prompt",
+                        "ex_part4",
+                        8
+                ))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.result.part").value(4))
+                .andExpect(jsonPath("$.result.questionNumber").value(8))
+                .andExpect(jsonPath("$.result.tableContext.resume_owner")
+                        .value("Maya Bennett"))
+                .andExpect(jsonPath(
+                        "$.result.tableContext.education_history[0].university_name"
+                ).value("Example University"))
+                .andExpect(jsonPath("$.result.tableImageUrl").doesNotExist());
+
+        verify(examService).getQuestionPrompt("ex_part4", 8);
+        verifyNoInteractions(examReadService);
+    }
+
+    @Test
+    void questionResultResponseExposesStoredOpaquePartFourTableContext() throws Exception {
+        Map<String, Object> storedTableContext = partFourTableContext();
+        when(examService.getExamQuestion("ex_part4", 8, 0)).thenReturn(
+                ExamResponseDTO.QuestionResult.builder()
+                        .examId("ex_part4")
+                        .question(ExamResponseDTO.PartResultDTO.builder()
+                                .partNumber(4)
+                                .questionNumber(8)
+                                .retryCount(0)
+                                .questionInfo(ExamResponseDTO.QuestionDTO.builder()
+                                        .part(4)
+                                        .questionNumber(8)
+                                        .tableContext(storedTableContext)
+                                        .build())
+                                .build())
+                        .build()
+        );
+
+        mockMvc.perform(get("/api/v1/exams/{examId}/questions", "ex_part4")
+                        .param("questionNumber", "8")
+                        .param("retryCount", "0"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.result.question.questionInfo.part").value(4))
+                .andExpect(jsonPath("$.result.question.questionInfo.questionNumber").value(8))
+                .andExpect(jsonPath(
+                        "$.result.question.questionInfo.tableContext.education_history[0].graduation_year"
+                ).value(2022))
+                .andExpect(jsonPath(
+                        "$.result.question.questionInfo.tableContext.education_history[0].university_name"
+                ).value("Example University"))
+                .andExpect(jsonPath(
+                        "$.result.question.questionInfo.tableImageUrl"
+                ).doesNotExist());
+
+        verify(examService).getExamQuestion("ex_part4", 8, 0);
         verifyNoInteractions(examReadService);
     }
 
@@ -207,6 +289,16 @@ class ExamReadApiContractTest {
                 () -> assertTrue(retriesOperation.description().contains("retryCount 1 이상")),
                 () -> assertTrue(retriesOperation.description().contains("상세 피드백")),
                 () -> assertTrue(retriesOperation.description().contains("빈 questions"))
+        );
+    }
+
+    private static Map<String, Object> partFourTableContext() {
+        return Map.of(
+                "resume_owner", "Maya Bennett",
+                "education_history", List.of(Map.of(
+                        "graduation_year", 2022,
+                        "university_name", "Example University"
+                ))
         );
     }
 }

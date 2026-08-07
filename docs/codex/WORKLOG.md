@@ -1745,3 +1745,106 @@
 - Jira `TMI-61` History의 현재 성공 응답이 BaseResponse와 `result.totalCount`, `result.histories`로 구성되며, History 항목에 `status`, `maxScore`, `startedAt`, `retriedQuestionCount`를 포함한다는 안내를 최종 기록했다.
 - `maxScore` 200, `startedAt`/`completedAt`의 `LocalDateTime` 형식, Legacy `startedAt: null`, Summary 누락 시 점수·레벨 null 정책을 함께 확인했다. page·size와 pagination metadata는 현재 지원하지 않는다.
 - 이번 turn은 읽기 전용 안내로 애플리케이션·테스트 코드를 변경하지 않았고 테스트도 재실행하지 않았다. Secret·Token을 기록하지 않았고 Git·Jira 쓰기 작업을 수행하지 않았다.
+
+## 2026-08-07 — Part 4 tableImageUrl 응답 경로 확인
+
+<!-- codex-turn:019fda79-d841-7190-9c56-3b9b781565ba -->
+
+- 범위·결과: 별도 Jira 이슈 키 없이 Part 4 문항의 DB `table_image_url` → Java `tableImageUrl` → API 응답 경로를 Controller, Service, Converter, Entity, 테스트로 읽기 전용 확인했다.
+- 시험 시작: `POST /api/v1/exams`의 `questions` 배열은 Part 4에서 저장된 `tableImageUrl`을 그대로 반환하고 `tableContext`를 null로 설정해 JSON에서 제외한다.
+- 채점 결과 문항 단건: `GET /api/v1/exams/{examId}/questions?questionNumber=...&retryCount=...`의 `questionInfo`는 Part 4에서 `part`, `questionNumber`, `tableImageUrl`만 반환하고 `tableContext`와 기타 표 상세를 노출하지 않는다.
+- 주의·발견: 별도 `GET /api/v1/exams/{examId}/questions/{questionNumber}/prompt`는 현재 `toQuestionDTO()`를 사용해 `tableContext`를 매핑하고 `tableImageUrl`을 매핑하지 않는다. 따라서 “문제 조회”가 prompt API를 의미하면 아직 이미지 URL 방식으로 일치하지 않는다.
+- 이번 확인에서 애플리케이션·테스트 코드를 변경하지 않았고 테스트도 재실행하지 않았다. Secret·Token을 기록하지 않았고 Git·Jira 쓰기나 외부 시스템 호출을 수행하지 않았다.
+
+## 2026-08-07 — Part 4 table_context 세 API 통일 계획
+
+<!-- codex-turn:019fda8d-d3b2-7cd1-a85b-c90f9e9ae069 -->
+
+- 범위·결과: 별도 Jira 이슈 키 없이 `POST /api/v1/exams`, `GET /api/v1/exams/{examId}/questions?questionNumber=...&retryCount=...`, `GET /api/v1/exams/{examId}/questions/{questionNumber}/prompt` 세 경로의 Part 4 표 응답을 DB `table_context` 기준으로 통일하는 계획을 수립했다. 이번 turn은 계획만 작성했고 구현은 시작하지 않았다.
+- 계약 가정: Part 4 외부 응답은 `tableImageUrl`을 제외하고 API camelCase `tableContext`만 반환한다. MongoDB `table_context` → Java/API `tableContext`, 내부 `session_title` → API `sessionTitle`의 네이밍 매핑만 적용하고 title/location/date/fee/items 값은 재구성·기본값 생성 없이 그대로 전달한다.
+- 예정 구현: 시험 시작 Mapper의 Part 4 image 치환을 제거해 기존 `tableContext`를 유지하고, 채점 결과 `questionInfo` Mapper는 `part`, `questionNumber`, `tableContext`를 반환하도록 변경한다. prompt 경로는 이미 `tableContext`를 매핑하므로 계약 테스트를 보강한다.
+- 검증·오류 정책 계획: 현재 `requirePartFourTableImageUrl` 검증을 `tableContext` 기준으로 교체하고, Part 4 `table_context` 누락을 NPE로 처리하지 않도록 기존 catalog configuration 오류 정책을 유지한다. 세 API JSON, Mongo snake_case/camelCase, 중첩 items, Part 1·2·3·5·6·7, AI 채점 회귀를 테스트한다.
+- 주의·배포: 현재 `tableImageUrl`을 사용하는 프론트에는 breaking response change이므로 배포 순서 조정이 필요하다. 적용 전 운영·Staging `mock_exams.questions[].table_context`가 모든 Part 4 문항에 존재하는지 읽기 전용으로 확인해야 한다.
+- 이번 계획 수립에서 애플리케이션·테스트 코드를 변경하지 않았고 테스트도 재실행하지 않았다. Secret·Token을 기록하지 않았고 Git·Jira 쓰기와 외부 DB 조회를 수행하지 않았다.
+
+## 2026-08-07 — TMI-61 Retries 응답 비교 turn 종료
+
+<!-- codex-turn:019fda7d-a6ae-76d1-b300-2e79e4e83a9a -->
+
+- Jira `TMI-61` Retries 현재 응답이 문항별 `totalAttemptCount`, `latestRetryCount`와 회차별 `retryCount`, `status`를 반환하며, 사용자 제시안의 `score`, `completedAt`은 반환하지 않는다는 비교 결과를 최종 기록했다.
+- Job/Legacy `(questionNumber,retryCount)` dedupe, Job status 우선, Legacy-only `COMPLETED`, `retryCount >= 1` 문항만 포함, 실제 저장된 0회차만 포함하는 현재 계약을 재확인했다.
+- 이번 turn은 읽기 전용 비교로 애플리케이션·테스트 코드를 변경하지 않았고 테스트도 재실행하지 않았다. Secret·Token을 기록하지 않았고 Git·Jira 쓰기 작업을 수행하지 않았다.
+
+## 2026-08-07 — TMI-61 Retries score·completedAt 추가
+
+- 범위·결과: Jira `TMI-61`의 `GET /api/v1/exams/{examId}/retries` 회차 항목에 `score`, `completedAt`을 additive로 추가했다. 기존 `retryCount`, `status`, 문항별 `totalAttemptCount`, `latestRetryCount`와 BaseResponse 구조는 유지했다.
+- 데이터 출처: `score`는 `ExamResult.score`, `completedAt`은 `QuestionGradingJob.completedAt` `Instant`를 반환한다. Job이 없는 Legacy Result-only 회차는 완료 시각 필드가 없으므로 `completedAt=null`이고, Result가 없는 Job-only 회차는 `score=null`이다.
+- 결합 규칙: `(questionNumber,retryCount)` dedupe, Job status 우선, Legacy-only `COMPLETED`, 실제 저장된 회차만 반환하는 정책을 유지했다. Job과 Result가 겹치면 Job의 status/completedAt과 Result의 score를 함께 보존한다.
+- Repository·보안: 기존 단일 examId 조회에서 Job `completedAt`과 Result `score`만 projection에 추가했다. `dispatchAttempt`, failure reason, feedback, Transcript, 음성 URL, 내부 userId는 여전히 노출하지 않는다. MongoDB 문서·인덱스 변경은 없다.
+- 테스트·검증: Result score와 Job completedAt 결합, Legacy completedAt null, API ISO-8601 `Z` 직렬화, Repository 최소 projection, JWT sub 소유 응답을 검증했다. 집중 테스트와 `./gradlew clean test`가 성공했고 tests/failures/errors/skipped는 298/0/0/0이다. `git diff --check`도 성공했다.
+- 외부 작업: Secret·Token·Credential을 기록하지 않았고 실제 DB·API·외부 시스템을 호출하지 않았다. Git commit·push·PR과 Jira 댓글·필드·상태 변경도 수행하지 않았다.
+
+## 2026-08-07 — TMI-61 Retries 현재 응답 구조 비교
+
+- 범위·결과: Jira `TMI-61`의 `GET /api/v1/exams/{examId}/retries` Controller, DTO, Service, Repository projection, 계약 테스트를 읽기 전용으로 확인하고 사용자 제시 응답과 비교했다.
+- 현재 구조: `result` 하위에 `examId`, `questions`가 있고 문항 항목은 `partNumber`, `questionNumber`, `totalAttemptCount`, `latestRetryCount`, `attempts`를 반환한다. 각 attempt는 `retryCount`, `status` 두 필드만 반환하며 status는 `PENDING`, `PROCESSING`, `COMPLETED`, `FAILED`다.
+- 제시안과 차이: 현재 API에는 attempt별 `score`, `completedAt`이 없고 대신 `status`가 있다. 현재에만 문항별 `totalAttemptCount`가 있다. Repository도 score·완료 시각을 projection하지 않는다.
+- 결합 규칙: `QuestionGradingJob`과 Legacy `ExamResult`를 `(questionNumber,retryCount)`로 dedupe하고 Job이 있으면 Job status가 우선한다. Legacy Result만 있는 회차는 `COMPLETED`로 표시한다. `retryCount >= 1`이 하나도 없는 문항은 제외하고, 재답변 문항의 저장된 0회차는 포함하되 없는 0회차를 생성하지 않는다.
+- 이번 확인에서 애플리케이션·테스트 코드를 변경하지 않았고 테스트도 재실행하지 않았다. Secret·Token을 기록하지 않았고 Git·Jira 쓰기나 외부 시스템 호출을 수행하지 않았다.
+
+## 2026-08-07 — Part 4 table_context 통일 계획 종료 기록
+
+- 위에 기록한 Part 4 세 API `tableContext`-only 통일 계획을 WORKLOG 끝에 추가로 확정했다. 해당 계획의 turn marker는 같은 작업 항목에 정확히 한 번만 기록되어 있다.
+- 구현 전제는 Part 4 응답에서 `tableImageUrl`을 제외하고 DB `table_context` 내용을 API `tableContext`로 전달하는 것이다. 현재 프론트와 데이터 존재 여부를 확인한 뒤 구현·배포해야 한다.
+- 이번 turn에서 애플리케이션·테스트 코드는 변경하지 않았고 테스트도 재실행하지 않았다. Secret·Token을 기록하지 않았고 Git·Jira 쓰기를 수행하지 않았다.
+
+## 2026-08-07 — Part 4 table_context 비정형 원본 전달 계획 보정
+
+<!-- codex-turn:019fda92-666b-73c3-ac7d-2f1a71477442 -->
+
+- 사용자 확인에 따라 이전의 고정 `Question.TableContext(title/location/date/fee/items)` DTO 계획을 보정했다. 현재 고정 타입은 MongoDB `table_context`의 알려지지 않은 키를 보존하지 못하고, 없는 고정 필드를 null로 직렬화할 수 있으므로 “DB 구조 그대로” 계약을 충족하지 못한다.
+- 최종 계획은 MongoDB 최상위 필드명 `table_context`만 Java/API의 `tableContext`에 연결하고, 그 값은 `Map<String, Object>` 등 JSON 호환 비정형 객체로 읽어 세 API에 재구성 없이 전달하는 것이다. 중첩 객체·배열·null과 임의 키를 보존하며 Map 키에는 camelCase 변환을 적용하지 않는다. 따라서 DB 내부 키가 `session_title`이면 응답 내부에서도 `session_title`을 유지한다.
+- 적용 대상은 `POST /api/v1/exams`, 채점 결과 문항 단건 `GET /api/v1/exams/{examId}/questions?questionNumber=...&retryCount=...`, prompt `GET /api/v1/exams/{examId}/questions/{questionNumber}/prompt`다. Part 4의 `tableImageUrl`은 제외하고 각 응답의 기존 공통 필드는 유지한다.
+- 구현 시 `Question.tableContext`와 `ExamResponseDTO.QuestionDTO.tableContext`의 고정 타입 의존을 제거하고, Converter 세 경로가 같은 원본 Map을 사용하게 한다. 누락 검증은 null 여부만 확인하고 title/items 같은 특정 스키마는 강제하지 않는다. 임의 중첩 키를 가진 실제 Mongo Document 매핑 및 세 API JSON의 deep equality 테스트를 추가한다.
+- 이번 turn은 계획 보정만 수행했고 애플리케이션·테스트 코드는 변경하거나 실행하지 않았다. Secret·Token을 기록하지 않았고 Git·Jira 쓰기와 외부 DB 조회를 수행하지 않았다.
+
+## 2026-08-07 — Part 4 세 API 동일 tableContext 정책 확인
+
+<!-- codex-turn:019fda94-988b-7d21-a6eb-a0637eb451b4 -->
+
+- 별도 Jira 이슈 키 없이 시험 시작 `POST /api/v1/exams`, 채점 결과 문항 단건 `GET /api/v1/exams/{examId}/questions?questionNumber=...&retryCount=...`, 문제 prompt `GET /api/v1/exams/{examId}/questions/{questionNumber}/prompt` 세 API에 동일한 Part 4 정책을 적용한다는 점을 확인했다.
+- 세 경로 모두 MongoDB `table_context`를 API 최상위 `tableContext`에 연결하고, 내부 객체·배열·null·임의 키는 고정 DTO 재구성이나 키 이름 변환 없이 동일하게 전달한다. 각 API의 기존 외곽 응답과 공통 필드만 경로별로 유지한다.
+- Part 4 `tableImageUrl`은 세 경로에서 표 데이터의 대체 소스로 사용하지 않는다. 이번 turn은 계획 확인만 수행했고 애플리케이션·테스트 코드는 변경하거나 실행하지 않았다. Secret·Token을 기록하지 않았고 Git·Jira 쓰기와 외부 DB 조회를 수행하지 않았다.
+
+## 2026-08-07 — Part 4 비정형 tableContext 세 API 최종 구현 계획
+
+<!-- codex-turn:019fda97-23b1-7ee2-834b-98219a933e99 -->
+
+- 별도 Jira 이슈 키 없이 Part 4 표 데이터 통일 작업의 전체 구현 계획을 확정했다. 대상은 시험 시작, 채점 결과 문항 단건, 문제 prompt 세 API이며 모두 MongoDB `table_context`를 API `tableContext`로 전달한다.
+- 도메인과 응답 DTO의 고정 `Question.TableContext` 의존을 `Map<String, Object>` 형태로 교체해 중첩 객체·배열·null·임의 키를 보존한다. 최상위 필드명만 camelCase로 매핑하고 내부 Map 키와 값은 변환·보강·삭제하지 않는다.
+- Converter 세 경로를 같은 원본 전달 정책으로 맞추고 Part 4 `tableImageUrl`은 제외한다. `table_context`가 null인 경우에만 기존 catalog configuration 오류를 사용하며 특정 title/items 등 하위 스키마는 검증하지 않는다. Part 1·2·3·5·6·7, AI 요청·Callback, Summary 및 각 API 외곽 계약은 유지한다.
+- 테스트 계획은 실제 Mongo Document의 임의 구조 매핑, 세 API의 JSON deep equality와 `tableImageUrl` 미노출, 내부 snake_case 키 보존, 누락 오류, 다른 Part와 AI 흐름 회귀를 포함하며 구현 후 집중 테스트와 `./gradlew clean test`, `git diff --check`를 실행한다.
+- 이번 turn은 최종 계획 정리만 수행했고 애플리케이션·테스트 코드는 변경하거나 실행하지 않았다. Secret·Token을 기록하지 않았고 Git·Jira 쓰기와 외부 DB 조회를 수행하지 않았다.
+
+## 2026-08-07 — TMI-77 Part 4 비정형 table_context 세 API 통일 구현
+
+<!-- codex-turn:019fda9f-a812-7020-ae20-687cc758f48d -->
+
+- Jira `TMI-77` `[Learning Core] Part 4 table_context 원본 응답 통일` 작업을 사용자 요청에 따라 먼저 생성한 뒤 구현했다. Jira 댓글·상태·필드 추가 변경은 수행하지 않았다.
+- Mongo 매핑: `Question.tableContext`를 고정 `Question.TableContext`에서 `Map<String, Object>`로 변경하고 `@Field("table_context")`는 유지했다. 실제 `MappingMongoConverter` 테스트로 임의 키, 중첩 객체·배열, null과 snake_case 내부 키가 고정 필드 주입이나 이름 변환 없이 보존되는 것을 검증했다.
+- API 계약: 시험 시작 `POST /api/v1/exams`의 `questions[]`, 채점 결과 문항 단건 `GET /api/v1/exams/{examId}/questions`의 `questionInfo`, 문제 prompt `GET /api/v1/exams/{examId}/questions/{questionNumber}/prompt`가 모두 같은 원본 `tableContext` Map을 반환한다. 응답 DTO의 `tableImageUrl` 필드는 제거했지만 Mongo `table_image_url` 내부 필드는 삭제하거나 문서를 변경하지 않았다.
+- 오류·회귀: Part 4 `table_context=null`은 기존 `_EXAM_CATALOG_CONFIGURATION_ERROR`로 처리하고 빈 객체는 그대로 반환한다. Part 1·2·3·5·6·7 공통 필드, API URL·파라미터·BaseResponse, AI 요청에서 table context를 보내지 않는 계약, JWT 소유권과 Summary 흐름은 유지했다.
+- 테스트: Mongo 원본 매핑, 세 서비스 경로와 세 JSON 응답, `tableImageUrl` 미노출, null/empty, 내부 null과 snake_case, 다른 Part, AI dispatch, 문항 API 경로, JWT 보안 집중 테스트가 성공했다. `./gradlew clean test`는 tests/failures/errors/skipped `303/0/0/0`, `git diff --check`도 성공했다.
+- 외부 작업: 실제 MongoDB 조회·수정이나 데이터 마이그레이션은 수행하지 않았다. Secret·Token을 기록하지 않았고 Git commit·push·PR은 생성하지 않았다.
+
+## 2026-08-07 — TMI-77 Jira 완료 처리
+
+- 사용자 요청에 따라 Jira `TMI-77`을 워크플로 상태 `완료`로 전환했고, 조회 결과 상태 category가 `done`, resolution이 `완료`인 것을 확인했다.
+- Jira 댓글이나 설명·기타 필드는 변경하지 않았다. 애플리케이션·테스트 코드는 추가 변경하지 않았고 테스트도 다시 실행하지 않았다. Secret·Token을 기록하지 않았으며 Git commit·push·PR은 생성하지 않았다.
+
+## 2026-08-07 — TMI-77 Jira 완료 처리 turn 기록
+
+<!-- codex-turn:019fdaa8-5032-7e22-8442-80f575289057 -->
+
+- Jira `TMI-77`의 상태와 resolution이 `완료`임을 재확인하고 현재 turn 기록을 마쳤다. Jira 댓글·기타 필드와 애플리케이션·테스트 코드는 추가 변경하지 않았다.
+- Secret·Token을 기록하지 않았고 Git commit·push·PR을 생성하지 않았다. Jira 종료 후 코드 테스트는 재실행하지 않았으며 문서 변경에 대한 `git diff --check`만 확인한다.

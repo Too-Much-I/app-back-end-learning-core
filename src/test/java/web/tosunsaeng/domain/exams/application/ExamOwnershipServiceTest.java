@@ -7,7 +7,6 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.EnumSource;
-import org.junit.jupiter.params.provider.NullSource;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.ArgumentCaptor;
 import org.mockito.InOrder;
@@ -57,6 +56,7 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.never;
@@ -252,6 +252,69 @@ class ExamOwnershipServiceTest {
     }
 
     @Test
+    void partFourPromptReturnsStoredOpaqueTableContextWithoutTableImage() throws Exception {
+        stubOwnedSession();
+        Map<String, Object> storedTableContext = Map.of(
+                "resume_owner", "Maya Bennett",
+                "education_history", List.of(Map.of(
+                        "graduation_year", 2022,
+                        "university_name", "Example University"
+                ))
+        );
+        Question question = Question.builder()
+                .partNumber(4)
+                .questionNumber(8)
+                .question("Part 4 prompt")
+                .tableImageUrl("https://cdn.example.com/legacy-table-image.png")
+                .tableContext(storedTableContext)
+                .build();
+        when(mockExamCatalogService.getRequiredExam("mock_exam_003")).thenReturn(MockExam.builder()
+                .mockExamId("mock_exam_003")
+                .questions(List.of(question))
+                .build());
+        when(s3Presigner.presignGetObject(any(GetObjectPresignRequest.class)))
+                .thenReturn(presignedGetObjectRequest);
+        when(presignedGetObjectRequest.url())
+                .thenReturn(URI.create("https://example.com/question-audio").toURL());
+
+        ExamResponseDTO.QuestionDTO result = examService.getQuestionPrompt(EXAM_ID, 8);
+        JsonNode resultJson = objectMapper.valueToTree(result);
+
+        assertAll(
+                () -> assertEquals(4, result.getPart()),
+                () -> assertEquals(8, result.getQuestionNumber()),
+                () -> assertSame(storedTableContext, result.getTableContext()),
+                () -> assertEquals(
+                        objectMapper.valueToTree(storedTableContext),
+                        resultJson.get("tableContext")
+                ),
+                () -> assertFalse(resultJson.has("tableImageUrl"))
+        );
+    }
+
+    @Test
+    void partFourPromptWithoutTableContextUsesCatalogConfigurationError() {
+        stubOwnedSession();
+        Question question = Question.builder()
+                .partNumber(4)
+                .questionNumber(8)
+                .tableImageUrl("https://cdn.example.com/legacy-table-image.png")
+                .build();
+        when(mockExamCatalogService.getRequiredExam("mock_exam_003")).thenReturn(MockExam.builder()
+                .mockExamId("mock_exam_003")
+                .questions(List.of(question))
+                .build());
+
+        ExamsException exception = assertThrows(
+                ExamsException.class,
+                () -> examService.getQuestionPrompt(EXAM_ID, 8)
+        );
+
+        assertSame(ErrorStatus._EXAM_CATALOG_CONFIGURATION_ERROR, exception.getCode());
+        verifyNoInteractions(s3Presigner);
+    }
+
+    @Test
     void missingPromptQuestionFailsBeforeCreatingPresignedUrls() {
         stubOwnedSession();
         when(mockExamCatalogService.getRequiredExam("mock_exam_003")).thenReturn(mockExam());
@@ -434,20 +497,15 @@ class ExamOwnershipServiceTest {
     }
 
     @Test
-    void partFourQuestionInfoReturnsStoredTableImageUrlWithoutTableDetails() {
+    void partFourQuestionInfoReturnsStoredOpaqueTableContextWithoutTableImage() {
         String storedUrl = "https://cdn.example.com/mock-exam/001/part4/q8.png";
-        Question.TableContext tableContext = Question.TableContext.builder()
-                .title("Conference Schedule")
-                .location("Convention Center")
-                .date("August 6")
-                .fee("$20")
-                .items(List.of(Question.TableItem.builder()
-                        .time("10:00")
-                        .sessionTitle("Opening Session")
-                        .speaker("Speaker")
-                        .note("Bring identification")
-                        .build()))
-                .build();
+        Map<String, Object> tableContext = Map.of(
+                "resume_owner", "Maya Bennett",
+                "work_experience", List.of(Map.of(
+                        "section_name", "Work Experience",
+                        "details", List.of("Batch cooking", "Knife safety")
+                ))
+        );
         Question partFour = Question.builder()
                 .partNumber(4)
                 .questionNumber(8)
@@ -471,9 +529,13 @@ class ExamOwnershipServiceTest {
         assertAll(
                 () -> assertEquals(4, questionInfo.getPart()),
                 () -> assertEquals(8, questionInfo.getQuestionNumber()),
-                () -> assertEquals(storedUrl, questionInfo.getTableImageUrl()),
+                () -> assertSame(tableContext, questionInfo.getTableContext()),
                 () -> assertEquals(3, questionInfoJson.size()),
-                () -> assertEquals(storedUrl, questionInfoJson.get("tableImageUrl").asText()),
+                () -> assertEquals(
+                        objectMapper.valueToTree(tableContext),
+                        questionInfoJson.get("tableContext")
+                ),
+                () -> assertFalse(questionInfoJson.has("tableImageUrl")),
                 () -> assertFalse(questionInfoJson.has("table_image_url")),
                 () -> assertFalse(questionInfoJson.has("text")),
                 () -> assertFalse(questionInfoJson.has("referenceText")),
@@ -481,21 +543,17 @@ class ExamOwnershipServiceTest {
                 () -> assertFalse(questionInfoJson.has("audioUrl")),
                 () -> assertFalse(questionInfoJson.has("guideAudioUrl")),
                 () -> assertFalse(questionInfoJson.has("imageUrl")),
-                () -> assertFalse(questionInfoJson.has("tableContext")),
                 () -> assertFalse(questionInfoJson.has("prepTimeSec")),
                 () -> assertFalse(questionInfoJson.has("speakTimeSec"))
         );
     }
 
-    @ParameterizedTest
-    @NullSource
-    @ValueSource(strings = {"", "   "})
-    void partFourQuestionWithoutTableImageUrlUsesCatalogConfigurationError(String tableImageUrl) {
+    @Test
+    void partFourQuestionWithoutTableContextUsesCatalogConfigurationError() {
         Question partFour = Question.builder()
                 .partNumber(4)
                 .questionNumber(8)
-                .tableImageUrl(tableImageUrl)
-                .tableContext(Question.TableContext.builder().title("Legacy table").build())
+                .tableImageUrl("https://cdn.example.com/legacy-table-image.png")
                 .build();
         stubQuestionResultPaper(partFour);
 
@@ -508,12 +566,31 @@ class ExamOwnershipServiceTest {
         verifyNoInteractions(s3Presigner);
     }
 
+    @Test
+    void partFourQuestionWithEmptyTableContextReturnsEmptyObject() {
+        Question partFour = Question.builder()
+                .partNumber(4)
+                .questionNumber(8)
+                .tableContext(Map.of())
+                .build();
+        stubQuestionResultPaper(partFour);
+
+        ExamResponseDTO.QuestionResult result = examService.getExamQuestion(EXAM_ID, 8, 0);
+
+        JsonNode tableContext = objectMapper.valueToTree(
+                result.getQuestion().getQuestionInfo().getTableContext()
+        );
+        assertAll(
+                () -> assertTrue(result.getQuestion().getQuestionInfo().getTableContext().isEmpty()),
+                () -> assertTrue(tableContext.isObject()),
+                () -> assertEquals(0, tableContext.size())
+        );
+    }
+
     @ParameterizedTest
     @ValueSource(ints = {1, 2, 3, 5, 6, 7})
     void nonPartFourQuestionInfoKeepsExistingFields(int partNumber) {
-        Question.TableContext existingTableContext = Question.TableContext.builder()
-                .title("Existing context")
-                .build();
+        Map<String, Object> existingTableContext = Map.of("existing_context", true);
         Question question = Question.builder()
                 .partNumber(partNumber)
                 .questionNumber(partNumber)
@@ -544,8 +621,7 @@ class ExamOwnershipServiceTest {
                 () -> assertEquals("existing-image", questionInfo.getImageUrl()),
                 () -> assertSame(existingTableContext, questionInfo.getTableContext()),
                 () -> assertEquals(30, questionInfo.getPrepTimeSec()),
-                () -> assertEquals(45, questionInfo.getSpeakTimeSec()),
-                () -> assertNull(questionInfo.getTableImageUrl())
+                () -> assertEquals(45, questionInfo.getSpeakTimeSec())
         );
     }
 

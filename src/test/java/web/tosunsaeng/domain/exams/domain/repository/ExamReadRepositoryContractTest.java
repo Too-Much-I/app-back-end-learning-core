@@ -98,11 +98,12 @@ class ExamReadRepositoryContractTest {
                 () -> assertEquals("{ 'examId': ?0 }", jobQuery.value()),
                 () -> assertTrue(jobQuery.fields().contains("'retryCount': 1")),
                 () -> assertTrue(jobQuery.fields().contains("'status': 1")),
+                () -> assertTrue(jobQuery.fields().contains("'completedAt': 1")),
                 () -> assertFalse(jobQuery.fields().contains("dispatchAttempt")),
                 () -> assertFalse(jobQuery.fields().contains("failureReason")),
                 () -> assertTrue(resultQuery.value().contains("'examId': ?0")),
                 () -> assertTrue(resultQuery.value().contains("'questionNumber'")),
-                () -> assertFalse(resultQuery.fields().contains("score")),
+                () -> assertTrue(resultQuery.fields().contains("'score': 1")),
                 () -> assertFalse(resultQuery.fields().contains("feedback")),
                 () -> assertFalse(resultQuery.fields().contains("transcript"))
         );
