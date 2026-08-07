@@ -21,6 +21,23 @@ jobs:
             exit 1
           fi
 
+      - name: Print OIDC claims
+        uses: actions/github-script@v8
+        with:
+          script: |
+            const token = await core.getIDToken('sts.amazonaws.com')
+            const payload = JSON.parse(
+              Buffer.from(token.split('.')[1], 'base64url').toString()
+            )
+
+            console.log(JSON.stringify({
+              aud: payload.aud,
+              sub: payload.sub,
+              repository: payload.repository,
+              ref: payload.ref,
+              environment: payload.environment
+            }, null, 2))
+
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:
