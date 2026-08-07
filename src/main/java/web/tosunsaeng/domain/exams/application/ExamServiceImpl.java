@@ -197,11 +197,13 @@ public class ExamServiceImpl implements ExamService {
     }
 
     private ExamResponseDTO.QuestionDTO toCreateSessionQuestion(String mockExamId, Question question) {
+        requirePartFourTableContext(question);
         ExamResponseDTO.QuestionDTO dto = ExamConverter.toCreateSessionQuestionDTO(question);
         return addQuestionAudioUrls(mockExamId, question, dto);
     }
 
     private ExamResponseDTO.QuestionDTO toQuestionPrompt(String mockExamId, Question question) {
+        requirePartFourTableContext(question);
         ExamResponseDTO.QuestionDTO dto = ExamConverter.toQuestionDTO(question);
         return addQuestionAudioUrls(mockExamId, question, dto);
     }
@@ -418,7 +420,7 @@ public class ExamServiceImpl implements ExamService {
                 .filter(q -> q.getQuestionNumber() != null && q.getQuestionNumber().equals(questionNumber))
                 .findFirst()
                 .orElseThrow(() -> new ExamsException(ErrorStatus._QUESTION_NOT_FOUND));
-        requirePartFourTableImageUrl(rawQuestion);
+        requirePartFourTableContext(rawQuestion);
 
         // 기존 상태 정책상 matching ExamResult는 해당 회차의 채점 완료 증거입니다.
         // 결과가 없는 제출 전·처리 중·실패 회차에서는 사용자/모범답안 URL과 catalog 조회를 모두 생략합니다.
@@ -447,10 +449,10 @@ public class ExamServiceImpl implements ExamService {
         );
     }
 
-    private static void requirePartFourTableImageUrl(Question question) {
+    private static void requirePartFourTableContext(Question question) {
         if (question != null
                 && Integer.valueOf(4).equals(question.getPartNumber())
-                && (question.getTableImageUrl() == null || question.getTableImageUrl().isBlank())) {
+                && question.getTableContext() == null) {
             throw new ExamsException(ErrorStatus._EXAM_CATALOG_CONFIGURATION_ERROR);
         }
     }

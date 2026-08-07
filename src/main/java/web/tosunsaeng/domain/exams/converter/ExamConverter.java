@@ -43,12 +43,7 @@ public class ExamConverter {
     }
 
     public static ExamResponseDTO.QuestionDTO toCreateSessionQuestionDTO(Question question) {
-        ExamResponseDTO.QuestionDTO dto = toQuestionDTO(question);
-        if (Integer.valueOf(4).equals(question.getPartNumber())) {
-            dto.setTableImageUrl(question.getTableImageUrl());
-            dto.setTableContext(null);
-        }
-        return dto;
+        return toQuestionDTO(question);
     }
 
     private static ExamResponseDTO.QuestionDTO toQuestionInfoDTO(Question question) {
@@ -56,7 +51,7 @@ public class ExamConverter {
             return ExamResponseDTO.QuestionDTO.builder()
                     .part(question.getPartNumber())
                     .questionNumber(question.getQuestionNumber())
-                    .tableImageUrl(question.getTableImageUrl())
+                    .tableContext(question.getTableContext())
                     .build();
         }
         return toQuestionDTO(question);

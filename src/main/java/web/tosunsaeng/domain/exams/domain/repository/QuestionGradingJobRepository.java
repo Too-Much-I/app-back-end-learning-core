@@ -14,7 +14,8 @@ public interface QuestionGradingJobRepository extends MongoRepository<QuestionGr
 
     @Query(
             value = "{ 'examId': ?0 }",
-            fields = "{ '_id': 1, 'examId': 1, 'questionNumber': 1, 'retryCount': 1, 'status': 1 }",
+            fields = "{ '_id': 1, 'examId': 1, 'questionNumber': 1, 'retryCount': 1, "
+                    + "'status': 1, 'completedAt': 1 }",
             sort = "{ 'questionNumber': 1, 'retryCount': 1, '_id': -1 }"
     )
     List<QuestionGradingJob> findAttemptsByExamId(String examId);

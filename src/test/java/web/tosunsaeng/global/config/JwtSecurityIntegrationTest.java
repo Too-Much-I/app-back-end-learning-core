@@ -351,6 +351,14 @@ class JwtSecurityIntegrationTest {
                         .examId(examId)
                         .questionNumber(1)
                         .retryCount(0)
+                        .score(2.1)
+                        .build(),
+                ExamResult.builder()
+                        .id("feedback:ex_retries_security_test:1:1")
+                        .examId(examId)
+                        .questionNumber(1)
+                        .retryCount(1)
+                        .score(2.6)
                         .build()
         ));
         when(questionGradingJobRepository.findAttemptsByExamId(examId)).thenReturn(List.of(
@@ -360,7 +368,8 @@ class JwtSecurityIntegrationTest {
                         .questionNumber(1)
                         .retryCount(1)
                         .dispatchAttempt(34)
-                        .status(GradingJobStatus.PROCESSING)
+                        .status(GradingJobStatus.COMPLETED)
+                        .completedAt(Instant.parse("2026-08-01T12:20:00Z"))
                         .build()
         ));
 
@@ -370,8 +379,12 @@ class JwtSecurityIntegrationTest {
                 .andExpect(jsonPath("$.result.examId").value(examId))
                 .andExpect(jsonPath("$.result.questions[0].attempts[0].retryCount").value(0))
                 .andExpect(jsonPath("$.result.questions[0].attempts[0].status").value("COMPLETED"))
+                .andExpect(jsonPath("$.result.questions[0].attempts[0].score").value(2.1))
                 .andExpect(jsonPath("$.result.questions[0].attempts[1].retryCount").value(1))
-                .andExpect(jsonPath("$.result.questions[0].attempts[1].status").value("PROCESSING"))
+                .andExpect(jsonPath("$.result.questions[0].attempts[1].status").value("COMPLETED"))
+                .andExpect(jsonPath("$.result.questions[0].attempts[1].score").value(2.6))
+                .andExpect(jsonPath("$.result.questions[0].attempts[1].completedAt")
+                        .value("2026-08-01T12:20:00Z"))
                 .andExpect(jsonPath("$..dispatchAttempt").doesNotExist());
     }
 

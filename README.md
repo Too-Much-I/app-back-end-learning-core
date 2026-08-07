@@ -104,10 +104,13 @@ JWT 모드에서 다음 사용자용 GET API는 Bearer Access Token이 필요하
 - `GET /api/v1/exams/{examId}/retries`: 사용자 소유 시험의 `question_grading_jobs`와 문항별
   Legacy `exam_results` 회차를 합쳐, `retryCount >= 1`이 실제로 존재하는 문항만 반환한다. 해당
   문항의 저장된 최초 회차는 비교를 위해 포함하지만 존재하지 않는 0회차는 만들지 않는다. Job이
-  없는 Legacy 결과 회차는 `COMPLETED`이고, Job과 결과가 겹치면 Job 상태가 우선한다.
+  없는 Legacy 결과 회차는 `COMPLETED`이고, Job과 결과가 겹치면 Job 상태가 우선한다. 회차별
+  `score`는 `ExamResult.score`, `completedAt`은 `QuestionGradingJob.completedAt`을 반환한다. Legacy
+  Result만 있어 완료 시각을 알 수 없는 회차는 `completedAt=null`이다.
 
 History가 없으면 `histories: []`, 재답변 문항이 없으면 `questions: []`인 200 응답이다. Retries는
-점수, 피드백, Transcript, 음성 URL을 반환하지 않는다. 선택한 회차의 상세 피드백은 기존
+회차별 점수와 완료 시각은 반환하지만 피드백, Transcript, 음성 URL은 반환하지 않는다. 선택한 회차의
+상세 피드백은 기존
 `GET /api/v1/exams/{examId}/questions?questionNumber={questionNumber}&retryCount={retryCount}`로
 조회한다. `dispatchAttempt`는 AI 재전송 횟수이며 사용자 답변 회차인 `retryCount`로 사용하지 않는다.
 

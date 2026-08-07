@@ -6,12 +6,12 @@ import com.fasterxml.jackson.databind.PropertyNamingStrategies;
 import com.fasterxml.jackson.databind.annotation.JsonNaming;
 import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.*;
-import web.tosunsaeng.domain.exams.domain.entity.Question;
 import web.tosunsaeng.domain.exams.domain.enums.ExamSessionStatus;
 import web.tosunsaeng.domain.exams.domain.enums.ExamStatus;
 import web.tosunsaeng.domain.exams.domain.enums.GradingJobStatus;
 import web.tosunsaeng.domain.exams.domain.enums.SummaryAction;
 
+import java.time.Instant;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Map;
@@ -36,8 +36,8 @@ public class ExamResponseDTO {
         private String audioUrl;
         private String guideAudioUrl;
         private String imageUrl;
-        private String tableImageUrl;
-        private Question.TableContext tableContext;
+        @Schema(description = "MongoDB table_context에 저장된 비정형 Part 4 표 정보")
+        private Map<String, Object> tableContext;
         private Integer prepTimeSec;
         private Integer speakTimeSec;
     }
@@ -118,6 +118,10 @@ public class ExamResponseDTO {
     public static class RetryAttemptItem {
         private Integer retryCount;
         private GradingJobStatus status;
+        @Schema(description = "해당 답변 회차의 채점 점수")
+        private Double score;
+        @Schema(description = "해당 회차 QuestionGradingJob의 완료 시각")
+        private Instant completedAt;
     }
 
     @Builder @Getter @NoArgsConstructor @AllArgsConstructor

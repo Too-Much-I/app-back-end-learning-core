@@ -36,7 +36,7 @@ public interface ExamResultRepository extends MongoRepository<ExamResult, String
 
     @Query(
             value = "{ 'examId': ?0, 'questionNumber': { '$exists': true, '$ne': null } }",
-            fields = "{ '_id': 1, 'questionNumber': 1, 'retryCount': 1 }",
+            fields = "{ '_id': 1, 'questionNumber': 1, 'retryCount': 1, 'score': 1 }",
             sort = "{ 'questionNumber': 1, 'retryCount': 1, '_id': -1 }"
     )
     List<ExamResult> findQuestionAttemptsByExamId(String examId);

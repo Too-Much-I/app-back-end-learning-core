@@ -831,3 +831,34 @@
 - `histories` 항목은 `examId`, `title`, `status`, `cycleNumber`, `startedAt`, `completedAt`, `totalScore`, `maxScore`, `levelEstimate`, `summaryAvailable`, `retriedQuestionCount`를 반환한다.
 - `status`는 `ExamSession.effectiveStatus()`, `startedAt`은 `ExamSession.createdAt`, `maxScore`는 200이다. Legacy createdAt 누락 세션은 `startedAt: null`이고 Summary가 없으면 `totalScore`/`levelEstimate`는 null, `summaryAvailable`는 false다.
 - page·size는 현재 바인딩하지 않으며 pagination metadata도 없다. 응답 구조 안내 turn 종료 기록까지 반영했고, 코드·테스트·Git·Jira를 변경하지 않았다.
+
+## Latest Part 4 tableImageUrl response-path audit (2026-08-07)
+
+- `Question.tableImageUrl`은 MongoDB `table_image_url`에 명시적으로 매핑된다. URL은 재작성·presign·기본값 생성 없이 저장값을 사용한다.
+- `POST /api/v1/exams` 시험 시작 응답은 Part 4 `questions[]` 항목에 `tableImageUrl`을 반환하고 `tableContext`는 제외한다.
+- `GET /api/v1/exams/{examId}/questions?questionNumber=...&retryCount=...` 채점 결과 문항 단건의 Part 4 `questionInfo`는 `part`, `questionNumber`, `tableImageUrl`만 반환한다.
+- 다만 `GET /api/v1/exams/{examId}/questions/{questionNumber}/prompt`는 아직 `toQuestionDTO()` 경로라 `tableContext`를 매핑하고 `tableImageUrl`을 매핑하지 않는다. 이번 turn은 읽기 전용 확인으로 코드·테스트·Git·Jira를 변경하지 않았다.
+
+## Latest TMI-61 Retries response-shape audit (2026-08-07)
+
+- `GET /api/v1/exams/{examId}/retries`의 `result`는 `examId`, `questions`고, 문항 항목은 `partNumber`, `questionNumber`, `totalAttemptCount`, `latestRetryCount`, `attempts`를 반환한다.
+- 각 `attempts[]`는 `retryCount`, `status` 두 필드만 반환한다. `score`, `completedAt`, 피드백·음성·Transcript는 노출하지 않는다. 상태는 `PENDING`, `PROCESSING`, `COMPLETED`, `FAILED`다.
+- Job과 Legacy Result를 `(questionNumber,retryCount)`로 합치고 Job status를 우선하며, Legacy-only 회차는 `COMPLETED`다. 실제 저장된 회차만 retryCount 오름차순으로 반환한다.
+- `retryCount >= 1`이 하나도 없는 문항은 제외하고 저장된 0회차는 포함하지만 없는 0회차를 생성하지 않는다. 응답 비교 turn 종료 기록까지 반영했고 코드·테스트·Git·Jira를 변경하지 않았다.
+
+## Latest TMI-61 Retries score/completedAt implementation (2026-08-07)
+
+- `GET /api/v1/exams/{examId}/retries`의 각 `attempts[]`는 `retryCount`, `status`, `score`, `completedAt`을 반환한다. `score`는 Double, `completedAt`은 UTC `Instant`이므로 JSON에서 `Z` suffix ISO-8601 문자열이다.
+- `score`는 `ExamResult.score`, `completedAt`은 `QuestionGradingJob.completedAt`에서 가져온다. Legacy Result-only 회차는 `completedAt=null`, Job-only 회차는 `score=null`이다.
+- Job/Result가 겹치면 Job status·completedAt과 Result score를 함께 보존한다. 기존 dedupe, Job 상태 우선, Legacy-only `COMPLETED`, 정렬, 소유권, 빈 결과 계약은 유지된다.
+- Repository는 Result `score`와 Job `completedAt`만 추가 projection하고 피드백·Transcript·음성 URL·`dispatchAttempt`·내부 userId는 노출하지 않는다. MongoDB 문서·인덱스 변경은 없다.
+- 집중 테스트와 `./gradlew clean test`가 성공했고 tests/failures/errors/skipped는 298/0/0/0이다. `git diff --check`도 성공했으며 Git·Jira 쓰기 작업은 수행하지 않았다.
+
+## Latest TMI-77 Part 4 table_context implementation (2026-08-07)
+
+- Jira `TMI-77` `[Learning Core] Part 4 table_context 원본 응답 통일`을 생성하고 구현한 뒤 사용자 요청에 따라 상태와 resolution을 `완료`로 전환했다. Jira 댓글·기타 필드는 변경하지 않았고 Git commit·push·PR은 생성하지 않았다.
+- `Question.tableContext`와 응답 `QuestionDTO.tableContext`는 `Map<String, Object>`다. Mongo 최상위 `table_context`만 API `tableContext`로 연결하며 내부 임의 키, 중첩 객체·배열, null과 snake_case는 이름 변경이나 고정 구조 생성 없이 보존한다.
+- 시험 시작 `POST /api/v1/exams`, 채점 결과 문항 단건 `GET /api/v1/exams/{examId}/questions`, 문제 prompt `GET /api/v1/exams/{examId}/questions/{questionNumber}/prompt`의 Part 4가 동일한 원본 Map을 반환한다. 응답 DTO에는 `tableImageUrl`이 없으며 Mongo 내부 `table_image_url` 필드와 기존 데이터는 유지한다.
+- Part 4 `table_context=null`은 기존 catalog configuration 오류, 빈 Map은 정상 빈 객체 응답이다. Part 1·2·3·5·6·7, BaseResponse와 URL·파라미터, AI 요청·Callback, Summary, JWT 소유권은 유지된다.
+- 실제 `MappingMongoConverter`, 세 API JSON, null/empty, 다른 Part, AI dispatch, 문항 경로, JWT 집중 테스트와 전체 `./gradlew clean test`가 성공했다. 전체 tests/failures/errors/skipped는 `303/0/0/0`, `git diff --check`도 성공했다. 실제 MongoDB와 외부 인프라는 호출하거나 수정하지 않았다.
+- 배포 전 프론트가 기존 Part 4 `tableImageUrl` 대신 비정형 `tableContext`와 DB 내부 키 이름을 그대로 처리하는지 확인해야 한다. 모든 운영 Part 4 문서에 `table_context`가 존재하는지도 별도 읽기 전용 점검이 필요하다.
