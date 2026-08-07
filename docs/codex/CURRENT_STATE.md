@@ -862,3 +862,4 @@
 - Part 4 `table_context=null`은 기존 catalog configuration 오류, 빈 Map은 정상 빈 객체 응답이다. Part 1·2·3·5·6·7, BaseResponse와 URL·파라미터, AI 요청·Callback, Summary, JWT 소유권은 유지된다.
 - 실제 `MappingMongoConverter`, 세 API JSON, null/empty, 다른 Part, AI dispatch, 문항 경로, JWT 집중 테스트와 전체 `./gradlew clean test`가 성공했다. 전체 tests/failures/errors/skipped는 `303/0/0/0`, `git diff --check`도 성공했다. 실제 MongoDB와 외부 인프라는 호출하거나 수정하지 않았다.
 - 배포 전 프론트가 기존 Part 4 `tableImageUrl` 대신 비정형 `tableContext`와 DB 내부 키 이름을 그대로 처리하는지 확인해야 한다. 모든 운영 Part 4 문서에 `table_context`가 존재하는지도 별도 읽기 전용 점검이 필요하다.
+- Jira `TMI-77` 완료 처리 turn의 WORKLOG 기록까지 반영됐다. 종료 처리 이후 애플리케이션·테스트 코드는 추가 변경하지 않았다.

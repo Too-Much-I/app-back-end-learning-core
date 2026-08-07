@@ -1841,3 +1841,10 @@
 
 - 사용자 요청에 따라 Jira `TMI-77`을 워크플로 상태 `완료`로 전환했고, 조회 결과 상태 category가 `done`, resolution이 `완료`인 것을 확인했다.
 - Jira 댓글이나 설명·기타 필드는 변경하지 않았다. 애플리케이션·테스트 코드는 추가 변경하지 않았고 테스트도 다시 실행하지 않았다. Secret·Token을 기록하지 않았으며 Git commit·push·PR은 생성하지 않았다.
+
+## 2026-08-07 — TMI-77 Jira 완료 처리 turn 기록
+
+<!-- codex-turn:019fdaa8-5032-7e22-8442-80f575289057 -->
+
+- Jira `TMI-77`의 상태와 resolution이 `완료`임을 재확인하고 현재 turn 기록을 마쳤다. Jira 댓글·기타 필드와 애플리케이션·테스트 코드는 추가 변경하지 않았다.
+- Secret·Token을 기록하지 않았고 Git commit·push·PR을 생성하지 않았다. Jira 종료 후 코드 테스트는 재실행하지 않았으며 문서 변경에 대한 `git diff --check`만 확인한다.
