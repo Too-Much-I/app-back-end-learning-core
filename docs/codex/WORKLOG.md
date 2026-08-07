@@ -1653,3 +1653,24 @@
 - 현재 구현 상태: `POST /api/v1/exams`의 Part 4 문항은 text·audioUrl을 유지하고 DB `table_image_url`의 원본 값을 `tableImageUrl`로 반환하며 tableContext는 프론트 JSON에서 제외한다. Part 1·2·3·5·6·7, 기존 문항 단건 API와 AI 내부 모델은 유지된다.
 - 검증 상태: 직전 전체 `./gradlew clean test` 결과는 Java 295개, failures/errors/skipped 0개이고 `git diff --check`가 성공했다. 이번 기록 동기화에서는 애플리케이션·테스트 코드를 변경하거나 테스트를 다시 실행하지 않았다.
 - 외부 작업: 실제 외부 시스템을 호출하지 않았고 Secret·Token·Credential을 기록하지 않았다. Git commit·push·PR 및 Jira 쓰기 작업도 수행하지 않았다.
+
+## 2026-08-07 — GitHub Actions ExamSession 동시성 테스트 실패 진단
+
+<!-- codex-turn:019fd9e5-d960-70e2-a83b-6229fe61f82f -->
+
+- 범위·결과: 별도 Jira 이슈 키 없이 GitHub Actions에서 `ExamSessionManagerTest.concurrentStartsLeaveExactlyOneActiveSessionAndNeverReuseExamId`가 `TooFewActualInvocations`로 실패한 원인을 테스트와 Manager 구현에서 읽기 전용으로 확인했다.
+- 직접 원인: 테스트의 두 initial lookup은 latch 해제 뒤에 `sessions` snapshot을 읽는다. 한 스레드가 먼저 Session을 insert한 후 다른 스레드가 snapshot을 읽으면 두 번째 스레드는 첫 Session을 ABANDONED로 전이하고 자신의 Session을 충돌 없이 insert하므로 총 insert 호출은 2회다. 두 스레드가 모두 빈 snapshot을 먼저 읽는 스케줄에서는 한 번의 Duplicate Key와 재시도로 총 3회가 된다.
+- 실패 의미: 최종 active Session 1개, 서로 다른 examId, 두 생성 결과와 보존 문서 2개 검증은 먼저 통과했고, line 282의 `times(3)`만 2회 실행을 허용하지 않아 실패했다. 로컬과 CI의 thread scheduling 차이에 따라 결과가 달라지는 테스트 flakiness이며 이 로그만으로 운영 비즈니스 로직 실패를 의미하지 않는다.
+- 권장 수정: collision 경로를 검증하려면 두 initial lookup의 snapshot을 latch 대기 전에 고정해 Duplicate Key를 결정적으로 발생시킨다. 또는 동시성 테스트는 최종 불변식만 검증하고 Duplicate Key 재시도는 별도 deterministic 단위 테스트로 분리한다. 단순히 CI 재실행만 하는 것은 재발 가능성을 남긴다.
+- 이번 진단에서는 애플리케이션·테스트 코드를 수정하거나 테스트를 재실행하지 않았다. 실제 MongoDB와 외부 시스템을 호출하지 않았고 Secret·Token·Credential을 기록하지 않았으며 Git·Jira 쓰기 작업도 수행하지 않았다.
+
+## 2026-08-07 — GitHub Actions flaky ExamSession 테스트 수정
+
+<!-- codex-turn:019fd9eb-f015-7830-9818-3a1f66b4746f -->
+
+- 범위·결과: 별도 Jira 이슈 키 없이 `ExamSessionManagerTest`만 수정했다. production 코드는 변경하지 않았고 기존 동시 시험 시작 로직과 사용자별 최종 active Session 하나 정책을 유지했다.
+- flaky assertion 제거: `concurrentStartsLeaveExactlyOneActiveSessionAndNeverReuseExamId`에서 thread scheduling에 따라 2회 또는 3회가 될 수 있는 Repository `insert()`의 정확한 `times(3)` 검증을 제거했다. 같은 examId 미재사용, 두 결과 모두 created, 최종 active 1개, 문서 2개 보존이라는 observable final invariant는 그대로 유지했다.
+- deterministic retry 테스트: `duplicateKeyDuringSessionCreationRetries`를 추가해 첫 `insert()`는 Mockito가 반드시 `DuplicateKeyException`을 던지고, retry lookup에서 concurrent active Session을 ABANDONED 처리한 뒤 두 번째 `insert()`가 저장 결과를 반환하도록 고정했다. 정상 Assignment 반환, IN_PROGRESS 상태, 다른 examId, insert 2회와 abandon 수행을 검증한다.
+- 반복 검증: 문제가 발생했던 단일 동시성 테스트를 사용자 제시 명령의 `--rerun-tasks` 방식으로 10회 반복했고 10/10 성공했다. `Thread.sleep`, `@Disabled`, `times(2)` 또는 `atLeast` 완화는 사용하지 않았다.
+- 전체 검증: `./gradlew test`가 성공했고 XML 기준 tests/failures/errors/skipped는 296/0/0/0이다. `git diff --check`도 성공했다.
+- 외부 작업: 실제 MongoDB와 외부 시스템을 호출하지 않았고 Secret·Token·Credential을 기록하지 않았다. Git commit·push·PR 및 Jira 쓰기 작업도 수행하지 않았다.

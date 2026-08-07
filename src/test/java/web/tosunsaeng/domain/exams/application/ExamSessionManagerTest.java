@@ -220,6 +220,39 @@ class ExamSessionManagerTest {
     }
 
     @Test
+    void duplicateKeyDuringSessionCreationRetries() {
+        ExamSession concurrentSession = inProgress("exam_concurrent", "mock_exam_001");
+        ExamSession savedSession = ExamSession.builder()
+                .examId("ex_saved_after_retry")
+                .userId(USER_ID)
+                .createdAt(LocalDateTime.of(2026, 7, 29, 6, 30))
+                .mockExamId("mock_exam_001")
+                .cycleNumber(1)
+                .active(true)
+                .status(ExamSessionStatus.IN_PROGRESS)
+                .build();
+        when(examSessionRepository.findActiveOrLegacyCandidatesByUserId(USER_ID))
+                .thenReturn(List.of(), List.of(concurrentSession));
+        when(examSessionRepository.abandonIfInProgress(concurrentSession.getExamId())).thenReturn(1L);
+        when(examSessionCompletionQuery.countCompletedByMockExamId(USER_ID)).thenReturn(List.of());
+        when(mockExamCatalogService.findAssignableExams()).thenReturn(catalog);
+        when(examSessionRepository.insert(any(ExamSession.class)))
+                .thenThrow(new DuplicateKeyException("duplicate active Session"))
+                .thenReturn(savedSession);
+
+        ExamSessionManager.Assignment assignment = manager.startNew(USER_ID);
+
+        assertAll(
+                () -> assertTrue(assignment.created()),
+                () -> assertEquals(savedSession.getExamId(), assignment.session().getExamId()),
+                () -> assertEquals(ExamSessionStatus.IN_PROGRESS, assignment.session().getStatus()),
+                () -> assertNotEquals(concurrentSession.getExamId(), assignment.session().getExamId())
+        );
+        verify(examSessionRepository, times(2)).insert(any(ExamSession.class));
+        verify(examSessionRepository).abandonIfInProgress(concurrentSession.getExamId());
+    }
+
+    @Test
     void concurrentStartsLeaveExactlyOneActiveSessionAndNeverReuseExamId() throws Exception {
         Map<String, ExamSession> sessions = new ConcurrentHashMap<>();
         CountDownLatch initialLookups = new CountDownLatch(2);
@@ -279,7 +312,6 @@ class ExamSessionManagerTest {
                     () -> assertTrue(secondResult.created()),
                     () -> assertEquals(2, sessions.size())
             );
-            verify(examSessionRepository, times(3)).insert(any(ExamSession.class));
         } finally {
             releaseLookups.countDown();
             executor.shutdownNow();

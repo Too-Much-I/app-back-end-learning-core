@@ -782,3 +782,16 @@
 
 - 현재 turn hook 요구에 따라 Part 4 시험 시작 응답 구현 상태를 WORKLOG 끝에 append하고 CURRENT_STATE를 동기화했다. 구현 및 검증 결과는 직전 상태와 동일하며 애플리케이션·테스트 코드는 추가 변경하지 않았다.
 - 별도 Jira 이슈 키가 없고 Secret·Token·Credential 및 사용자 제공 임시 URL 값은 기록하지 않았다. Git·Jira 쓰기 작업과 외부 시스템 호출도 수행하지 않았다.
+
+## Latest GitHub Actions concurrency-test diagnosis (2026-08-07)
+
+- `ExamSessionManagerTest.concurrentStartsLeaveExactlyOneActiveSessionAndNeverReuseExamId`의 CI 실패는 최종 세션 불변식이 아니라 `insert()` 정확히 3회라는 Mockito 검증에서 발생한다.
+- latch 해제 후 snapshot을 읽는 현재 테스트에서는 스케줄에 따라 두 initial lookup이 모두 빈 목록을 보아 Duplicate Key와 3회 insert가 발생하거나, 두 번째 lookup이 첫 insert를 보아 정상 abandon 후 총 2회 insert로 완료될 수 있다. 둘 다 최종 active Session 1개와 서로 다른 신규 examId를 만족한다.
+- 권장 방향은 snapshot을 latch 대기 전에 고정해 collision을 결정적으로 만들거나, 최종 동시성 불변식 테스트와 Duplicate Key 재시도 테스트를 분리하는 것이다. 이번 진단에서는 코드·테스트·외부 시스템 및 Git·Jira를 변경하지 않았다.
+
+## Latest GitHub Actions concurrency-test resolution (2026-08-07)
+
+- `ExamSessionManagerTest`의 동시 시작 테스트에서 스케줄링 의존적인 `insert()` 정확히 3회 검증을 제거하고, 기존 최종 불변식 검증은 유지했다.
+- Duplicate Key retry는 별도 `duplicateKeyDuringSessionCreationRetries` 테스트로 분리했다. 첫 insert 예외, recursive retry, concurrent Session abandon, 두 번째 insert 성공과 정상 Assignment 반환을 Mockito로 결정적으로 검증한다.
+- flaky 대상 테스트는 `--rerun-tasks`로 10회 반복해 10/10 성공했다. 전체 `./gradlew test`도 성공했고 Java 296개, failures/errors/skipped 0개다. `git diff --check`가 성공했으며 production 코드는 변경하지 않았다.
+- 실제 외부 시스템과 Git·Jira 쓰기 작업은 수행하지 않았고 Secret·Token·Credential을 기록하지 않았다.
