@@ -1,14 +1,18 @@
 package web.tosunsaeng.domain.exams.api;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.SerializationFeature;
 import io.swagger.v3.oas.annotations.Operation;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.springframework.http.converter.json.MappingJackson2HttpMessageConverter;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import web.tosunsaeng.domain.exams.application.ExamReadService;
 import web.tosunsaeng.domain.exams.application.ExamService;
+import web.tosunsaeng.domain.exams.domain.enums.ExamSessionStatus;
 import web.tosunsaeng.domain.exams.domain.enums.GradingJobStatus;
 import web.tosunsaeng.domain.exams.dto.ExamResponseDTO;
 
@@ -41,9 +45,14 @@ class ExamReadApiContractTest {
     void setUp() {
         examService = mock(ExamService.class);
         examReadService = mock(ExamReadService.class);
+        ObjectMapper objectMapper = new ObjectMapper()
+                .findAndRegisterModules()
+                .disable(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS);
         mockMvc = MockMvcBuilders.standaloneSetup(
                 new ExamRestController(examService, examReadService)
-        ).build();
+        )
+                .setMessageConverters(new MappingJackson2HttpMessageConverter(objectMapper))
+                .build();
     }
 
     @Test
@@ -54,11 +63,15 @@ class ExamReadApiContractTest {
                         .histories(List.of(ExamResponseDTO.ExamHistoryItem.builder()
                                 .examId("ex_history")
                                 .title("모의고사 4")
+                                .status(ExamSessionStatus.COMPLETED)
                                 .cycleNumber(2)
+                                .startedAt(LocalDateTime.of(2026, 8, 4, 9, 0))
                                 .completedAt(LocalDateTime.of(2026, 8, 4, 9, 30))
                                 .totalScore(145)
+                                .maxScore(200)
                                 .levelEstimate("Advanced High")
                                 .summaryAvailable(true)
+                                .retriedQuestionCount(2)
                                 .build()))
                         .build()
         );
@@ -70,7 +83,11 @@ class ExamReadApiContractTest {
                 .andExpect(jsonPath("$.result.totalCount").value(1))
                 .andExpect(jsonPath("$.result.histories[0].examId").value("ex_history"))
                 .andExpect(jsonPath("$.result.histories[0].title").value("모의고사 4"))
+                .andExpect(jsonPath("$.result.histories[0].status").value("COMPLETED"))
+                .andExpect(jsonPath("$.result.histories[0].maxScore").value(200))
+                .andExpect(jsonPath("$.result.histories[0].startedAt").value("2026-08-04T09:00:00"))
                 .andExpect(jsonPath("$.result.histories[0].summaryAvailable").value(true))
+                .andExpect(jsonPath("$.result.histories[0].retriedQuestionCount").value(2))
                 .andExpect(jsonPath("$..userId").doesNotExist())
                 .andExpect(jsonPath("$..mockExamId").doesNotExist());
 

@@ -1674,3 +1674,59 @@
 - 반복 검증: 문제가 발생했던 단일 동시성 테스트를 사용자 제시 명령의 `--rerun-tasks` 방식으로 10회 반복했고 10/10 성공했다. `Thread.sleep`, `@Disabled`, `times(2)` 또는 `atLeast` 완화는 사용하지 않았다.
 - 전체 검증: `./gradlew test`가 성공했고 XML 기준 tests/failures/errors/skipped는 296/0/0/0이다. `git diff --check`도 성공했다.
 - 외부 작업: 실제 MongoDB와 외부 시스템을 호출하지 않았고 Secret·Token·Credential을 기록하지 않았다. Git commit·push·PR 및 Jira 쓰기 작업도 수행하지 않았다.
+
+## 2026-08-07 — History 응답 및 retriedQuestionCount 경로 확인
+
+<!-- codex-turn:019fda14-5b70-70a2-bd6c-0bb59cce9153 -->
+
+- 범위·결과: 별도 Jira 이슈 키 없이 `GET /api/v1/exams/history?page=0&size=20`의 Controller, DTO, Service, Repository와 retries 집계 경로를 읽기 전용으로 확인했다.
+- 인증·대상: JWT 모드에서 공개 endpoint가 아니므로 Bearer 인증이 필요하고 JWT sub UUID를 현재 userId로 사용한다. 현재 사용자의 `completedAt != null` Session만 포함하며 completedAt DESC, examId DESC로 정렬한다.
+- 응답: 현재 `ExamHistoryResult`는 totalCount와 histories만, 각 `ExamHistoryItem`은 examId, title, cycleNumber, completedAt, totalScore, levelEstimate, summaryAvailable만 제공한다. 신규 ExamSummary를 우선하고 없으면 legacy ExamResult total summary를 fallback한다.
+- 페이지네이션: Controller 메서드에는 page·size RequestParam과 Pageable이 없다. 따라서 해당 query parameter는 바인딩되지 않고 무시되며 완료 이력 전체와 전체 개수만 반환한다. page, size, totalPages, hasNext 계약은 없다.
+- retriedQuestionCount: 현재 저장소의 main 소스·테스트 및 Git 전체 이력 검색에 해당 필드가 없고 History 서비스는 Question Job/문항 Result를 조회하지 않는다. Learning Core 현재 코드가 이 필드를 직렬화할 수 없으므로 배포 응답에 있다면 다른 이미지·커밋 또는 클라이언트/BFF 등 다른 계층의 보강 여부를 확인해야 한다.
+- 관련 retries 의미: 별도 `GET /api/v1/exams/{examId}/retries`는 Job과 legacy Result를 `(questionNumber,retryCount)`로 합치고 Job을 우선한 뒤 retryCount 1 이상이 하나라도 있는 서로 다른 questionNumber만 반환한다. 이 questions 배열 크기를 count로 사용한다면 2는 추가 시도 총횟수가 아니라 재답변한 문항 2개라는 의미다. 이 계산은 현재 History에 결합되지 않는다.
+- 이번 확인에서는 애플리케이션·테스트를 수정하거나 테스트를 재실행하지 않았다. 실제 API·MongoDB·외부 시스템에 접근하지 않았고 Access Token·Secret·Credential을 기록하지 않았으며 Git·Jira 쓰기 작업도 수행하지 않았다.
+
+## 2026-08-07 — TMI-61 History retriedQuestionCount 추가
+
+- 범위·결과: 관련 Jira는 `TMI-61`이며 Jira 쓰기는 수행하지 않았다. `GET /api/v1/exams/history`의 각 항목에 `retriedQuestionCount`를 additive로 추가했다. 기존 page·size 미지원, 완료 판정, 정렬, Summary fallback과 다른 API 계약은 변경하지 않았다.
+- 필드 의미: `retriedQuestionCount`는 해당 시험에서 사용자 `retryCount >= 1`인 저장 회차가 하나라도 존재하는 서로 다른 `questionNumber` 수다. 같은 문항의 retry 1·2·3 및 Job/Legacy Result 중복은 Set으로 한 문항만 계산하고, 해당 문항이 없으면 0을 반환한다. `dispatchAttempt`와 Job 상태는 count 값으로 사용하지 않는다.
+- 조회·성능: 완료 History의 전체 examId Set으로 `question_grading_jobs`와 `exam_results`를 각각 한 번씩 batch 조회하고 examId·questionNumber·retryCount만 projection한다. 시험별 Repository 호출을 만들지 않았으며 기존 `{examId:1, questionNumber:1, retryCount:1}` 인덱스의 examId prefix를 재사용해 인덱스 스크립트는 변경하지 않았다.
+- 문서·계약: DTO Schema, Controller OpenAPI 설명과 README를 갱신했다. JWT sub 사용자, completedAt 필터, completedAt DESC/examId DESC, 신규 Summary 우선·Legacy fallback, 내부 userId·mockExamId 비노출은 유지된다.
+- 테스트: Job/Legacy batch union, 같은 문항·여러 회차 dedupe, retryCount 0 제외, 다른 examId 방어, count 0, API JSON의 `retriedQuestionCount: 2`, 최소 projection과 N+1 미사용을 검증했다. 집중 테스트와 `./gradlew clean test`가 성공했고 XML 기준 tests/failures/errors/skipped는 297/0/0/0이다. `git diff --check`도 성공했다.
+- 외부 작업: 실제 MongoDB apply·query explain·API 호출은 수행하지 않았다. Secret·Token·Credential을 기록하지 않았고 Git commit·push·PR 및 Jira 댓글·필드·상태 변경을 수행하지 않았다.
+
+## 2026-08-07 — TMI-61 History retriedQuestionCount 최종 확인
+
+<!-- codex-turn:019fda16-f53e-70f1-a1f6-39d04483e4a6 -->
+
+- 범위·결과: Jira `TMI-61`의 History 응답 `retriedQuestionCount` 추가 상태를 최종 확인했다. 해당 값은 시험별 `retryCount >= 1`인 고유 `questionNumber` 수이며, 같은 문항의 여러 회차와 Job/Legacy 중복은 한 번만 계산하고 없으면 0을 반환한다. `dispatchAttempt`는 계산에 사용하지 않는다.
+- 구현·계약: 완료 History examId 전체를 QuestionGradingJob과 Legacy ExamResult에서 batch 조회하여 N+1을 피했다. JWT sub, completedAt 완료 판정, History 정렬, Summary fallback, 기존 시험 API 계약은 유지했다.
+- 검증: 이번 turn에서 `ExamReadServiceTest`, `ExamReadApiContractTest`, `ExamReadRepositoryContractTest`를 재실행해 성공했고 `git diff --check`도 성공했다. 앞선 전체 `./gradlew clean test`는 Java 297개, failures/errors/skipped 0개로 성공한 상태다.
+- 외부 작업: 실제 DB apply·explain은 수행하지 않았고 Secret·Token·Credential을 기록하지 않았다. Git commit·push·PR과 Jira 쓰기 작업도 수행하지 않았다.
+
+## 2026-08-07 — TMI-61 History 현재 응답 계약 확인
+
+<!-- codex-turn:019fda24-b264-7411-8b25-dc0a11e1f341 -->
+
+- 범위·결과: Jira `TMI-61`과 관련해 `GET /api/v1/exams/history?page=0&size=20`의 Controller, DTO, BaseResponse, API 계약 테스트를 읽기 전용으로 확인했다.
+- 실제 응답: `result` 하위는 `exams`가 아니라 `totalCount`와 `histories`다. History 항목은 `examId`, `title`, `cycleNumber`, `completedAt`, `totalScore`, `levelEstimate`, `summaryAvailable`, `retriedQuestionCount`를 반환한다.
+- 미지원 필드: 현재 DTO에 `status`, `maxScore`, `startedAt`, `page`, `size`, `totalElements`, `totalPages`, `hasNext`는 없다. Controller가 page·size를 바인딩하지 않아 쿼리 파라미터는 무시되고 완료 History 전체를 반환한다.
+- 시간·카운트: `completedAt`은 `LocalDateTime`으로 timezone suffix `Z`가 없는 형태로 직렬화된다. `retriedQuestionCount`는 `retryCount >= 1`이 있는 고유 문항 수로, Job/Legacy 중복과 여러 재답변 회차를 한 문항으로 계산한다.
+- 외부 계약·작업: 이번 확인에서 애플리케이션·테스트 코드는 변경하지 않았고 기존 BaseResponse와 History 계약을 유지했다. Secret·Token을 기록하지 않았고 Git·Jira 쓰기 작업이나 외부 시스템 호출을 수행하지 않았다.
+
+## 2026-08-07 — TMI-61 History status·maxScore·startedAt 추가
+
+- 범위·결과: Jira `TMI-61`의 `GET /api/v1/exams/history` 항목에 요청된 `status`, `maxScore`, `startedAt` 세 필드만 additive로 추가했다. `totalCount`/`histories`, page·size 미지원, 완료 판정·정렬·Summary fallback·`retriedQuestionCount` 계약은 유지했다.
+- 매핑: `status`는 Legacy 세션도 보정하는 `ExamSession.effectiveStatus()`, `startedAt`은 `ExamSession.createdAt`, `maxScore`는 현재 모의고사 고정 만점 200으로 반환한다. 추가 Repository 조회나 MongoDB 문서·인덱스 변경은 없다.
+- 테스트: Service 매핑, API JSON의 `COMPLETED`/`200`/`startedAt`, JWT sub 소유 이력 응답과 내부 식별자 비노출을 검증했다. standalone MockMvc도 운영 Spring 날짜 직렬화와 같게 ISO-8601 문자열을 사용하도록 테스트 ObjectMapper를 구성했다.
+- 검증: 집중 테스트와 `./gradlew clean test`가 성공했다. XML 기준 tests/failures/errors/skipped는 297/0/0/0이고 `git diff --check`도 성공했다.
+- 외부 작업: Secret·Token·Credential을 기록하지 않았고 실제 DB·API·외부 시스템을 호출하지 않았다. Git commit·push·PR과 Jira 댓글·필드·상태 변경도 수행하지 않았다.
+
+## 2026-08-07 — TMI-61 History 세 필드 추가 turn 종료 기록
+
+<!-- codex-turn:019fda27-3dca-7c71-bb14-e9e5abdf5878 -->
+
+- Jira `TMI-61` History 항목에 `status`, `maxScore`, `startedAt`을 추가한 현재 turn을 최종 기록했다. 매핑은 각각 `ExamSession.effectiveStatus()`, 고정 만점 200, `ExamSession.createdAt`이다.
+- 기존 `totalCount`/`histories`, 완료 판정·정렬·Summary fallback·`retriedQuestionCount`와 기타 시험 API 계약은 유지됐다. Legacy 세션에 `createdAt`이 없으면 `startedAt` 또한 null이다.
+- 집중 테스트와 전체 `./gradlew clean test`가 성공했고 tests/failures/errors/skipped는 297/0/0/0이다. Secret·Token을 기록하지 않았고 Git·Jira 쓰기 작업을 수행하지 않았다.

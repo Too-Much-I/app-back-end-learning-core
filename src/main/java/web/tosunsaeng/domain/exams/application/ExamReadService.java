@@ -35,6 +35,7 @@ import java.util.stream.Collectors;
 @Transactional(readOnly = true)
 public class ExamReadService {
 
+    private static final int EXAM_MAX_SCORE = 200;
     private static final Comparator<ExamSession> HISTORY_ORDER = Comparator
             .comparing(
                     ExamSession::getCompletedAt,
@@ -95,13 +96,15 @@ public class ExamReadService {
                 safeList(examResultRepository.findLegacySummaryCandidatesByExamIdIn(examIds)),
                 ExamResult::getExamId
         );
+        Map<String, Integer> retriedQuestionCountsByExamId = retriedQuestionCounts(examIds);
 
         List<ExamResponseDTO.ExamHistoryItem> histories = completedSessions.stream()
                 .map(session -> toHistoryItem(
                         session,
                         titlesByMockExamId,
                         summariesByExamId,
-                        legacySummariesByExamId
+                        legacySummariesByExamId,
+                        retriedQuestionCountsByExamId
                 ))
                 .toList();
 
@@ -168,7 +171,8 @@ public class ExamReadService {
             ExamSession session,
             Map<String, String> titlesByMockExamId,
             Map<String, ExamSummary> summariesByExamId,
-            Map<String, ExamResult> legacySummariesByExamId) {
+            Map<String, ExamResult> legacySummariesByExamId,
+            Map<String, Integer> retriedQuestionCountsByExamId) {
         String examId = session.getExamId();
         String title = titlesByMockExamId.get(
                 GradingKeys.effectiveMockExamId(session.getMockExamId())
@@ -187,14 +191,63 @@ public class ExamReadService {
         return ExamResponseDTO.ExamHistoryItem.builder()
                 .examId(examId)
                 .title(title)
+                .status(session.effectiveStatus())
                 .cycleNumber(session.getCycleNumber())
+                .startedAt(session.getCreatedAt())
                 .completedAt(session.getCompletedAt())
                 .totalScore(summary != null ? summary.getTotalScore()
                         : legacySummary != null ? legacySummary.getTotalScore() : null)
+                .maxScore(EXAM_MAX_SCORE)
                 .levelEstimate(summary != null ? summary.getLevelEstimate()
                         : legacySummary != null ? legacySummary.getLevelEstimate() : null)
                 .summaryAvailable(summaryAvailable)
+                .retriedQuestionCount(retriedQuestionCountsByExamId.getOrDefault(examId, 0))
                 .build();
+    }
+
+    private Map<String, Integer> retriedQuestionCounts(Set<String> examIds) {
+        Map<String, Set<Integer>> questionNumbersByExamId = new HashMap<>();
+        safeList(examResultRepository.findRetriedQuestionCandidatesByExamIdIn(examIds))
+                .stream()
+                .filter(Objects::nonNull)
+                .forEach(result -> addRetriedQuestion(
+                        questionNumbersByExamId,
+                        examIds,
+                        result.getExamId(),
+                        result.getQuestionNumber(),
+                        result.getRetryCount()
+                ));
+        safeList(questionGradingJobRepository.findRetriedQuestionCandidatesByExamIdIn(examIds))
+                .stream()
+                .filter(Objects::nonNull)
+                .forEach(job -> addRetriedQuestion(
+                        questionNumbersByExamId,
+                        examIds,
+                        job.getExamId(),
+                        job.getQuestionNumber(),
+                        job.getRetryCount()
+                ));
+
+        Map<String, Integer> countsByExamId = new HashMap<>();
+        questionNumbersByExamId.forEach((examId, questionNumbers) ->
+                countsByExamId.put(examId, questionNumbers.size()));
+        return countsByExamId;
+    }
+
+    private static void addRetriedQuestion(
+            Map<String, Set<Integer>> questionNumbersByExamId,
+            Set<String> requestedExamIds,
+            String examId,
+            Integer questionNumber,
+            Integer retryCount) {
+        if (!requestedExamIds.contains(examId)
+                || questionNumber == null
+                || GradingKeys.canonicalRetryCount(retryCount) < 1) {
+            return;
+        }
+        questionNumbersByExamId
+                .computeIfAbsent(examId, ignored -> new LinkedHashSet<>())
+                .add(questionNumber);
     }
 
     private ExamResponseDTO.RetriedQuestionItem toRetriedQuestion(

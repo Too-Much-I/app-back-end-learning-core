@@ -33,7 +33,9 @@ public class ExamRestController {
     @Operation(
             summary = "현재 사용자의 완료 모의고사 이력 조회 API",
             description = "Bearer 인증 사용자의 completedAt이 기록된 완료 시험만 최신순으로 반환합니다. "
-                    + "종합 결과가 없는 완료 시험도 포함하며, 이력이 없으면 200과 빈 histories 배열을 반환합니다."
+                    + "시작·완료 시각, 상태, 만점과 시험별 재답변 문항 수를 함께 제공하고, "
+                    + "종합 결과가 없는 완료 시험도 포함하며, "
+                    + "이력이 없으면 200과 빈 histories 배열을 반환합니다."
     )
     @GetMapping("/history")
     public BaseResponse<ExamResponseDTO.ExamHistoryResult> getExamHistory() {

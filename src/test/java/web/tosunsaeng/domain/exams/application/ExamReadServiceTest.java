@@ -13,6 +13,7 @@ import web.tosunsaeng.domain.exams.domain.entity.ExamSession;
 import web.tosunsaeng.domain.exams.domain.entity.ExamSummary;
 import web.tosunsaeng.domain.exams.domain.entity.MockExam;
 import web.tosunsaeng.domain.exams.domain.entity.QuestionGradingJob;
+import web.tosunsaeng.domain.exams.domain.enums.ExamSessionStatus;
 import web.tosunsaeng.domain.exams.domain.enums.GradingJobStatus;
 import web.tosunsaeng.domain.exams.domain.repository.ExamResultRepository;
 import web.tosunsaeng.domain.exams.domain.repository.ExamSessionRepository;
@@ -83,6 +84,7 @@ class ExamReadServiceTest {
     @Test
     void historyUsesCompletedAtDeterministicOrderAndBatchSummaryCompatibility() {
         LocalDateTime newest = LocalDateTime.of(2026, 8, 4, 11, 0);
+        LocalDateTime newestStartedAt = LocalDateTime.of(2026, 8, 4, 10, 30);
         LocalDateTime tied = LocalDateTime.of(2026, 8, 4, 10, 0);
         LocalDateTime legacyTime = LocalDateTime.of(2026, 8, 3, 9, 0);
         List<ExamSession> repositoryCandidates = List.of(
@@ -92,7 +94,7 @@ class ExamReadServiceTest {
                 session("ex_incomplete_active", USER_ID, "mock_exam_004", 1, true, null),
                 session("ex_tie_z", USER_ID, "mock_exam_004", 2, false, tied),
                 session("ex_inactive_without_completion", USER_ID, "mock_exam_004", 1, false, null),
-                session("ex_newest", USER_ID, "mock_exam_004", 5, true, newest)
+                session("ex_newest", USER_ID, "mock_exam_004", 5, true, newestStartedAt, newest)
         );
         when(examSessionRepository.findCompletedByUserId(USER_ID)).thenReturn(repositoryCandidates);
         when(mockExamRepository.findTitlesByMockExamIdIn(anyCollection())).thenReturn(List.of(
@@ -109,6 +111,10 @@ class ExamReadServiceTest {
                 legacySummary("legacy:ex_tie_z:0002", "ex_tie_z", 130, "Advanced Low"),
                 legacySummary("legacy:ex_tie_z:0001", "ex_tie_z", 120, "Intermediate")
         ));
+        when(examResultRepository.findRetriedQuestionCandidatesByExamIdIn(anyCollection()))
+                .thenReturn(List.of());
+        when(questionGradingJobRepository.findRetriedQuestionCandidatesByExamIdIn(anyCollection()))
+                .thenReturn(List.of());
 
         ExamResponseDTO.ExamHistoryResult result = examReadService.getExamHistory();
 
@@ -123,15 +129,20 @@ class ExamReadServiceTest {
         ExamResponseDTO.ExamHistoryItem legacyActiveNull = result.getHistories().get(3);
         assertAll(
                 () -> assertEquals("모의고사 4", newestItem.getTitle()),
+                () -> assertEquals(ExamSessionStatus.COMPLETED, newestItem.getStatus()),
                 () -> assertEquals(5, newestItem.getCycleNumber()),
+                () -> assertEquals(newestStartedAt, newestItem.getStartedAt()),
                 () -> assertEquals(newest, newestItem.getCompletedAt()),
                 () -> assertEquals(145, newestItem.getTotalScore()),
+                () -> assertEquals(200, newestItem.getMaxScore()),
                 () -> assertEquals("Advanced High", newestItem.getLevelEstimate()),
                 () -> assertTrue(newestItem.isSummaryAvailable()),
+                () -> assertEquals(0, newestItem.getRetriedQuestionCount()),
                 () -> assertEquals(130, legacyFallback.getTotalScore()),
                 () -> assertEquals("Advanced Low", legacyFallback.getLevelEstimate()),
                 () -> assertTrue(legacyFallback.isSummaryAvailable()),
                 () -> assertNull(missingSummary.getTotalScore()),
+                () -> assertEquals(200, missingSummary.getMaxScore()),
                 () -> assertNull(missingSummary.getLevelEstimate()),
                 () -> assertFalse(missingSummary.isSummaryAvailable()),
                 () -> assertEquals("Legacy 모의고사", legacyActiveNull.getTitle()),
@@ -153,10 +164,55 @@ class ExamReadServiceTest {
         verify(examResultRepository).findLegacySummaryCandidatesByExamIdIn(Set.of(
                 "ex_newest", "ex_tie_z", "ex_tie_a", "ex_legacy"
         ));
+        verify(examResultRepository).findRetriedQuestionCandidatesByExamIdIn(Set.of(
+                "ex_newest", "ex_tie_z", "ex_tie_a", "ex_legacy"
+        ));
+        verify(questionGradingJobRepository).findRetriedQuestionCandidatesByExamIdIn(Set.of(
+                "ex_newest", "ex_tie_z", "ex_tie_a", "ex_legacy"
+        ));
         verify(mockExamRepository, never()).findAll();
         verify(examSummaryRepository, never()).findFirstByExamIdOrderByIdDesc(anyString());
         verify(examResultRepository, never()).findFirstByExamIdAndTotalScoreIsNotNullOrderByIdDesc(anyString());
         verify(examResultRepository, never()).findByExamId(anyString());
+    }
+
+    @Test
+    void historyCountsDistinctRetriedQuestionsAcrossBatchJobAndLegacyCandidates() {
+        LocalDateTime completedAt = LocalDateTime.of(2026, 8, 7, 12, 0);
+        when(examSessionRepository.findCompletedByUserId(USER_ID)).thenReturn(List.of(
+                session("ex_first", USER_ID, "mock_exam_004", 1, false, completedAt),
+                session("ex_second", USER_ID, "mock_exam_004", 2, false, completedAt.minusMinutes(1))
+        ));
+        when(mockExamRepository.findTitlesByMockExamIdIn(anyCollection())).thenReturn(List.of());
+        when(examSummaryRepository.findHistoryCandidatesByExamIdIn(anyCollection())).thenReturn(List.of());
+        when(examResultRepository.findLegacySummaryCandidatesByExamIdIn(anyCollection()))
+                .thenReturn(List.of());
+        when(examResultRepository.findRetriedQuestionCandidatesByExamIdIn(anyCollection())).thenReturn(List.of(
+                result("legacy-first-q1-r1", "ex_first", 1, 1),
+                result("legacy-first-q1-r2", "ex_first", 1, 2),
+                result("legacy-first-q2-r0", "ex_first", 2, 0),
+                result("legacy-second-q3-r1", "ex_second", 3, 1)
+        ));
+        when(questionGradingJobRepository.findRetriedQuestionCandidatesByExamIdIn(anyCollection()))
+                .thenReturn(List.of(
+                        job("job-first-q1-r3", "ex_first", 1, 3, GradingJobStatus.FAILED, 1),
+                        job("job-first-q4-r1", "ex_first", 4, 1, GradingJobStatus.PROCESSING, 1),
+                        job("job-second-q3-r1", "ex_second", 3, 1, GradingJobStatus.COMPLETED, 1),
+                        job("job-second-q5-r2", "ex_second", 5, 2, GradingJobStatus.PENDING, 1),
+                        job("job-outside-q9-r1", "ex_outside", 9, 1, GradingJobStatus.COMPLETED, 1)
+                ));
+
+        ExamResponseDTO.ExamHistoryResult result = examReadService.getExamHistory();
+
+        assertAll(
+                () -> assertEquals(2, result.getHistories().get(0).getRetriedQuestionCount()),
+                () -> assertEquals(2, result.getHistories().get(1).getRetriedQuestionCount())
+        );
+        Set<String> completedExamIds = Set.of("ex_first", "ex_second");
+        verify(examResultRepository).findRetriedQuestionCandidatesByExamIdIn(completedExamIds);
+        verify(questionGradingJobRepository).findRetriedQuestionCandidatesByExamIdIn(completedExamIds);
+        verify(examResultRepository, never()).findQuestionAttemptsByExamId(anyString());
+        verify(questionGradingJobRepository, never()).findAttemptsByExamId(anyString());
     }
 
     @Test
@@ -321,9 +377,21 @@ class ExamReadServiceTest {
             Integer cycleNumber,
             Boolean active,
             LocalDateTime completedAt) {
+        return session(examId, userId, mockExamId, cycleNumber, active, null, completedAt);
+    }
+
+    private static ExamSession session(
+            String examId,
+            String userId,
+            String mockExamId,
+            Integer cycleNumber,
+            Boolean active,
+            LocalDateTime createdAt,
+            LocalDateTime completedAt) {
         return ExamSession.builder()
                 .examId(examId)
                 .userId(userId)
+                .createdAt(createdAt)
                 .mockExamId(mockExamId)
                 .cycleNumber(cycleNumber)
                 .active(active)
@@ -358,9 +426,17 @@ class ExamReadServiceTest {
     }
 
     private static ExamResult result(String id, Integer questionNumber, Integer retryCount) {
+        return result(id, EXAM_ID, questionNumber, retryCount);
+    }
+
+    private static ExamResult result(
+            String id,
+            String examId,
+            Integer questionNumber,
+            Integer retryCount) {
         return ExamResult.builder()
                 .id(id)
-                .examId(EXAM_ID)
+                .examId(examId)
                 .questionNumber(questionNumber)
                 .retryCount(retryCount)
                 .score(9.5)
@@ -375,9 +451,19 @@ class ExamReadServiceTest {
             Integer retryCount,
             GradingJobStatus status,
             int dispatchAttempt) {
+        return job(id, EXAM_ID, questionNumber, retryCount, status, dispatchAttempt);
+    }
+
+    private static QuestionGradingJob job(
+            String id,
+            String examId,
+            Integer questionNumber,
+            Integer retryCount,
+            GradingJobStatus status,
+            int dispatchAttempt) {
         return QuestionGradingJob.builder()
                 .jobId(id)
-                .examId(EXAM_ID)
+                .examId(examId)
                 .questionNumber(questionNumber)
                 .retryCount(retryCount)
                 .status(status)

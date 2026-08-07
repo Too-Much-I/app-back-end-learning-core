@@ -50,6 +50,16 @@ class ExamReadRepositoryContractTest {
                 "findLegacySummaryCandidatesByExamIdIn",
                 Collection.class
         );
+        Query retriedJobQuery = query(
+                QuestionGradingJobRepository.class,
+                "findRetriedQuestionCandidatesByExamIdIn",
+                Collection.class
+        );
+        Query retriedResultQuery = query(
+                ExamResultRepository.class,
+                "findRetriedQuestionCandidatesByExamIdIn",
+                Collection.class
+        );
 
         assertAll(
                 () -> assertTrue(mockExamQuery.value().contains("'$in': ?0")),
@@ -59,7 +69,15 @@ class ExamReadRepositoryContractTest {
                 () -> assertEquals("{ 'examId': 1, '_id': -1 }", summaryQuery.sort()),
                 () -> assertTrue(legacySummaryQuery.value().contains("'totalScore'")),
                 () -> assertTrue(legacySummaryQuery.value().contains("'$ne': null")),
-                () -> assertEquals("{ 'examId': 1, '_id': -1 }", legacySummaryQuery.sort())
+                () -> assertEquals("{ 'examId': 1, '_id': -1 }", legacySummaryQuery.sort()),
+                () -> assertTrue(retriedJobQuery.value().contains("'examId': { '$in': ?0 }")),
+                () -> assertTrue(retriedJobQuery.value().contains("'retryCount': { '$gte': 1 }")),
+                () -> assertTrue(retriedJobQuery.fields().contains("'questionNumber': 1")),
+                () -> assertFalse(retriedJobQuery.fields().contains("dispatchAttempt")),
+                () -> assertTrue(retriedResultQuery.value().contains("'examId': { '$in': ?0 }")),
+                () -> assertTrue(retriedResultQuery.value().contains("'retryCount': { '$gte': 1 }")),
+                () -> assertTrue(retriedResultQuery.fields().contains("'questionNumber': 1")),
+                () -> assertFalse(retriedResultQuery.fields().contains("feedback"))
         );
     }
 

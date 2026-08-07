@@ -291,11 +291,13 @@ class JwtSecurityIntegrationTest {
 
     @Test
     void validTokenHistoryUsesJwtSubjectAndDoesNotExposeInternalIds() throws Exception {
+        LocalDateTime startedAt = LocalDateTime.of(2026, 8, 4, 9, 0);
         LocalDateTime completedAt = LocalDateTime.of(2026, 8, 4, 9, 30);
         when(examSessionRepository.findCompletedByUserId(OWNER_USER_ID)).thenReturn(List.of(
                 ExamSession.builder()
                         .examId("ex_history_security_test")
                         .userId(OWNER_USER_ID)
+                        .createdAt(startedAt)
                         .mockExamId("mock_exam_004")
                         .cycleNumber(2)
                         .active(null)
@@ -325,7 +327,10 @@ class JwtSecurityIntegrationTest {
                 .andExpect(jsonPath("$.result.totalCount").value(1))
                 .andExpect(jsonPath("$.result.histories[0].examId").value("ex_history_security_test"))
                 .andExpect(jsonPath("$.result.histories[0].title").value("JWT history test exam"))
+                .andExpect(jsonPath("$.result.histories[0].status").value("COMPLETED"))
                 .andExpect(jsonPath("$.result.histories[0].totalScore").value(145))
+                .andExpect(jsonPath("$.result.histories[0].maxScore").value(200))
+                .andExpect(jsonPath("$.result.histories[0].startedAt").value("2026-08-04T09:00:00"))
                 .andExpect(jsonPath("$..userId").doesNotExist())
                 .andExpect(jsonPath("$..user_id").doesNotExist())
                 .andExpect(jsonPath("$..mockExamId").doesNotExist());

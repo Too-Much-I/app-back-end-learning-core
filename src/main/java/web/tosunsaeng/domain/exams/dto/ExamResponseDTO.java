@@ -7,6 +7,7 @@ import com.fasterxml.jackson.databind.annotation.JsonNaming;
 import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.*;
 import web.tosunsaeng.domain.exams.domain.entity.Question;
+import web.tosunsaeng.domain.exams.domain.enums.ExamSessionStatus;
 import web.tosunsaeng.domain.exams.domain.enums.ExamStatus;
 import web.tosunsaeng.domain.exams.domain.enums.GradingJobStatus;
 import web.tosunsaeng.domain.exams.domain.enums.SummaryAction;
@@ -82,11 +83,17 @@ public class ExamResponseDTO {
     public static class ExamHistoryItem {
         private String examId;
         private String title;
+        private ExamSessionStatus status;
         private Integer cycleNumber;
+        private LocalDateTime startedAt;
         private LocalDateTime completedAt;
         private Integer totalScore;
+        @Schema(description = "모의고사 만점", example = "200")
+        private int maxScore;
         private String levelEstimate;
         private boolean summaryAvailable;
+        @Schema(description = "retryCount 1 이상이 존재하는 서로 다른 문항 수")
+        private int retriedQuestionCount;
     }
 
     @Schema(description = "시험에서 재답변한 문항과 저장된 답변 회차")

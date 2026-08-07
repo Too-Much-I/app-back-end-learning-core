@@ -97,7 +97,10 @@ JWT 모드에서 다음 사용자용 GET API는 Bearer Access Token이 필요하
   `completedAt` 내림차순, `examId` 내림차순으로 반환한다. `active=false`만으로 완료를 판정하지
   않는다. 신규 `exam_summaries`의 최신 문서를 우선하고, 없으면 `exam_results.totalScore`가 있는
   Legacy 종합 문서를 사용한다. 종합 결과가 없는 완료 시험은 점수·레벨을 `null`,
-  `summaryAvailable=false`로 반환한다.
+  `summaryAvailable=false`로 반환한다. `retriedQuestionCount`는 Job과 Legacy 문항 결과를 batch
+  결합하여 `retryCount >= 1`이 존재하는 서로 다른 문항 수로 반환한다. `status`는
+  ExamSession의 유효 상태, `startedAt`은 ExamSession `createdAt`, `maxScore`는 모의고사 고정
+  만점 200을 반환한다.
 - `GET /api/v1/exams/{examId}/retries`: 사용자 소유 시험의 `question_grading_jobs`와 문항별
   Legacy `exam_results` 회차를 합쳐, `retryCount >= 1`이 실제로 존재하는 문항만 반환한다. 해당
   문항의 저장된 최초 회차는 비교를 위해 포함하지만 존재하지 않는 0회차는 만들지 않는다. Job이

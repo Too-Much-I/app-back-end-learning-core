@@ -795,3 +795,32 @@
 - Duplicate Key retry는 별도 `duplicateKeyDuringSessionCreationRetries` 테스트로 분리했다. 첫 insert 예외, recursive retry, concurrent Session abandon, 두 번째 insert 성공과 정상 Assignment 반환을 Mockito로 결정적으로 검증한다.
 - flaky 대상 테스트는 `--rerun-tasks`로 10회 반복해 10/10 성공했다. 전체 `./gradlew test`도 성공했고 Java 296개, failures/errors/skipped 0개다. `git diff --check`가 성공했으며 production 코드는 변경하지 않았다.
 - 실제 외부 시스템과 Git·Jira 쓰기 작업은 수행하지 않았고 Secret·Token·Credential을 기록하지 않았다.
+
+## Latest History response inspection (2026-08-07)
+
+- 현재 `GET /api/v1/exams/history`는 JWT sub 사용자의 completedAt이 있는 Session 전체를 completedAt DESC, examId DESC로 반환한다. 결과는 totalCount와 histories이며 항목 필드는 examId, title, cycleNumber, completedAt, totalScore, levelEstimate, summaryAvailable이다.
+- Controller가 page·size 또는 Pageable을 받지 않으므로 `?page=0&size=20`은 무시되며 실제 pagination metadata도 없다.
+- 현재 main 소스·테스트·Git 이력에 retriedQuestionCount 필드는 없고 History 경로는 Question Job/문항 Result를 조회하지 않는다. 별도 retries API의 questions 크기는 retryCount 1 이상이 존재하는 서로 다른 문항 수지만 History에는 결합되지 않는다.
+- 배포 응답에 retriedQuestionCount가 있다면 실행 이미지/커밋 또는 클라이언트·중간 계층 확인이 필요하다. 이번 확인에서는 코드·테스트·외부 시스템과 Git·Jira를 변경하지 않았다.
+
+## Latest TMI-61 History retriedQuestionCount implementation (2026-08-07)
+
+- `GET /api/v1/exams/history`의 각 history 항목에 primitive int `retriedQuestionCount`를 추가했다. 값은 해당 examId에서 `retryCount >= 1`이 존재하는 서로 다른 questionNumber 수이며 없으면 0이다.
+- 완료 History examId 전체를 기준으로 QuestionGradingJob과 Legacy ExamResult 후보를 각각 batch 조회하고 `(examId, questionNumber)` Set으로 합친다. 여러 retry 회차와 Job/Legacy 중복은 한 문항으로 계산하며 dispatchAttempt는 사용하지 않는다. 기존 read 인덱스를 재사용하고 N+1 조회를 만들지 않았다.
+- JWT sub, completedAt 완료 기준, History 정렬, 신규 Summary 우선·Legacy fallback, 기존 Retries·문항 단건·Summary API와 page·size 미지원 상태는 유지된다.
+- 집중 테스트를 이번 turn에 재실행해 성공했고, 전체 `./gradlew clean test`도 Java 297개, failures/errors/skipped 0개로 성공했다. `git diff --check`가 성공했으며 실제 DB apply·explain, Git·Jira 쓰기 작업은 수행하지 않았다.
+
+## Latest TMI-61 History response contract clarification (2026-08-07)
+
+- 현재 `GET /api/v1/exams/history`의 `result`는 `totalCount` 및 `histories`로 구성된다. `exams` 배열과 page·size·totalElements·totalPages·hasNext 메타데이터는 없다.
+- History 항목의 현재 필드는 `examId`, `title`, `cycleNumber`, `completedAt`, `totalScore`, `levelEstimate`, `summaryAvailable`, `retriedQuestionCount`다. `status`, `maxScore`, `startedAt`은 반환하지 않는다.
+- `page`/`size` query parameter는 Controller에 바인딩되지 않아 무시되며 완료 이력 전체가 반환된다. `completedAt`은 `LocalDateTime`이므로 `Z`가 붙지 않는다.
+- `retriedQuestionCount`는 `retryCount >= 1`이 존재하는 고유 `questionNumber` 수이며 Job/Legacy 중복과 다중 회차는 한 문항으로 계산한다. 이번 turn에서 애플리케이션·테스트 코드, Git·Jira는 변경하지 않았다.
+
+## Latest TMI-61 History status/maxScore/startedAt implementation (2026-08-07)
+
+- `GET /api/v1/exams/history`의 `histories` 항목에 `status`, `maxScore`, `startedAt`이 additive로 추가됐다. 기존 응답 필드와 `totalCount`/`histories` 구조는 그대로다.
+- `status`는 `ExamSession.effectiveStatus()`를 사용해 Legacy 완료 세션도 `COMPLETED`로 보정하고, `startedAt`은 `ExamSession.createdAt`을 가공 없이 반환한다. Legacy 문서에 createdAt이 없으면 `startedAt` 또한 null이다.
+- `maxScore`는 현재 모의고사 채점 계약의 고정 만점 200이다. 이 추가로 Repository·MongoDB 문서·인덱스는 변경하지 않았다.
+- JWT sub, completedAt 완료 판정, completedAt DESC/examId DESC 정렬, Summary fallback, `retriedQuestionCount`, page·size 미지원은 유지된다.
+- 집중 테스트와 `./gradlew clean test`가 성공했고 tests/failures/errors/skipped는 297/0/0/0이다. turn 종료 기록까지 반영했으며 `git diff --check`도 성공했고 Git·Jira 쓰기 작업은 수행하지 않았다.
