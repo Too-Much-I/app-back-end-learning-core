@@ -824,3 +824,10 @@
 - `maxScore`는 현재 모의고사 채점 계약의 고정 만점 200이다. 이 추가로 Repository·MongoDB 문서·인덱스는 변경하지 않았다.
 - JWT sub, completedAt 완료 판정, completedAt DESC/examId DESC 정렬, Summary fallback, `retriedQuestionCount`, page·size 미지원은 유지된다.
 - 집중 테스트와 `./gradlew clean test`가 성공했고 tests/failures/errors/skipped는 297/0/0/0이다. turn 종료 기록까지 반영했으며 `git diff --check`도 성공했고 Git·Jira 쓰기 작업은 수행하지 않았다.
+
+## Latest TMI-61 History response shape (2026-08-07)
+
+- 현재 성공 응답은 BaseResponse의 `isSuccess`, `code`, `message`, `result`를 사용하고, `result`는 `totalCount`와 `histories`로 구성된다.
+- `histories` 항목은 `examId`, `title`, `status`, `cycleNumber`, `startedAt`, `completedAt`, `totalScore`, `maxScore`, `levelEstimate`, `summaryAvailable`, `retriedQuestionCount`를 반환한다.
+- `status`는 `ExamSession.effectiveStatus()`, `startedAt`은 `ExamSession.createdAt`, `maxScore`는 200이다. Legacy createdAt 누락 세션은 `startedAt: null`이고 Summary가 없으면 `totalScore`/`levelEstimate`는 null, `summaryAvailable`는 false다.
+- page·size는 현재 바인딩하지 않으며 pagination metadata도 없다. 응답 구조 안내 turn 종료 기록까지 반영했고, 코드·테스트·Git·Jira를 변경하지 않았다.

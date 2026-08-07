@@ -1730,3 +1730,18 @@
 - Jira `TMI-61` History 항목에 `status`, `maxScore`, `startedAt`을 추가한 현재 turn을 최종 기록했다. 매핑은 각각 `ExamSession.effectiveStatus()`, 고정 만점 200, `ExamSession.createdAt`이다.
 - 기존 `totalCount`/`histories`, 완료 판정·정렬·Summary fallback·`retriedQuestionCount`와 기타 시험 API 계약은 유지됐다. Legacy 세션에 `createdAt`이 없으면 `startedAt` 또한 null이다.
 - 집중 테스트와 전체 `./gradlew clean test`가 성공했고 tests/failures/errors/skipped는 297/0/0/0이다. Secret·Token을 기록하지 않았고 Git·Jira 쓰기 작업을 수행하지 않았다.
+
+## 2026-08-07 — TMI-61 History 최종 응답 구조 안내
+
+- Jira `TMI-61`의 현재 Controller·DTO·Service·BaseResponse를 읽기 전용으로 재확인했다. 응답은 `result.totalCount`와 `result.histories`로 구성된다.
+- 각 History 항목은 `examId`, `title`, `status`, `cycleNumber`, `startedAt`, `completedAt`, `totalScore`, `maxScore`, `levelEstimate`, `summaryAvailable`, `retriedQuestionCount`를 반환한다. `maxScore`는 200이고 `status`는 유효 ExamSession 상태며, 시간 필드는 `LocalDateTime` ISO-8601 문자열이다.
+- `page`, `size`, `totalElements`, `totalPages`, `hasNext`는 현재 응답에 없고 page·size query parameter는 무시된다. 이번 안내에서 애플리케이션·테스트 코드는 변경하지 않았고 테스트도 재실행하지 않았다.
+- Secret·Token·Credential을 기록하지 않았고 Git·Jira 쓰기 작업과 외부 시스템 호출을 수행하지 않았다.
+
+## 2026-08-07 — TMI-61 History 응답 구조 안내 turn 종료
+
+<!-- codex-turn:019fda2e-db9d-7b41-aae0-a8020cab992d -->
+
+- Jira `TMI-61` History의 현재 성공 응답이 BaseResponse와 `result.totalCount`, `result.histories`로 구성되며, History 항목에 `status`, `maxScore`, `startedAt`, `retriedQuestionCount`를 포함한다는 안내를 최종 기록했다.
+- `maxScore` 200, `startedAt`/`completedAt`의 `LocalDateTime` 형식, Legacy `startedAt: null`, Summary 누락 시 점수·레벨 null 정책을 함께 확인했다. page·size와 pagination metadata는 현재 지원하지 않는다.
+- 이번 turn은 읽기 전용 안내로 애플리케이션·테스트 코드를 변경하지 않았고 테스트도 재실행하지 않았다. Secret·Token을 기록하지 않았고 Git·Jira 쓰기 작업을 수행하지 않았다.
