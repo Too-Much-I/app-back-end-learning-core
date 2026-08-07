@@ -20,6 +20,7 @@ import java.net.URI;
 import java.time.Duration;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.concurrent.TimeUnit;
 
 @Slf4j
 @Service
@@ -39,13 +40,7 @@ public class GradingDispatchService {
     private String bucketName;
 
     public void dispatchQuestion(QuestionDispatchClaim claim) {
-        byte[] audioBytes = restTemplate.getForObject(
-                URI.create(generatePresignedGetUrl(claim.fileKey(), Duration.ofMinutes(5))),
-                byte[].class
-        );
-        if (audioBytes == null) {
-            throw new IllegalStateException("S3 audio object returned an empty response");
-        }
+        byte[] audioBytes = downloadAudio(claim);
 
         ByteArrayResource audioResource = new ByteArrayResource(audioBytes) {
             @Override
@@ -67,20 +62,7 @@ public class GradingDispatchService {
         headers.setContentType(MediaType.MULTIPART_FORM_DATA);
         headers.set(IDEMPOTENCY_KEY_HEADER, claim.jobId());
 
-        URI evaluationUri = aiEvaluationUri(gradingProperties.aiServerUrl());
-        log.info(
-                "AI multipart POST 시작: jobId={}, uri={}, fileKey={}, audioSize={}",
-                claim.jobId(), evaluationUri, claim.fileKey(), audioBytes.length
-        );
-        var response = restTemplate.postForEntity(
-                evaluationUri,
-                new HttpEntity<>(body, headers),
-                String.class
-        );
-        log.info(
-                "AI multipart POST 완료: jobId={}, status={}",
-                claim.jobId(), response.getStatusCode()
-        );
+        postEvaluation(new HttpEntity<>(body, headers), claim.jobId(), "question");
     }
 
     public void dispatchSummary(SummaryDispatchClaim claim) {
@@ -94,11 +76,54 @@ public class GradingDispatchService {
         headers.setContentType(MediaType.APPLICATION_JSON);
         headers.set(IDEMPOTENCY_KEY_HEADER, claim.jobId());
 
-        restTemplate.postForEntity(
-                aiEvaluationUri(gradingProperties.aiServerUrl()),
-                new HttpEntity<>(body, headers),
-                String.class
-        );
+        postEvaluation(new HttpEntity<>(body, headers), claim.jobId(), "summary");
+    }
+
+    private byte[] downloadAudio(QuestionDispatchClaim claim) {
+        long startedAt = System.nanoTime();
+        try {
+            byte[] audioBytes = restTemplate.getForObject(
+                    URI.create(generatePresignedGetUrl(claim.fileKey(), Duration.ofMinutes(5))),
+                    byte[].class
+            );
+            if (audioBytes == null) {
+                throw new IllegalStateException("S3 audio object returned an empty response");
+            }
+            log.debug(
+                    "event=grading.dispatch.stage outcome=success stage=s3_download "
+                            + "dispatchType=question jobId={} durationMs={}",
+                    claim.jobId(), elapsedMillis(startedAt)
+            );
+            return audioBytes;
+        } catch (RuntimeException downloadFailure) {
+            throw GradingDispatchException.at(
+                    GradingDispatchException.Stage.S3_DOWNLOAD,
+                    startedAt,
+                    downloadFailure
+            );
+        }
+    }
+
+    private void postEvaluation(HttpEntity<?> request, String jobId, String dispatchType) {
+        long startedAt = System.nanoTime();
+        try {
+            restTemplate.postForEntity(
+                    aiEvaluationUri(gradingProperties.aiServerUrl()),
+                    request,
+                    String.class
+            );
+            log.debug(
+                    "event=grading.dispatch.stage outcome=success stage=ai_post "
+                            + "dispatchType={} jobId={} durationMs={}",
+                    dispatchType, jobId, elapsedMillis(startedAt)
+            );
+        } catch (RuntimeException postFailure) {
+            throw GradingDispatchException.at(
+                    GradingDispatchException.Stage.AI_POST,
+                    startedAt,
+                    postFailure
+            );
+        }
     }
 
     static URI aiEvaluationUri(URI aiServerUrl) {
@@ -117,6 +142,10 @@ public class GradingDispatchService {
                 .getObjectRequest(getObjectRequest)
                 .build();
         return s3Presigner.presignGetObject(presignRequest).url().toString();
+    }
+
+    private static long elapsedMillis(long startedAt) {
+        return TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - startedAt);
     }
 
     static int partNumber(Integer questionNumber) {

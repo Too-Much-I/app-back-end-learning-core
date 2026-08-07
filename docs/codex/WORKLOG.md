@@ -1848,3 +1848,56 @@
 
 - Jira `TMI-77`의 상태와 resolution이 `완료`임을 재확인하고 현재 turn 기록을 마쳤다. Jira 댓글·기타 필드와 애플리케이션·테스트 코드는 추가 변경하지 않았다.
 - Secret·Token을 기록하지 않았고 Git commit·push·PR을 생성하지 않았다. Jira 종료 후 코드 테스트는 재실행하지 않았으며 문서 변경에 대한 `git diff --check`만 확인한다.
+
+## 2026-08-07 — TMI-77 Part 4 table_context 운영 로그 검토
+
+<!-- codex-turn:019fdac4-b305-72f2-8190-24284ca0f306 -->
+
+- 완료된 Jira `TMI-77` 구현의 운영 가시성 후속 검토로, 시험 시작·채점 결과 문항 단건·prompt 세 경로에는 현재 Part 4 `table_context` 매핑 성공/누락 전용 로그가 없고 누락 시 catalog 예외만 발생함을 확인했다.
+- 권장안은 Converter를 순수 변환기로 유지하고 `ExamServiceImpl`의 세 API 경계에서만 Part 4 성공을 `INFO`, `table_context=null`을 `WARN`으로 기록하는 것이다. 허용 정보는 operation, examId, questionNumber, Map fieldCount이며 tableContext 원문·내부 키·값, 사용자 ID, URL·Token은 기록하지 않는다.
+- 이번 turn은 로그 설계 검토만 수행했고 운영 코드와 테스트는 변경하거나 실행하지 않았다. Jira `TMI-77` 상태는 완료로 유지하며 Jira·Git 쓰기 작업을 수행하지 않았다.
+
+## 2026-08-07 — Learning Core 운영 모니터링 로그 범위 분석
+
+<!-- codex-turn:019fdac5-c7ac-79d2-9079-6bc449aeb6d7 -->
+
+- 현재 로그는 시험 세션 생성, 문항 submit과 Job 생성·재사용, Question AI 전송, Feedback·SpeechAce·Azure Callback 저장과 중복 멱등 처리를 일부 추적한다. Sentry는 error 이벤트, Actuator는 health endpoint만 설정되어 있어 INFO/WARN 추가만으로 자동 모니터링이나 알림이 완성되지는 않는다.
+- 우선 보완 대상은 Summary 전송의 시작·성공·실패와 `jobId`/attempt, 시험 단위 retry의 집계 결과, Job 상태 전환, AI submit-to-callback 소요 시간이다. 폴링 API는 호출마다 INFO를 남기지 않고 상태가 바뀌는 순간만 기록하는 방향을 권장한다.
+- 로그 형식은 안정적인 `event`, `outcome`, `jobId`, `examId`, `questionNumber`, `retryCount`, `dispatchAttempt`, `durationMs`, `reason` 키로 통일하고, INFO는 정상 상태 전환, WARN은 복구 가능한 이상, ERROR는 실제 실패에 한정하는 안을 제시했다.
+- 기존 로그 중 실제 `userId`와 abandoned exam ID 목록, S3 `fileKey`, 예외 원문·`printStackTrace()`는 노출·검색 일관성 관점에서 먼저 정리할 후보로 확인했다. 음성, Transcript, Callback 원문, `tableContext` 원문·키·값, Presigned URL, Token·Secret은 새 로그에 포함하지 않는다.
+- 이번 turn은 제안·정적 분석만 수행해 애플리케이션·테스트 코드를 변경하지 않았고 테스트를 실행하지 않았다. 완료된 Jira `TMI-77`의 코드와 상태는 변경하지 않았으며 Jira·Git 쓰기 작업도 수행하지 않았다.
+
+## 2026-08-07 — Learning Core AI 통신 로그 정리
+
+<!-- codex-turn:019fdaca-a026-7b02-ad4c-58a6aeebab21 -->
+
+- Question AI 전송 한 번에 남던 submit 시작, Job 생성, 호출 직전, HTTP POST 시작·완료, 성공 로그를 정리했다. 기본 INFO에서는 최종 성공 이벤트 한 줄만 남고, 실제 Question Job 실패 전이가 저장된 경우에만 ERROR 한 줄을 남긴다. 이전 attempt의 늦은 실패는 최신 Job을 덮지 않으며 ERROR 없이 DEBUG로만 기록한다.
+- Controller의 Feedback Callback 수신 로그와 HTTP adapter의 AI URI·S3 `fileKey`·오디오 크기 로그를 제거했다. 핵심 Feedback/Summary 저장 성공만 INFO로 유지하고, 중복 멱등 처리와 SpeechAce·Azure 보조 Callback은 DEBUG로 낮췄다. Callback 원문, 음성, Transcript와 Presigned URL은 기록하지 않는다.
+- Summary dispatch에는 성공 또는 실제 실패 전이 한 줄과 `durationMs`를 추가하고, executor rejection은 WARN 한 줄로 남겼다. 시험 단위 retry는 문항 목록 대신 retried/waiting/missing 개수, Summary action과 전체 상태를 INFO 한 줄로 집계한다.
+- 시험 세션 시작 시 실제 `userId`와 abandoned exam ID 목록을 기록하던 중복 로그를 제거하고, 생성된 `examId`, `mockExamId`, cycle, abandoned 개수만 한 줄로 남겼다. 전역 예외 처리의 `printStackTrace()`와 JSON 파싱 예외 원문 두 줄도 원문 없는 WARN 이벤트 한 줄로 정리했으며 기존 오류 응답 계약은 바꾸지 않았다.
+- 로그 전용 집중 테스트와 stale attempt 동시성 테스트를 보강했다. 최종 `./gradlew clean test`는 tests/failures/errors/skipped `303/0/0/0`, `git diff --check`도 성공했다. 기존 공개 API·DTO·BaseResponse, `retryCount`, AI `user_id=examId`, Callback JSON, Redis Key/TTL과 S3 Object Key는 변경하지 않았다.
+- 관련 완료 Jira `TMI-25`의 채점·Callback 동작과 `TMI-77`의 Part 4 응답 동작은 유지했고 Jira 상태·댓글·필드는 변경하지 않았다. 실제 외부 AI·AWS·MongoDB·Redis·Sentry는 호출하지 않았으며 Git commit·push·PR도 수행하지 않았다.
+
+## 2026-08-07 — Learning Core 운영 모니터링 로그 추가 계획
+
+<!-- codex-turn:019fdad6-532f-7f41-af6a-f4c1c9236b6d -->
+
+- 별도 Jira 이슈 키 없이 현재 워킹 트리의 시험 생성, 소유권 검증, S3 업로드 URL, submit, Question/Summary Job, 시험 단위 retry, AI 전송, 네 종류 Callback, 전체·문항 Polling과 전역 예외 흐름을 정적 분석했다. 기존 사용자 미커밋 코드와 직전 로그 정리 변경은 수정하거나 되돌리지 않았다.
+- 현재 기준 로그에는 `exam.session.created`, Question/Summary dispatch 성공·실패와 소요 시간, retry 집계, Feedback/Summary 저장, 보조 Callback 중복, executor rejection과 completion race가 있다. Sentry error 수집과 Actuator health는 설정되어 있으나 request/trace correlation, 로그 수집기·대시보드·알림 정의는 저장소에서 확인되지 않았다.
+- 1순위 구현 지점은 `ExamSessionManager`의 이전 세션 폐기와 Summary 성공 후 완료 전이, `ExamGradingService`의 Question/Summary Job 완료·최대 attempt 도달·Summary Trigger 결정, `ExamServiceImpl`의 Callback 거절과 저장 후 Job 완료 연결, `GlobalExceptionAdvice`·`SecurityErrorResponseHandler`의 안전한 4xx/5xx 경계다. 정상 Polling 조회는 INFO로 남기지 않고 실제 상태 전이 또는 비정상 장기 체류만 관측한다.
+- 2순위는 내부 requestId를 MDC에 넣는 요청 필터와 `GradingDispatchService`의 S3 다운로드/AI POST 단계 구분이다. 외부 응답 헤더나 DTO를 바꾸지 않고 requestId는 같은 HTTP 요청 안의 로그만 연결하며, 비동기 submit·Callback은 기존 `examId`와 `jobId`로 연결한다.
+- 로그 표준은 `event`, `outcome`, `reason`, `examId`, `jobId`, `questionNumber`, `retryCount`, `dispatchAttempt`, `fromStatus`, `toStatus`, `durationMs`의 안정적인 key-value 형식으로 한다. INFO는 중요한 정상 전이, WARN은 복구 가능 이상·거절·최대 시도 도달, ERROR는 실제 Job 실패 전이와 예상하지 못한 5xx에만 사용하고 Sentry 중복 이벤트가 생기지 않도록 한 경로만 유지한다.
+- 실제 `userId`, Authorization/JWT, Secret·Token, Presigned URL, S3 URL·Object Key, 음성 크기·내용, Transcript, Callback 원문, Azure/SpeechAce 원문, Feedback 전문과 `tableContext` 원문·키·값, 예외 메시지는 기록하지 않는다. 외부 공개 API·DTO·`BaseResponse`, AI/Callback `user_id=examId`, `retryCount`, Redis Key/TTL과 S3 Object Key 계약은 변경하지 않는다.
+- 검증 계획은 `OutputCaptureExtension`으로 이벤트명·level·필수 식별자·정확한 1회 기록·민감값 미포함을 확인하고, 동시 submit/Callback의 stale attempt와 중복 Callback이 ERROR를 만들지 않는지 회귀 테스트한다. 구현 후 집중 테스트, `./gradlew clean test`, `git diff --check`를 실행한다.
+- 로그만으로는 도착하지 않은 Callback을 직접 관측할 수 없으므로 CloudWatch 등 수집 대상 확정 후 PROCESSING 장기 체류, dispatch failure, executor rejection, max attempts, completion race, 5xx를 필터·대시보드·알림으로 연결해야 한다. 이번 turn은 계획과 작업 기록 문서만 변경했으며 애플리케이션·테스트 코드와 Jira·Git 상태는 변경하지 않았다.
+
+## 2026-08-07 — Learning Core 운영 모니터링 로그 구현
+
+<!-- codex-turn:019fdadf-73ee-7351-80fc-95cad908a3be -->
+
+- 별도 Jira 이슈 키 없이 앞서 확정한 모니터링 로그 계획을 구현했다. HTTP 요청마다 내부 UUID `requestId`를 MDC에 설정하고 요청 종료 시 복원하며, 외부 응답 헤더·DTO에는 노출하지 않았다. Summary 비동기 실행에도 MDC를 복사·복원하도록 TaskDecorator를 적용했다.
+- 시험 세션 폐기·생성 충돌 재시도·완료 전이, Question/Summary Job 완료·최대 시도 도달, Summary Trigger 판단·예약, Callback 분류 거절, 사용자 소유권 거절과 읽기 데이터 누락을 안정적인 `event` key-value 로그로 추가했다. 정상 Polling과 일반 요청은 DEBUG로 제한하고 실제 상태 전이는 한 번만 INFO/WARN/ERROR로 기록한다.
+- S3 다운로드와 AI POST 실패를 안전한 stage로 구분하고 각 단계 소요 시간을 기록했다. Presigned URL·S3 Object Key·예외 메시지·payload는 기록하지 않으며, 전역 4xx/5xx와 인증 401/403 로그도 URI 등 제한된 메타데이터와 예외 타입만 사용한다. 잘못된 JSON은 Sentry로 전송하지 않고 예상하지 못한 5xx만 메시지·원문 없는 단일 Sentry 이벤트로 보낸다.
+- 실제 `userId`, Authorization/JWT, Secret·Token, 음성·Transcript, Callback/Feedback/Azure/SpeechAce/tableContext 원문이나 내부 키·값은 로그에 포함하지 않았다. 공개 API URL·Method·Request/Response DTO·`BaseResponse`, `retryCount`, AI/Callback `user_id=examId`, Redis Key/TTL, S3 Object Key 계약은 변경하지 않았다.
+- 로그 캡처, requestId 비노출·정리, MDC 비동기 전파·복원, 상태 전이 정확히 1회, 중복/동시 Callback과 stale attempt, 안전한 401/403·4xx/5xx·Sentry, 민감값 미포함 테스트를 추가·보강했다. 집중 테스트와 `./gradlew clean test --no-daemon`이 성공했고 전체 tests/failures/errors/skipped는 `316/0/0/0`이다. `git diff --check`도 성공했다.
+- 실제 MongoDB·Redis·AWS S3·Python AI·Sentry는 호출하지 않았고 Git commit·push·PR과 Jira 쓰기는 수행하지 않았다. CloudWatch 로그 그룹·retention·metric filter·dashboard·alarm은 저장소 밖 운영 설정이라 남아 있으며, Callback 미도착과 장기 `PROCESSING` 탐지는 별도 metric/watchdog 정책이 필요하다.

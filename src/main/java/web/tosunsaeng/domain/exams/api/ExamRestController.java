@@ -3,7 +3,6 @@ package web.tosunsaeng.domain.exams.api;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
-import lombok.extern.slf4j.Slf4j;
 import org.springframework.web.bind.annotation.*;
 import web.tosunsaeng.domain.exams.application.ExamReadService;
 import web.tosunsaeng.domain.exams.application.ExamService;
@@ -15,7 +14,6 @@ import web.tosunsaeng.global.error.code.status.SuccessStatus;
 import java.util.Map;
 
 @Tag(name = "Exam API", description = "모의고사 세션 및 채점 관련 API")
-@Slf4j
 @RestController
 @RequiredArgsConstructor
 @RequestMapping("/api/v1/exams")
@@ -128,8 +126,6 @@ public class ExamRestController {
     @Operation(summary = "[AI 서버용] 채점 피드백 콜백 API", description = "AI가 분석한 결과를 부분적으로 저장합니다.")
     @PostMapping("/callback/feedback")
     public BaseResponse<Void> receiveAiResult(@RequestBody ExamRequestDTO.AiResultReq req) {
-        log.info("☎️ [AI 콜백 수신] ExamID: {}, Part: {}, Question: {}, RetryCount: {}",
-                req.getExamId(), req.getPartNumber(), req.getQuestionNumber(), req.getRetryCount());
         examService.updateExamResult(req);
         return BaseResponse.onSuccess(SuccessStatus.OK, null);
     }

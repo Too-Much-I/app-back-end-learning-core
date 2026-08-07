@@ -10,6 +10,8 @@ import org.mockito.InOrder;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.boot.test.system.CapturedOutput;
+import org.springframework.boot.test.system.OutputCaptureExtension;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.data.redis.core.ValueOperations;
 import org.springframework.test.util.ReflectionTestUtils;
@@ -52,7 +54,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
-@ExtendWith(MockitoExtension.class)
+@ExtendWith({MockitoExtension.class, OutputCaptureExtension.class})
 class ExamServiceImplTest {
 
     private static final String LEGACY_USER_ID = "00000000-0000-0000-0000-000000000001";
@@ -141,7 +143,7 @@ class ExamServiceImplTest {
     }
 
     @Test
-    void createExamSessionSavesCurrentUserMappingAfterResponseDataIsPrepared() {
+    void createExamSessionSavesCurrentUserMappingAfterResponseDataIsPrepared(CapturedOutput output) {
         ExamResponseDTO.CreateSessionResult result = examService.createExamSession();
 
         String expectedRedisKey = "exam:status:" + result.getExamId();
@@ -172,6 +174,12 @@ class ExamServiceImplTest {
         assertTrue(responseJson.has("questions"));
         assertFalse(responseJson.has("userId"));
         assertFalse(responseJson.has("user_id"));
+        assertTrue(output.getOut().contains(
+                "event=exam.session.ready outcome=success examId=" + result.getExamId()
+                        + " mockExamId=mock_exam_003 questionCount=1 durationMs="
+        ));
+        assertFalse(output.getOut().contains(LEGACY_USER_ID));
+        assertFalse(output.getOut().contains("https://example.com"));
 
         verifyNoInteractions(
                 restTemplate,

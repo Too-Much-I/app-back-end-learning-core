@@ -4,6 +4,7 @@ import org.springframework.boot.context.properties.EnableConfigurationProperties
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor;
+import web.tosunsaeng.global.logging.MdcTaskDecorator;
 
 import java.time.Clock;
 
@@ -24,6 +25,7 @@ public class GradingConfig {
         executor.setQueueCapacity(properties.summaryDispatchQueueCapacity());
         executor.setThreadNamePrefix("summary-grading-");
         executor.setWaitForTasksToCompleteOnShutdown(false);
+        executor.setTaskDecorator(new MdcTaskDecorator());
         return executor;
     }
 }

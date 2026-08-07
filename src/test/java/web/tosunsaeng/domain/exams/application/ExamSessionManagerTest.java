@@ -5,6 +5,8 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.boot.test.system.CapturedOutput;
+import org.springframework.boot.test.system.OutputCaptureExtension;
 import org.springframework.dao.DuplicateKeyException;
 import web.tosunsaeng.domain.exams.domain.entity.ExamSession;
 import web.tosunsaeng.domain.exams.domain.entity.MockExam;
@@ -42,7 +44,7 @@ import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
-@ExtendWith(MockitoExtension.class)
+@ExtendWith({MockitoExtension.class, OutputCaptureExtension.class})
 class ExamSessionManagerTest {
 
     private static final String USER_ID = "00000000-0000-0000-0000-000000000031";
@@ -97,7 +99,7 @@ class ExamSessionManagerTest {
     }
 
     @Test
-    void startingNewExamAbandonsExistingInProgressSession() {
+    void startingNewExamAbandonsExistingInProgressSession(CapturedOutput output) {
         ExamSession existing = inProgress("exam_A", "mock_exam_001");
         stubNewAssignment(List.of(existing), List.of());
         when(examSessionRepository.abandonIfInProgress("exam_A")).thenReturn(1L);
@@ -107,7 +109,13 @@ class ExamSessionManagerTest {
         assertAll(
                 () -> assertNotEquals("exam_A", assignment.session().getExamId()),
                 () -> assertEquals(ExamSessionStatus.IN_PROGRESS, assignment.session().getStatus()),
-                () -> assertTrue(assignment.session().isActive())
+                () -> assertTrue(assignment.session().isActive()),
+                () -> assertTrue(output.getOut().contains(
+                        "event=exam.session.abandoned outcome=transitioned examId=exam_A "
+                                + "fromStatus=IN_PROGRESS toStatus=ABANDONED "
+                                + "reason=new_session_started"
+                )),
+                () -> assertFalse(output.getOut().contains(USER_ID))
         );
         verify(examSessionRepository).abandonIfInProgress("exam_A");
     }
@@ -220,7 +228,7 @@ class ExamSessionManagerTest {
     }
 
     @Test
-    void duplicateKeyDuringSessionCreationRetries() {
+    void duplicateKeyDuringSessionCreationRetries(CapturedOutput output) {
         ExamSession concurrentSession = inProgress("exam_concurrent", "mock_exam_001");
         ExamSession savedSession = ExamSession.builder()
                 .examId("ex_saved_after_retry")
@@ -246,7 +254,13 @@ class ExamSessionManagerTest {
                 () -> assertTrue(assignment.created()),
                 () -> assertEquals(savedSession.getExamId(), assignment.session().getExamId()),
                 () -> assertEquals(ExamSessionStatus.IN_PROGRESS, assignment.session().getStatus()),
-                () -> assertNotEquals(concurrentSession.getExamId(), assignment.session().getExamId())
+                () -> assertNotEquals(concurrentSession.getExamId(), assignment.session().getExamId()),
+                () -> assertTrue(output.getOut().contains(
+                        "event=exam.session.create outcome=retry reason=duplicate_active_session "
+                                + "createAttempt=1 nextAttempt=2"
+                )),
+                () -> assertFalse(output.getOut().contains("duplicate active Session")),
+                () -> assertFalse(output.getOut().contains(USER_ID))
         );
         verify(examSessionRepository, times(2)).insert(any(ExamSession.class));
         verify(examSessionRepository).abandonIfInProgress(concurrentSession.getExamId());
@@ -319,7 +333,7 @@ class ExamSessionManagerTest {
     }
 
     @Test
-    void completionUsesClockAndChangesStateOnlyOnce() {
+    void completionUsesClockAndChangesStateOnlyOnce(CapturedOutput output) {
         AtomicReference<LocalDateTime> storedCompletion = new AtomicReference<>();
         AtomicBoolean active = new AtomicBoolean(true);
         when(examSessionRepository.completeIfIncomplete(eq("ex_complete_001"), any(LocalDateTime.class)))
@@ -338,8 +352,20 @@ class ExamSessionManagerTest {
                 () -> assertTrue(first),
                 () -> assertFalse(duplicate),
                 () -> assertFalse(active.get()),
-                () -> assertEquals(LocalDateTime.of(2026, 7, 29, 6, 30), storedCompletion.get())
+                () -> assertEquals(LocalDateTime.of(2026, 7, 29, 6, 30), storedCompletion.get()),
+                () -> assertEquals(
+                        1,
+                        countOccurrences(
+                                output.getOut(),
+                                "event=exam.session.completed outcome=transitioned "
+                                        + "examId=ex_complete_001"
+                        )
+                )
         );
+    }
+
+    private static int countOccurrences(String value, String token) {
+        return value.split(java.util.regex.Pattern.quote(token), -1).length - 1;
     }
 
     private void stubNewAssignment(

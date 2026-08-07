@@ -863,3 +863,37 @@
 - 실제 `MappingMongoConverter`, 세 API JSON, null/empty, 다른 Part, AI dispatch, 문항 경로, JWT 집중 테스트와 전체 `./gradlew clean test`가 성공했다. 전체 tests/failures/errors/skipped는 `303/0/0/0`, `git diff --check`도 성공했다. 실제 MongoDB와 외부 인프라는 호출하거나 수정하지 않았다.
 - 배포 전 프론트가 기존 Part 4 `tableImageUrl` 대신 비정형 `tableContext`와 DB 내부 키 이름을 그대로 처리하는지 확인해야 한다. 모든 운영 Part 4 문서에 `table_context`가 존재하는지도 별도 읽기 전용 점검이 필요하다.
 - Jira `TMI-77` 완료 처리 turn의 WORKLOG 기록까지 반영됐다. 종료 처리 이후 애플리케이션·테스트 코드는 추가 변경하지 않았다.
+- 운영 로그 후속 검토 결과, 세 API의 Part 4 성공/누락 로그는 아직 구현되지 않았다. 구현한다면 Service 경계에서 operation, examId, questionNumber, fieldCount만 INFO/WARN으로 남기고 tableContext 원문·키·값과 URL·Token은 금지하는 방향이다.
+
+## Latest operations logging analysis (2026-08-07)
+
+- 운영 로그 추가는 권장하지만, 현재 가장 큰 공백은 Summary dispatch, 시험 단위 retry 결과, Job 상태 전환과 submit-to-callback 지연 시간이다. 폴링 요청별 INFO 로그는 대량 중복을 만들므로 상태 전환만 기록해야 한다.
+- 신규 로그는 안정적인 `event`/`outcome`과 `jobId`, `examId`, question/retry/attempt, `durationMs`, 제한된 reason만 사용한다. 실제 `userId`, 음성·Transcript·Callback/Table Context 원문, Presigned URL, Token·Secret은 기록하지 않는다.
+- 기존 `ExamSessionManager`의 `userId`·abandoned ID 목록, `GradingDispatchService`의 `fileKey`, `GlobalExceptionAdvice`의 `printStackTrace()`·예외 원문은 새 로그 추가 전에 정리할 후보다. 현재 저장소에는 Sentry error와 Actuator health 외의 로그 집계·알림 구성이 확인되지 않아 배포 환경의 수집기·대시보드·알림 연결이 별도로 필요하다.
+- 이번 검토에서는 애플리케이션·테스트 코드와 외부 API·AI/Callback·Redis/S3 계약을 변경하지 않았다. Jira `TMI-77`은 완료 상태로 유지하며 신규 Jira 작업이나 Jira/Git 쓰기는 수행하지 않았다.
+
+## Latest AI communication logging cleanup (2026-08-07)
+
+- 최초 Question AI 전송의 기본 로그는 기존 약 6줄에서 `event=grading.question.dispatch` 성공 한 줄로 줄었다. 실패는 Mongo Job 실패 전이가 실제 반영된 경우에만 ERROR이며, 오래된 attempt 실패는 DEBUG no-op이다. 로그에는 `jobId`, `examId`, question/retry/attempt와 `durationMs`만 남기고 URI, S3 key, 오디오 크기와 예외 메시지는 제외한다.
+- Feedback Controller 수신 로그와 adapter 내부 POST 단계 로그는 제거했다. 핵심 Feedback/Summary 저장은 INFO 한 줄, 중복 및 SpeechAce·Azure 보조 Callback은 DEBUG다. Summary dispatch 성공/실패, executor rejection과 시험 단위 retry 집계는 별도 단일 이벤트로 추적한다.
+- 시험 생성 로그는 실제 `userId`와 abandoned ID 목록 없이 생성 결과 한 줄만 남긴다. 전역 JSON 파싱 오류도 `printStackTrace()`와 원문 로그 대신 예외 타입만 포함한 WARN 한 줄로 정리했다.
+- 로그 전용·동시성 집중 테스트와 전체 `./gradlew clean test`가 성공했다. 전체 tests/failures/errors/skipped는 `303/0/0/0`이고 `git diff --check`도 성공했다. 외부 API·DTO·BaseResponse, AI `user_id=examId`와 Callback JSON, retryCount, Redis/S3 계약은 그대로다.
+- 관련 Jira `TMI-25`와 `TMI-77`은 완료 상태를 유지하며 Jira 쓰기 작업은 없었다. 로그 집계·대시보드·알림 연결과 request/trace correlation은 아직 별도 운영 과제로 남는다.
+
+## Latest monitoring logging plan (2026-08-07)
+
+- 이번 계획 작업에는 별도 Jira 이슈 키가 없다. 현재 워킹 트리의 기존 구조화 로그와 미커밋 로그 정리 변경을 보존했으며 애플리케이션·테스트 코드는 수정하지 않았다.
+- 현재 정상 흐름은 세션 생성, Question/Summary dispatch, 시험 retry 집계와 핵심 Callback 저장 로그로 일부 연결된다. 다음 구현 우선순위는 세션 폐기·완료, Question/Summary Job 완료와 최대 attempt, Summary Trigger 결정, Callback 거절, 안전한 인증/비즈니스/5xx 오류 경계다.
+- Polling 성공을 요청마다 INFO로 기록하지 않고 상태 전이와 장기 PROCESSING만 관측한다. 내부 requestId/MDC는 동기 요청을 연결하고, submit과 별도 Callback 요청은 외부 계약 변경 없이 `examId`·`jobId`로 연결한다.
+- 외부 I/O 장애는 Presigned URL·S3 Key·예외 메시지를 남기지 않은 채 S3 다운로드와 AI POST 단계, 결과, attempt, 소요 시간만 구분한다. INFO/WARN/ERROR 기준과 안정적인 key-value 이벤트명을 먼저 고정하고 Sentry의 중복 오류 이벤트도 방지한다.
+- 실제 사용자 ID, Token·Secret, 음성·Transcript, Callback/Feedback/Azure/SpeechAce/Table Context 원문과 내부 키·값은 로그 금지 대상이다. 공개 API·DTO·`BaseResponse`, AI/Callback `user_id=examId`, retryCount, Redis와 S3 계약은 그대로 유지한다.
+- 구현 시 로그 캡처 단위 테스트, 중복·동시성 회귀, 민감값 부재 검사를 추가한 뒤 `./gradlew clean test`와 `git diff --check`를 실행한다. CloudWatch 등 실제 수집 대상과 retention이 저장소에 없으므로 배포 전 확정하고 장기 PROCESSING, dispatch 실패, queue rejection, max attempts, completion race와 5xx 알림을 연결해야 한다.
+
+## Latest monitoring logging implementation (2026-08-07)
+
+- 별도 Jira 이슈 키 없이 운영 모니터링 로그 계획을 구현했다. 요청 필터가 내부 UUID `requestId`를 MDC에 설정·정리하고 Summary executor의 TaskDecorator가 MDC를 작업 스레드에 복사·복원한다. requestId를 외부 응답 헤더나 DTO에는 추가하지 않았다.
+- 시험 세션 폐기·충돌 재시도·완료, Question/Summary Job 완료·최대 attempt, Summary Trigger 판단·예약, Callback 분류 거절, 소유권 거절과 조회 데이터 누락을 구조화 이벤트로 관측한다. 일반 요청과 정상 Polling은 DEBUG이며, 중요한 상태 전이는 정확히 한 번 기록되도록 멱등·동시성 경로를 보존했다.
+- 외부 dispatch는 `s3_download`와 `ai_post` stage 및 `durationMs`로 실패 위치를 구분한다. 로그와 Sentry에는 실제 userId, Authorization/JWT, Secret·Token, URL·S3 Key, 음성·Transcript, Callback/채점/tableContext payload, 예외 메시지를 넣지 않는다. 잘못된 JSON은 Sentry 대상에서 제외하고 예상하지 못한 5xx만 예외 타입 tag를 포함한 안전한 단일 메시지 이벤트로 전송한다.
+- 공개 API·DTO·`BaseResponse`, AI/Callback `user_id=examId`, retryCount, Redis Key/TTL과 S3 Object Key는 유지했다. 실제 외부 인프라는 호출하지 않았다.
+- 집중 테스트와 `./gradlew clean test --no-daemon`이 성공했다. 전체 tests/failures/errors/skipped는 `316/0/0/0`이며 `git diff --check`도 성공했다.
+- CloudWatch 로그 그룹·retention·metric filter·dashboard·alarm은 저장소 외부 운영 설정으로 남아 있다. Callback이 아예 도착하지 않는 경우와 장기 `PROCESSING` Job은 로그만으로 직접 검출할 수 없어 별도 metric/watchdog 결정이 필요하다.
