@@ -35,13 +35,11 @@ public class ExamSessionManager {
     private final Clock clock;
 
     public Assignment startNew(String userId) {
-        log.info("새 시험 시작 요청: userId={}", userId);
         return startNew(userId, 1);
     }
 
     private Assignment startNew(String userId, int attempt) {
         List<String> abandonedExamIds = abandonInProgressSessions(userId);
-        log.info("기존 시험 종료: userId={}, abandonedExamIds={}", userId, abandonedExamIds);
 
         List<MockExamCatalogService.CatalogExam> catalog = mockExamCatalogService.findAssignableExams();
         Map<String, Long> completionCounts = completionCounts(userId);
@@ -67,9 +65,24 @@ public class ExamSessionManager {
 
         try {
             ExamSession inserted = examSessionRepository.insert(newSession);
-            log.info("새 시험 생성 완료: userId={}, newExamId={}", userId, inserted.getExamId());
+            log.info(
+                    "event=exam.session.created outcome=success examId={} mockExamId={} "
+                            + "cycleNumber={} abandonedCount={} createAttempt={}",
+                    inserted.getExamId(),
+                    inserted.getMockExamId(),
+                    inserted.getCycleNumber(),
+                    abandonedExamIds.size(),
+                    attempt
+            );
             return new Assignment(inserted, selected.mockExam(), true);
         } catch (DuplicateKeyException concurrentCreation) {
+            log.warn(
+                    "event=exam.session.create outcome={} reason=duplicate_active_session "
+                            + "createAttempt={} nextAttempt={}",
+                    attempt < CREATE_ATTEMPTS ? "retry" : "failed",
+                    attempt,
+                    attempt < CREATE_ATTEMPTS ? attempt + 1 : null
+            );
             if (attempt < CREATE_ATTEMPTS) {
                 return startNew(userId, attempt + 1);
             }
@@ -79,7 +92,17 @@ public class ExamSessionManager {
 
     public boolean completeIfIncomplete(String examId) {
         LocalDateTime completedAt = LocalDateTime.ofInstant(clock.instant(), clock.getZone());
-        return examSessionRepository.completeIfIncomplete(examId, completedAt) == 1;
+        boolean completed = examSessionRepository.completeIfIncomplete(examId, completedAt) == 1;
+        if (completed) {
+            log.info(
+                    "event=exam.session.completed outcome=transitioned examId={} "
+                            + "fromStatus=IN_PROGRESS toStatus=COMPLETED",
+                    examId
+            );
+        } else {
+            log.debug("event=exam.session.completed outcome=noop examId={}", examId);
+        }
+        return completed;
     }
 
     private List<String> abandonInProgressSessions(String userId) {
@@ -87,6 +110,11 @@ public class ExamSessionManager {
         for (ExamSession candidate : findInProgressSessions(userId)) {
             if (examSessionRepository.abandonIfInProgress(candidate.getExamId()) == 1) {
                 abandonedExamIds.add(candidate.getExamId());
+                log.info(
+                        "event=exam.session.abandoned outcome=transitioned examId={} "
+                                + "fromStatus=IN_PROGRESS toStatus=ABANDONED reason=new_session_started",
+                        candidate.getExamId()
+                );
             }
         }
         return List.copyOf(abandonedExamIds);

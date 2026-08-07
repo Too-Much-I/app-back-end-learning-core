@@ -101,11 +101,35 @@ public class ExamServiceImpl implements ExamService {
                 .orElseThrow(() -> new ExamsException(ErrorStatus._EXAM_NOT_FOUND));
     }
 
+    private ExamSession resolveCallbackSession(String callbackType, String examId, String jobId) {
+        if (examId == null || examId.isBlank()) {
+            log.warn(
+                    "event=grading.callback outcome=rejected reason=invalid_metadata "
+                            + "callbackType={} jobId={}",
+                    callbackType, jobId
+            );
+            return resolveSession(examId);
+        }
+        return examSessionRepository.findById(examId)
+                .orElseThrow(() -> {
+                    log.warn(
+                            "event=grading.callback outcome=rejected reason=exam_not_found "
+                                    + "callbackType={} examId={} jobId={}",
+                            callbackType, examId, jobId
+                    );
+                    return new ExamsException(ErrorStatus._EXAM_NOT_FOUND);
+                });
+    }
+
     private ExamSession requireOwnedSession(String examId) {
         ExamSession examSession = resolveSession(examId);
         String currentUserId = currentUserProvider.getCurrentUserId();
 
         if (!Objects.equals(examSession.getUserId(), currentUserId)) {
+            log.warn(
+                    "event=exam.access outcome=denied reason=ownership_mismatch examId={}",
+                    examId
+            );
             throw new ExamsException(ErrorStatus._FORBIDDEN);
         }
 
@@ -143,8 +167,9 @@ public class ExamServiceImpl implements ExamService {
         if (!examSession.isAbandoned()) {
             return false;
         }
-        log.info(
-                "ABANDONED 시험 Callback 무시: examId={}, questionNumber={}, retryCount={}, jobId={}",
+        log.debug(
+                "event=grading.callback outcome=ignored reason=exam_abandoned "
+                        + "examId={} questionNumber={} retryCount={} jobId={}",
                 examSession.getExamId(), questionNumber, retryCount, jobId
         );
         return true;
@@ -162,14 +187,13 @@ public class ExamServiceImpl implements ExamService {
     // 새로운 정규 모의고사 세션을 생성하고 초기 시험 지문 및 S3 오디오 스트리밍 주소를 조립합니다.
     @Override
     public ExamResponseDTO.CreateSessionResult createExamSession() {
+        long startedAt = System.nanoTime();
         String userId = currentUserProvider.getCurrentUserId();
         ExamSessionManager.Assignment assignment = examSessionManager.startNew(userId);
         String examId = assignment.session().getExamId();
         String redisKey = "exam:status:" + examId;
 
         redisTemplate.opsForValue().set(redisKey, ExamStatus.PENDING.name(), 1, TimeUnit.HOURS);
-        log.info("정규 모의고사 세션 생성 완료: examId={}, mockExamId={}",
-                examId, assignment.mockExam().getMockExamId());
 
         MockExam mockExam = assignment.mockExam();
         List<ExamResponseDTO.QuestionDTO> questionDTOs = mockExam.getQuestions().stream()
@@ -177,7 +201,17 @@ public class ExamServiceImpl implements ExamService {
                 .map(q -> toCreateSessionQuestion(mockExam.getMockExamId(), q))
                 .collect(Collectors.toList());
 
-        return ExamConverter.toCreateSessionResult(examId, mockExam.getTitle(), questionDTOs);
+        ExamResponseDTO.CreateSessionResult result =
+                ExamConverter.toCreateSessionResult(examId, mockExam.getTitle(), questionDTOs);
+        log.info(
+                "event=exam.session.ready outcome=success examId={} mockExamId={} "
+                        + "questionCount={} durationMs={}",
+                examId,
+                mockExam.getMockExamId(),
+                questionDTOs.size(),
+                TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - startedAt)
+        );
+        return result;
     }
 
     @Override
@@ -222,6 +256,7 @@ public class ExamServiceImpl implements ExamService {
     // 사용자가 가상으로 녹음 오디오 파일을 업로드할 수 있는 임시 S3 PutObject용 Presigned URL을 발급합니다.
     @Override
     public ExamResponseDTO.UploadUrlResult getPresignedUrl(String examId, Integer questionNumber, Integer retryCount) {
+        long startedAt = System.nanoTime();
         requireOwnedNotAbandonedSession(examId);
 
         String fileKey = String.format("temp/%s/q_%d_r%d.wav", examId, questionNumber, retryCount);
@@ -242,6 +277,15 @@ public class ExamServiceImpl implements ExamService {
                 s3Presigner.presignPutObject(presignRequest);
 
         String url = presignedRequest.url().toString();
+
+        log.debug(
+                "event=s3.upload_url outcome=issued examId={} questionNumber={} "
+                        + "retryCount={} durationMs={}",
+                examId,
+                questionNumber,
+                GradingKeys.canonicalRetryCount(retryCount),
+                TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - startedAt)
+        );
 
         return ExamConverter.toUploadUrlResult(url, fileKey, 60);
     }
@@ -272,11 +316,16 @@ public class ExamServiceImpl implements ExamService {
     @Override
     public void updateExamResult(ExamRequestDTO.AiResultReq req) {
         String examId = req.getExamId();
-        ExamSession examSession = resolveSession(examId);
         int retryCount = GradingKeys.canonicalRetryCount(req.getRetryCount());
-        String callbackJobId = req.getTotalScore() != null
+        boolean summaryCallback = req.getTotalScore() != null;
+        String callbackJobId = summaryCallback
                 ? GradingKeys.summaryJobId(examId)
                 : GradingKeys.questionJobId(examId, req.getQuestionNumber(), retryCount);
+        ExamSession examSession = resolveCallbackSession(
+                summaryCallback ? "summary" : "feedback",
+                examId,
+                callbackJobId
+        );
         if (ignoreAbandonedCallback(
                 examSession,
                 req.getQuestionNumber(),
@@ -287,7 +336,7 @@ public class ExamServiceImpl implements ExamService {
         String mockExamId = GradingKeys.effectiveMockExamId(examSession.getMockExamId());
 
         // 종합 결과도 결정적 ID와 legacy 논리 결과 확인으로 멱등 저장합니다.
-        if (req.getTotalScore() != null) {
+        if (summaryCallback) {
             String resultId = GradingKeys.summaryJobId(examId);
             boolean alreadyStored = examSummaryRepository.existsById(resultId)
                     || examSummaryRepository.existsByExamId(examId)
@@ -301,10 +350,24 @@ public class ExamServiceImpl implements ExamService {
                             mockExamId
                     );
                     examSummaryRepository.insert(summary);
-                    log.info("AI 종합 피드백 영구 데이터 적재 완료: examId={}", examId);
+                    log.info(
+                            "event=grading.callback outcome=stored callbackType=summary "
+                                    + "examId={} jobId={}",
+                            examId, callbackJobId
+                    );
                 } catch (DuplicateKeyException duplicateCallback) {
-                    log.info("중복 AI 종합 피드백 Callback 멱등 처리: examId={}", examId);
+                    log.debug(
+                            "event=grading.callback outcome=duplicate callbackType=summary "
+                                    + "examId={} jobId={}",
+                            examId, callbackJobId
+                    );
                 }
+            } else {
+                log.debug(
+                        "event=grading.callback outcome=duplicate callbackType=summary "
+                                + "examId={} jobId={}",
+                        examId, callbackJobId
+                );
             }
             examSessionManager.completeIfIncomplete(examId);
             gradingService.completeSummary(examId);
@@ -326,12 +389,24 @@ public class ExamServiceImpl implements ExamService {
                         mockExamId
                 );
                 examResultRepository.insert(result);
-                log.info("AI 피드백 영구 데이터 적재 완료: examId={}, qNum={}, retryCount={}",
-                        examId, req.getQuestionNumber(), retryCount);
+                log.info(
+                        "event=grading.callback outcome=stored callbackType=feedback "
+                                + "examId={} jobId={} questionNumber={} retryCount={}",
+                        examId, callbackJobId, req.getQuestionNumber(), retryCount
+                );
             } catch (DuplicateKeyException duplicateCallback) {
-                log.info("중복 AI Feedback Callback 멱등 처리: examId={}, qNum={}, retryCount={}",
-                        examId, req.getQuestionNumber(), retryCount);
+                log.debug(
+                        "event=grading.callback outcome=duplicate callbackType=feedback "
+                                + "examId={} jobId={} questionNumber={} retryCount={}",
+                        examId, callbackJobId, req.getQuestionNumber(), retryCount
+                );
             }
+        } else {
+            log.debug(
+                    "event=grading.callback outcome=duplicate callbackType=feedback "
+                            + "examId={} jobId={} questionNumber={} retryCount={}",
+                    examId, callbackJobId, req.getQuestionNumber(), retryCount
+            );
         }
 
         gradingService.completeQuestion(examId, req.getQuestionNumber(), retryCount);
@@ -529,9 +604,9 @@ public class ExamServiceImpl implements ExamService {
     @Override
     public void saveSpeechAceResult(ExamRequestDTO.SpeechAceReq req) {
         int retryCount = GradingKeys.canonicalRetryCount(req.getRetryCount());
-        ExamSession examSession = resolveSession(req.getExamId());
         String jobId = GradingKeys.questionJobId(
                 req.getExamId(), req.getQuestionNumber(), retryCount);
+        ExamSession examSession = resolveCallbackSession("speechace", req.getExamId(), jobId);
         if (ignoreAbandonedCallback(
                 examSession, req.getQuestionNumber(), retryCount, jobId)) {
             return;
@@ -540,6 +615,11 @@ public class ExamServiceImpl implements ExamService {
                 req.getExamId(),
                 req.getQuestionNumber(),
                 compatibleRetryCounts(retryCount))) {
+            log.debug(
+                    "event=grading.callback outcome=duplicate callbackType=speechace "
+                            + "examId={} jobId={} questionNumber={} retryCount={}",
+                    req.getExamId(), jobId, req.getQuestionNumber(), retryCount
+            );
             return;
         }
 
@@ -553,11 +633,17 @@ public class ExamServiceImpl implements ExamService {
 
         try {
             speechAceResultRepository.insert(result);
-            log.info("SpeechAce 가공 분석 원본 데이터 수복 완료: examId={}, questionNum={}",
-                    req.getExamId(), req.getQuestionNumber());
+            log.debug(
+                    "event=grading.callback outcome=stored callbackType=speechace "
+                            + "examId={} jobId={} questionNumber={} retryCount={}",
+                    req.getExamId(), jobId, req.getQuestionNumber(), retryCount
+            );
         } catch (DuplicateKeyException duplicateCallback) {
-            log.info("중복 SpeechAce Callback 멱등 처리: examId={}, qNum={}, retryCount={}",
-                    req.getExamId(), req.getQuestionNumber(), retryCount);
+            log.debug(
+                    "event=grading.callback outcome=duplicate callbackType=speechace "
+                            + "examId={} jobId={} questionNumber={} retryCount={}",
+                    req.getExamId(), jobId, req.getQuestionNumber(), retryCount
+            );
         }
     }
 
@@ -565,23 +651,38 @@ public class ExamServiceImpl implements ExamService {
     @Override
     @Transactional
     public void processAzureCallback(Map<String, Object> rawPayload) {
-        Map<String, Object> metadata = (Map<String, Object>) rawPayload.get("metadata");
-        String examId = (String) metadata.get("user_id");
-        Integer questionNumber = (Integer) metadata.get("question_number");
-        Integer retryCount = metadata.get("retry_count") != null ? (Integer) metadata.get("retry_count") : 0;
+        String examId;
+        Integer questionNumber;
+        Integer retryCount;
+        try {
+            Map<String, Object> metadata = (Map<String, Object>) rawPayload.get("metadata");
+            examId = (String) metadata.get("user_id");
+            questionNumber = (Integer) metadata.get("question_number");
+            retryCount = metadata.get("retry_count") != null ? (Integer) metadata.get("retry_count") : 0;
+        } catch (RuntimeException invalidMetadata) {
+            log.warn(
+                    "event=grading.callback outcome=rejected reason=invalid_metadata "
+                            + "callbackType=azure errorType={}",
+                    invalidMetadata.getClass().getName()
+            );
+            throw invalidMetadata;
+        }
 
-        ExamSession examSession = resolveSession(examId);
         String jobId = GradingKeys.questionJobId(examId, questionNumber, retryCount);
+        ExamSession examSession = resolveCallbackSession("azure", examId, jobId);
         if (ignoreAbandonedCallback(examSession, questionNumber, retryCount, jobId)) {
             return;
         }
-
-        log.info("Azure 음성인식 분석 원본 수신 및 저장 시작: examId={}, questionNumber={}, retryCount={}", examId, questionNumber, retryCount);
 
         if (azureResultRepository.existsByExamIdAndQuestionNumberAndRetryCountIn(
                 examId,
                 questionNumber,
                 compatibleRetryCounts(retryCount))) {
+            log.debug(
+                    "event=grading.callback outcome=duplicate callbackType=azure "
+                            + "examId={} jobId={} questionNumber={} retryCount={}",
+                    examId, jobId, questionNumber, retryCount
+            );
             return;
         }
 
@@ -595,9 +696,17 @@ public class ExamServiceImpl implements ExamService {
 
         try {
             azureResultRepository.insert(entity);
+            log.debug(
+                    "event=grading.callback outcome=stored callbackType=azure "
+                            + "examId={} jobId={} questionNumber={} retryCount={}",
+                    examId, jobId, questionNumber, retryCount
+            );
         } catch (DuplicateKeyException duplicateCallback) {
-            log.info("중복 Azure Callback 멱등 처리: examId={}, qNum={}, retryCount={}",
-                    examId, questionNumber, retryCount);
+            log.debug(
+                    "event=grading.callback outcome=duplicate callbackType=azure "
+                            + "examId={} jobId={} questionNumber={} retryCount={}",
+                    examId, jobId, questionNumber, retryCount
+            );
         }
     }
 

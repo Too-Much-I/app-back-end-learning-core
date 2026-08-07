@@ -179,6 +179,10 @@ public class ExamReadService {
         ExamSession session = examSessionRepository.findById(examId)
                 .orElseThrow(() -> new ExamsException(ErrorStatus._EXAM_NOT_FOUND));
         if (!Objects.equals(session.getUserId(), currentUserProvider.getCurrentUserId())) {
+            log.warn(
+                    "event=exam.access outcome=denied reason=ownership_mismatch examId={}",
+                    examId
+            );
             throw new ExamsException(ErrorStatus._FORBIDDEN);
         }
         return session;
@@ -199,10 +203,16 @@ public class ExamReadService {
         boolean summaryAvailable = summary != null || legacySummary != null;
 
         if (title == null) {
-            log.warn("완료 시험 이력 문제지 제목 없음: examId={}", examId);
+            log.warn(
+                    "event=exam.history.data outcome=incomplete reason=missing_mock_exam_title examId={}",
+                    examId
+            );
         }
         if (!summaryAvailable) {
-            log.warn("완료 시험 이력 종합 결과 없음: examId={}", examId);
+            log.warn(
+                    "event=exam.history.data outcome=incomplete reason=missing_summary examId={}",
+                    examId
+            );
         }
 
         return ExamResponseDTO.ExamHistoryItem.builder()

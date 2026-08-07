@@ -8,6 +8,8 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.boot.test.system.CapturedOutput;
+import org.springframework.boot.test.system.OutputCaptureExtension;
 import web.tosunsaeng.domain.exams.domain.entity.ExamResult;
 import web.tosunsaeng.domain.exams.domain.entity.ExamSession;
 import web.tosunsaeng.domain.exams.domain.entity.ExamSummary;
@@ -46,7 +48,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
-@ExtendWith(MockitoExtension.class)
+@ExtendWith({MockitoExtension.class, OutputCaptureExtension.class})
 class ExamReadServiceTest {
 
     private static final String USER_ID = "00000000-0000-0000-0000-000000000081";
@@ -82,7 +84,7 @@ class ExamReadServiceTest {
     }
 
     @Test
-    void historyUsesCompletedAtDeterministicOrderAndBatchSummaryCompatibility() {
+    void historyUsesCompletedAtDeterministicOrderAndBatchSummaryCompatibility(CapturedOutput output) {
         LocalDateTime newest = LocalDateTime.of(2026, 8, 4, 11, 0);
         LocalDateTime newestStartedAt = LocalDateTime.of(2026, 8, 4, 10, 30);
         LocalDateTime tied = LocalDateTime.of(2026, 8, 4, 10, 0);
@@ -154,7 +156,12 @@ class ExamReadServiceTest {
         assertAll(
                 () -> assertFalse(json.toString().contains("userId")),
                 () -> assertFalse(json.toString().contains("user_id")),
-                () -> assertFalse(json.toString().contains("mockExamId"))
+                () -> assertFalse(json.toString().contains("mockExamId")),
+                () -> assertTrue(output.getOut().contains(
+                        "event=exam.history.data outcome=incomplete "
+                                + "reason=missing_summary examId=ex_tie_a"
+                )),
+                () -> assertFalse(output.getOut().contains(USER_ID))
         );
         verify(examSessionRepository).findCompletedByUserId(USER_ID);
         verify(mockExamRepository).findTitlesByMockExamIdIn(Set.of("mock_exam_004", "mock_exam_003"));

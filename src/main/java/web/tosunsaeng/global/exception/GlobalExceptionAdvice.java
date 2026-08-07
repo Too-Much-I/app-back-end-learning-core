@@ -1,6 +1,7 @@
 package web.tosunsaeng.global.exception;
 
 import io.sentry.Sentry;
+import io.sentry.SentryLevel;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.ConstraintViolationException;
 import lombok.extern.slf4j.Slf4j;
@@ -20,6 +21,7 @@ import org.springframework.web.context.request.WebRequest;
 import org.springframework.web.servlet.mvc.method.annotation.ResponseEntityExceptionHandler;
 import web.tosunsaeng.global.common.response.BaseResponse;
 import web.tosunsaeng.global.error.code.status.BaseErrorCode;
+import web.tosunsaeng.global.error.code.status.ErrorReasonDTO;
 import web.tosunsaeng.global.error.code.status.ErrorStatus;
 
 import java.util.LinkedHashMap;
@@ -38,6 +40,7 @@ public class GlobalExceptionAdvice extends ResponseEntityExceptionHandler {
             WebRequest request) {
         String errorMessage = e.getPropertyName() + ": 올바른 값이 아닙니다.";
 
+        logRequestRejected(e, ErrorStatus._BAD_REQUEST, request);
         return handleExceptionInternalMessage(e, headers, request, errorMessage);
     }
 
@@ -49,6 +52,7 @@ public class GlobalExceptionAdvice extends ResponseEntityExceptionHandler {
             WebRequest request) {
         String errorMessage = e.getParameterName() + ": 올바른 값이 아닙니다.";
 
+        logRequestRejected(e, ErrorStatus._BAD_REQUEST, request);
         return handleExceptionInternalMessage(e, headers, request, errorMessage);
     }
 
@@ -63,6 +67,7 @@ public class GlobalExceptionAdvice extends ResponseEntityExceptionHandler {
                                         new RuntimeException(
                                                 "ConstraintViolationException 추출 도중 에러 발생"));
 
+        logRequestRejected(e, ErrorStatus.valueOf(errorMessage), request);
         return handleExceptionInternalConstraint(
                 e, ErrorStatus.valueOf(errorMessage), HttpHeaders.EMPTY, request);
     }
@@ -102,24 +107,37 @@ public class GlobalExceptionAdvice extends ResponseEntityExceptionHandler {
                     (existingErrorMessage, newErrorMessage) -> existingErrorMessage + ", " + newErrorMessage);
         });
 
+        logRequestRejected(e, ErrorStatus._BAD_REQUEST, request);
         return handleExceptionInternalArgs(
                 e, HttpHeaders.EMPTY, ErrorStatus.valueOf("_BAD_REQUEST"), request, errors);
     }
 
     @ExceptionHandler
     public ResponseEntity<Object> exception(Exception e, WebRequest request) {
-        e.printStackTrace();
-
-        Sentry.captureException(e);
-
-        // 🌟 여기에 넣어두면 부모 클래스 메서드 상관없이 파싱 에러를 100% 낚아챕니다!
         if (e instanceof HttpMessageNotReadableException) {
-            log.error("🚨 [AI 콜백 에러] JSON 파싱 실패! AI 서버가 보낸 데이터 타입이 DTO와 맞지 않습니다.");
-            log.error("🚨 [파싱 에러 원인]: {}", e.getMessage());
+            log.warn(
+                    "event=http.request.parse outcome=rejected status={} errorCode={} "
+                            + "method={} path={} errorType={}",
+                    ErrorStatus._BAD_REQUEST.getHttpStatus().value(),
+                    ErrorStatus._BAD_REQUEST.getCode(),
+                    requestMethod(request),
+                    requestPath(request),
+                    e.getClass().getName()
+            );
 
             String errorMessage = "요청 본문(JSON) 파싱 실패: " + e.getMessage();
             return handleExceptionInternalMessage(e, HttpHeaders.EMPTY, request, errorMessage);
         }
+
+        captureUnexpectedException(e);
+        log.warn(
+                "event=http.request outcome=failed status={} errorCode={} method={} path={} errorType={}",
+                ErrorStatus._INTERNAL_SERVER_ERROR.getHttpStatus().value(),
+                ErrorStatus._INTERNAL_SERVER_ERROR.getCode(),
+                requestMethod(request),
+                requestPath(request),
+                e.getClass().getName()
+        );
 
         return handleExceptionInternalFalse(
                 e,
@@ -133,7 +151,61 @@ public class GlobalExceptionAdvice extends ResponseEntityExceptionHandler {
     @ExceptionHandler(value = GeneralException.class)
     public ResponseEntity onThrowException(
             GeneralException generalException, HttpServletRequest request) {
+        ErrorReasonDTO reason = generalException.getCode().getReasonHttpStatus();
+        log.warn(
+                "event=http.business outcome=rejected status={} errorCode={} "
+                        + "method={} path={} errorType={}",
+                reason.getHttpStatus().value(),
+                reason.getCode(),
+                request.getMethod(),
+                request.getRequestURI(),
+                generalException.getClass().getName()
+        );
         return handleExceptionInternal(generalException, generalException.getCode(), null, request);
+    }
+
+    private void logRequestRejected(Exception exception, BaseErrorCode code, WebRequest request) {
+        ErrorReasonDTO reason = code.getReasonHttpStatus();
+        log.warn(
+                "event=http.request outcome=rejected status={} errorCode={} "
+                        + "method={} path={} errorType={}",
+                reason.getHttpStatus().value(),
+                reason.getCode(),
+                requestMethod(request),
+                requestPath(request),
+                exception.getClass().getName()
+        );
+    }
+
+    private static String requestMethod(WebRequest request) {
+        if (request instanceof ServletWebRequest servletWebRequest) {
+            return servletWebRequest.getRequest().getMethod();
+        }
+        return "unknown";
+    }
+
+    private static String requestPath(WebRequest request) {
+        if (request instanceof ServletWebRequest servletWebRequest) {
+            return servletWebRequest.getRequest().getRequestURI();
+        }
+        return "unknown";
+    }
+
+    private static void captureUnexpectedException(Exception exception) {
+        Sentry.withScope(scope -> {
+            scope.setTag("error.type", exception.getClass().getName());
+            scope.setTag("error.root_cause_type", rootCauseType(exception));
+            scope.setTag("http.status_code", "500");
+            Sentry.captureMessage("Unhandled server exception", SentryLevel.ERROR);
+        });
+    }
+
+    private static String rootCauseType(Throwable failure) {
+        Throwable rootCause = failure;
+        while (rootCause.getCause() != null && rootCause.getCause() != rootCause) {
+            rootCause = rootCause.getCause();
+        }
+        return rootCause.getClass().getName();
     }
 
     private ResponseEntity<Object> handleExceptionInternal(

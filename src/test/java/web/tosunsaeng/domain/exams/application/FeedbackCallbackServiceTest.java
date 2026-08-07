@@ -343,7 +343,7 @@ class FeedbackCallbackServiceTest {
     }
 
     @Test
-    void missingExamSessionThrowsExistingErrorAndDoesNotSaveResult() throws Exception {
+    void missingExamSessionThrowsExistingErrorAndDoesNotSaveResult(CapturedOutput output) throws Exception {
         ExamRequestDTO.AiResultReq req = objectMapper.readValue("""
                 {
                   "user_id": "ex_callback_001",
@@ -361,6 +361,12 @@ class FeedbackCallbackServiceTest {
         );
 
         assertSame(ErrorStatus._EXAM_NOT_FOUND, exception.getCode());
+        assertTrue(output.getOut().contains(
+                "event=grading.callback outcome=rejected reason=exam_not_found "
+                        + "callbackType=feedback examId=" + EXAM_ID
+                        + " jobId=question:" + EXAM_ID + ":5:0"
+        ));
+        assertFalse(output.getOut().contains(USER_ID));
         verify(examSessionRepository).findById(EXAM_ID);
         verifyNoInteractions(
                 examResultRepository,
@@ -485,7 +491,7 @@ class FeedbackCallbackServiceTest {
     }
 
     @Test
-    void abandonedQuestionCallbackIsIdempotentNoOp(CapturedOutput output) throws Exception {
+    void abandonedQuestionCallbackIsIdempotentNoOp() throws Exception {
         ExamRequestDTO.AiResultReq req = objectMapper.readValue("""
                 {
                   "user_id": "ex_callback_001",
@@ -499,10 +505,6 @@ class FeedbackCallbackServiceTest {
         examService.updateExamResult(req);
         examService.updateExamResult(req);
 
-        assertTrue(output.getOut().contains(
-                "ABANDONED 시험 Callback 무시: examId=" + EXAM_ID
-                        + ", questionNumber=4, retryCount=2, jobId=question:"
-                        + EXAM_ID + ":4:2"));
         verify(examSessionRepository, times(2)).findById(EXAM_ID);
         verifyNoInteractions(
                 examResultRepository,
@@ -556,6 +558,30 @@ class FeedbackCallbackServiceTest {
         examService.processAzureCallback(azurePayload);
 
         verifyNoInteractions(speechAceResultRepository, azureResultRepository);
+    }
+
+    @Test
+    void malformedAzureMetadataLogsOnlySafeClassification(CapturedOutput output) {
+        Map<String, Object> payload = Map.of(
+                "metadata", Map.of(
+                        "user_id", EXAM_ID,
+                        "question_number", "not-an-integer",
+                        "sensitive_field", "should-not-be-logged"
+                )
+        );
+
+        assertThrows(ClassCastException.class, () -> examService.processAzureCallback(payload));
+
+        assertAll(
+                () -> assertTrue(output.getOut().contains(
+                        "event=grading.callback outcome=rejected reason=invalid_metadata "
+                                + "callbackType=azure errorType=java.lang.ClassCastException"
+                )),
+                () -> assertFalse(output.getOut().contains("not-an-integer")),
+                () -> assertFalse(output.getOut().contains("should-not-be-logged")),
+                () -> assertFalse(output.getOut().contains("sensitive_field"))
+        );
+        verifyNoInteractions(examSessionRepository, azureResultRepository);
     }
 
     private ExamSession examSession() {

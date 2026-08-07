@@ -40,7 +40,6 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Function;
-import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
 @Slf4j
@@ -52,11 +51,6 @@ public class ExamGradingService {
     private static final String QUESTION_DISPATCH_FAILED = "QUESTION_DISPATCH_FAILED";
     private static final String MAX_DISPATCH_ATTEMPTS = "MAX_DISPATCH_ATTEMPTS";
     private static final String EXAM_ABANDONED = "EXAM_ABANDONED";
-    private static final int MAX_FAILURE_LOG_MESSAGE_LENGTH = 500;
-    private static final Pattern URI_IN_MESSAGE = Pattern.compile("(?i)https?://\\S+");
-    private static final Pattern SENSITIVE_VALUE_IN_MESSAGE = Pattern.compile(
-            "(?i)(authorization|token|secret|signature|credential)\\s*[=:]\\s*[^\\s,;&]+"
-    );
 
     private final QuestionGradingJobRepository questionJobRepository;
     private final SummaryGradingJobRepository summaryJobRepository;
@@ -79,10 +73,6 @@ public class ExamGradingService {
         int canonicalRetryCount = GradingKeys.canonicalRetryCount(retryCount);
         String mockExamId = resolveMockExamId(examId);
         String jobId = GradingKeys.questionJobId(examId, questionNumber, canonicalRetryCount);
-        log.info(
-                "채점 submit 시작: jobId={}, examId={}, questionNumber={}, retryCount={}",
-                jobId, examId, questionNumber, canonicalRetryCount
-        );
         if (hasQuestionResult(examId, questionNumber, canonicalRetryCount)) {
             completeQuestion(examId, questionNumber, canonicalRetryCount);
             calculateAndCacheOverallStatus(examId);
@@ -103,12 +93,16 @@ public class ExamGradingService {
         QuestionGradingJob inserted;
         try {
             inserted = questionJobRepository.insert(pending);
-            log.info("신규 채점 Job 생성: jobId={}", jobId);
+            log.debug(
+                    "event=grading.question.job outcome=created jobId={} examId={} "
+                            + "questionNumber={} retryCount={}",
+                    jobId, examId, questionNumber, canonicalRetryCount
+            );
         } catch (DuplicateKeyException duplicate) {
             QuestionGradingJob existing = questionJobRepository.findById(jobId)
                     .orElse(null);
-            log.info(
-                    "기존 채점 Job 반환: jobId={}, status={}, dispatchAttempt={}",
+            log.debug(
+                    "event=grading.question.job outcome=reused jobId={} status={} dispatchAttempt={}",
                     jobId,
                     existing == null ? null : existing.getStatus(),
                     existing == null ? null : existing.getDispatchAttempt()
@@ -143,16 +137,7 @@ public class ExamGradingService {
             failQuestionClaim(claim, EXAM_ABANDONED);
             throw new ExamsException(ErrorStatus._EXAM_ABANDONED);
         }
-        log.info(
-                "AI 전송 호출 직전: jobId={}, fileKey={}, attempt={}",
-                claim.jobId(), claim.fileKey(), claimed.getDispatchAttempt()
-        );
-        try {
-            dispatchService.dispatchQuestion(claim);
-            log.info("AI 전송 성공: jobId={}", claim.jobId());
-        } catch (RuntimeException dispatchFailure) {
-            logDispatchFailure(claim.jobId(), dispatchFailure);
-            failQuestionClaim(claim, QUESTION_DISPATCH_FAILED);
+        if (!dispatchQuestion(claim)) {
             calculateAndCacheOverallStatus(examId);
             throw new ExamsException(ErrorStatus._AI_SERVER_CONNECTION_ERROR);
         }
@@ -189,6 +174,16 @@ public class ExamGradingService {
                 ? retrySummaryIfEligible(examId)
                 : SummaryAction.NOT_READY;
         ExamStatus overallStatus = calculateAndCacheOverallStatus(examId, questionNumbers);
+        log.info(
+                "event=grading.exam.retry outcome=completed examId={} retriedCount={} "
+                        + "waitingCount={} missingSubmissionCount={} summaryAction={} overallStatus={}",
+                examId,
+                retried.size(),
+                waiting.size(),
+                missing.size(),
+                summaryAction,
+                overallStatus
+        );
 
         return ExamResponseDTO.GradingRetryResult.builder()
                 .examId(examId)
@@ -213,7 +208,7 @@ public class ExamGradingService {
             Optional<QuestionGradingJob> existing = questionJobRepository.findById(jobId);
             if (existing.isEmpty()) {
                 try {
-                    questionJobRepository.insert(QuestionGradingJob.completed(
+                    QuestionGradingJob completed = QuestionGradingJob.completed(
                             jobId,
                             examId,
                             questionNumber,
@@ -221,7 +216,19 @@ public class ExamGradingService {
                             GradingKeys.questionFileKey(examId, questionNumber, canonicalRetryCount),
                             mockExamId,
                             now
-                    ));
+                    );
+                    questionJobRepository.insert(completed);
+                    log.info(
+                            "event=grading.question.job outcome=completed jobId={} examId={} "
+                                    + "questionNumber={} retryCount={} dispatchAttempt={} "
+                                    + "fromStatus=MISSING toStatus=COMPLETED callbackLatencyMs={}",
+                            jobId,
+                            examId,
+                            questionNumber,
+                            canonicalRetryCount,
+                            completed.getDispatchAttempt(),
+                            -1L
+                    );
                     return;
                 } catch (DuplicateKeyException concurrentInsert) {
                     continue;
@@ -232,15 +239,34 @@ public class ExamGradingService {
             if (job.getStatus() == GradingJobStatus.COMPLETED) {
                 return;
             }
+            GradingJobStatus fromStatus = job.getStatus();
+            Instant processingStartedAt = job.getProcessingStartedAt();
+            int dispatchAttempt = job.getDispatchAttempt();
             job.complete(now);
             try {
                 questionJobRepository.save(job);
+                log.info(
+                        "event=grading.question.job outcome=completed jobId={} examId={} "
+                                + "questionNumber={} retryCount={} dispatchAttempt={} "
+                                + "fromStatus={} toStatus=COMPLETED callbackLatencyMs={}",
+                        jobId,
+                        examId,
+                        questionNumber,
+                        canonicalRetryCount,
+                        dispatchAttempt,
+                        fromStatus,
+                        elapsedSince(processingStartedAt, now)
+                );
                 return;
             } catch (OptimisticLockingFailureException concurrentUpdate) {
                 // Re-read and converge on COMPLETED without overwriting a newer document version.
             }
         }
-        log.warn("Question Job completion raced repeatedly: jobId={}", jobId);
+        log.warn(
+                "event=grading.question.job outcome=completion_race jobId={} examId={} "
+                        + "questionNumber={} retryCount={}",
+                jobId, examId, questionNumber, canonicalRetryCount
+        );
     }
 
     public void completeSummary(String examId) {
@@ -255,7 +281,18 @@ public class ExamGradingService {
             Optional<SummaryGradingJob> existing = summaryJobRepository.findById(jobId);
             if (existing.isEmpty()) {
                 try {
-                    summaryJobRepository.insert(SummaryGradingJob.completed(jobId, examId, mockExamId, now));
+                    SummaryGradingJob completed =
+                            SummaryGradingJob.completed(jobId, examId, mockExamId, now);
+                    summaryJobRepository.insert(completed);
+                    log.info(
+                            "event=grading.summary.job outcome=completed jobId={} examId={} "
+                                    + "dispatchAttempt={} fromStatus=MISSING toStatus=COMPLETED "
+                                    + "callbackLatencyMs={}",
+                            jobId,
+                            examId,
+                            completed.getDispatchAttempt(),
+                            -1L
+                    );
                     return;
                 } catch (DuplicateKeyException concurrentInsert) {
                     continue;
@@ -266,29 +303,62 @@ public class ExamGradingService {
             if (job.getStatus() == GradingJobStatus.COMPLETED) {
                 return;
             }
+            GradingJobStatus fromStatus = job.getStatus();
+            Instant processingStartedAt = job.getProcessingStartedAt();
+            int dispatchAttempt = job.getDispatchAttempt();
             job.complete(now);
             try {
                 summaryJobRepository.save(job);
+                log.info(
+                        "event=grading.summary.job outcome=completed jobId={} examId={} "
+                                + "dispatchAttempt={} fromStatus={} toStatus=COMPLETED "
+                                + "callbackLatencyMs={}",
+                        jobId,
+                        examId,
+                        dispatchAttempt,
+                        fromStatus,
+                        elapsedSince(processingStartedAt, now)
+                );
                 return;
             } catch (OptimisticLockingFailureException concurrentUpdate) {
                 // Re-read and converge on COMPLETED without overwriting a newer document version.
             }
         }
-        log.warn("Summary Job completion raced repeatedly: jobId={}", jobId);
+        log.warn(
+                "event=grading.summary.job outcome=completion_race jobId={} examId={}",
+                jobId, examId
+        );
     }
 
     public void ensureSummaryStartedIfReady(String examId) {
         if (!canProcessSession(examId)) {
+            log.debug(
+                    "event=grading.summary.trigger outcome=ignored reason=session_not_processable examId={}",
+                    examId
+            );
             return;
         }
         List<Integer> questionNumbers = expectedQuestionNumbers(examId);
-        if (!allQuestionsComplete(examId, questionNumbers)) {
+        QuestionCompletionSnapshot completionSnapshot = loadQuestionCompletionSnapshot(examId);
+        long completedCount = questionNumbers.stream()
+                .filter(completionSnapshot::isComplete)
+                .count();
+        if (completedCount != questionNumbers.size()) {
+            log.debug(
+                    "event=grading.summary.trigger outcome=not_ready examId={} "
+                            + "completedQuestionCount={} expectedQuestionCount={}",
+                    examId, completedCount, questionNumbers.size()
+            );
             calculateAndCacheOverallStatus(examId, questionNumbers);
             return;
         }
 
         if (hasSummaryResult(examId)) {
             completeSummary(examId);
+            log.debug(
+                    "event=grading.summary.trigger outcome=already_completed examId={} jobId={}",
+                    examId, GradingKeys.summaryJobId(examId)
+            );
             calculateAndCacheOverallStatus(examId, questionNumbers);
             return;
         }
@@ -296,6 +366,7 @@ public class ExamGradingService {
         String jobId = GradingKeys.summaryJobId(examId);
         Optional<SummaryGradingJob> existing = summaryJobRepository.findById(jobId);
         SummaryGradingJob summaryJob = null;
+        boolean created = false;
         if (existing.isEmpty()) {
             SummaryGradingJob pending = SummaryGradingJob.pending(
                     jobId,
@@ -305,6 +376,7 @@ public class ExamGradingService {
             );
             try {
                 summaryJob = summaryJobRepository.insert(pending);
+                created = true;
             } catch (DuplicateKeyException concurrentInsert) {
                 summaryJob = summaryJobRepository.findById(jobId).orElse(null);
             }
@@ -313,7 +385,36 @@ public class ExamGradingService {
         }
 
         if (summaryJob != null && summaryJob.getStatus() == GradingJobStatus.PENDING) {
-            summaryDispatchScheduler.schedulePending(jobId);
+            boolean scheduled = summaryDispatchScheduler.schedulePending(jobId);
+            if (created && scheduled) {
+                log.info(
+                        "event=grading.summary.trigger outcome=scheduled examId={} jobId={} "
+                                + "completedQuestionCount={} expectedQuestionCount={}",
+                        examId, jobId, completedCount, questionNumbers.size()
+                );
+            } else {
+                log.debug(
+                        "event=grading.summary.trigger outcome={} examId={} jobId={} "
+                                + "jobStatus={} scheduleAccepted={}",
+                        scheduled ? "already_scheduled" : "schedule_rejected",
+                        examId,
+                        jobId,
+                        summaryJob.getStatus(),
+                        scheduled
+                );
+            }
+        } else if (summaryJob == null) {
+            log.warn(
+                    "event=grading.summary.trigger outcome=skipped reason=job_missing_after_insert_race "
+                            + "examId={} jobId={}",
+                    examId, jobId
+            );
+        } else {
+            log.debug(
+                    "event=grading.summary.trigger outcome=skipped reason=job_not_pending "
+                            + "examId={} jobId={} jobStatus={}",
+                    examId, jobId, summaryJob.getStatus()
+            );
         }
 
         calculateAndCacheOverallStatus(examId, questionNumbers);
@@ -419,53 +520,86 @@ public class ExamGradingService {
             failQuestionClaim(claim, EXAM_ABANDONED);
             return DispatchOutcome.FAILED;
         }
-        log.info(
-                "AI 전송 호출 직전: jobId={}, fileKey={}, attempt={}",
-                claim.jobId(), claim.fileKey(), claimed.getDispatchAttempt()
-        );
+        return dispatchQuestion(claim)
+                ? DispatchOutcome.DISPATCHED
+                : DispatchOutcome.FAILED;
+    }
+
+    private boolean dispatchQuestion(QuestionDispatchClaim claim) {
+        long startedAt = System.nanoTime();
         try {
             dispatchService.dispatchQuestion(claim);
-            log.info("AI 전송 성공: jobId={}", claim.jobId());
-            return DispatchOutcome.DISPATCHED;
+            log.info(
+                    "event=grading.question.dispatch outcome=success jobId={} examId={} "
+                            + "questionNumber={} retryCount={} dispatchAttempt={} durationMs={}",
+                    claim.jobId(),
+                    claim.examId(),
+                    claim.questionNumber(),
+                    claim.retryCount(),
+                    claim.dispatchAttempt(),
+                    elapsedMillis(startedAt)
+            );
+            return true;
         } catch (RuntimeException dispatchFailure) {
-            logDispatchFailure(claim.jobId(), dispatchFailure);
-            failQuestionClaim(claim, QUESTION_DISPATCH_FAILED);
-            return DispatchOutcome.FAILED;
+            long durationMs = elapsedMillis(startedAt);
+            if (failQuestionClaim(claim, QUESTION_DISPATCH_FAILED)) {
+                log.error(
+                        "event=grading.question.dispatch outcome=failure reason={} jobId={} examId={} "
+                                + "questionNumber={} retryCount={} dispatchAttempt={} durationMs={} "
+                                + "stage={} stageDurationMs={} errorType={} rootCauseType={}",
+                        QUESTION_DISPATCH_FAILED,
+                        claim.jobId(),
+                        claim.examId(),
+                        claim.questionNumber(),
+                        claim.retryCount(),
+                        claim.dispatchAttempt(),
+                        durationMs,
+                        GradingDispatchException.stageCode(dispatchFailure),
+                        GradingDispatchException.stageDurationMs(dispatchFailure),
+                        dispatchFailure.getClass().getName(),
+                        rootCauseType(dispatchFailure)
+                );
+            } else {
+                log.debug(
+                        "event=grading.question.dispatch outcome=stale_failure_ignored "
+                                + "jobId={} dispatchAttempt={} durationMs={} errorType={}",
+                        claim.jobId(),
+                        claim.dispatchAttempt(),
+                        durationMs,
+                        dispatchFailure.getClass().getName()
+                );
+            }
+            return false;
         }
     }
 
-    private void logDispatchFailure(String jobId, RuntimeException dispatchFailure) {
-        log.error(
-                "AI 전송 실패: jobId={}, type={}, message={}",
-                jobId,
-                dispatchFailure.getClass().getName(),
-                safeFailureMessage(dispatchFailure)
-        );
+    private static long elapsedMillis(long startedAt) {
+        return TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - startedAt);
     }
 
-    private static String safeFailureMessage(RuntimeException failure) {
-        String message = failure.getMessage();
-        if (message == null || message.isBlank()) {
-            return null;
+    private static long elapsedSince(Instant startedAt, Instant completedAt) {
+        if (startedAt == null || completedAt == null || completedAt.isBefore(startedAt)) {
+            return -1L;
         }
-        String singleLine = message.replace('\n', ' ').replace('\r', ' ');
-        String sanitized = URI_IN_MESSAGE.matcher(singleLine).replaceAll("[redacted-uri]");
-        sanitized = SENSITIVE_VALUE_IN_MESSAGE.matcher(sanitized).replaceAll("$1=[redacted]");
-        return sanitized.length() <= MAX_FAILURE_LOG_MESSAGE_LENGTH
-                ? sanitized
-                : sanitized.substring(0, MAX_FAILURE_LOG_MESSAGE_LENGTH) + "...";
+        return Duration.between(startedAt, completedAt).toMillis();
     }
 
-    private void failQuestionClaim(QuestionDispatchClaim claim, String reason) {
+    private static String rootCauseType(Throwable failure) {
+        Throwable rootCause = failure;
+        while (rootCause.getCause() != null && rootCause.getCause() != rootCause) {
+            rootCause = rootCause.getCause();
+        }
+        return rootCause.getClass().getName();
+    }
+
+    private boolean failQuestionClaim(QuestionDispatchClaim claim, String reason) {
         long updated = questionJobRepository.failClaimedAttempt(
                 claim.jobId(),
                 claim.dispatchAttempt(),
                 clock.instant(),
                 reason
         );
-        if (updated == 0) {
-            log.debug("Ignored a stale Question dispatch failure");
-        }
+        return updated == 1;
     }
 
     private void markAttemptLimitReached(QuestionGradingJob job) {
@@ -473,9 +607,21 @@ public class ExamGradingService {
                 && MAX_DISPATCH_ATTEMPTS.equals(job.getFailureReason())) {
             return;
         }
+        GradingJobStatus fromStatus = job.getStatus();
         job.fail(clock.instant(), MAX_DISPATCH_ATTEMPTS);
         try {
             questionJobRepository.save(job);
+            log.warn(
+                    "event=grading.question.job outcome=max_attempts reason={} jobId={} examId={} "
+                            + "questionNumber={} retryCount={} dispatchAttempt={} fromStatus={} toStatus=FAILED",
+                    MAX_DISPATCH_ATTEMPTS,
+                    job.getJobId(),
+                    job.getExamId(),
+                    job.getQuestionNumber(),
+                    job.getRetryCount(),
+                    job.getDispatchAttempt(),
+                    fromStatus
+            );
         } catch (OptimisticLockingFailureException concurrentUpdate) {
             // A concurrent retry or callback owns the newer state.
         }
@@ -565,9 +711,19 @@ public class ExamGradingService {
                 && MAX_DISPATCH_ATTEMPTS.equals(job.getFailureReason())) {
             return;
         }
+        GradingJobStatus fromStatus = job.getStatus();
         job.fail(clock.instant(), MAX_DISPATCH_ATTEMPTS);
         try {
             summaryJobRepository.save(job);
+            log.warn(
+                    "event=grading.summary.job outcome=max_attempts reason={} jobId={} examId={} "
+                            + "dispatchAttempt={} fromStatus={} toStatus=FAILED",
+                    MAX_DISPATCH_ATTEMPTS,
+                    job.getJobId(),
+                    job.getExamId(),
+                    job.getDispatchAttempt(),
+                    fromStatus
+            );
         } catch (OptimisticLockingFailureException concurrentUpdate) {
             // A concurrent retry or callback owns the newer state.
         }

@@ -60,7 +60,11 @@ public class SummaryDispatchScheduler {
             taskExecutor.execute(() -> claimAndDispatch(jobId, mode));
             return true;
         } catch (TaskRejectedException rejected) {
-            log.warn("Summary dispatch queue rejected a task; the Job remains recoverable");
+            log.warn(
+                    "event=grading.summary.schedule outcome=rejected reason=executor_rejected "
+                            + "jobId={} mode={}",
+                    jobId, mode
+            );
             return false;
         }
     }
@@ -99,9 +103,19 @@ public class SummaryDispatchScheduler {
             );
             return;
         }
+        long startedAt = System.nanoTime();
         try {
             dispatchService.dispatchSummary(claim);
+            log.info(
+                    "event=grading.summary.dispatch outcome=success jobId={} examId={} "
+                            + "dispatchAttempt={} durationMs={}",
+                    claim.jobId(),
+                    claim.examId(),
+                    claim.dispatchAttempt(),
+                    elapsedMillis(startedAt)
+            );
         } catch (RuntimeException dispatchFailure) {
+            long durationMs = elapsedMillis(startedAt);
             long updated = summaryJobRepository.failClaimedAttempt(
                     claim.jobId(),
                     claim.dispatchAttempt(),
@@ -109,7 +123,29 @@ public class SummaryDispatchScheduler {
                     SUMMARY_DISPATCH_FAILED
             );
             if (updated == 0) {
-                log.debug("Ignored a stale Summary dispatch failure");
+                log.debug(
+                        "event=grading.summary.dispatch outcome=stale_failure_ignored "
+                                + "jobId={} dispatchAttempt={} durationMs={} errorType={}",
+                        claim.jobId(),
+                        claim.dispatchAttempt(),
+                        durationMs,
+                        dispatchFailure.getClass().getName()
+                );
+            } else {
+                log.error(
+                        "event=grading.summary.dispatch outcome=failure reason={} jobId={} examId={} "
+                                + "dispatchAttempt={} durationMs={} stage={} stageDurationMs={} "
+                                + "errorType={} rootCauseType={}",
+                        SUMMARY_DISPATCH_FAILED,
+                        claim.jobId(),
+                        claim.examId(),
+                        claim.dispatchAttempt(),
+                        durationMs,
+                        GradingDispatchException.stageCode(dispatchFailure),
+                        GradingDispatchException.stageDurationMs(dispatchFailure),
+                        dispatchFailure.getClass().getName(),
+                        rootCauseType(dispatchFailure)
+                );
             }
         }
     }
@@ -143,6 +179,18 @@ public class SummaryDispatchScheduler {
 
     private static boolean timedOut(Instant startedAt, Duration timeout, Instant now) {
         return startedAt == null || !startedAt.plus(timeout).isAfter(now);
+    }
+
+    private static long elapsedMillis(long startedAt) {
+        return java.util.concurrent.TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - startedAt);
+    }
+
+    private static String rootCauseType(Throwable failure) {
+        Throwable rootCause = failure;
+        while (rootCause.getCause() != null && rootCause.getCause() != rootCause) {
+            rootCause = rootCause.getCause();
+        }
+        return rootCause.getClass().getName();
     }
 
     private enum DispatchMode {

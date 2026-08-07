@@ -182,13 +182,21 @@ class ExamGradingServiceTest {
                 () -> assertEquals(0, stored.getRetryCount()),
                 () -> assertEquals("temp/" + EXAM_ID + "/q_1_r0.wav", stored.getFileKey()),
                 () -> assertTrue(output.getOut().contains(
-                        "채점 submit 시작: jobId=question:" + EXAM_ID + ":1:0")),
-                () -> assertTrue(output.getOut().contains(
-                        "신규 채점 Job 생성: jobId=question:" + EXAM_ID + ":1:0")),
-                () -> assertTrue(output.getOut().contains(
-                        "AI 전송 호출 직전: jobId=question:" + EXAM_ID + ":1:0")),
-                () -> assertTrue(output.getOut().contains(
-                        "AI 전송 성공: jobId=question:" + EXAM_ID + ":1:0"))
+                        "event=grading.question.dispatch outcome=success "
+                                + "jobId=question:" + EXAM_ID + ":1:0 "
+                                + "examId=" + EXAM_ID + " questionNumber=1 retryCount=0 "
+                                + "dispatchAttempt=1 durationMs=")),
+                () -> assertEquals(
+                        1,
+                        countOccurrences(
+                                output.getOut(),
+                                "event=grading.question.dispatch outcome=success "
+                                        + "jobId=question:" + EXAM_ID + ":1:0"
+                        )
+                ),
+                () -> assertFalse(output.getOut().contains("채점 submit 시작")),
+                () -> assertFalse(output.getOut().contains("AI 전송 호출 직전")),
+                () -> assertFalse(output.getOut().contains("temp/" + EXAM_ID + "/q_1_r0.wav"))
         );
         verify(dispatchService).dispatchQuestion(any(QuestionDispatchClaim.class));
     }
@@ -216,26 +224,41 @@ class ExamGradingServiceTest {
 
         assertAll(
                 () -> assertEquals(ExamStatus.PROCESSING, repeatedStatus),
-                () -> assertTrue(output.getOut().contains(
-                        "기존 채점 Job 반환: jobId=question:" + EXAM_ID
-                                + ":1:0, status=PROCESSING, dispatchAttempt=1"))
+                () -> assertEquals(
+                        1,
+                        countOccurrences(
+                                output.getOut(),
+                                "event=grading.question.dispatch outcome=success "
+                                        + "jobId=question:" + EXAM_ID + ":1:0"
+                        )
+                )
         );
         verify(dispatchService, times(1)).dispatchQuestion(any(QuestionDispatchClaim.class));
     }
 
     @Test
-    void dispatchFailureLogRedactsPresignedUrl(CapturedOutput output) {
-        doThrow(new RuntimeException(
-                "GET https://example.com/audio.wav?X-Amz-Signature=should-not-be-logged failed"
+    void dispatchFailureLogOmitsExceptionMessageAndPresignedUrl(CapturedOutput output) {
+        doThrow(GradingDispatchException.at(
+                GradingDispatchException.Stage.AI_POST,
+                System.nanoTime(),
+                new RuntimeException(
+                        "POST https://example.com/evaluations?token=should-not-be-logged failed"
+                )
         )).when(dispatchService).dispatchQuestion(any(QuestionDispatchClaim.class));
 
         assertThrows(ExamsException.class, () -> service.submitQuestion(EXAM_ID, 1, 0));
 
         assertAll(
                 () -> assertTrue(output.getOut().contains(
-                        "AI 전송 실패: jobId=question:" + EXAM_ID + ":1:0")),
-                () -> assertTrue(output.getOut().contains("type=java.lang.RuntimeException")),
-                () -> assertTrue(output.getOut().contains("message=GET [redacted-uri]")),
+                        "event=grading.question.dispatch outcome=failure "
+                                + "reason=QUESTION_DISPATCH_FAILED jobId=question:"
+                                + EXAM_ID + ":1:0")),
+                () -> assertTrue(output.getOut().contains(
+                        "stage=ai_post stageDurationMs=")),
+                () -> assertTrue(output.getOut().contains(
+                        "errorType=web.tosunsaeng.domain.exams.application.GradingDispatchException "
+                                + "rootCauseType=java.lang.RuntimeException")),
+                () -> assertFalse(output.getOut().contains("https://example.com")),
                 () -> assertFalse(output.getOut().contains("X-Amz-Signature")),
                 () -> assertFalse(output.getOut().contains("should-not-be-logged"))
         );
@@ -264,13 +287,20 @@ class ExamGradingServiceTest {
     }
 
     @Test
-    void retryDispatchesFailedQuestionOnly() {
+    void retryDispatchesFailedQuestionOnly(CapturedOutput output) {
         putQuestion(questionJob(1, 0, GradingJobStatus.FAILED, 1, NOW.minusSeconds(600)));
 
         ExamResponseDTO.GradingRetryResult result = service.retryExam(EXAM_ID);
 
-        assertEquals(List.of(1), result.getRetriedQuestionNumbers());
-        assertEquals(SummaryAction.NOT_READY, result.getSummaryAction());
+        assertAll(
+                () -> assertEquals(List.of(1), result.getRetriedQuestionNumbers()),
+                () -> assertEquals(SummaryAction.NOT_READY, result.getSummaryAction()),
+                () -> assertTrue(output.getOut().contains(
+                        "event=grading.exam.retry outcome=completed examId=" + EXAM_ID
+                                + " retriedCount=1 waitingCount=0 missingSubmissionCount=0 "
+                                + "summaryAction=NOT_READY overallStatus=PROCESSING"
+                ))
+        );
         verify(dispatchService).dispatchQuestion(any(QuestionDispatchClaim.class));
     }
 
@@ -404,7 +434,7 @@ class ExamGradingServiceTest {
     }
 
     @Test
-    void retryStopsAtMaximumDispatchAttempts() {
+    void retryStopsAtMaximumDispatchAttempts(CapturedOutput output) {
         putQuestion(questionJob(1, 0, GradingJobStatus.FAILED, 3, NOW.minusSeconds(600)));
 
         ExamResponseDTO.GradingRetryResult result = service.retryExam(EXAM_ID);
@@ -412,7 +442,13 @@ class ExamGradingServiceTest {
         assertAll(
                 () -> assertTrue(result.getRetriedQuestionNumbers().isEmpty()),
                 () -> assertEquals(ExamStatus.FAILED, result.getOverallStatus()),
-                () -> assertEquals("MAX_DISPATCH_ATTEMPTS", storedQuestion(1, 0).getFailureReason())
+                () -> assertEquals("MAX_DISPATCH_ATTEMPTS", storedQuestion(1, 0).getFailureReason()),
+                () -> assertTrue(output.getOut().contains(
+                        "event=grading.question.job outcome=max_attempts "
+                                + "reason=MAX_DISPATCH_ATTEMPTS jobId=question:" + EXAM_ID + ":1:0 "
+                                + "examId=" + EXAM_ID + " questionNumber=1 retryCount=0 "
+                                + "dispatchAttempt=3 fromStatus=FAILED toStatus=FAILED"
+                ))
         );
         verify(dispatchService, never()).dispatchQuestion(any());
     }
@@ -515,14 +551,50 @@ class ExamGradingServiceTest {
     }
 
     @Test
-    void callbackCompletionRecoversMissingLegacyJob() {
+    void callbackCompletionRecoversMissingLegacyJob(CapturedOutput output) {
         service.completeQuestion(EXAM_ID, 1, 0);
 
         QuestionGradingJob stored = storedQuestion(1, 0);
         assertAll(
                 () -> assertEquals(GradingJobStatus.COMPLETED, stored.getStatus()),
                 () -> assertEquals("question:" + EXAM_ID + ":1:0", stored.getJobId()),
-                () -> assertEquals(NOW, stored.getCompletedAt())
+                () -> assertEquals(NOW, stored.getCompletedAt()),
+                () -> assertTrue(output.getOut().contains(
+                        "event=grading.question.job outcome=completed jobId=question:"
+                                + EXAM_ID + ":1:0 examId=" + EXAM_ID
+                                + " questionNumber=1 retryCount=0 dispatchAttempt=0 "
+                                + "fromStatus=MISSING toStatus=COMPLETED callbackLatencyMs=-1"
+                ))
+        );
+    }
+
+    @Test
+    void callbackCompletionLogsQuestionProcessingLatencyOnce(CapturedOutput output) {
+        putQuestion(questionJob(
+                1,
+                0,
+                GradingJobStatus.PROCESSING,
+                2,
+                NOW.minusSeconds(45)
+        ));
+
+        service.completeQuestion(EXAM_ID, 1, 0);
+        service.completeQuestion(EXAM_ID, 1, 0);
+
+        assertAll(
+                () -> assertEquals(GradingJobStatus.COMPLETED, storedQuestion(1, 0).getStatus()),
+                () -> assertEquals(
+                        1,
+                        countOccurrences(
+                                output.getOut(),
+                                "event=grading.question.job outcome=completed jobId=question:"
+                                        + EXAM_ID + ":1:0"
+                        )
+                ),
+                () -> assertTrue(output.getOut().contains(
+                        "dispatchAttempt=2 fromStatus=PROCESSING toStatus=COMPLETED "
+                                + "callbackLatencyMs=45000"
+                ))
         );
     }
 
@@ -602,7 +674,7 @@ class ExamGradingServiceTest {
     }
 
     @Test
-    void staleQuestionAttemptFailureDoesNotOverwriteNewerProcessingAttempt() {
+    void staleQuestionAttemptFailureDoesNotOverwriteNewerProcessingAttempt(CapturedOutput output) {
         CountDownLatch attemptOneStarted = new CountDownLatch(1);
         CountDownLatch releaseAttemptOne = new CountDownLatch(1);
         doAnswer(invocation -> {
@@ -638,7 +710,10 @@ class ExamGradingServiceTest {
                     () -> assertEquals(GradingJobStatus.PROCESSING, stored.getStatus()),
                     () -> assertEquals(2, stored.getDispatchAttempt()),
                     () -> assertNull(stored.getFailedAt()),
-                    () -> assertNull(stored.getFailureReason())
+                    () -> assertNull(stored.getFailureReason()),
+                    () -> assertFalse(output.getOut().contains(
+                            "event=grading.question.dispatch outcome=failure"
+                    ))
             );
             verify(questionJobRepository).failClaimedAttempt(
                     GradingKeys.questionJobId(EXAM_ID, 1, 0),
@@ -656,14 +731,48 @@ class ExamGradingServiceTest {
     }
 
     @Test
-    void summaryCallbackCompletionRecoversMissingLegacyJob() {
+    void summaryCallbackCompletionRecoversMissingLegacyJob(CapturedOutput output) {
         service.completeSummary(EXAM_ID);
 
         SummaryGradingJob stored = storedSummary();
         assertAll(
                 () -> assertEquals(GradingJobStatus.COMPLETED, stored.getStatus()),
                 () -> assertEquals(1, stored.getSummaryVersion()),
-                () -> assertEquals(NOW, stored.getCompletedAt())
+                () -> assertEquals(NOW, stored.getCompletedAt()),
+                () -> assertTrue(output.getOut().contains(
+                        "event=grading.summary.job outcome=completed jobId=summary:"
+                                + EXAM_ID + ":v1 examId=" + EXAM_ID
+                                + " dispatchAttempt=0 fromStatus=MISSING "
+                                + "toStatus=COMPLETED callbackLatencyMs=-1"
+                ))
+        );
+    }
+
+    @Test
+    void callbackCompletionLogsSummaryProcessingLatencyOnce(CapturedOutput output) {
+        putSummary(summaryJob(
+                GradingJobStatus.PROCESSING,
+                2,
+                NOW.minusSeconds(90)
+        ));
+
+        service.completeSummary(EXAM_ID);
+        service.completeSummary(EXAM_ID);
+
+        assertAll(
+                () -> assertEquals(GradingJobStatus.COMPLETED, storedSummary().getStatus()),
+                () -> assertEquals(
+                        1,
+                        countOccurrences(
+                                output.getOut(),
+                                "event=grading.summary.job outcome=completed jobId=summary:"
+                                        + EXAM_ID + ":v1"
+                        )
+                ),
+                () -> assertTrue(output.getOut().contains(
+                        "dispatchAttempt=2 fromStatus=PROCESSING toStatus=COMPLETED "
+                                + "callbackLatencyMs=90000"
+                ))
         );
     }
 
@@ -680,7 +789,7 @@ class ExamGradingServiceTest {
     }
 
     @Test
-    void allRequiredQuestionsCreateOnePendingSummaryJobAndOnlyScheduleIt() {
+    void allRequiredQuestionsCreateOnePendingSummaryJobAndOnlyScheduleIt(CapturedOutput output) {
         expectedQuestionNumbers = List.of(1, 2);
         putCompletedQuestions(expectedQuestionNumbers);
 
@@ -694,7 +803,15 @@ class ExamGradingServiceTest {
         assertAll(
                 () -> assertEquals(GradingJobStatus.PENDING, stored.getStatus()),
                 () -> assertEquals(0, stored.getDispatchAttempt()),
-                () -> assertEquals("summary:" + EXAM_ID + ":v1", stored.getJobId())
+                () -> assertEquals("summary:" + EXAM_ID + ":v1", stored.getJobId()),
+                () -> assertEquals(
+                        1,
+                        countOccurrences(
+                                output.getOut(),
+                                "event=grading.summary.trigger outcome=scheduled "
+                                        + "examId=" + EXAM_ID
+                        )
+                )
         );
     }
 
@@ -743,6 +860,30 @@ class ExamGradingServiceTest {
         assertAll(
                 () -> assertEquals(SummaryAction.WAITING, result.getSummaryAction()),
                 () -> assertEquals(GradingJobStatus.PROCESSING, storedSummary().getStatus())
+        );
+        verify(summaryDispatchScheduler, never()).scheduleRetry(anyString());
+    }
+
+    @Test
+    void failedSummaryAtAttemptLimitIsMarkedAndLogged(CapturedOutput output) {
+        putCompletedQuestions(expectedQuestionNumbers);
+        putSummary(summaryJob(
+                GradingJobStatus.FAILED,
+                3,
+                NOW.minus(Duration.ofMinutes(4))
+        ));
+
+        ExamResponseDTO.GradingRetryResult result = service.retryExam(EXAM_ID);
+
+        assertAll(
+                () -> assertEquals(SummaryAction.WAITING, result.getSummaryAction()),
+                () -> assertEquals("MAX_DISPATCH_ATTEMPTS", storedSummary().getFailureReason()),
+                () -> assertTrue(output.getOut().contains(
+                        "event=grading.summary.job outcome=max_attempts "
+                                + "reason=MAX_DISPATCH_ATTEMPTS jobId=summary:" + EXAM_ID + ":v1 "
+                                + "examId=" + EXAM_ID + " dispatchAttempt=3 "
+                                + "fromStatus=FAILED toStatus=FAILED"
+                ))
         );
         verify(summaryDispatchScheduler, never()).scheduleRetry(anyString());
     }
@@ -1026,6 +1167,10 @@ class ExamGradingServiceTest {
         } finally {
             executor.shutdownNow();
         }
+    }
+
+    private static int countOccurrences(String source, String target) {
+        return source.split(java.util.regex.Pattern.quote(target), -1).length - 1;
     }
 
     private static final class MutableClock extends Clock {

@@ -60,6 +60,10 @@ server:
       min-spare: 4
     max-connections: 100
 
+logging:
+  pattern:
+    level: "%5p requestId=%X{requestId:-}"
+
 sentry:
   dsn: ${SENTRY_DSN:}
   send-default-pii: false

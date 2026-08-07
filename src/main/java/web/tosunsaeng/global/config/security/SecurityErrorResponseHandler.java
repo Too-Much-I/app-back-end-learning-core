@@ -5,6 +5,7 @@ import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.MediaType;
 import org.springframework.security.core.AuthenticationException;
 import org.springframework.security.web.AuthenticationEntryPoint;
@@ -16,6 +17,7 @@ import web.tosunsaeng.global.error.code.status.ErrorStatus;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 
+@Slf4j
 @Component
 @RequiredArgsConstructor
 public class SecurityErrorResponseHandler implements AuthenticationEntryPoint, AccessDeniedHandler {
@@ -27,6 +29,14 @@ public class SecurityErrorResponseHandler implements AuthenticationEntryPoint, A
             HttpServletRequest request,
             HttpServletResponse response,
             AuthenticationException authenticationException) throws IOException {
+        log.warn(
+                "event=http.security outcome=rejected reason=unauthorized method={} path={} "
+                        + "errorCode={} errorType={}",
+                request.getMethod(),
+                request.getRequestURI(),
+                ErrorStatus._UNAUTHORIZED.getCode(),
+                authenticationException.getClass().getName()
+        );
         writeErrorResponse(response, ErrorStatus._UNAUTHORIZED);
     }
 
@@ -36,6 +46,14 @@ public class SecurityErrorResponseHandler implements AuthenticationEntryPoint, A
             HttpServletResponse response,
             org.springframework.security.access.AccessDeniedException accessDeniedException)
             throws IOException, ServletException {
+        log.warn(
+                "event=http.security outcome=rejected reason=forbidden method={} path={} "
+                        + "errorCode={} errorType={}",
+                request.getMethod(),
+                request.getRequestURI(),
+                ErrorStatus._FORBIDDEN.getCode(),
+                accessDeniedException.getClass().getName()
+        );
         writeErrorResponse(response, ErrorStatus._FORBIDDEN);
     }
 

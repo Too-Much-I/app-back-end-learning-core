@@ -6,6 +6,8 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.boot.test.system.CapturedOutput;
+import org.springframework.boot.test.system.OutputCaptureExtension;
 import org.springframework.core.task.TaskExecutor;
 import org.springframework.core.task.TaskRejectedException;
 import org.springframework.dao.OptimisticLockingFailureException;
@@ -53,7 +55,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
-@ExtendWith(MockitoExtension.class)
+@ExtendWith({MockitoExtension.class, OutputCaptureExtension.class})
 class SummaryDispatchSchedulerTest {
 
     private static final String EXAM_ID = "ex_summary_scheduler_001";
@@ -86,7 +88,7 @@ class SummaryDispatchSchedulerTest {
     }
 
     @Test
-    void duplicatePendingTasksDispatchSummaryOnlyOnce() {
+    void duplicatePendingTasksDispatchSummaryOnlyOnce(CapturedOutput output) {
         CapturingTaskExecutor taskExecutor = new CapturingTaskExecutor();
         AtomicReference<SummaryGradingJob> store = installRepositoryStore(
                 SummaryGradingJob.pending(JOB_ID, EXAM_ID, "mock_exam_002", NOW)
@@ -108,7 +110,15 @@ class SummaryDispatchSchedulerTest {
                 () -> assertEquals(1, claimCaptor.getValue().dispatchAttempt()),
                 () -> assertEquals("mock_exam_002", claimCaptor.getValue().mockExamId()),
                 () -> assertEquals(GradingJobStatus.PROCESSING, stored.getStatus()),
-                () -> assertEquals(1, stored.getDispatchAttempt())
+                () -> assertEquals(1, stored.getDispatchAttempt()),
+                () -> assertEquals(
+                        1,
+                        countOccurrences(
+                                output.getOut(),
+                                "event=grading.summary.dispatch outcome=success "
+                                        + "jobId=" + JOB_ID
+                        )
+                )
         );
     }
 
@@ -192,7 +202,7 @@ class SummaryDispatchSchedulerTest {
     }
 
     @Test
-    void rejectedTaskLeavesPendingSummaryRecoverable() {
+    void rejectedTaskLeavesPendingSummaryRecoverable(CapturedOutput output) {
         SummaryGradingJob pending = SummaryGradingJob.pending(JOB_ID, EXAM_ID, NOW);
         TaskExecutor rejectingExecutor = task -> {
             throw new TaskRejectedException("queue full");
@@ -204,13 +214,18 @@ class SummaryDispatchSchedulerTest {
         assertAll(
                 () -> assertFalse(scheduled),
                 () -> assertEquals(GradingJobStatus.PENDING, pending.getStatus()),
-                () -> assertEquals(0, pending.getDispatchAttempt())
+                () -> assertEquals(0, pending.getDispatchAttempt()),
+                () -> assertTrue(output.getOut().contains(
+                        "event=grading.summary.schedule outcome=rejected reason=executor_rejected "
+                                + "jobId=" + JOB_ID + " mode=PENDING_ONLY"
+                ))
         );
         verifyNoInteractions(summaryJobRepository, dispatchService);
     }
 
     @Test
-    void staleSummaryAttemptFailureDoesNotOverwriteNewerProcessingAttempt() throws Exception {
+    void staleSummaryAttemptFailureDoesNotOverwriteNewerProcessingAttempt(
+            CapturedOutput output) throws Exception {
         CapturingTaskExecutor taskExecutor = new CapturingTaskExecutor();
         AtomicReference<SummaryGradingJob> store = installRepositoryStore(
                 SummaryGradingJob.pending(JOB_ID, EXAM_ID, NOW)
@@ -249,7 +264,10 @@ class SummaryDispatchSchedulerTest {
                     () -> assertEquals(GradingJobStatus.PROCESSING, stored.getStatus()),
                     () -> assertEquals(2, stored.getDispatchAttempt()),
                     () -> assertNull(stored.getFailedAt()),
-                    () -> assertNull(stored.getFailureReason())
+                    () -> assertNull(stored.getFailureReason()),
+                    () -> assertFalse(output.getOut().contains(
+                            "event=grading.summary.dispatch outcome=failure"
+                    ))
             );
             verify(summaryJobRepository).failClaimedAttempt(
                     JOB_ID,
@@ -264,13 +282,17 @@ class SummaryDispatchSchedulerTest {
     }
 
     @Test
-    void summaryHttpTimeoutFailsOnlyTheClaimedAttempt() {
+    void summaryHttpTimeoutFailsOnlyTheClaimedAttempt(CapturedOutput output) {
         CapturingTaskExecutor taskExecutor = new CapturingTaskExecutor();
         AtomicReference<SummaryGradingJob> store = installRepositoryStore(
                 SummaryGradingJob.pending(JOB_ID, EXAM_ID, NOW.minusSeconds(61))
         );
         SummaryDispatchScheduler scheduler = scheduler(taskExecutor);
-        doThrow(new ResourceAccessException("read timed out"))
+        doThrow(GradingDispatchException.at(
+                GradingDispatchException.Stage.AI_POST,
+                System.nanoTime(),
+                new ResourceAccessException("read timed out at https://example.com?token=secret")
+        ))
                 .when(dispatchService).dispatchSummary(any(SummaryDispatchClaim.class));
 
         assertTrue(scheduler.schedulePending(JOB_ID));
@@ -281,7 +303,21 @@ class SummaryDispatchSchedulerTest {
                 () -> assertEquals(GradingJobStatus.FAILED, stored.getStatus()),
                 () -> assertEquals(1, stored.getDispatchAttempt()),
                 () -> assertEquals(NOW, stored.getFailedAt()),
-                () -> assertEquals(SummaryDispatchScheduler.SUMMARY_DISPATCH_FAILED, stored.getFailureReason())
+                () -> assertEquals(SummaryDispatchScheduler.SUMMARY_DISPATCH_FAILED, stored.getFailureReason()),
+                () -> assertTrue(output.getOut().contains(
+                        "event=grading.summary.dispatch outcome=failure "
+                                + "reason=SUMMARY_DISPATCH_FAILED jobId=" + JOB_ID
+                )),
+                () -> assertTrue(output.getOut().contains(
+                        "stage=ai_post stageDurationMs="
+                )),
+                () -> assertTrue(output.getOut().contains(
+                        "errorType=web.tosunsaeng.domain.exams.application.GradingDispatchException "
+                                + "rootCauseType=org.springframework.web.client.ResourceAccessException"
+                )),
+                () -> assertFalse(output.getOut().contains("read timed out")),
+                () -> assertFalse(output.getOut().contains("https://example.com")),
+                () -> assertFalse(output.getOut().contains("token=secret"))
         );
         verify(summaryJobRepository).failClaimedAttempt(
                 JOB_ID,
@@ -465,5 +501,9 @@ class SummaryDispatchSchedulerTest {
         public Instant instant() {
             return instant.get();
         }
+    }
+
+    private static int countOccurrences(String source, String target) {
+        return source.split(java.util.regex.Pattern.quote(target), -1).length - 1;
     }
 }

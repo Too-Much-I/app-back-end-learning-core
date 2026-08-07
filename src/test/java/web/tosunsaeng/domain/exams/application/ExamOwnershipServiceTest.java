@@ -12,6 +12,8 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.InOrder;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.boot.test.system.CapturedOutput;
+import org.springframework.boot.test.system.OutputCaptureExtension;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.data.redis.core.ValueOperations;
 import org.springframework.test.util.ReflectionTestUtils;
@@ -65,7 +67,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
-@ExtendWith(MockitoExtension.class)
+@ExtendWith({MockitoExtension.class, OutputCaptureExtension.class})
 class ExamOwnershipServiceTest {
 
     private static final String EXAM_ID = "ex_ownership_001";
@@ -883,7 +885,9 @@ class ExamOwnershipServiceTest {
 
     @ParameterizedTest
     @EnumSource(UserExamApi.class)
-    void anotherUsersSessionIsForbiddenBeforeAnyDownstreamOperation(UserExamApi api) {
+    void anotherUsersSessionIsForbiddenBeforeAnyDownstreamOperation(
+            UserExamApi api,
+            CapturedOutput output) {
         when(examSessionRepository.findById(EXAM_ID))
                 .thenReturn(Optional.of(sessionFor(OTHER_USER_ID)));
         when(currentUserProvider.getCurrentUserId()).thenReturn(OWNER_USER_ID);
@@ -891,6 +895,11 @@ class ExamOwnershipServiceTest {
         ExamsException exception = assertThrows(ExamsException.class, () -> invoke(api));
 
         assertSame(ErrorStatus._FORBIDDEN, exception.getCode());
+        assertTrue(output.getOut().contains(
+                "event=exam.access outcome=denied reason=ownership_mismatch examId=" + EXAM_ID
+        ));
+        assertFalse(output.getOut().contains(OWNER_USER_ID));
+        assertFalse(output.getOut().contains(OTHER_USER_ID));
         verify(examSessionRepository).findById(EXAM_ID);
         verify(currentUserProvider).getCurrentUserId();
         verifyNoInteractions(

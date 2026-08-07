@@ -14,6 +14,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.test.util.ReflectionTestUtils;
 import org.springframework.util.MultiValueMap;
 import org.springframework.web.client.RestTemplate;
+import org.springframework.web.client.ResourceAccessException;
 import software.amazon.awssdk.services.s3.presigner.S3Presigner;
 import software.amazon.awssdk.services.s3.presigner.model.GetObjectPresignRequest;
 import software.amazon.awssdk.services.s3.presigner.model.PresignedGetObjectRequest;
@@ -31,6 +32,7 @@ import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.verify;
@@ -111,13 +113,9 @@ class GradingDispatchServiceTest {
                         "question:" + EXAM_ID + ":4:2",
                         requestCaptor.getValue().getHeaders().getFirst("Idempotency-Key")
                 ),
-                () -> assertTrue(output.getOut().contains(
-                        "AI multipart POST 시작: jobId=question:" + EXAM_ID
-                                + ":4:2, uri=" + AI_EVALUATION_URL
-                                + ", fileKey=temp/" + EXAM_ID + "/q_4_r2.wav, audioSize=3")),
-                () -> assertTrue(output.getOut().contains(
-                        "AI multipart POST 완료: jobId=question:" + EXAM_ID
-                                + ":4:2, status=200 OK"))
+                () -> assertFalse(output.getOut().contains("AI multipart POST")),
+                () -> assertFalse(output.getOut().contains(AI_EVALUATION_URL.toString())),
+                () -> assertFalse(output.getOut().contains("temp/" + EXAM_ID + "/q_4_r2.wav"))
         );
     }
 
@@ -192,10 +190,78 @@ class GradingDispatchServiceTest {
     }
 
     @Test
+    void questionDownloadFailureIsClassifiedWithoutLoggingUrlOrObjectKey(CapturedOutput output)
+            throws Exception {
+        when(s3Presigner.presignGetObject(any(GetObjectPresignRequest.class)))
+                .thenReturn(presignedGetObjectRequest);
+        when(presignedGetObjectRequest.url())
+                .thenReturn(URI.create(
+                        "https://example.com/test-audio.wav?X-Amz-Signature=should-not-be-logged"
+                ).toURL());
+        when(restTemplate.getForObject(any(URI.class), eq(byte[].class)))
+                .thenThrow(new ResourceAccessException("signed URL should-not-be-logged"));
+
+        GradingDispatchException failure = assertThrows(
+                GradingDispatchException.class,
+                () -> service.dispatchQuestion(questionClaim())
+        );
+
+        assertAll(
+                () -> assertEquals("s3_download", GradingDispatchException.stageCode(failure)),
+                () -> assertTrue(GradingDispatchException.stageDurationMs(failure) >= 0),
+                () -> assertFalse(failure.getMessage().contains("https://")),
+                () -> assertFalse(failure.getMessage().contains("X-Amz-Signature")),
+                () -> assertFalse(output.getOut().contains("should-not-be-logged")),
+                () -> assertFalse(output.getOut().contains("temp/" + EXAM_ID))
+        );
+    }
+
+    @Test
+    void questionAiPostFailureIsClassifiedWithoutLoggingEndpoint(CapturedOutput output)
+            throws Exception {
+        when(s3Presigner.presignGetObject(any(GetObjectPresignRequest.class)))
+                .thenReturn(presignedGetObjectRequest);
+        when(presignedGetObjectRequest.url())
+                .thenReturn(URI.create("https://example.com/test-audio.wav").toURL());
+        when(restTemplate.getForObject(any(URI.class), eq(byte[].class)))
+                .thenReturn(new byte[]{1, 2, 3});
+        when(restTemplate.postForEntity(eq(AI_EVALUATION_URL), any(HttpEntity.class), eq(String.class)))
+                .thenThrow(new ResourceAccessException(
+                        "POST http://configured-ai:8123/evaluations token=should-not-be-logged"
+                ));
+
+        GradingDispatchException failure = assertThrows(
+                GradingDispatchException.class,
+                () -> service.dispatchQuestion(questionClaim())
+        );
+
+        assertAll(
+                () -> assertEquals("ai_post", GradingDispatchException.stageCode(failure)),
+                () -> assertTrue(GradingDispatchException.stageDurationMs(failure) >= 0),
+                () -> assertFalse(failure.getMessage().contains("configured-ai")),
+                () -> assertFalse(output.getOut().contains("configured-ai")),
+                () -> assertFalse(output.getOut().contains("should-not-be-logged"))
+        );
+    }
+
+    @Test
     void evaluationPathIsAppendedOnceWhenConfiguredBaseUrlHasTrailingSlash() {
         assertEquals(
                 URI.create("http://configured-ai:8123/evaluations"),
                 GradingDispatchService.aiEvaluationUri(URI.create("http://configured-ai:8123/"))
+        );
+    }
+
+    private static QuestionDispatchClaim questionClaim() {
+        return new QuestionDispatchClaim(
+                "question:" + EXAM_ID + ":4:2",
+                1,
+                Instant.parse("2026-07-28T00:00:00Z"),
+                EXAM_ID,
+                4,
+                2,
+                "temp/" + EXAM_ID + "/q_4_r2.wav",
+                "mock_exam_002"
         );
     }
 }
