@@ -41,7 +41,8 @@ class SecurityErrorResponseHandlerTest {
                 () -> assertEquals(401, response.getStatus()),
                 () -> assertEquals("COMMON401", body.path("code").asText()),
                 () -> assertTrue(output.getOut().contains(
-                        "event=http.security outcome=rejected reason=unauthorized "
+                        "인증되지 않은 요청 거절 "
+                                + "event=http.security outcome=rejected reason=unauthorized "
                                 + "method=POST path=/api/v1/exams errorCode=COMMON401"
                 )),
                 () -> assertFalse(output.getOut().contains("Authorization")),
@@ -69,7 +70,8 @@ class SecurityErrorResponseHandlerTest {
                 () -> assertEquals(403, response.getStatus()),
                 () -> assertEquals("COMMON403", body.path("code").asText()),
                 () -> assertTrue(output.getOut().contains(
-                        "event=http.security outcome=rejected reason=forbidden "
+                        "접근 권한이 없는 요청 거절 "
+                                + "event=http.security outcome=rejected reason=forbidden "
                                 + "method=GET path=/api/v1/exams/ex_forbidden/status "
                                 + "errorCode=COMMON403"
                 )),

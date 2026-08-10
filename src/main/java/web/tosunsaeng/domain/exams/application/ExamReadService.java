@@ -180,7 +180,8 @@ public class ExamReadService {
                 .orElseThrow(() -> new ExamsException(ErrorStatus._EXAM_NOT_FOUND));
         if (!Objects.equals(session.getUserId(), currentUserProvider.getCurrentUserId())) {
             log.warn(
-                    "event=exam.access outcome=denied reason=ownership_mismatch examId={}",
+                    "시험 소유권 검증 실패 event=exam.access outcome=denied "
+                            + "reason=ownership_mismatch examId={}",
                     examId
             );
             throw new ExamsException(ErrorStatus._FORBIDDEN);
@@ -204,13 +205,15 @@ public class ExamReadService {
 
         if (title == null) {
             log.warn(
-                    "event=exam.history.data outcome=incomplete reason=missing_mock_exam_title examId={}",
+                    "시험 이력 제목 누락 event=exam.history.data outcome=incomplete "
+                            + "reason=missing_mock_exam_title examId={}",
                     examId
             );
         }
         if (!summaryAvailable) {
             log.warn(
-                    "event=exam.history.data outcome=incomplete reason=missing_summary examId={}",
+                    "시험 이력 요약 결과 누락 event=exam.history.data outcome=incomplete "
+                            + "reason=missing_summary examId={}",
                     examId
             );
         }

@@ -115,7 +115,8 @@ class SummaryDispatchSchedulerTest {
                         1,
                         countOccurrences(
                                 output.getOut(),
-                                "event=grading.summary.dispatch outcome=success "
+                                "요약 채점 요청 전송 완료 "
+                                        + "event=grading.summary.dispatch outcome=success "
                                         + "jobId=" + JOB_ID
                         )
                 )
@@ -216,7 +217,8 @@ class SummaryDispatchSchedulerTest {
                 () -> assertEquals(GradingJobStatus.PENDING, pending.getStatus()),
                 () -> assertEquals(0, pending.getDispatchAttempt()),
                 () -> assertTrue(output.getOut().contains(
-                        "event=grading.summary.schedule outcome=rejected reason=executor_rejected "
+                        "요약 채점 실행 예약 거절 "
+                                + "event=grading.summary.schedule outcome=rejected reason=executor_rejected "
                                 + "jobId=" + JOB_ID + " mode=PENDING_ONLY"
                 ))
         );
@@ -305,7 +307,8 @@ class SummaryDispatchSchedulerTest {
                 () -> assertEquals(NOW, stored.getFailedAt()),
                 () -> assertEquals(SummaryDispatchScheduler.SUMMARY_DISPATCH_FAILED, stored.getFailureReason()),
                 () -> assertTrue(output.getOut().contains(
-                        "event=grading.summary.dispatch outcome=failure "
+                        "요약 채점 요청 전송 실패 "
+                                + "event=grading.summary.dispatch outcome=failure "
                                 + "reason=SUMMARY_DISPATCH_FAILED jobId=" + JOB_ID
                 )),
                 () -> assertTrue(output.getOut().contains(

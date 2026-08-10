@@ -175,7 +175,7 @@ class ExamServiceImplTest {
         assertFalse(responseJson.has("userId"));
         assertFalse(responseJson.has("user_id"));
         assertTrue(output.getOut().contains(
-                "event=exam.session.ready outcome=success examId=" + result.getExamId()
+                "시험 세션 준비 완료 event=exam.session.ready outcome=success examId=" + result.getExamId()
                         + " mockExamId=mock_exam_003 questionCount=1 durationMs="
         ));
         assertFalse(output.getOut().contains(LEGACY_USER_ID));

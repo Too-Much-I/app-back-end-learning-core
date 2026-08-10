@@ -66,7 +66,8 @@ public class ExamSessionManager {
         try {
             ExamSession inserted = examSessionRepository.insert(newSession);
             log.info(
-                    "event=exam.session.created outcome=success examId={} mockExamId={} "
+                    "시험 세션 생성 완료 event=exam.session.created outcome=success "
+                            + "examId={} mockExamId={} "
                             + "cycleNumber={} abandonedCount={} createAttempt={}",
                     inserted.getExamId(),
                     inserted.getMockExamId(),
@@ -77,7 +78,8 @@ public class ExamSessionManager {
             return new Assignment(inserted, selected.mockExam(), true);
         } catch (DuplicateKeyException concurrentCreation) {
             log.warn(
-                    "event=exam.session.create outcome={} reason=duplicate_active_session "
+                    "활성 시험 세션 중복 감지 event=exam.session.create "
+                            + "outcome={} reason=duplicate_active_session "
                             + "createAttempt={} nextAttempt={}",
                     attempt < CREATE_ATTEMPTS ? "retry" : "failed",
                     attempt,
@@ -95,12 +97,13 @@ public class ExamSessionManager {
         boolean completed = examSessionRepository.completeIfIncomplete(examId, completedAt) == 1;
         if (completed) {
             log.info(
-                    "event=exam.session.completed outcome=transitioned examId={} "
+                    "시험 세션 완료 전환 event=exam.session.completed "
+                            + "outcome=transitioned examId={} "
                             + "fromStatus=IN_PROGRESS toStatus=COMPLETED",
                     examId
             );
         } else {
-            log.debug("event=exam.session.completed outcome=noop examId={}", examId);
+            log.debug("시험 세션 완료 전환 생략 event=exam.session.completed outcome=noop examId={}", examId);
         }
         return completed;
     }
@@ -111,7 +114,8 @@ public class ExamSessionManager {
             if (examSessionRepository.abandonIfInProgress(candidate.getExamId()) == 1) {
                 abandonedExamIds.add(candidate.getExamId());
                 log.info(
-                        "event=exam.session.abandoned outcome=transitioned examId={} "
+                        "이전 시험 세션 폐기 완료 event=exam.session.abandoned "
+                                + "outcome=transitioned examId={} "
                                 + "fromStatus=IN_PROGRESS toStatus=ABANDONED reason=new_session_started",
                         candidate.getExamId()
                 );
@@ -161,8 +165,8 @@ public class ExamSessionManager {
             }
 
             if (evidence.completedAt() == null) {
-                log.warn("Legacy ExamSession has completion evidence but no trustworthy completion timestamp; "
-                        + "the Session will not be reused or backfilled: examId={}", candidate.getExamId());
+                log.warn("레거시 시험 세션에 완료 근거가 있지만 신뢰할 수 있는 완료 시각이 없어 "
+                        + "재사용하거나 보정하지 않습니다: examId={}", candidate.getExamId());
                 continue;
             }
 
@@ -172,16 +176,16 @@ public class ExamSessionManager {
                     : examSessionRepository.backfillLegacyCompletionIfUnchanged(
                             candidate.getExamId(), evidence.completedAt());
             if (updated == 0) {
-                log.debug("Legacy ExamSession completion backfill was already applied or the Session changed: examId={}",
+                log.debug("레거시 시험 세션 완료 시각 보정이 이미 적용됐거나 세션 상태가 변경되었습니다: examId={}",
                         candidate.getExamId());
             } else if (evidence.approximateTimestamp()) {
-                log.warn("Legacy ExamSession completion used createdAt as an approximate timestamp: examId={}",
+                log.warn("레거시 시험 세션 완료 시각에 createdAt을 근사값으로 사용했습니다: examId={}",
                         candidate.getExamId());
             }
         }
 
         if (reusable.size() > 1) {
-            log.warn("Multiple in-progress ExamSessions exist for one user; all will be abandoned");
+            log.warn("한 사용자에게 진행 중인 시험 세션이 여러 개 있어 모두 폐기합니다");
         }
         return List.copyOf(reusable);
     }

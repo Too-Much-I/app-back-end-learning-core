@@ -94,7 +94,8 @@ public class ExamGradingService {
         try {
             inserted = questionJobRepository.insert(pending);
             log.debug(
-                    "event=grading.question.job outcome=created jobId={} examId={} "
+                    "문항 채점 작업 생성 event=grading.question.job outcome=created "
+                            + "jobId={} examId={} "
                             + "questionNumber={} retryCount={}",
                     jobId, examId, questionNumber, canonicalRetryCount
             );
@@ -102,7 +103,8 @@ public class ExamGradingService {
             QuestionGradingJob existing = questionJobRepository.findById(jobId)
                     .orElse(null);
             log.debug(
-                    "event=grading.question.job outcome=reused jobId={} status={} dispatchAttempt={}",
+                    "기존 문항 채점 작업 재사용 event=grading.question.job outcome=reused "
+                            + "jobId={} status={} dispatchAttempt={}",
                     jobId,
                     existing == null ? null : existing.getStatus(),
                     existing == null ? null : existing.getDispatchAttempt()
@@ -175,7 +177,8 @@ public class ExamGradingService {
                 : SummaryAction.NOT_READY;
         ExamStatus overallStatus = calculateAndCacheOverallStatus(examId, questionNumbers);
         log.info(
-                "event=grading.exam.retry outcome=completed examId={} retriedCount={} "
+                "시험 단위 채점 재시도 처리 완료 event=grading.exam.retry "
+                        + "outcome=completed examId={} retriedCount={} "
                         + "waitingCount={} missingSubmissionCount={} summaryAction={} overallStatus={}",
                 examId,
                 retried.size(),
@@ -219,7 +222,8 @@ public class ExamGradingService {
                     );
                     questionJobRepository.insert(completed);
                     log.info(
-                            "event=grading.question.job outcome=completed jobId={} examId={} "
+                            "문항 채점 작업 완료 event=grading.question.job outcome=completed "
+                                    + "jobId={} examId={} "
                                     + "questionNumber={} retryCount={} dispatchAttempt={} "
                                     + "fromStatus=MISSING toStatus=COMPLETED callbackLatencyMs={}",
                             jobId,
@@ -246,7 +250,8 @@ public class ExamGradingService {
             try {
                 questionJobRepository.save(job);
                 log.info(
-                        "event=grading.question.job outcome=completed jobId={} examId={} "
+                        "문항 채점 작업 완료 event=grading.question.job outcome=completed "
+                                + "jobId={} examId={} "
                                 + "questionNumber={} retryCount={} dispatchAttempt={} "
                                 + "fromStatus={} toStatus=COMPLETED callbackLatencyMs={}",
                         jobId,
@@ -263,7 +268,8 @@ public class ExamGradingService {
             }
         }
         log.warn(
-                "event=grading.question.job outcome=completion_race jobId={} examId={} "
+                "문항 채점 완료 전환 경합 감지 event=grading.question.job "
+                        + "outcome=completion_race jobId={} examId={} "
                         + "questionNumber={} retryCount={}",
                 jobId, examId, questionNumber, canonicalRetryCount
         );
@@ -285,7 +291,8 @@ public class ExamGradingService {
                             SummaryGradingJob.completed(jobId, examId, mockExamId, now);
                     summaryJobRepository.insert(completed);
                     log.info(
-                            "event=grading.summary.job outcome=completed jobId={} examId={} "
+                            "요약 채점 작업 완료 event=grading.summary.job outcome=completed "
+                                    + "jobId={} examId={} "
                                     + "dispatchAttempt={} fromStatus=MISSING toStatus=COMPLETED "
                                     + "callbackLatencyMs={}",
                             jobId,
@@ -310,7 +317,8 @@ public class ExamGradingService {
             try {
                 summaryJobRepository.save(job);
                 log.info(
-                        "event=grading.summary.job outcome=completed jobId={} examId={} "
+                        "요약 채점 작업 완료 event=grading.summary.job outcome=completed "
+                                + "jobId={} examId={} "
                                 + "dispatchAttempt={} fromStatus={} toStatus=COMPLETED "
                                 + "callbackLatencyMs={}",
                         jobId,
@@ -325,7 +333,8 @@ public class ExamGradingService {
             }
         }
         log.warn(
-                "event=grading.summary.job outcome=completion_race jobId={} examId={}",
+                "요약 채점 완료 전환 경합 감지 event=grading.summary.job "
+                        + "outcome=completion_race jobId={} examId={}",
                 jobId, examId
         );
     }
@@ -333,7 +342,9 @@ public class ExamGradingService {
     public void ensureSummaryStartedIfReady(String examId) {
         if (!canProcessSession(examId)) {
             log.debug(
-                    "event=grading.summary.trigger outcome=ignored reason=session_not_processable examId={}",
+                    "처리할 수 없는 시험 세션의 요약 채점 시작 무시 "
+                            + "event=grading.summary.trigger outcome=ignored "
+                            + "reason=session_not_processable examId={}",
                     examId
             );
             return;
@@ -345,7 +356,8 @@ public class ExamGradingService {
                 .count();
         if (completedCount != questionNumbers.size()) {
             log.debug(
-                    "event=grading.summary.trigger outcome=not_ready examId={} "
+                    "요약 채점 시작 조건 미충족 event=grading.summary.trigger "
+                            + "outcome=not_ready examId={} "
                             + "completedQuestionCount={} expectedQuestionCount={}",
                     examId, completedCount, questionNumbers.size()
             );
@@ -356,7 +368,8 @@ public class ExamGradingService {
         if (hasSummaryResult(examId)) {
             completeSummary(examId);
             log.debug(
-                    "event=grading.summary.trigger outcome=already_completed examId={} jobId={}",
+                    "요약 채점 결과 이미 완료 event=grading.summary.trigger "
+                            + "outcome=already_completed examId={} jobId={}",
                     examId, GradingKeys.summaryJobId(examId)
             );
             calculateAndCacheOverallStatus(examId, questionNumbers);
@@ -388,13 +401,15 @@ public class ExamGradingService {
             boolean scheduled = summaryDispatchScheduler.schedulePending(jobId);
             if (created && scheduled) {
                 log.info(
-                        "event=grading.summary.trigger outcome=scheduled examId={} jobId={} "
+                        "요약 채점 실행 예약 완료 event=grading.summary.trigger "
+                                + "outcome=scheduled examId={} jobId={} "
                                 + "completedQuestionCount={} expectedQuestionCount={}",
                         examId, jobId, completedCount, questionNumbers.size()
                 );
             } else {
                 log.debug(
-                        "event=grading.summary.trigger outcome={} examId={} jobId={} "
+                        "요약 채점 실행 예약 상태 확인 event=grading.summary.trigger "
+                                + "outcome={} examId={} jobId={} "
                                 + "jobStatus={} scheduleAccepted={}",
                         scheduled ? "already_scheduled" : "schedule_rejected",
                         examId,
@@ -405,13 +420,15 @@ public class ExamGradingService {
             }
         } else if (summaryJob == null) {
             log.warn(
-                    "event=grading.summary.trigger outcome=skipped reason=job_missing_after_insert_race "
+                    "요약 채점 작업 생성 경합 후 조회 실패 event=grading.summary.trigger "
+                            + "outcome=skipped reason=job_missing_after_insert_race "
                             + "examId={} jobId={}",
                     examId, jobId
             );
         } else {
             log.debug(
-                    "event=grading.summary.trigger outcome=skipped reason=job_not_pending "
+                    "대기 상태가 아닌 요약 채점 작업 시작 생략 event=grading.summary.trigger "
+                            + "outcome=skipped reason=job_not_pending "
                             + "examId={} jobId={} jobStatus={}",
                     examId, jobId, summaryJob.getStatus()
             );
@@ -530,7 +547,8 @@ public class ExamGradingService {
         try {
             dispatchService.dispatchQuestion(claim);
             log.info(
-                    "event=grading.question.dispatch outcome=success jobId={} examId={} "
+                    "문항 채점 요청 전송 완료 event=grading.question.dispatch "
+                            + "outcome=success jobId={} examId={} "
                             + "questionNumber={} retryCount={} dispatchAttempt={} durationMs={}",
                     claim.jobId(),
                     claim.examId(),
@@ -544,7 +562,8 @@ public class ExamGradingService {
             long durationMs = elapsedMillis(startedAt);
             if (failQuestionClaim(claim, QUESTION_DISPATCH_FAILED)) {
                 log.error(
-                        "event=grading.question.dispatch outcome=failure reason={} jobId={} examId={} "
+                        "문항 채점 요청 전송 실패 event=grading.question.dispatch "
+                                + "outcome=failure reason={} jobId={} examId={} "
                                 + "questionNumber={} retryCount={} dispatchAttempt={} durationMs={} "
                                 + "stage={} stageDurationMs={} errorType={} rootCauseType={}",
                         QUESTION_DISPATCH_FAILED,
@@ -561,7 +580,8 @@ public class ExamGradingService {
                 );
             } else {
                 log.debug(
-                        "event=grading.question.dispatch outcome=stale_failure_ignored "
+                        "이전 문항 채점 전송 실패 무시 event=grading.question.dispatch "
+                                + "outcome=stale_failure_ignored "
                                 + "jobId={} dispatchAttempt={} durationMs={} errorType={}",
                         claim.jobId(),
                         claim.dispatchAttempt(),
@@ -612,7 +632,8 @@ public class ExamGradingService {
         try {
             questionJobRepository.save(job);
             log.warn(
-                    "event=grading.question.job outcome=max_attempts reason={} jobId={} examId={} "
+                    "문항 채점 최대 전송 시도 도달 event=grading.question.job "
+                            + "outcome=max_attempts reason={} jobId={} examId={} "
                             + "questionNumber={} retryCount={} dispatchAttempt={} fromStatus={} toStatus=FAILED",
                     MAX_DISPATCH_ATTEMPTS,
                     job.getJobId(),
@@ -716,7 +737,8 @@ public class ExamGradingService {
         try {
             summaryJobRepository.save(job);
             log.warn(
-                    "event=grading.summary.job outcome=max_attempts reason={} jobId={} examId={} "
+                    "요약 채점 최대 전송 시도 도달 event=grading.summary.job "
+                            + "outcome=max_attempts reason={} jobId={} examId={} "
                             + "dispatchAttempt={} fromStatus={} toStatus=FAILED",
                     MAX_DISPATCH_ATTEMPTS,
                     job.getJobId(),

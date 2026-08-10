@@ -182,7 +182,8 @@ class ExamGradingServiceTest {
                 () -> assertEquals(0, stored.getRetryCount()),
                 () -> assertEquals("temp/" + EXAM_ID + "/q_1_r0.wav", stored.getFileKey()),
                 () -> assertTrue(output.getOut().contains(
-                        "event=grading.question.dispatch outcome=success "
+                        "문항 채점 요청 전송 완료 "
+                                + "event=grading.question.dispatch outcome=success "
                                 + "jobId=question:" + EXAM_ID + ":1:0 "
                                 + "examId=" + EXAM_ID + " questionNumber=1 retryCount=0 "
                                 + "dispatchAttempt=1 durationMs=")),

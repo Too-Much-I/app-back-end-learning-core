@@ -897,3 +897,18 @@
 - 공개 API·DTO·`BaseResponse`, AI/Callback `user_id=examId`, retryCount, Redis Key/TTL과 S3 Object Key는 유지했다. 실제 외부 인프라는 호출하지 않았다.
 - 집중 테스트와 `./gradlew clean test --no-daemon`이 성공했다. 전체 tests/failures/errors/skipped는 `316/0/0/0`이며 `git diff --check`도 성공했다.
 - CloudWatch 로그 그룹·retention·metric filter·dashboard·alarm은 저장소 외부 운영 설정으로 남아 있다. Callback이 아예 도착하지 않는 경우와 장기 `PROCESSING` Job은 로그만으로 직접 검출할 수 없어 별도 metric/watchdog 결정이 필요하다.
+
+## Latest monitoring log language recommendation (2026-08-08)
+
+- 운영자가 빠르게 읽을 수 있도록 로그의 고정 설명 문장은 한글화하는 방향을 권장한다. 다만 자동 검색·집계·알림 계약인 `event`, `outcome`, `reason`, `stage`, 상태값과 필드명은 영문으로 유지한다.
+- 권장 형식은 `문항 채점 작업 완료 event=grading.question.job.completed outcome=success ...`와 같은 혼합형이다. 기존 event code를 유지하면 향후 CloudWatch metric filter와 dashboard를 언어에 의존하지 않고 구성할 수 있다.
+- 한글 설명에는 예외 메시지나 payload를 삽입하지 않는다. 실제 userId, Token, URL·S3 Key, 음성·Transcript, Callback/채점/tableContext 원문을 남기지 않는 기존 로그 보안 원칙도 유지한다.
+- 이번 검토에서는 운영 코드와 테스트를 변경하거나 실행하지 않았다. 한글화 구현 여부와 적용 범위는 사용자 확인 후 결정한다.
+
+## Latest monitoring log Korean descriptions (2026-08-08)
+
+- 운영 로그의 사람이 읽는 고정 설명을 한글로 변경했다. 적용 범위는 HTTP 요청·인증·전역 예외, 시험 세션·소유권·이력, Question/Summary 채점 Job·Trigger·dispatch, Callback, S3/AI 단계, MongoDB 인덱스와 MockExam 카탈로그다.
+- 자동 검색·집계·알림 계약인 `event`, `outcome`, `reason`, `stage`, 상태값과 구조화 필드명은 영문으로 유지했다. HEAD 대비 현재 `event` 코드 목록의 정적 비교 결과가 동일하다.
+- 실제 userId, Authorization/JWT, Secret·Token, URL·S3 Key, 음성·Transcript, Callback/채점/tableContext payload와 예외 메시지를 로그에 넣지 않는 보안 원칙은 유지한다. 외부 API·AI/Callback·Redis/S3 계약도 변경하지 않았다.
+- 한글 설명과 기존 event code의 동시 출력을 대표 로그 캡처 테스트로 검증했다. 집중 테스트와 전체 `./gradlew clean test --no-daemon`이 성공했으며 tests/failures/errors/skipped는 `316/0/0/0`, `git diff --check`도 성공했다.
+- CloudWatch 등 수집 환경은 UTF-8 출력을 기준으로 확인해야 한다. metric filter·dashboard·alarm은 한글 문장보다 유지된 `event` 코드와 영문 구조화 필드를 기준으로 구성한다.

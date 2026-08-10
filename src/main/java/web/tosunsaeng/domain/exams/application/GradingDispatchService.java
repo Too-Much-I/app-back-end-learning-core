@@ -90,7 +90,8 @@ public class GradingDispatchService {
                 throw new IllegalStateException("S3 audio object returned an empty response");
             }
             log.debug(
-                    "event=grading.dispatch.stage outcome=success stage=s3_download "
+                    "S3 음성 파일 다운로드 완료 event=grading.dispatch.stage "
+                            + "outcome=success stage=s3_download "
                             + "dispatchType=question jobId={} durationMs={}",
                     claim.jobId(), elapsedMillis(startedAt)
             );
@@ -113,7 +114,8 @@ public class GradingDispatchService {
                     String.class
             );
             log.debug(
-                    "event=grading.dispatch.stage outcome=success stage=ai_post "
+                    "AI 채점 요청 전송 완료 event=grading.dispatch.stage "
+                            + "outcome=success stage=ai_post "
                             + "dispatchType={} jobId={} durationMs={}",
                     dispatchType, jobId, elapsedMillis(startedAt)
             );

@@ -34,7 +34,8 @@ public class RequestCorrelationFilter extends OncePerRequestFilter {
             filterChain.doFilter(request, response);
         } finally {
             log.debug(
-                    "event=http.request outcome=completed method={} path={} status={} durationMs={}",
+                    "HTTP 요청 처리 완료 event=http.request outcome=completed "
+                            + "method={} path={} status={} durationMs={}",
                     request.getMethod(),
                     request.getRequestURI(),
                     response.getStatus(),

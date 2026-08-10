@@ -362,7 +362,8 @@ class FeedbackCallbackServiceTest {
 
         assertSame(ErrorStatus._EXAM_NOT_FOUND, exception.getCode());
         assertTrue(output.getOut().contains(
-                "event=grading.callback outcome=rejected reason=exam_not_found "
+                "채점 콜백 시험 세션 조회 실패 "
+                        + "event=grading.callback outcome=rejected reason=exam_not_found "
                         + "callbackType=feedback examId=" + EXAM_ID
                         + " jobId=question:" + EXAM_ID + ":5:0"
         ));
@@ -574,7 +575,8 @@ class FeedbackCallbackServiceTest {
 
         assertAll(
                 () -> assertTrue(output.getOut().contains(
-                        "event=grading.callback outcome=rejected reason=invalid_metadata "
+                        "Azure 콜백 메타데이터 검증 실패 "
+                                + "event=grading.callback outcome=rejected reason=invalid_metadata "
                                 + "callbackType=azure errorType=java.lang.ClassCastException"
                 )),
                 () -> assertFalse(output.getOut().contains("not-an-integer")),

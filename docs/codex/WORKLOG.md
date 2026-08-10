@@ -1901,3 +1901,23 @@
 - 실제 `userId`, Authorization/JWT, Secret·Token, 음성·Transcript, Callback/Feedback/Azure/SpeechAce/tableContext 원문이나 내부 키·값은 로그에 포함하지 않았다. 공개 API URL·Method·Request/Response DTO·`BaseResponse`, `retryCount`, AI/Callback `user_id=examId`, Redis Key/TTL, S3 Object Key 계약은 변경하지 않았다.
 - 로그 캡처, requestId 비노출·정리, MDC 비동기 전파·복원, 상태 전이 정확히 1회, 중복/동시 Callback과 stale attempt, 안전한 401/403·4xx/5xx·Sentry, 민감값 미포함 테스트를 추가·보강했다. 집중 테스트와 `./gradlew clean test --no-daemon`이 성공했고 전체 tests/failures/errors/skipped는 `316/0/0/0`이다. `git diff --check`도 성공했다.
 - 실제 MongoDB·Redis·AWS S3·Python AI·Sentry는 호출하지 않았고 Git commit·push·PR과 Jira 쓰기는 수행하지 않았다. CloudWatch 로그 그룹·retention·metric filter·dashboard·alarm은 저장소 밖 운영 설정이라 남아 있으며, Callback 미도착과 장기 `PROCESSING` 탐지는 별도 metric/watchdog 정책이 필요하다.
+
+## 2026-08-08 — 운영 로그 한글화 방식 검토
+
+<!-- codex-turn:019fdf22-23b0-7f71-b16e-f10326f405fe -->
+
+- 별도 Jira 이슈 키 없이 현재 운영 로그의 가독성 개선 방향을 검토했다. 사람이 직접 읽는 고정 설명 문장은 한글로 바꾸되, CloudWatch 검색·metric filter·dashboard·alarm과 테스트의 안정적인 기준이 되는 `event`, `outcome`, `reason`, `stage`, 상태값 및 필드명은 영문 식별자로 유지하는 혼합형을 권장한다.
+- 권장 형식은 `문항 채점 작업 완료 event=grading.question.job.completed outcome=success ...`처럼 한글 설명 뒤에 기존 구조화 key-value를 두는 방식이다. 이벤트 코드까지 한글화하면 향후 필터와 알림 조건을 모두 다시 연결해야 하고 표기 변경에도 취약해지므로 권장하지 않는다.
+- 한글 설명도 동적 payload나 예외 메시지를 조합하지 않는 고정 문구로 제한한다. 실제 userId, Authorization/JWT, Secret·Token, URL·S3 Key, 음성·Transcript, Callback/채점/tableContext 원문을 기록하지 않는 기존 보안 원칙은 그대로 유지한다.
+- 이번 turn은 의견 제시와 정적 확인만 수행했고 애플리케이션·테스트 코드는 변경하지 않았으며 테스트도 실행하지 않았다. 공개 API·AI/Callback·Redis/S3 계약과 Jira·Git 상태는 변경하지 않았다.
+
+## 2026-08-08 — 운영 로그 한글 설명 적용
+
+<!-- codex-turn:019fe110-0c54-74b1-ae92-13611ca79d3f -->
+
+- 별도 Jira 이슈 키 없이 사용자 확인에 따라 운영 로그를 혼합형으로 변경했다. HTTP 요청·인증·전역 예외, 시험 세션·소유권·이력, Question/Summary Job·Trigger·dispatch, Callback, S3/AI 단계, MongoDB 인덱스와 MockExam 카탈로그 로그의 사람이 읽는 고정 설명을 한글로 바꿨다.
+- `event`, `outcome`, `reason`, `stage`, 상태값과 구조화 필드명은 영문 식별자로 유지했다. 변경 전 HEAD와 현재 소스에서 추출한 `event` 코드 목록이 완전히 동일함을 정적 비교해 기존 검색·metric filter·dashboard·alarm 연결 기준을 보존했다.
+- Sentry의 예상하지 못한 5xx 고정 메시지도 한글로 변경했지만 예외 타입 tag는 유지했다. 실제 userId, Authorization/JWT, Secret·Token, Presigned URL·S3 Key, 음성·Transcript, Callback/채점/tableContext payload와 예외 메시지를 로그에 추가하지 않았다.
+- 로그 캡처 테스트는 한글 설명과 기존 영문 이벤트 코드가 함께 출력되는지 확인하도록 갱신했다. 세션 전이·소유권·채점 전송·Summary 예약/실패·Callback 분류·401/403·비즈니스/5xx 경계와 민감값 미포함 검증을 유지했다.
+- 관련 집중 테스트와 `./gradlew clean test --no-daemon`이 성공했다. 전체 tests/failures/errors/skipped는 `316/0/0/0`이며 `git diff --check`도 성공했다. 기존 컴파일 경고는 이번 작업과 무관해 변경하지 않았다.
+- 공개 API URL·Method·Request/Response DTO·`BaseResponse`, `retryCount`, AI/Callback `user_id=examId`, Redis Key/TTL과 S3 Object Key는 변경하지 않았다. 실제 MongoDB·Redis·AWS S3·Python AI·Sentry를 호출하지 않았고 Git commit·push·PR 및 Jira 쓰기도 수행하지 않았다.

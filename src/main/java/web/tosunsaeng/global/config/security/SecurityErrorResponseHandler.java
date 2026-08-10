@@ -30,7 +30,8 @@ public class SecurityErrorResponseHandler implements AuthenticationEntryPoint, A
             HttpServletResponse response,
             AuthenticationException authenticationException) throws IOException {
         log.warn(
-                "event=http.security outcome=rejected reason=unauthorized method={} path={} "
+                "인증되지 않은 요청 거절 event=http.security outcome=rejected "
+                        + "reason=unauthorized method={} path={} "
                         + "errorCode={} errorType={}",
                 request.getMethod(),
                 request.getRequestURI(),
@@ -47,7 +48,8 @@ public class SecurityErrorResponseHandler implements AuthenticationEntryPoint, A
             org.springframework.security.access.AccessDeniedException accessDeniedException)
             throws IOException, ServletException {
         log.warn(
-                "event=http.security outcome=rejected reason=forbidden method={} path={} "
+                "접근 권한이 없는 요청 거절 event=http.security outcome=rejected "
+                        + "reason=forbidden method={} path={} "
                         + "errorCode={} errorType={}",
                 request.getMethod(),
                 request.getRequestURI(),

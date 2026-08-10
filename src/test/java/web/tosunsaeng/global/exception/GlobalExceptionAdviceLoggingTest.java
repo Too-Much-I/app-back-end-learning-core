@@ -35,7 +35,8 @@ class GlobalExceptionAdviceLoggingTest {
         assertAll(
                 () -> assertEquals(403, response.getStatusCode().value()),
                 () -> assertTrue(output.getOut().contains(
-                        "event=http.business outcome=rejected status=403 errorCode=COMMON403 "
+                        "비즈니스 요청 거절 "
+                                + "event=http.business outcome=rejected status=403 errorCode=COMMON403 "
                                 + "method=GET path=/api/v1/exams/ex_forbidden/status"
                 )),
                 () -> assertFalse(output.getOut().contains(
@@ -59,7 +60,8 @@ class GlobalExceptionAdviceLoggingTest {
         assertAll(
                 () -> assertEquals(500, response.getStatusCode().value()),
                 () -> assertTrue(output.getOut().contains(
-                        "event=http.request outcome=failed status=500 errorCode=COMMON500 "
+                        "HTTP 요청 처리 실패 "
+                                + "event=http.request outcome=failed status=500 errorCode=COMMON500 "
                                 + "method=POST path=/api/v1/exams/ex_failure/questions/1/submit "
                                 + "errorType=java.lang.IllegalStateException"
                 )),

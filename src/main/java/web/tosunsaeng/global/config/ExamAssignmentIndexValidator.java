@@ -43,9 +43,9 @@ public class ExamAssignmentIndexValidator implements ApplicationRunner {
         } catch (RuntimeException inspectionFailure) {
             if (failClosed) {
                 throw new IllegalStateException(
-                        "Required MongoDB exam-assignment indexes could not be verified", inspectionFailure);
+                        "필수 MongoDB 시험 배정 인덱스를 확인할 수 없습니다", inspectionFailure);
             }
-            log.warn("MongoDB exam-assignment indexes could not be verified in this environment");
+            log.warn("현재 환경에서 MongoDB 시험 배정 인덱스를 확인할 수 없습니다");
         }
     }
 
@@ -72,7 +72,7 @@ public class ExamAssignmentIndexValidator implements ApplicationRunner {
         );
 
         if (!requiredProblems.isEmpty()) {
-            String message = "Required MongoDB exam-assignment index validation failed: "
+            String message = "필수 MongoDB 시험 배정 인덱스 검증 실패: "
                     + String.join("; ", requiredProblems);
             if (failClosed) {
                 throw new IllegalStateException(message);
@@ -93,7 +93,7 @@ public class ExamAssignmentIndexValidator implements ApplicationRunner {
                 ))
                 .orElse(false);
         if (!completionIndexValid) {
-            log.warn("MongoDB completion-count lookup index is missing or incompatible: {}",
+            log.warn("MongoDB 시험 완료 횟수 조회 인덱스가 없거나 호환되지 않습니다: {}",
                     COMPLETION_LOOKUP_INDEX);
         }
     }
@@ -107,11 +107,11 @@ public class ExamAssignmentIndexValidator implements ApplicationRunner {
             List<String> problems) {
         IndexInfo index = findByName(indexes, name).orElse(null);
         if (index == null) {
-            problems.add(name + " is missing");
+            problems.add(name + " 인덱스가 없습니다");
             return;
         }
         if (!matches(index, keys, unique, partialFilter)) {
-            problems.add(name + " has an incompatible definition");
+            problems.add(name + " 인덱스 정의가 호환되지 않습니다");
         }
     }
 

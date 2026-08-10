@@ -896,7 +896,8 @@ class ExamOwnershipServiceTest {
 
         assertSame(ErrorStatus._FORBIDDEN, exception.getCode());
         assertTrue(output.getOut().contains(
-                "event=exam.access outcome=denied reason=ownership_mismatch examId=" + EXAM_ID
+                "시험 소유권 검증 실패 "
+                        + "event=exam.access outcome=denied reason=ownership_mismatch examId=" + EXAM_ID
         ));
         assertFalse(output.getOut().contains(OWNER_USER_ID));
         assertFalse(output.getOut().contains(OTHER_USER_ID));

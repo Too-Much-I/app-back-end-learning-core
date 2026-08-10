@@ -111,7 +111,8 @@ class ExamSessionManagerTest {
                 () -> assertEquals(ExamSessionStatus.IN_PROGRESS, assignment.session().getStatus()),
                 () -> assertTrue(assignment.session().isActive()),
                 () -> assertTrue(output.getOut().contains(
-                        "event=exam.session.abandoned outcome=transitioned examId=exam_A "
+                        "이전 시험 세션 폐기 완료 "
+                                + "event=exam.session.abandoned outcome=transitioned examId=exam_A "
                                 + "fromStatus=IN_PROGRESS toStatus=ABANDONED "
                                 + "reason=new_session_started"
                 )),
@@ -256,7 +257,8 @@ class ExamSessionManagerTest {
                 () -> assertEquals(ExamSessionStatus.IN_PROGRESS, assignment.session().getStatus()),
                 () -> assertNotEquals(concurrentSession.getExamId(), assignment.session().getExamId()),
                 () -> assertTrue(output.getOut().contains(
-                        "event=exam.session.create outcome=retry reason=duplicate_active_session "
+                        "활성 시험 세션 중복 감지 "
+                                + "event=exam.session.create outcome=retry reason=duplicate_active_session "
                                 + "createAttempt=1 nextAttempt=2"
                 )),
                 () -> assertFalse(output.getOut().contains("duplicate active Session")),
@@ -357,7 +359,8 @@ class ExamSessionManagerTest {
                         1,
                         countOccurrences(
                                 output.getOut(),
-                                "event=exam.session.completed outcome=transitioned "
+                                "시험 세션 완료 전환 "
+                                        + "event=exam.session.completed outcome=transitioned "
                                         + "examId=ex_complete_001"
                         )
                 )

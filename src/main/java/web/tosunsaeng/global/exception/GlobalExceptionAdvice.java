@@ -116,7 +116,7 @@ public class GlobalExceptionAdvice extends ResponseEntityExceptionHandler {
     public ResponseEntity<Object> exception(Exception e, WebRequest request) {
         if (e instanceof HttpMessageNotReadableException) {
             log.warn(
-                    "event=http.request.parse outcome=rejected status={} errorCode={} "
+                    "요청 본문 파싱 거절 event=http.request.parse outcome=rejected status={} errorCode={} "
                             + "method={} path={} errorType={}",
                     ErrorStatus._BAD_REQUEST.getHttpStatus().value(),
                     ErrorStatus._BAD_REQUEST.getCode(),
@@ -131,7 +131,8 @@ public class GlobalExceptionAdvice extends ResponseEntityExceptionHandler {
 
         captureUnexpectedException(e);
         log.warn(
-                "event=http.request outcome=failed status={} errorCode={} method={} path={} errorType={}",
+                "HTTP 요청 처리 실패 event=http.request outcome=failed status={} errorCode={} "
+                        + "method={} path={} errorType={}",
                 ErrorStatus._INTERNAL_SERVER_ERROR.getHttpStatus().value(),
                 ErrorStatus._INTERNAL_SERVER_ERROR.getCode(),
                 requestMethod(request),
@@ -153,7 +154,7 @@ public class GlobalExceptionAdvice extends ResponseEntityExceptionHandler {
             GeneralException generalException, HttpServletRequest request) {
         ErrorReasonDTO reason = generalException.getCode().getReasonHttpStatus();
         log.warn(
-                "event=http.business outcome=rejected status={} errorCode={} "
+                "비즈니스 요청 거절 event=http.business outcome=rejected status={} errorCode={} "
                         + "method={} path={} errorType={}",
                 reason.getHttpStatus().value(),
                 reason.getCode(),
@@ -167,7 +168,7 @@ public class GlobalExceptionAdvice extends ResponseEntityExceptionHandler {
     private void logRequestRejected(Exception exception, BaseErrorCode code, WebRequest request) {
         ErrorReasonDTO reason = code.getReasonHttpStatus();
         log.warn(
-                "event=http.request outcome=rejected status={} errorCode={} "
+                "HTTP 요청 거절 event=http.request outcome=rejected status={} errorCode={} "
                         + "method={} path={} errorType={}",
                 reason.getHttpStatus().value(),
                 reason.getCode(),
@@ -196,7 +197,7 @@ public class GlobalExceptionAdvice extends ResponseEntityExceptionHandler {
             scope.setTag("error.type", exception.getClass().getName());
             scope.setTag("error.root_cause_type", rootCauseType(exception));
             scope.setTag("http.status_code", "500");
-            Sentry.captureMessage("Unhandled server exception", SentryLevel.ERROR);
+            Sentry.captureMessage("처리되지 않은 서버 예외", SentryLevel.ERROR);
         });
     }
 

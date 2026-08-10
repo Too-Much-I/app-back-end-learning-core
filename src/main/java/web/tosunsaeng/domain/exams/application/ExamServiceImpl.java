@@ -104,7 +104,8 @@ public class ExamServiceImpl implements ExamService {
     private ExamSession resolveCallbackSession(String callbackType, String examId, String jobId) {
         if (examId == null || examId.isBlank()) {
             log.warn(
-                    "event=grading.callback outcome=rejected reason=invalid_metadata "
+                    "채점 콜백 메타데이터 검증 실패 event=grading.callback "
+                            + "outcome=rejected reason=invalid_metadata "
                             + "callbackType={} jobId={}",
                     callbackType, jobId
             );
@@ -113,7 +114,8 @@ public class ExamServiceImpl implements ExamService {
         return examSessionRepository.findById(examId)
                 .orElseThrow(() -> {
                     log.warn(
-                            "event=grading.callback outcome=rejected reason=exam_not_found "
+                            "채점 콜백 시험 세션 조회 실패 event=grading.callback "
+                                    + "outcome=rejected reason=exam_not_found "
                                     + "callbackType={} examId={} jobId={}",
                             callbackType, examId, jobId
                     );
@@ -127,7 +129,8 @@ public class ExamServiceImpl implements ExamService {
 
         if (!Objects.equals(examSession.getUserId(), currentUserId)) {
             log.warn(
-                    "event=exam.access outcome=denied reason=ownership_mismatch examId={}",
+                    "시험 소유권 검증 실패 event=exam.access outcome=denied "
+                            + "reason=ownership_mismatch examId={}",
                     examId
             );
             throw new ExamsException(ErrorStatus._FORBIDDEN);
@@ -168,7 +171,8 @@ public class ExamServiceImpl implements ExamService {
             return false;
         }
         log.debug(
-                "event=grading.callback outcome=ignored reason=exam_abandoned "
+                "폐기된 시험 세션의 채점 콜백 무시 event=grading.callback "
+                        + "outcome=ignored reason=exam_abandoned "
                         + "examId={} questionNumber={} retryCount={} jobId={}",
                 examSession.getExamId(), questionNumber, retryCount, jobId
         );
@@ -204,7 +208,8 @@ public class ExamServiceImpl implements ExamService {
         ExamResponseDTO.CreateSessionResult result =
                 ExamConverter.toCreateSessionResult(examId, mockExam.getTitle(), questionDTOs);
         log.info(
-                "event=exam.session.ready outcome=success examId={} mockExamId={} "
+                "시험 세션 준비 완료 event=exam.session.ready outcome=success "
+                        + "examId={} mockExamId={} "
                         + "questionCount={} durationMs={}",
                 examId,
                 mockExam.getMockExamId(),
@@ -279,7 +284,8 @@ public class ExamServiceImpl implements ExamService {
         String url = presignedRequest.url().toString();
 
         log.debug(
-                "event=s3.upload_url outcome=issued examId={} questionNumber={} "
+                "S3 업로드 URL 발급 완료 event=s3.upload_url outcome=issued "
+                        + "examId={} questionNumber={} "
                         + "retryCount={} durationMs={}",
                 examId,
                 questionNumber,
@@ -351,20 +357,23 @@ public class ExamServiceImpl implements ExamService {
                     );
                     examSummaryRepository.insert(summary);
                     log.info(
-                            "event=grading.callback outcome=stored callbackType=summary "
+                            "요약 채점 콜백 저장 완료 event=grading.callback "
+                                    + "outcome=stored callbackType=summary "
                                     + "examId={} jobId={}",
                             examId, callbackJobId
                     );
                 } catch (DuplicateKeyException duplicateCallback) {
                     log.debug(
-                            "event=grading.callback outcome=duplicate callbackType=summary "
+                            "중복 요약 채점 콜백 무시 event=grading.callback "
+                                    + "outcome=duplicate callbackType=summary "
                                     + "examId={} jobId={}",
                             examId, callbackJobId
                     );
                 }
             } else {
                 log.debug(
-                        "event=grading.callback outcome=duplicate callbackType=summary "
+                        "중복 요약 채점 콜백 무시 event=grading.callback "
+                                + "outcome=duplicate callbackType=summary "
                                 + "examId={} jobId={}",
                         examId, callbackJobId
                 );
@@ -390,20 +399,23 @@ public class ExamServiceImpl implements ExamService {
                 );
                 examResultRepository.insert(result);
                 log.info(
-                        "event=grading.callback outcome=stored callbackType=feedback "
+                        "문항 채점 콜백 저장 완료 event=grading.callback "
+                                + "outcome=stored callbackType=feedback "
                                 + "examId={} jobId={} questionNumber={} retryCount={}",
                         examId, callbackJobId, req.getQuestionNumber(), retryCount
                 );
             } catch (DuplicateKeyException duplicateCallback) {
                 log.debug(
-                        "event=grading.callback outcome=duplicate callbackType=feedback "
+                        "중복 문항 채점 콜백 무시 event=grading.callback "
+                                + "outcome=duplicate callbackType=feedback "
                                 + "examId={} jobId={} questionNumber={} retryCount={}",
                         examId, callbackJobId, req.getQuestionNumber(), retryCount
                 );
             }
         } else {
             log.debug(
-                    "event=grading.callback outcome=duplicate callbackType=feedback "
+                    "중복 문항 채점 콜백 무시 event=grading.callback "
+                            + "outcome=duplicate callbackType=feedback "
                             + "examId={} jobId={} questionNumber={} retryCount={}",
                     examId, callbackJobId, req.getQuestionNumber(), retryCount
             );
@@ -616,7 +628,8 @@ public class ExamServiceImpl implements ExamService {
                 req.getQuestionNumber(),
                 compatibleRetryCounts(retryCount))) {
             log.debug(
-                    "event=grading.callback outcome=duplicate callbackType=speechace "
+                    "중복 SpeechAce 콜백 무시 event=grading.callback "
+                            + "outcome=duplicate callbackType=speechace "
                             + "examId={} jobId={} questionNumber={} retryCount={}",
                     req.getExamId(), jobId, req.getQuestionNumber(), retryCount
             );
@@ -634,13 +647,15 @@ public class ExamServiceImpl implements ExamService {
         try {
             speechAceResultRepository.insert(result);
             log.debug(
-                    "event=grading.callback outcome=stored callbackType=speechace "
+                    "SpeechAce 콜백 저장 완료 event=grading.callback "
+                            + "outcome=stored callbackType=speechace "
                             + "examId={} jobId={} questionNumber={} retryCount={}",
                     req.getExamId(), jobId, req.getQuestionNumber(), retryCount
             );
         } catch (DuplicateKeyException duplicateCallback) {
             log.debug(
-                    "event=grading.callback outcome=duplicate callbackType=speechace "
+                    "중복 SpeechAce 콜백 무시 event=grading.callback "
+                            + "outcome=duplicate callbackType=speechace "
                             + "examId={} jobId={} questionNumber={} retryCount={}",
                     req.getExamId(), jobId, req.getQuestionNumber(), retryCount
             );
@@ -661,7 +676,8 @@ public class ExamServiceImpl implements ExamService {
             retryCount = metadata.get("retry_count") != null ? (Integer) metadata.get("retry_count") : 0;
         } catch (RuntimeException invalidMetadata) {
             log.warn(
-                    "event=grading.callback outcome=rejected reason=invalid_metadata "
+                    "Azure 콜백 메타데이터 검증 실패 event=grading.callback "
+                            + "outcome=rejected reason=invalid_metadata "
                             + "callbackType=azure errorType={}",
                     invalidMetadata.getClass().getName()
             );
@@ -679,7 +695,8 @@ public class ExamServiceImpl implements ExamService {
                 questionNumber,
                 compatibleRetryCounts(retryCount))) {
             log.debug(
-                    "event=grading.callback outcome=duplicate callbackType=azure "
+                    "중복 Azure 콜백 무시 event=grading.callback "
+                            + "outcome=duplicate callbackType=azure "
                             + "examId={} jobId={} questionNumber={} retryCount={}",
                     examId, jobId, questionNumber, retryCount
             );
@@ -697,13 +714,15 @@ public class ExamServiceImpl implements ExamService {
         try {
             azureResultRepository.insert(entity);
             log.debug(
-                    "event=grading.callback outcome=stored callbackType=azure "
+                    "Azure 콜백 저장 완료 event=grading.callback "
+                            + "outcome=stored callbackType=azure "
                             + "examId={} jobId={} questionNumber={} retryCount={}",
                     examId, jobId, questionNumber, retryCount
             );
         } catch (DuplicateKeyException duplicateCallback) {
             log.debug(
-                    "event=grading.callback outcome=duplicate callbackType=azure "
+                    "중복 Azure 콜백 무시 event=grading.callback "
+                            + "outcome=duplicate callbackType=azure "
                             + "examId={} jobId={} questionNumber={} retryCount={}",
                     examId, jobId, questionNumber, retryCount
             );

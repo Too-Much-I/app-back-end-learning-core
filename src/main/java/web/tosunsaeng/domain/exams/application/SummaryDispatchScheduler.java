@@ -61,7 +61,8 @@ public class SummaryDispatchScheduler {
             return true;
         } catch (TaskRejectedException rejected) {
             log.warn(
-                    "event=grading.summary.schedule outcome=rejected reason=executor_rejected "
+                    "요약 채점 실행 예약 거절 event=grading.summary.schedule "
+                            + "outcome=rejected reason=executor_rejected "
                             + "jobId={} mode={}",
                     jobId, mode
             );
@@ -107,7 +108,8 @@ public class SummaryDispatchScheduler {
         try {
             dispatchService.dispatchSummary(claim);
             log.info(
-                    "event=grading.summary.dispatch outcome=success jobId={} examId={} "
+                    "요약 채점 요청 전송 완료 event=grading.summary.dispatch "
+                            + "outcome=success jobId={} examId={} "
                             + "dispatchAttempt={} durationMs={}",
                     claim.jobId(),
                     claim.examId(),
@@ -124,7 +126,8 @@ public class SummaryDispatchScheduler {
             );
             if (updated == 0) {
                 log.debug(
-                        "event=grading.summary.dispatch outcome=stale_failure_ignored "
+                        "이전 요약 채점 전송 실패 무시 event=grading.summary.dispatch "
+                                + "outcome=stale_failure_ignored "
                                 + "jobId={} dispatchAttempt={} durationMs={} errorType={}",
                         claim.jobId(),
                         claim.dispatchAttempt(),
@@ -133,7 +136,8 @@ public class SummaryDispatchScheduler {
                 );
             } else {
                 log.error(
-                        "event=grading.summary.dispatch outcome=failure reason={} jobId={} examId={} "
+                        "요약 채점 요청 전송 실패 event=grading.summary.dispatch "
+                                + "outcome=failure reason={} jobId={} examId={} "
                                 + "dispatchAttempt={} durationMs={} stage={} stageDurationMs={} "
                                 + "errorType={} rootCauseType={}",
                         SUMMARY_DISPATCH_FAILED,

@@ -37,7 +37,7 @@ public class MockExamCatalogService {
             for (MockExam mockExam : documents) {
                 String mockExamId = validateMockExamId(mockExam);
                 if (!mockExamIds.add(mockExamId)) {
-                    configurationError("duplicate mockExamId in catalog");
+                    configurationError("카탈로그에 mockExamId가 중복되었습니다");
                 }
                 if (Boolean.FALSE.equals(mockExam.getActive()) || !hasQuestions(mockExam)) {
                     continue;
@@ -45,14 +45,14 @@ public class MockExamCatalogService {
 
                 int sequence = effectiveSequence(mockExam);
                 if (!sequences.add(sequence)) {
-                    configurationError("duplicate active sequence=" + sequence);
+                    configurationError("활성 sequence가 중복되었습니다: sequence=" + sequence);
                 }
                 assignable.add(new CatalogExam(mockExam, sequence));
             }
         }
 
         if (assignable.isEmpty()) {
-            configurationError("no active non-empty MockExam is assignable");
+            configurationError("배정 가능한 활성 문항 포함 MockExam이 없습니다");
         }
 
         assignable.sort(Comparator.comparingInt(CatalogExam::sequence));
@@ -65,23 +65,23 @@ public class MockExamCatalogService {
             throw new ExamsException(ErrorStatus._EXAM_PAPER_NOT_FOUND);
         }
         if (matches.size() > 1) {
-            configurationError("duplicate mockExamId lookup result");
+            configurationError("mockExamId 조회 결과가 중복되었습니다");
         }
         MockExam mockExam = matches.getFirst();
         validateMockExamId(mockExam);
         if (!hasQuestions(mockExam)) {
-            configurationError("MockExam has no assignable questions");
+            configurationError("MockExam에 배정 가능한 문항이 없습니다");
         }
         return mockExam;
     }
 
     private String validateMockExamId(MockExam mockExam) {
         if (mockExam == null || mockExam.getMockExamId() == null || mockExam.getMockExamId().isBlank()) {
-            configurationError("MockExam requires a non-blank mockExamId");
+            configurationError("MockExam의 mockExamId는 비어 있을 수 없습니다");
         }
         String mockExamId = mockExam.getMockExamId();
         if (!mockExamId.equals(mockExamId.trim())) {
-            configurationError("mockExamId must not contain leading or trailing whitespace");
+            configurationError("mockExamId 앞뒤에 공백을 포함할 수 없습니다");
         }
         return mockExamId;
     }
@@ -90,7 +90,7 @@ public class MockExamCatalogService {
         Integer configured = mockExam.getSequence();
         if (configured != null) {
             if (configured < 1 || configured > Integer.MAX_VALUE) {
-                configurationError("sequence must be within 1..Integer.MAX_VALUE: "
+                configurationError("sequence는 1 이상 Integer.MAX_VALUE 이하여야 합니다: "
                         + mockExam.getMockExamId());
             }
             return configured;
@@ -101,17 +101,17 @@ public class MockExamCatalogService {
                 ? LEGACY_SEQUENCE_PATTERN.matcher("")
                 : LEGACY_SEQUENCE_PATTERN.matcher(mockExamId);
         if (!matcher.find()) {
-            configurationError("legacy sequence cannot be derived: " + mockExamId);
+            configurationError("레거시 sequence를 추출할 수 없습니다: " + mockExamId);
         }
 
         try {
             int derived = Integer.parseInt(matcher.group(1));
             if (derived < 1) {
-                configurationError("derived sequence must be at least 1: " + mockExamId);
+                configurationError("추출한 sequence는 1 이상이어야 합니다: " + mockExamId);
             }
             return derived;
         } catch (NumberFormatException invalidSequence) {
-            configurationError("legacy sequence is outside the supported integer range: " + mockExamId);
+            configurationError("레거시 sequence가 지원하는 정수 범위를 벗어났습니다: " + mockExamId);
             return -1;
         }
     }
@@ -129,7 +129,7 @@ public class MockExamCatalogService {
         try {
             return mockExamRepository.findAll();
         } catch (ConversionException | MappingException invalidMappedSequence) {
-            configurationError("MockExam sequence type or range is incompatible with Java Integer");
+            configurationError("MockExam sequence 타입 또는 범위가 Java Integer와 호환되지 않습니다");
             return List.of();
         }
     }
@@ -138,13 +138,13 @@ public class MockExamCatalogService {
         try {
             return mockExamRepository.findAllByMockExamId(mockExamId);
         } catch (ConversionException | MappingException invalidMappedSequence) {
-            configurationError("MockExam sequence type or range is incompatible with Java Integer");
+            configurationError("MockExam sequence 타입 또는 범위가 Java Integer와 호환되지 않습니다");
             return List.of();
         }
     }
 
     private void configurationError(String detail) {
-        log.error("MockExam catalog configuration error: {}", detail);
+        log.error("MockExam 카탈로그 설정 오류: {}", detail);
         throw new ExamsException(ErrorStatus._EXAM_CATALOG_CONFIGURATION_ERROR);
     }
 

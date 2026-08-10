@@ -158,7 +158,8 @@ class ExamReadServiceTest {
                 () -> assertFalse(json.toString().contains("user_id")),
                 () -> assertFalse(json.toString().contains("mockExamId")),
                 () -> assertTrue(output.getOut().contains(
-                        "event=exam.history.data outcome=incomplete "
+                        "시험 이력 요약 결과 누락 "
+                                + "event=exam.history.data outcome=incomplete "
                                 + "reason=missing_summary examId=ex_tie_a"
                 )),
                 () -> assertFalse(output.getOut().contains(USER_ID))
