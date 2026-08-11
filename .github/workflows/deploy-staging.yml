@@ -21,6 +21,7 @@ env:
   ECS_SERVICE: tosunsaeng-learning-core-service
   CONTAINER_NAME: tosunsaeng-learning-core
   HEALTH_URL: https://api-staging.to-teacher.com/actuator/health
+  SENTRY_RELEASE: app-back-end-learning-core@${{ github.sha }}
 
 jobs:
   deploy:

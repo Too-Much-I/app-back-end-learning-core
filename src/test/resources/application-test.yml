@@ -22,6 +22,11 @@ app:
 
 sentry:
   dsn: ""
-  send-default-pii: false
-  traces-sample-rate: 0.0
   environment: test
+  release: app-back-end-learning-core@test
+  send-default-pii: false
+  max-request-body-size: none
+  exception-resolver-order: 1
+  logging:
+    enabled: false
+  traces-sample-rate: 0.0

@@ -66,11 +66,14 @@ logging:
 
 sentry:
   dsn: ${SENTRY_DSN:}
+  environment: ${SENTRY_ENVIRONMENT:${spring.profiles.active:local}}
+  release: ${SENTRY_RELEASE:}
   send-default-pii: false
+  max-request-body-size: none
+  exception-resolver-order: 1
   logging:
-    minimum-event-level: error
+    enabled: false
   traces-sample-rate: ${SENTRY_TRACES_SAMPLE_RATE:0.0}
-  environment: ${spring.profiles.active:local}
 
 management:
   endpoints:

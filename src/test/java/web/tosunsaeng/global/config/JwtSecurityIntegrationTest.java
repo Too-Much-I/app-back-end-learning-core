@@ -66,6 +66,7 @@ import web.tosunsaeng.global.auth.JwtCurrentUserProvider;
 import web.tosunsaeng.global.auth.LegacyCurrentUserProvider;
 import web.tosunsaeng.global.config.security.SecurityErrorResponseHandler;
 import web.tosunsaeng.global.exception.GlobalExceptionAdvice;
+import web.tosunsaeng.global.sentry.UnexpectedExceptionReporter;
 
 import java.io.IOException;
 import java.net.InetSocketAddress;
@@ -179,6 +180,9 @@ class JwtSecurityIntegrationTest {
 
     @MockitoBean
     private SummaryGradingJobRepository summaryGradingJobRepository;
+
+    @MockitoBean
+    private UnexpectedExceptionReporter unexpectedExceptionReporter;
 
     private final Map<String, ExamSession> sessions = new ConcurrentHashMap<>();
     private ValueOperations<String, Object> valueOperations;

@@ -30,6 +30,7 @@ import web.tosunsaeng.domain.exams.domain.enums.SummaryAction;
 import web.tosunsaeng.global.auth.CurrentUserProvider;
 import web.tosunsaeng.global.auth.JwtCurrentUserProvider;
 import web.tosunsaeng.global.auth.LegacyCurrentUserProvider;
+import web.tosunsaeng.global.sentry.UnexpectedExceptionReporter;
 
 import java.util.List;
 import java.util.Set;
@@ -94,6 +95,9 @@ class LegacySecurityIntegrationTest {
 
     @MockitoBean
     private SummaryGradingJobRepository summaryGradingJobRepository;
+
+    @MockitoBean
+    private UnexpectedExceptionReporter unexpectedExceptionReporter;
 
     @BeforeEach
     void setUp() {

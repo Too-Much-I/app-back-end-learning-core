@@ -912,3 +912,60 @@
 - 실제 userId, Authorization/JWT, Secret·Token, URL·S3 Key, 음성·Transcript, Callback/채점/tableContext payload와 예외 메시지를 로그에 넣지 않는 보안 원칙은 유지한다. 외부 API·AI/Callback·Redis/S3 계약도 변경하지 않았다.
 - 한글 설명과 기존 event code의 동시 출력을 대표 로그 캡처 테스트로 검증했다. 집중 테스트와 전체 `./gradlew clean test --no-daemon`이 성공했으며 tests/failures/errors/skipped는 `316/0/0/0`, `git diff --check`도 성공했다.
 - CloudWatch 등 수집 환경은 UTF-8 출력을 기준으로 확인해야 한다. metric filter·dashboard·alarm은 한글 문장보다 유지된 `event` 코드와 영문 구조화 필드를 기준으로 구성한다.
+
+## Latest Sentry DSN readiness audit (2026-08-10)
+
+- Sentry Spring Boot starter가 이미 포함되어 있고 `application.yml`은 실제 값을 저장하지 않은 채 `SENTRY_DSN` 환경변수를 참조한다. DSN 자체를 코드 변경이나 채팅으로 전달할 필요가 없다.
+- 기본 설정은 `send-default-pii=false`, active profile 기반 environment, trace sampling 0이며 테스트는 비운영 DSN과 sampling 0을 사용한다. 전역 예외 처리의 예상하지 못한 5xx는 안전한 고정 메시지와 예외 타입 tag로 명시적으로 수집한다.
+- 적용 단계는 배포 환경 Secret에 `SENTRY_DSN`을 등록하고 애플리케이션을 재시작한 뒤 의도적으로 발생시킨 비민감 테스트 오류가 해당 environment로 수집되는지 확인하는 것이다. tracing이 필요할 때만 `SENTRY_TRACES_SAMPLE_RATE`를 별도로 결정한다.
+- 이번 확인에서는 운영 코드·테스트·외부 시스템을 변경하지 않았고 실제 DSN이나 Secret을 조회·기록하지 않았다.
+
+## Latest Sentry production-readiness assessment (2026-08-10)
+
+- 현재 설정은 DSN 환경변수, `send-default-pii=false`, ERROR 자동 수집, trace sampling 0과 4xx WARN 제외를 사용하므로 초기 오류 수집과 노이즈 제어 관점에서는 적절하다.
+- 운영 분석의 최우선 공백은 예상하지 못한 5xx가 안전한 `captureMessage`로만 수집되어 예외 타입 tag는 있지만 원본 스택트레이스가 없다는 점이다. 예외 메시지·payload를 제거하면서 스택 프레임을 보존하는 안전한 Sentry event sanitizing 설계와 테스트가 필요하다.
+- 배포 추적을 위해 `SENTRY_RELEASE`, 환경 오분류 방지를 위해 명시적인 `SENTRY_ENVIRONMENT`를 배포 Secret/환경변수로 주입하는 것을 권장한다. tracing은 성능 관측 요구가 생길 때 별도 sampling 정책을 정한다.
+- DSN 주입 후 staging의 비민감 5xx 테스트로 수집, environment/release, 중복 이벤트, stack trace, PII 부재를 확인하고 Sentry 프로젝트의 Alert Rule도 별도로 구성해야 한다.
+- 이번 검토에서는 코드·테스트·외부 시스템을 변경하지 않았고 실제 자격정보를 조회·기록하지 않았다.
+
+## Latest Sentry production hardening plan (2026-08-10)
+
+- 상세 계획서는 `docs/codex/SENTRY_PRODUCTION_HARDENING_PLAN.md`에 있다. 별도 Jira 이슈 키는 없다.
+- P0 순서는 `SENTRY_ENVIRONMENT`·`SENTRY_RELEASE` 명시, `BeforeSendCallback` sanitizer, `IHub` 기반 reporter와 안전한 `captureException`, 인메모리 transport 중복·PII 테스트, staging smoke 검증이다.
+- sanitizer는 exception value와 자유 형식 message, request data/query/cookie/header, user와 비허용 breadcrumb/extra를 제거하고 예외 type·module·mechanism·stack frame 및 제한된 분류 tag만 보존한다.
+- 기본 order 1의 자동 `SentryExceptionResolver`, 명시적 reporter와 Logback ERROR 경로가 겹칠 수 있으므로 5xx 1건, 4xx 0건, grading ERROR 의도 건수를 통합 테스트로 고정한다.
+- SDK 8.x 업데이트와 Sentry Alert Rule은 capture 동작을 현재 7.14.0에서 먼저 고정한 후 별도 P1 단계로 진행한다. tracing은 초기 0을 유지하고 실제 DSN은 배포 Secret으로만 주입한다.
+- 계획 작성만 완료했으며 운영·테스트 코드와 외부 시스템은 변경하지 않았다. 구현 전 배포 환경변수 주입 방식, release 규칙, grading ERROR 수집 정책, Alert 임계값과 SDK 업데이트 순서를 확정해야 한다.
+
+## Latest Sentry production hardening plan revision (2026-08-11)
+
+- 상세 계획서는 `docs/codex/SENTRY_PRODUCTION_HARDENING_PLAN.md`에 있다. 별도 Jira 이슈 키는 없고 아직 애플리케이션 구현 전이다.
+- 초기 운영 역할은 `Sentry=조사가 필요한 예외`, `CloudWatch=구조화 운영 로그`로 확정했다. `sentry.logging.enabled=false`로 Sentry LogbackAppender를 끄고, 예상하지 못한 Controller 5xx만 명시적 `captureException` 1건과 안전한 CloudWatch ERROR 1건으로 남긴다. grading·AI dispatch·Callback ERROR는 초기 Sentry event 0건이다.
+- `BeforeSendCallback`은 fail-closed로 동작한다. event·exception message뿐 아니라 request·transaction·user·breadcrumb·비허용 tag/extra/context, stack local·절대 경로·source context·register·lock, mechanism 자유 형식 map과 SDK unknown field를 제거하고 실패하면 원본 대신 event를 drop한다.
+- `BeforeSendCallback`이 attachment와 tracing transaction까지 정제하지는 않으므로 초기 reporter의 attachment를 금지하고 envelope item 0건을 검사한다. tracing은 0을 유지하며 활성화 전 별도 transaction sanitizer 검토가 필요하다.
+- Sentry에는 저카디널리티 오류 분류와 형식 검증된 `correlation.request_id` context만 허용한다. examId·jobId·questionNumber·retryCount는 CloudWatch에서 조회하며 release는 CI source context와 ECS runtime 모두 `app-back-end-learning-core@<git-sha>`로 맞춘다.
+- SDK 7.14.0에서 sanitizer·호출별 local scope reporter·자동 resolver·recording transport의 정확히 1회 동작을 먼저 고정한다. 모든 위치의 가짜 민감 marker가 최종 직렬화 JSON에 없는지, 일반 ERROR의 Sentry event가 0건인지, 연속 capture 간 metadata가 누출되지 않는지와 reporter 실패에도 기존 응답 계약이 유지되는지를 테스트하고 8.x 업그레이드는 별도 이슈로 분리한다.
+- Spring MVC 6.2.2의 기본 exception resolver composite order 0과 Sentry resolver order 1을 확인했다. Advice가 처리한 예외는 명시적 reporter만, 앞선 resolver가 처리하지 못한 예외는 자동 resolver만 타는 현재 전제를 통합 테스트의 최종 event 건수로 고정한다.
+- 실제 DSN·Secret·Token은 기록하지 않고 공개 API·DTO·`BaseResponse`, AI/Callback `user_id=examId`, `retryCount`, Redis Key/TTL과 S3 Object Key를 유지한다. 이번 보정은 문서만 변경했으며 배포 workflow·Sentry 프로젝트·애플리케이션·테스트 코드는 변경하지 않았다.
+- 추적 문서 정적 검증으로 tracked 변경과 신규 계획서 모두 whitespace 오류가 없음을 확인했다. 문서 전용 작업이라 Gradle 테스트는 실행하지 않았다.
+
+## Latest Sentry production hardening implementation (2026-08-11)
+
+- 별도 Jira 이슈 키 없이 `docs/codex/SENTRY_PRODUCTION_HARDENING_PLAN.md`의 P0 애플리케이션 구현과 자동 검증을 완료했다. 실제 배포 환경과 외부 Sentry 프로젝트는 변경하지 않았다.
+- 설정은 `SENTRY_ENVIRONMENT`·`SENTRY_RELEASE` 환경변수를 지원하고 request body 비수집, resolver order 1, `sentry.logging.enabled=false`, trace sampling 기본 0을 명시한다. 따라서 일반 grading·AI dispatch·Callback ERROR는 CloudWatch에 남고 Logback을 통해 Sentry Issue로 자동 승격되지 않는다.
+- 예상하지 못한 ControllerAdvice 5xx는 `UnexpectedExceptionReporter`를 통해 `captureException` 정확히 1건과 원문 없는 한글 CloudWatch ERROR 정확히 1건을 남긴다. 4xx와 JSON 파싱·비즈니스 오류는 reporter를 호출하지 않으며 reporter 실패도 기존 응답을 바꾸지 않는다.
+- `SentryEventSanitizer`는 fail-closed `BeforeSendCallback`으로 event/exception message, request/user/breadcrumb, transaction/fingerprint, 비허용 tag·context·extra, module/dist, stack local·절대 경로·source context·register·lock·주소, mechanism 자유 형식 map과 unknown field를 제거한다. 예외 type과 애플리케이션 stack class/method/file/line, environment/release, 안전한 분류와 UUID requestId context만 남긴다.
+- reporter의 local scope는 parent request/user/breadcrumb/attachment뿐 아니라 session·propagation baggage·replay ID까지 초기화한다. 기본 Sentry resolver도 `SanitizedSentryExceptionResolver`로 교체해 같은 격리 reporter를 사용하고, `UnhandledExceptionCaptureFilter`는 하위 필터의 `ServletException`·`RuntimeException`을 1회 보고하며 request attribute로 resolver 중복을 막는다. `IOException`은 연결 종료 노이즈 가능성 때문에 자동 Issue로 보내지 않는다.
+- 인메모리 recording transport에서 연속 두 capture의 scope 누출 없음, event·envelope 전체의 가짜 민감 marker 부재, attachment/session item 부재, stack 보존, handled/unhandled 정확히 1건, sanitizer 실패 시 0건, Logback initializer 부재를 검증했다. 실제 외부 Sentry는 호출하지 않았다.
+- 최종 `./gradlew clean test --no-daemon`은 tests/failures/errors/skipped `332/0/0/0`, `git diff --check`와 민감정보 패턴 검사는 성공했다. 기존 `ExamServiceImpl` unchecked 경고만 남았으며 이번 범위와 무관하다.
+- 공개 API URL·Method·Request/Response DTO·`BaseResponse`, 실제 userId 비노출, AI/Callback `user_id=examId`, `retryCount`, Redis Key/TTL과 S3 Object Key는 변경하지 않았다. 기존 500 응답 body가 내부 예외 메시지를 담을 수 있는 위험도 호환성 때문에 이번 작업에서는 변경하지 않았다.
+- 운영 전 남은 작업은 실제 배포 환경의 DSN·environment·`app-back-end-learning-core@<git-sha>` release 주입, CI/ECS 값 일치 확인, staging smoke, Sentry IP 저장 방지와 Alert Rule 설정이다. SDK 7.14.0에서 8.x 업그레이드와 tracing 활성화는 별도 작업으로 유지한다.
+
+## Latest Sentry deployment environment variables (2026-08-11)
+
+- 별도 Jira 이슈 키 없이 현재 `application.yml`, Dockerfile과 배포 파일 존재 여부를 기준으로 Sentry 환경변수를 정리했다. 저장소에는 ECS Task Definition이나 GitHub Actions 배포 Workflow가 없으므로 실제 환경변수 주입은 아직 저장소 밖 배포 설정에서 수행해야 한다.
+- staging/prod 런타임 필수 항목은 보호 저장소에서 주입할 `SENTRY_DSN`, 명시적인 `SENTRY_ENVIRONMENT=staging|prod`, 배포 산출물의 전체 Git SHA를 사용한 `SENTRY_RELEASE=app-back-end-learning-core@<git-sha>`다. 같은 배포의 CI release 값과 ECS runtime 값을 반드시 일치시킨다.
+- `SENTRY_TRACES_SAMPLE_RATE`는 선택 항목이며 현재는 미설정 또는 `0.0`으로 유지한다. tracing을 활성화하기 전에는 transaction 데이터 정제와 sampling 비용 정책을 별도로 검토해야 한다.
+- 기존 `SPRING_PROFILES_ACTIVE`는 Sentry 전용 신규 값은 아니지만 staging/prod에서 각각 명시해야 한다. `SENTRY_ENVIRONMENT`가 없으면 Spring profile로 fallback하지만 운영 오분류 방지를 위해 두 값을 모두 명시한다.
+- `SENTRY_AUTH_TOKEN`, `SENTRY_ORG`, `SENTRY_PROJECT`는 현재 런타임 이벤트 전송에 필요하지 않으며 추가하지 않는다. 향후 CI에서 Sentry release 생성이나 source context 업로드를 도입할 때만 별도 최소 권한 CI Secret으로 검토한다.
+- 실제 DSN·Secret·Token은 조회하거나 기록하지 않았다. 애플리케이션·테스트·배포 파일과 외부 API·AI/Callback·Redis/S3 계약은 변경하지 않았고, 문서 갱신 외 코드 변경이 없어 Gradle 테스트는 다시 실행하지 않았다.

@@ -1,7 +1,5 @@
 package web.tosunsaeng.global.exception;
 
-import io.sentry.Sentry;
-import io.sentry.SentryLevel;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.ConstraintViolationException;
 import lombok.extern.slf4j.Slf4j;
@@ -23,6 +21,7 @@ import web.tosunsaeng.global.common.response.BaseResponse;
 import web.tosunsaeng.global.error.code.status.BaseErrorCode;
 import web.tosunsaeng.global.error.code.status.ErrorReasonDTO;
 import web.tosunsaeng.global.error.code.status.ErrorStatus;
+import web.tosunsaeng.global.sentry.UnexpectedExceptionReporter;
 
 import java.util.LinkedHashMap;
 import java.util.Map;
@@ -31,6 +30,12 @@ import java.util.Optional;
 @Slf4j
 @RestControllerAdvice(annotations = {RestController.class})
 public class GlobalExceptionAdvice extends ResponseEntityExceptionHandler {
+
+    private final UnexpectedExceptionReporter unexpectedExceptionReporter;
+
+    public GlobalExceptionAdvice(UnexpectedExceptionReporter unexpectedExceptionReporter) {
+        this.unexpectedExceptionReporter = unexpectedExceptionReporter;
+    }
 
     @Override
     protected ResponseEntity<Object> handleTypeMismatch(
@@ -129,8 +134,8 @@ public class GlobalExceptionAdvice extends ResponseEntityExceptionHandler {
             return handleExceptionInternalMessage(e, HttpHeaders.EMPTY, request, errorMessage);
         }
 
-        captureUnexpectedException(e);
-        log.warn(
+        reportUnexpectedException(e);
+        log.error(
                 "HTTP 요청 처리 실패 event=http.request outcome=failed status={} errorCode={} "
                         + "method={} path={} errorType={}",
                 ErrorStatus._INTERNAL_SERVER_ERROR.getHttpStatus().value(),
@@ -192,21 +197,16 @@ public class GlobalExceptionAdvice extends ResponseEntityExceptionHandler {
         return "unknown";
     }
 
-    private static void captureUnexpectedException(Exception exception) {
-        Sentry.withScope(scope -> {
-            scope.setTag("error.type", exception.getClass().getName());
-            scope.setTag("error.root_cause_type", rootCauseType(exception));
-            scope.setTag("http.status_code", "500");
-            Sentry.captureMessage("처리되지 않은 서버 예외", SentryLevel.ERROR);
-        });
-    }
-
-    private static String rootCauseType(Throwable failure) {
-        Throwable rootCause = failure;
-        while (rootCause.getCause() != null && rootCause.getCause() != rootCause) {
-            rootCause = rootCause.getCause();
+    private void reportUnexpectedException(Exception exception) {
+        try {
+            unexpectedExceptionReporter.report(exception);
+        } catch (RuntimeException reportingFailure) {
+            log.warn(
+                    "Sentry 예외 보고 실패 event=sentry.exception.report outcome=failed "
+                            + "errorType={}",
+                    reportingFailure.getClass().getName()
+            );
         }
-        return rootCause.getClass().getName();
     }
 
     private ResponseEntity<Object> handleExceptionInternal(
