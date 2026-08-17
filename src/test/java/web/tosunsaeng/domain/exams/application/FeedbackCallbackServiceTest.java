@@ -44,6 +44,7 @@ import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.doThrow;
@@ -127,6 +128,12 @@ class FeedbackCallbackServiceTest {
         ReflectionTestUtils.setField(examService, "bucketName", "test-learning-core-bucket");
         lenient().when(examSessionRepository.findById(EXAM_ID))
                 .thenReturn(Optional.of(examSession()));
+        lenient().when(gradingService.isCurrentSummaryGeneration(eq(EXAM_ID), anyInt()))
+                .thenReturn(true);
+        lenient().when(gradingService.claimSummaryCompletion(eq(EXAM_ID), anyInt()))
+                .thenReturn(true);
+        lenient().when(gradingService.completeSummary(eq(EXAM_ID), anyInt()))
+                .thenReturn(true);
     }
 
     @Test
@@ -254,6 +261,7 @@ class FeedbackCallbackServiceTest {
                 {
                   "user_id": "ex_callback_001",
                   "mock_exam_id": "mock_exam_003",
+                  "generation_attempt": 1,
                   "suggested_total_score": 170,
                   "level_estimate": "Advanced Mid",
                   "summary": "test overall summary",
@@ -291,9 +299,108 @@ class FeedbackCallbackServiceTest {
                 () -> assertEquals(List.of("test weakness"), savedSummary.getWeaknesses()),
                 () -> assertEquals(List.of("test practice"), savedSummary.getRecommendedPractice())
         );
-        verify(gradingService).completeSummary(EXAM_ID);
+        verify(gradingService).completeSummary(EXAM_ID, 1);
         verify(gradingService).calculateAndCacheOverallStatus(EXAM_ID);
         verifyNoInteractions(currentUserProvider, restTemplate);
+    }
+
+    @Test
+    void emptyOrNullPartFeedbackFailsCurrentGenerationWithoutSavingOrCompleting() throws Exception {
+        ExamRequestDTO.AiResultReq emptyFeedback = objectMapper.readValue("""
+                {
+                  "user_id": "ex_callback_001",
+                  "generation_attempt": 1,
+                  "suggested_total_score": 170,
+                  "part_feedback": {},
+                  "question_number": 0
+                }
+                """, ExamRequestDTO.AiResultReq.class);
+        ExamRequestDTO.AiResultReq nullFeedback = objectMapper.readValue("""
+                {
+                  "user_id": "ex_callback_001",
+                  "generation_attempt": 1,
+                  "suggested_total_score": 170,
+                  "part_feedback": null,
+                  "question_number": 0
+                }
+                """, ExamRequestDTO.AiResultReq.class);
+
+        examService.updateExamResult(emptyFeedback);
+        examService.updateExamResult(nullFeedback);
+
+        verify(gradingService, times(2)).failSummaryGeneration(
+                EXAM_ID,
+                1,
+                ExamGradingService.FEEDBACK_GENERATION_FAILED
+        );
+        verify(gradingService, times(2)).calculateAndCacheOverallStatus(EXAM_ID);
+        verify(examSummaryRepository, never()).insert(any(ExamSummary.class));
+        verify(gradingService, never()).claimSummaryCompletion(eq(EXAM_ID), anyInt());
+        verify(gradingService, never()).completeSummary(eq(EXAM_ID), anyInt());
+        verify(examSessionManager, never()).completeIfIncomplete(EXAM_ID);
+    }
+
+    @Test
+    void staleSummaryCallbackDoesNotStoreOrChangeCurrentGeneration() throws Exception {
+        ExamRequestDTO.AiResultReq req = objectMapper.readValue("""
+                {
+                  "user_id": "ex_callback_001",
+                  "generation_attempt": 1,
+                  "suggested_total_score": 170,
+                  "part_feedback": {"part1": "delayed feedback"},
+                  "question_number": 0
+                }
+                """, ExamRequestDTO.AiResultReq.class);
+        when(gradingService.isCurrentSummaryGeneration(EXAM_ID, 1)).thenReturn(false);
+
+        examService.updateExamResult(req);
+
+        verify(examSummaryRepository, never()).insert(any(ExamSummary.class));
+        verify(gradingService, never()).failSummaryGeneration(any(), anyInt(), any());
+        verify(gradingService, never()).claimSummaryCompletion(eq(EXAM_ID), anyInt());
+        verify(gradingService, never()).completeSummary(eq(EXAM_ID), anyInt());
+        verify(gradingService, never()).calculateAndCacheOverallStatus(EXAM_ID);
+        verify(examSessionManager, never()).completeIfIncomplete(EXAM_ID);
+    }
+
+    @Test
+    void summaryCallbackWithoutGenerationIsStaleNoOp() throws Exception {
+        ExamRequestDTO.AiResultReq req = objectMapper.readValue("""
+                {
+                  "user_id": "ex_callback_001",
+                  "suggested_total_score": 170,
+                  "part_feedback": {"part1": "legacy feedback"},
+                  "question_number": 0
+                }
+                """, ExamRequestDTO.AiResultReq.class);
+
+        examService.updateExamResult(req);
+
+        verify(gradingService).isCurrentSummaryGeneration(EXAM_ID, null);
+        verify(examSummaryRepository, never()).insert(any(ExamSummary.class));
+        verify(gradingService, never()).claimSummaryCompletion(eq(EXAM_ID), anyInt());
+        verify(gradingService, never()).completeSummary(eq(EXAM_ID), anyInt());
+        verify(examSessionManager, never()).completeIfIncomplete(EXAM_ID);
+    }
+
+    @Test
+    void summaryGenerationUsesSnakeCaseWireField() throws Exception {
+        ExamRequestDTO.AiResultReq req = objectMapper.readValue("""
+                {
+                  "user_id": "ex_callback_001",
+                  "generation_attempt": 3,
+                  "suggested_total_score": 170,
+                  "part_feedback": {"part1": "test feedback"}
+                }
+                """, ExamRequestDTO.AiResultReq.class);
+
+        JsonNode serializedRequest = objectMapper.valueToTree(req);
+
+        assertAll(
+                () -> assertEquals(3, req.getGenerationAttempt()),
+                () -> assertEquals(3, serializedRequest.get("generation_attempt").asInt()),
+                () -> assertFalse(serializedRequest.has("generationAttempt"))
+        );
     }
 
     @Test
@@ -302,7 +409,9 @@ class FeedbackCallbackServiceTest {
                 {
                   "user_id": "ex_callback_001",
                   "mock_exam_id": "mock_exam_002",
+                  "generation_attempt": 1,
                   "suggested_total_score": 170,
+                  "part_feedback": {"part1": "test feedback"},
                   "question_number": 0
                 }
                 """, ExamRequestDTO.AiResultReq.class);
@@ -313,7 +422,7 @@ class FeedbackCallbackServiceTest {
         assertThrows(IllegalStateException.class, () -> examService.updateExamResult(req));
 
         verify(examSessionManager, never()).completeIfIncomplete(EXAM_ID);
-        verify(gradingService, never()).completeSummary(EXAM_ID);
+        verify(gradingService, never()).completeSummary(eq(EXAM_ID), anyInt());
     }
 
     @Test
@@ -474,7 +583,9 @@ class FeedbackCallbackServiceTest {
                 {
                   "user_id": "ex_callback_001",
                   "mock_exam_id": "mock_exam_003",
+                  "generation_attempt": 1,
                   "suggested_total_score": 170,
+                  "part_feedback": {"part1": "test feedback"},
                   "question_number": 0
                 }
                 """, ExamRequestDTO.AiResultReq.class);
@@ -487,7 +598,7 @@ class FeedbackCallbackServiceTest {
 
         verify(examSummaryRepository, times(1)).insert(any(ExamSummary.class));
         verify(examSessionManager, times(2)).completeIfIncomplete(EXAM_ID);
-        verify(gradingService, times(2)).completeSummary(EXAM_ID);
+        verify(gradingService, times(2)).completeSummary(EXAM_ID, 1);
         verify(gradingService, times(2)).calculateAndCacheOverallStatus(EXAM_ID);
     }
 
@@ -520,6 +631,7 @@ class FeedbackCallbackServiceTest {
         ExamRequestDTO.AiResultReq req = objectMapper.readValue("""
                 {
                   "user_id": "ex_callback_001",
+                  "generation_attempt": 1,
                   "suggested_total_score": 170,
                   "question_number": 0
                 }

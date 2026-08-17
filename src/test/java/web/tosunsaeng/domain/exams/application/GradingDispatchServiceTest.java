@@ -163,7 +163,7 @@ class GradingDispatchServiceTest {
 
     @Test
     @SuppressWarnings("rawtypes")
-    void summaryDispatchKeepsExistingBodyAndUsesStableIdempotencyKey() {
+    void summaryDispatchAddsGenerationAndKeepsGenerationOneIdempotencyKey() {
         service.dispatchSummary(new SummaryDispatchClaim(
                 "summary:" + EXAM_ID + ":v1",
                 1,
@@ -178,12 +178,38 @@ class GradingDispatchServiceTest {
         assertAll(
                 () -> assertEquals(EXAM_ID, body.get("user_id")),
                 () -> assertEquals("mock_exam_002", body.get("mock_exam_id")),
+                () -> assertEquals(1, body.get("generation_attempt")),
                 () -> assertEquals(0, body.get("question_number")),
                 () -> assertEquals(0, body.get("part_number")),
                 () -> assertNull(body.get("retry_count")),
                 () -> assertNull(body.get("client_source")),
                 () -> assertEquals(
                         "summary:" + EXAM_ID + ":v1",
+                        requestCaptor.getValue().getHeaders().getFirst("Idempotency-Key")
+                )
+        );
+    }
+
+    @Test
+    @SuppressWarnings("rawtypes")
+    void regeneratedSummaryUsesGenerationSpecificIdempotencyKey() {
+        service.dispatchSummary(new SummaryDispatchClaim(
+                "summary:" + EXAM_ID + ":v1",
+                2,
+                1,
+                Instant.parse("2026-07-28T00:00:00Z"),
+                EXAM_ID,
+                "mock_exam_002"
+        ));
+
+        ArgumentCaptor<HttpEntity> requestCaptor = ArgumentCaptor.forClass(HttpEntity.class);
+        verify(restTemplate).postForEntity(
+                eq(AI_EVALUATION_URL), requestCaptor.capture(), eq(String.class));
+        Map<?, ?> body = assertInstanceOf(Map.class, requestCaptor.getValue().getBody());
+        assertAll(
+                () -> assertEquals(2, body.get("generation_attempt")),
+                () -> assertEquals(
+                        "summary:" + EXAM_ID + ":v1:generation:2",
                         requestCaptor.getValue().getHeaders().getFirst("Idempotency-Key")
                 )
         );

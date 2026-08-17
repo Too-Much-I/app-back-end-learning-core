@@ -49,8 +49,10 @@ public class ExamGradingService {
 
     private static final int CALLBACK_COMPLETION_RETRIES = 5;
     private static final String QUESTION_DISPATCH_FAILED = "QUESTION_DISPATCH_FAILED";
+    private static final String QUESTION_RESULT_MISSING = "QUESTION_RESULT_MISSING";
     private static final String MAX_DISPATCH_ATTEMPTS = "MAX_DISPATCH_ATTEMPTS";
     private static final String EXAM_ABANDONED = "EXAM_ABANDONED";
+    static final String FEEDBACK_GENERATION_FAILED = "FEEDBACK_GENERATION_FAILED";
 
     private final QuestionGradingJobRepository questionJobRepository;
     private final SummaryGradingJobRepository summaryJobRepository;
@@ -281,62 +283,165 @@ public class ExamGradingService {
         }
         String jobId = GradingKeys.summaryJobId(examId);
         String mockExamId = resolveMockExamId(examId);
-
-        for (int attempt = 0; attempt < CALLBACK_COMPLETION_RETRIES; attempt++) {
-            Instant now = clock.instant();
-            Optional<SummaryGradingJob> existing = summaryJobRepository.findById(jobId);
-            if (existing.isEmpty()) {
-                try {
-                    SummaryGradingJob completed =
-                            SummaryGradingJob.completed(jobId, examId, mockExamId, now);
-                    summaryJobRepository.insert(completed);
-                    log.info(
-                            "요약 채점 작업 완료 event=grading.summary.job outcome=completed "
-                                    + "jobId={} examId={} "
-                                    + "dispatchAttempt={} fromStatus=MISSING toStatus=COMPLETED "
-                                    + "callbackLatencyMs={}",
-                            jobId,
-                            examId,
-                            completed.getDispatchAttempt(),
-                            -1L
-                    );
-                    return;
-                } catch (DuplicateKeyException concurrentInsert) {
-                    continue;
-                }
-            }
-
-            SummaryGradingJob job = existing.get();
-            if (job.getStatus() == GradingJobStatus.COMPLETED) {
-                return;
-            }
-            GradingJobStatus fromStatus = job.getStatus();
-            Instant processingStartedAt = job.getProcessingStartedAt();
-            int dispatchAttempt = job.getDispatchAttempt();
-            job.complete(now);
-            try {
-                summaryJobRepository.save(job);
-                log.info(
-                        "요약 채점 작업 완료 event=grading.summary.job outcome=completed "
-                                + "jobId={} examId={} "
-                                + "dispatchAttempt={} fromStatus={} toStatus=COMPLETED "
-                                + "callbackLatencyMs={}",
-                        jobId,
-                        examId,
-                        dispatchAttempt,
-                        fromStatus,
-                        elapsedSince(processingStartedAt, now)
-                );
-                return;
-            } catch (OptimisticLockingFailureException concurrentUpdate) {
-                // Re-read and converge on COMPLETED without overwriting a newer document version.
-            }
+        Optional<SummaryGradingJob> existing = summaryJobRepository.findById(jobId);
+        if (existing.isPresent()) {
+            completeSummary(examId, existing.get().effectiveGenerationAttempt());
+            return;
         }
-        log.warn(
-                "요약 채점 완료 전환 경합 감지 event=grading.summary.job "
-                        + "outcome=completion_race jobId={} examId={}",
-                jobId, examId
+
+        Instant now = clock.instant();
+        try {
+            SummaryGradingJob completed = SummaryGradingJob.completed(
+                    jobId,
+                    examId,
+                    mockExamId,
+                    now
+            );
+            summaryJobRepository.insert(completed);
+            log.info(
+                    "요약 채점 작업 완료 event=grading.summary.job outcome=completed "
+                            + "jobId={} examId={} generationAttempt=1 "
+                            + "dispatchAttempt=0 fromStatus=MISSING toStatus=COMPLETED "
+                            + "callbackLatencyMs={}",
+                    jobId, examId, -1L
+            );
+        } catch (DuplicateKeyException concurrentInsert) {
+            summaryJobRepository.findById(jobId)
+                    .ifPresent(job -> completeSummary(examId, job.effectiveGenerationAttempt()));
+        }
+    }
+
+    public boolean isCurrentSummaryGeneration(String examId, Integer generationAttempt) {
+        if (generationAttempt == null || generationAttempt < 1) {
+            return false;
+        }
+        return summaryJobRepository.findById(GradingKeys.summaryJobId(examId))
+                .map(job -> job.effectiveGenerationAttempt() == generationAttempt)
+                .orElse(false);
+    }
+
+    public boolean claimSummaryCompletion(String examId, int generationAttempt) {
+        if (!canProcessSession(examId)) {
+            return false;
+        }
+        String jobId = GradingKeys.summaryJobId(examId);
+        Optional<SummaryGradingJob> current = summaryJobRepository.findById(jobId);
+        if (current.isEmpty()
+                || current.get().effectiveGenerationAttempt() != generationAttempt) {
+            return false;
+        }
+        if (current.get().getStatus() == GradingJobStatus.COMPLETED
+                && hasSummaryResult(examId)) {
+            return true;
+        }
+
+        long claimed = summaryJobRepository.claimCompletion(
+                jobId,
+                generationAttempt,
+                clock.instant()
         );
+        if (claimed == 1) {
+            return true;
+        }
+        return summaryJobRepository.findById(jobId)
+                .filter(job -> job.effectiveGenerationAttempt() == generationAttempt)
+                .filter(job -> job.getStatus() == GradingJobStatus.COMPLETED
+                        || job.isCompletionClaimedFor(generationAttempt))
+                .isPresent();
+    }
+
+    public boolean failSummaryGeneration(
+            String examId,
+            int generationAttempt,
+            String failureReason) {
+        if (hasSummaryResult(examId)) {
+            completeSummary(examId, generationAttempt);
+            return false;
+        }
+        String jobId = GradingKeys.summaryJobId(examId);
+        long updated = summaryJobRepository.failGeneration(
+                jobId,
+                generationAttempt,
+                clock.instant(),
+                failureReason
+        );
+        if (updated == 1) {
+            log.warn(
+                    "요약 피드백 생성 실패 event=grading.summary.callback "
+                            + "outcome=failed reason={} jobId={} examId={} "
+                            + "generationAttempt={}",
+                    failureReason, jobId, examId, generationAttempt
+            );
+            return true;
+        }
+        log.debug(
+                "이전 요약 피드백 실패 무시 event=grading.summary.callback "
+                        + "outcome=stale_ignored reason={} jobId={} generationAttempt={}",
+                failureReason, jobId, generationAttempt
+        );
+        return false;
+    }
+
+    public boolean completeSummary(String examId, int generationAttempt) {
+        if (!canProcessSession(examId)) {
+            return false;
+        }
+        String jobId = GradingKeys.summaryJobId(examId);
+        Optional<SummaryGradingJob> current = summaryJobRepository.findById(jobId);
+        if (current.isEmpty()
+                || current.get().effectiveGenerationAttempt() != generationAttempt) {
+            return false;
+        }
+        if (current.get().getStatus() == GradingJobStatus.COMPLETED) {
+            return true;
+        }
+        GradingJobStatus fromStatus = current.get().getStatus();
+        int dispatchAttempt = current.get().getDispatchAttempt();
+        Instant processingStartedAt = current.get().getProcessingStartedAt();
+        if (!current.get().isCompletionClaimedFor(generationAttempt)
+                && !claimSummaryCompletion(examId, generationAttempt)) {
+            return false;
+        }
+
+        Instant now = clock.instant();
+        long completed = summaryJobRepository.completeClaimedGeneration(
+                jobId,
+                generationAttempt,
+                now
+        );
+        if (completed == 0) {
+            return summaryJobRepository.findById(jobId)
+                    .filter(job -> job.effectiveGenerationAttempt() == generationAttempt)
+                    .filter(job -> job.getStatus() == GradingJobStatus.COMPLETED)
+                    .isPresent();
+        }
+
+        log.info(
+                "요약 채점 작업 완료 event=grading.summary.job outcome=completed "
+                        + "jobId={} examId={} generationAttempt={} dispatchAttempt={} "
+                        + "fromStatus={} toStatus=COMPLETED callbackLatencyMs={}",
+                jobId,
+                examId,
+                generationAttempt,
+                dispatchAttempt,
+                fromStatus,
+                elapsedSince(processingStartedAt, now)
+        );
+        return true;
+    }
+
+    public void throwIfFeedbackGenerationFailed(String examId) {
+        if (hasSummaryResult(examId)) {
+            return;
+        }
+        boolean feedbackGenerationFailed = summaryJobRepository
+                .findById(GradingKeys.summaryJobId(examId))
+                .filter(job -> job.getStatus() == GradingJobStatus.FAILED)
+                .filter(job -> FEEDBACK_GENERATION_FAILED.equals(job.getFailureReason()))
+                .isPresent();
+        if (feedbackGenerationFailed) {
+            throw new ExamsException(ErrorStatus._FEEDBACK_GENERATION_FAILED);
+        }
     }
 
     public void ensureSummaryStartedIfReady(String examId) {
@@ -398,7 +503,10 @@ public class ExamGradingService {
         }
 
         if (summaryJob != null && summaryJob.getStatus() == GradingJobStatus.PENDING) {
-            boolean scheduled = summaryDispatchScheduler.schedulePending(jobId);
+            boolean scheduled = summaryDispatchScheduler.schedulePending(
+                    jobId,
+                    summaryJob.effectiveGenerationAttempt()
+            );
             if (created && scheduled) {
                 log.info(
                         "요약 채점 실행 예약 완료 event=grading.summary.trigger "
@@ -449,7 +557,9 @@ public class ExamGradingService {
         return questionJobRepository.findById(
                         GradingKeys.questionJobId(examId, questionNumber, canonicalRetryCount)
                 )
-                .map(job -> toExamStatus(job.getStatus()))
+                .map(job -> job.getStatus() == GradingJobStatus.COMPLETED
+                        ? ExamStatus.FAILED
+                        : toExamStatus(job.getStatus()))
                 .orElse(ExamStatus.PROCESSING);
     }
 
@@ -491,6 +601,7 @@ public class ExamGradingService {
             List<Integer> retried,
             List<Integer> waiting) {
         if (job.getStatus() == GradingJobStatus.COMPLETED) {
+            reopenCompletedMissingResult(job, retried, waiting);
             return;
         }
 
@@ -512,6 +623,43 @@ public class ExamGradingService {
         }
 
         DispatchOutcome outcome = claimAndDispatchQuestion(job, false);
+        recordOutcome(job.getQuestionNumber(), outcome, retried, waiting);
+    }
+
+    private void reopenCompletedMissingResult(
+            QuestionGradingJob job,
+            List<Integer> retried,
+            List<Integer> waiting) {
+        int currentRecoveryCycle = job.effectiveRecoveryCycle();
+        long reopened = questionJobRepository.reopenCompletedMissingResult(
+                job.getJobId(),
+                currentRecoveryCycle,
+                clock.instant()
+        );
+        if (reopened == 0) {
+            waiting.add(job.getQuestionNumber());
+            return;
+        }
+
+        Optional<QuestionGradingJob> current = questionJobRepository.findById(job.getJobId());
+        if (current.isEmpty()
+                || current.get().getStatus() != GradingJobStatus.PENDING
+                || current.get().effectiveRecoveryCycle() != currentRecoveryCycle + 1) {
+            waiting.add(job.getQuestionNumber());
+            return;
+        }
+
+        log.warn(
+                "문항 채점 결과 누락 복구 시작 event=grading.question.recovery "
+                        + "outcome=reopened reason={} jobId={} examId={} "
+                        + "questionNumber={} retryCount=0 recoveryCycle={} dispatchAttempt=0",
+                QUESTION_RESULT_MISSING,
+                job.getJobId(),
+                job.getExamId(),
+                job.getQuestionNumber(),
+                current.get().effectiveRecoveryCycle()
+        );
+        DispatchOutcome outcome = claimAndDispatchQuestion(current.get(), true);
         recordOutcome(job.getQuestionNumber(), outcome, retried, waiting);
     }
 
@@ -616,6 +764,7 @@ public class ExamGradingService {
         long updated = questionJobRepository.failClaimedAttempt(
                 claim.jobId(),
                 claim.dispatchAttempt(),
+                claim.recoveryCycle(),
                 clock.instant(),
                 reason
         );
@@ -689,7 +838,10 @@ public class ExamGradingService {
                                 clock.instant()
                         )
                 );
-                return summaryDispatchScheduler.schedulePending(inserted.getJobId())
+                return summaryDispatchScheduler.schedulePending(
+                        inserted.getJobId(),
+                        inserted.effectiveGenerationAttempt()
+                )
                         ? SummaryAction.RETRIED
                         : SummaryAction.WAITING;
             } catch (DuplicateKeyException concurrentInsert) {
@@ -699,17 +851,51 @@ public class ExamGradingService {
 
         SummaryGradingJob job = existing.get();
         if (job.getStatus() == GradingJobStatus.COMPLETED) {
-            return SummaryAction.ALREADY_COMPLETED;
+            return SummaryAction.WAITING;
+        }
+        if (job.getStatus() == GradingJobStatus.FAILED
+                && FEEDBACK_GENERATION_FAILED.equals(job.getFailureReason())) {
+            int currentGenerationAttempt = job.effectiveGenerationAttempt();
+            int nextGenerationAttempt = currentGenerationAttempt + 1;
+            long rearmed = summaryJobRepository.rearmFeedbackGeneration(
+                    job.getJobId(),
+                    currentGenerationAttempt,
+                    nextGenerationAttempt,
+                    FEEDBACK_GENERATION_FAILED,
+                    clock.instant()
+            );
+            if (rearmed == 0) {
+                return SummaryAction.WAITING;
+            }
+            log.info(
+                    "요약 피드백 재생성 준비 완료 event=grading.summary.retry "
+                            + "outcome=rearmed reason={} jobId={} examId={} "
+                            + "generationAttempt={} dispatchAttempt=0",
+                    FEEDBACK_GENERATION_FAILED,
+                    job.getJobId(),
+                    examId,
+                    nextGenerationAttempt
+            );
+            return summaryDispatchScheduler.schedulePending(
+                    job.getJobId(),
+                    nextGenerationAttempt
+            ) ? SummaryAction.RETRIED : SummaryAction.WAITING;
         }
         if (!isSummaryRetryEligible(job, clock.instant())) {
             return SummaryAction.WAITING;
         }
-        return summaryDispatchScheduler.scheduleRetry(job.getJobId())
+        return summaryDispatchScheduler.scheduleRetry(
+                job.getJobId(),
+                job.effectiveGenerationAttempt()
+        )
                 ? SummaryAction.RETRIED
                 : SummaryAction.WAITING;
     }
 
     private boolean isSummaryRetryEligible(SummaryGradingJob job, Instant now) {
+        if (job.isCompletionClaimedFor(job.effectiveGenerationAttempt())) {
+            return false;
+        }
         boolean eligible = switch (job.getStatus()) {
             case FAILED -> true;
             case PENDING -> timedOut(job.getPendingAt(), properties.pendingTimeout(), now);
@@ -728,6 +914,9 @@ public class ExamGradingService {
 
 
     private void markSummaryAttemptLimitReached(SummaryGradingJob job) {
+        if (job.isCompletionClaimedFor(job.effectiveGenerationAttempt())) {
+            return;
+        }
         if (job.getStatus() == GradingJobStatus.FAILED
                 && MAX_DISPATCH_ATTEMPTS.equals(job.getFailureReason())) {
             return;
@@ -767,8 +956,7 @@ public class ExamGradingService {
                 continue;
             }
             switch (job.getStatus()) {
-                case COMPLETED -> {
-                }
+                case COMPLETED -> hasFailedQuestion = true;
                 case FAILED -> hasFailedQuestion = true;
                 case PENDING, PROCESSING -> hasActiveQuestion = true;
             }
@@ -786,7 +974,7 @@ public class ExamGradingService {
         } else {
             status = summaryJobRepository.findById(GradingKeys.summaryJobId(examId))
                     .map(job -> switch (job.getStatus()) {
-                        case COMPLETED -> ExamStatus.COMPLETED;
+                        case COMPLETED -> ExamStatus.FAILED;
                         case FAILED -> ExamStatus.FAILED;
                         case PENDING, PROCESSING -> ExamStatus.PROCESSING;
                     })
@@ -936,11 +1124,7 @@ public class ExamGradingService {
         }
 
         boolean isComplete(Integer questionNumber) {
-            if (hasResult(questionNumber)) {
-                return true;
-            }
-            QuestionGradingJob job = jobsByQuestionNumber.get(questionNumber);
-            return job != null && job.getStatus() == GradingJobStatus.COMPLETED;
+            return hasResult(questionNumber);
         }
     }
 }

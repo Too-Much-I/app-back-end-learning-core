@@ -315,6 +315,7 @@ public class ExamServiceImpl implements ExamService {
     public ExamResponseDTO.StatusResult getExamStatus(String examId) {
         requireOwnedSession(examId);
         ExamStatus currentStatus = gradingService.calculateAndCacheOverallStatus(examId);
+        gradingService.throwIfFeedbackGenerationFailed(examId);
         return ExamConverter.toStatusResult(examId, currentStatus, 60);
     }
 
@@ -323,7 +324,7 @@ public class ExamServiceImpl implements ExamService {
     public void updateExamResult(ExamRequestDTO.AiResultReq req) {
         String examId = req.getExamId();
         int retryCount = GradingKeys.canonicalRetryCount(req.getRetryCount());
-        boolean summaryCallback = req.getTotalScore() != null;
+        boolean summaryCallback = req.getGenerationAttempt() != null || req.getTotalScore() != null;
         String callbackJobId = summaryCallback
                 ? GradingKeys.summaryJobId(examId)
                 : GradingKeys.questionJobId(examId, req.getQuestionNumber(), retryCount);
@@ -343,44 +344,78 @@ public class ExamServiceImpl implements ExamService {
 
         // 종합 결과도 결정적 ID와 legacy 논리 결과 확인으로 멱등 저장합니다.
         if (summaryCallback) {
+            Integer generationAttempt = req.getGenerationAttempt();
+            if (!gradingService.isCurrentSummaryGeneration(examId, generationAttempt)) {
+                log.debug(
+                        "이전 요약 채점 콜백 무시 event=grading.callback "
+                                + "outcome=stale_ignored reason={} callbackType=summary "
+                                + "examId={} jobId={} generationAttempt={}",
+                        generationAttempt == null ? "missing_generation" : "generation_mismatch",
+                        examId,
+                        callbackJobId,
+                        generationAttempt
+                );
+                return;
+            }
+
             String resultId = GradingKeys.summaryJobId(examId);
             boolean alreadyStored = examSummaryRepository.existsById(resultId)
                     || examSummaryRepository.existsByExamId(examId)
                     || examResultRepository.findFirstByExamIdAndTotalScoreIsNotNullOrderByIdDesc(examId).isPresent();
-            if (!alreadyStored) {
-                try {
-                    ExamSummary summary = ExamConverter.toExamSummary(
-                            req,
-                            examSession.getUserId(),
-                            resultId,
-                            mockExamId
-                    );
-                    examSummaryRepository.insert(summary);
-                    log.info(
-                            "요약 채점 콜백 저장 완료 event=grading.callback "
-                                    + "outcome=stored callbackType=summary "
-                                    + "examId={} jobId={}",
-                            examId, callbackJobId
-                    );
-                } catch (DuplicateKeyException duplicateCallback) {
-                    log.debug(
-                            "중복 요약 채점 콜백 무시 event=grading.callback "
-                                    + "outcome=duplicate callbackType=summary "
-                                    + "examId={} jobId={}",
-                            examId, callbackJobId
-                    );
-                }
-            } else {
+            if (alreadyStored) {
                 log.debug(
                         "중복 요약 채점 콜백 무시 event=grading.callback "
                                 + "outcome=duplicate callbackType=summary "
-                                + "examId={} jobId={}",
-                        examId, callbackJobId
+                                + "examId={} jobId={} generationAttempt={}",
+                        examId, callbackJobId, generationAttempt
+                );
+                completeSummaryCallback(examId, generationAttempt);
+                return;
+            }
+
+            if (req.getPartFeedback() == null || req.getPartFeedback().isEmpty()) {
+                gradingService.failSummaryGeneration(
+                        examId,
+                        generationAttempt,
+                        ExamGradingService.FEEDBACK_GENERATION_FAILED
+                );
+                gradingService.calculateAndCacheOverallStatus(examId);
+                return;
+            }
+
+            if (!gradingService.claimSummaryCompletion(examId, generationAttempt)) {
+                log.debug(
+                        "요약 채점 저장 선점 실패 event=grading.callback "
+                                + "outcome=stale_ignored reason=completion_claim_lost "
+                                + "callbackType=summary examId={} jobId={} generationAttempt={}",
+                        examId, callbackJobId, generationAttempt
+                );
+                return;
+            }
+
+            try {
+                ExamSummary summary = ExamConverter.toExamSummary(
+                        req,
+                        examSession.getUserId(),
+                        resultId,
+                        mockExamId
+                );
+                examSummaryRepository.insert(summary);
+                log.info(
+                        "요약 채점 콜백 저장 완료 event=grading.callback "
+                                + "outcome=stored callbackType=summary "
+                                + "examId={} jobId={} generationAttempt={}",
+                        examId, callbackJobId, generationAttempt
+                );
+            } catch (DuplicateKeyException duplicateCallback) {
+                log.debug(
+                        "중복 요약 채점 콜백 무시 event=grading.callback "
+                                + "outcome=duplicate callbackType=summary "
+                                + "examId={} jobId={} generationAttempt={}",
+                        examId, callbackJobId, generationAttempt
                 );
             }
-            examSessionManager.completeIfIncomplete(examId);
-            gradingService.completeSummary(examId);
-            gradingService.calculateAndCacheOverallStatus(examId);
+            completeSummaryCallback(examId, generationAttempt);
             return;
         }
 
@@ -425,16 +460,25 @@ public class ExamServiceImpl implements ExamService {
         gradingService.ensureSummaryStartedIfReady(examId);
     }
 
-    // 특정 시험 세션의 AI 총합 진단 레코드와 파트별 획득 점수의 누적 가산 합산 값을 연산하여 성적표 리포트를 반환합니다.
+    private void completeSummaryCallback(String examId, int generationAttempt) {
+        if (gradingService.completeSummary(examId, generationAttempt)) {
+            examSessionManager.completeIfIncomplete(examId);
+            gradingService.calculateAndCacheOverallStatus(examId);
+        }
+    }
+
+    // 특정 시험 세션의 AI 총합 진단 레코드와 최초 응시 파트별 획득 점수를 연산하여 성적표 리포트를 반환합니다.
     @Override
     public ExamResponseDTO.SummaryResult getExamSummary(String examId) {
         requireOwnedSession(examId);
+        gradingService.throwIfFeedbackGenerationFailed(examId);
 
         List<ExamResult> results = examResultRepository.findByExamId(examId);
 
-        // 파트별 세부 획득 점수의 누적 총합 연산
+        // retryCount=0인 최초 응시 결과만 파트별로 합산합니다.
         java.util.Map<String, Double> partScores = results.stream()
                 .filter(r -> r.getQuestionNumber() != null && r.getScore() != null)
+                .filter(r -> Objects.equals(r.getRetryCount(), 0))
                 .collect(java.util.stream.Collectors.groupingBy(
                         r -> {
                             int partNum = r.getPartNumber() != null ? r.getPartNumber() : getPartNumber(r.getQuestionNumber());
@@ -446,7 +490,7 @@ public class ExamServiceImpl implements ExamService {
         // 소수점 유실 방지 및 가독성을 위한 첫째 자리 반올림 정규화를 수행합니다.
         partScores.replaceAll((part, sum) -> Math.round(sum * 10.0) / 10.0);
 
-        // 유저가 실제 풀이한 순수 문항 개수 산출 (retryCount == 0 이거나 null 체크, 종합요약 문서 제외)
+        // retryCount=0인 최초 응시 문항 개수만 산출합니다.
         long totalSolvedQuestions = results.stream()
                 .filter(r -> r.getQuestionNumber() != null && r.getQuestionNumber() > 0)
                 .filter(r -> r.getRetryCount() != null && r.getRetryCount() == 0)

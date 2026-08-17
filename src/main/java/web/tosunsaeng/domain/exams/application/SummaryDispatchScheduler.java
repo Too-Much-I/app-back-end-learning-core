@@ -47,36 +47,45 @@ public class SummaryDispatchScheduler {
         this.clock = clock;
     }
 
-    public boolean schedulePending(String jobId) {
-        return schedule(jobId, DispatchMode.PENDING_ONLY);
+    public boolean schedulePending(String jobId, int generationAttempt) {
+        return schedule(jobId, generationAttempt, DispatchMode.PENDING_ONLY);
     }
 
-    public boolean scheduleRetry(String jobId) {
-        return schedule(jobId, DispatchMode.RETRY_ELIGIBLE);
+    public boolean scheduleRetry(String jobId, int generationAttempt) {
+        return schedule(jobId, generationAttempt, DispatchMode.RETRY_ELIGIBLE);
     }
 
-    private boolean schedule(String jobId, DispatchMode mode) {
+    private boolean schedule(String jobId, int generationAttempt, DispatchMode mode) {
         try {
-            taskExecutor.execute(() -> claimAndDispatch(jobId, mode));
+            taskExecutor.execute(() -> claimAndDispatch(jobId, generationAttempt, mode));
             return true;
         } catch (TaskRejectedException rejected) {
             log.warn(
                     "요약 채점 실행 예약 거절 event=grading.summary.schedule "
                             + "outcome=rejected reason=executor_rejected "
-                            + "jobId={} mode={}",
-                    jobId, mode
+                            + "jobId={} generationAttempt={} mode={}",
+                    jobId, generationAttempt, mode
             );
             return false;
         }
     }
 
-    private void claimAndDispatch(String jobId, DispatchMode mode) {
+    private void claimAndDispatch(String jobId, int generationAttempt, DispatchMode mode) {
         Optional<SummaryGradingJob> existing = summaryJobRepository.findById(jobId);
         if (existing.isEmpty()) {
             return;
         }
 
         SummaryGradingJob job = existing.get();
+        if (job.effectiveGenerationAttempt() != generationAttempt) {
+            log.debug(
+                    "이전 요약 채점 예약 무시 event=grading.summary.schedule "
+                            + "outcome=stale_claim_ignored jobId={} "
+                            + "generationAttempt={} currentGenerationAttempt={}",
+                    jobId, generationAttempt, job.effectiveGenerationAttempt()
+            );
+            return;
+        }
         if (!isSessionInProgress(job.getExamId())) {
             return;
         }
@@ -98,9 +107,19 @@ public class SummaryDispatchScheduler {
         if (!isSessionInProgress(claim.examId())) {
             summaryJobRepository.failClaimedAttempt(
                     claim.jobId(),
+                    claim.generationAttempt(),
                     claim.dispatchAttempt(),
                     clock.instant(),
                     EXAM_ABANDONED
+            );
+            return;
+        }
+        if (!isCurrentDispatchClaim(claim)) {
+            log.debug(
+                    "이전 요약 채점 작업 무시 event=grading.summary.dispatch "
+                            + "outcome=stale_claim_ignored jobId={} "
+                            + "generationAttempt={} dispatchAttempt={}",
+                    claim.jobId(), claim.generationAttempt(), claim.dispatchAttempt()
             );
             return;
         }
@@ -110,9 +129,10 @@ public class SummaryDispatchScheduler {
             log.info(
                     "요약 채점 요청 전송 완료 event=grading.summary.dispatch "
                             + "outcome=success jobId={} examId={} "
-                            + "dispatchAttempt={} durationMs={}",
+                            + "generationAttempt={} dispatchAttempt={} durationMs={}",
                     claim.jobId(),
                     claim.examId(),
+                    claim.generationAttempt(),
                     claim.dispatchAttempt(),
                     elapsedMillis(startedAt)
             );
@@ -120,6 +140,7 @@ public class SummaryDispatchScheduler {
             long durationMs = elapsedMillis(startedAt);
             long updated = summaryJobRepository.failClaimedAttempt(
                     claim.jobId(),
+                    claim.generationAttempt(),
                     claim.dispatchAttempt(),
                     clock.instant(),
                     SUMMARY_DISPATCH_FAILED
@@ -128,8 +149,10 @@ public class SummaryDispatchScheduler {
                 log.debug(
                         "이전 요약 채점 전송 실패 무시 event=grading.summary.dispatch "
                                 + "outcome=stale_failure_ignored "
-                                + "jobId={} dispatchAttempt={} durationMs={} errorType={}",
+                                + "jobId={} generationAttempt={} dispatchAttempt={} "
+                                + "durationMs={} errorType={}",
                         claim.jobId(),
+                        claim.generationAttempt(),
                         claim.dispatchAttempt(),
                         durationMs,
                         dispatchFailure.getClass().getName()
@@ -138,11 +161,13 @@ public class SummaryDispatchScheduler {
                 log.error(
                         "요약 채점 요청 전송 실패 event=grading.summary.dispatch "
                                 + "outcome=failure reason={} jobId={} examId={} "
-                                + "dispatchAttempt={} durationMs={} stage={} stageDurationMs={} "
+                                + "generationAttempt={} dispatchAttempt={} durationMs={} "
+                                + "stage={} stageDurationMs={} "
                                 + "errorType={} rootCauseType={}",
                         SUMMARY_DISPATCH_FAILED,
                         claim.jobId(),
                         claim.examId(),
+                        claim.generationAttempt(),
                         claim.dispatchAttempt(),
                         durationMs,
                         GradingDispatchException.stageCode(dispatchFailure),
@@ -155,8 +180,15 @@ public class SummaryDispatchScheduler {
     }
 
     private boolean isEligible(SummaryGradingJob job, DispatchMode mode, Instant now) {
+        if (job.isCompletionClaimedFor(job.effectiveGenerationAttempt())) {
+            return false;
+        }
         if (mode == DispatchMode.PENDING_ONLY) {
             return job.getStatus() == GradingJobStatus.PENDING;
+        }
+        if (job.getStatus() == GradingJobStatus.FAILED
+                && ExamGradingService.FEEDBACK_GENERATION_FAILED.equals(job.getFailureReason())) {
+            return false;
         }
         return switch (job.getStatus()) {
             case FAILED -> true;
@@ -164,6 +196,15 @@ public class SummaryDispatchScheduler {
             case PROCESSING -> timedOut(job.getProcessingStartedAt(), properties.processingTimeout(), now);
             case COMPLETED -> false;
         };
+    }
+
+    private boolean isCurrentDispatchClaim(SummaryDispatchClaim claim) {
+        return summaryJobRepository.findById(claim.jobId())
+                .filter(job -> job.effectiveGenerationAttempt() == claim.generationAttempt())
+                .filter(job -> job.getStatus() == GradingJobStatus.PROCESSING)
+                .filter(job -> job.getDispatchAttempt() == claim.dispatchAttempt())
+                .filter(job -> !job.isCompletionClaimedFor(claim.generationAttempt()))
+                .isPresent();
     }
 
     private String resolveMockExamId(SummaryGradingJob job) {

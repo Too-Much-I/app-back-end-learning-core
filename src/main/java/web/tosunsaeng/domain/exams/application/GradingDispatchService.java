@@ -69,12 +69,16 @@ public class GradingDispatchService {
         Map<String, Object> body = new HashMap<>();
         body.put("user_id", claim.examId());
         body.put("mock_exam_id", GradingKeys.effectiveMockExamId(claim.mockExamId()));
+        body.put("generation_attempt", claim.generationAttempt());
         body.put("question_number", 0);
         body.put("part_number", 0);
 
         HttpHeaders headers = new HttpHeaders();
         headers.setContentType(MediaType.APPLICATION_JSON);
-        headers.set(IDEMPOTENCY_KEY_HEADER, claim.jobId());
+        headers.set(
+                IDEMPOTENCY_KEY_HEADER,
+                GradingKeys.summaryIdempotencyKey(claim.jobId(), claim.generationAttempt())
+        );
 
         postEvaluation(new HttpEntity<>(body, headers), claim.jobId(), "summary");
     }

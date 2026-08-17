@@ -15,6 +15,12 @@ public final class GradingKeys {
         return "summary:%s:v1".formatted(examId);
     }
 
+    public static String summaryIdempotencyKey(String jobId, int generationAttempt) {
+        return generationAttempt <= 1
+                ? jobId
+                : "%s:generation:%d".formatted(jobId, generationAttempt);
+    }
+
     public static String questionFileKey(String examId, Integer questionNumber, Integer retryCount) {
         return "temp/%s/q_%d_r%d.wav".formatted(examId, questionNumber, canonicalRetryCount(retryCount));
     }

@@ -23,6 +23,7 @@ public class SummaryGradingJob {
     private String examId;
     private String mockExamId;
     private int summaryVersion;
+    private Integer generationAttempt;
     private GradingJobStatus status;
     private int dispatchAttempt;
     private Instant pendingAt;
@@ -31,6 +32,8 @@ public class SummaryGradingJob {
     private Instant completedAt;
     private Instant failedAt;
     private String failureReason;
+    private Integer completionClaimedGeneration;
+    private Instant completionClaimedAt;
 
     @Version
     private Long version;
@@ -45,6 +48,7 @@ public class SummaryGradingJob {
                 .examId(examId)
                 .mockExamId(mockExamId)
                 .summaryVersion(1)
+                .generationAttempt(1)
                 .status(GradingJobStatus.PENDING)
                 .dispatchAttempt(0)
                 .pendingAt(now)
@@ -61,6 +65,7 @@ public class SummaryGradingJob {
                 .examId(examId)
                 .mockExamId(mockExamId)
                 .summaryVersion(1)
+                .generationAttempt(1)
                 .status(GradingJobStatus.COMPLETED)
                 .dispatchAttempt(0)
                 .pendingAt(now)
@@ -69,6 +74,7 @@ public class SummaryGradingJob {
     }
 
     public void startProcessing(Instant now) {
+        generationAttempt = effectiveGenerationAttempt();
         status = GradingJobStatus.PROCESSING;
         dispatchAttempt += 1;
         processingStartedAt = now;
@@ -76,6 +82,39 @@ public class SummaryGradingJob {
         completedAt = null;
         failedAt = null;
         failureReason = null;
+    }
+
+    public int effectiveGenerationAttempt() {
+        return generationAttempt == null || generationAttempt < 1 ? 1 : generationAttempt;
+    }
+
+    public boolean isCompletionClaimedFor(int expectedGenerationAttempt) {
+        return completionClaimedGeneration != null
+                && completionClaimedGeneration == expectedGenerationAttempt;
+    }
+
+    public void claimCompletion(int expectedGenerationAttempt, Instant now) {
+        generationAttempt = expectedGenerationAttempt;
+        status = GradingJobStatus.PROCESSING;
+        processingStartedAt = now;
+        failedAt = null;
+        failureReason = null;
+        completionClaimedGeneration = expectedGenerationAttempt;
+        completionClaimedAt = now;
+    }
+
+    public void rearmFeedbackGeneration(int nextGenerationAttempt, Instant now) {
+        generationAttempt = nextGenerationAttempt;
+        status = GradingJobStatus.PENDING;
+        dispatchAttempt = 0;
+        pendingAt = now;
+        processingStartedAt = null;
+        lastDispatchedAt = null;
+        completedAt = null;
+        failedAt = null;
+        failureReason = null;
+        completionClaimedGeneration = null;
+        completionClaimedAt = null;
     }
 
     public void complete(Instant now) {

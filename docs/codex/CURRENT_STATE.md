@@ -969,3 +969,89 @@
 - 기존 `SPRING_PROFILES_ACTIVE`는 Sentry 전용 신규 값은 아니지만 staging/prod에서 각각 명시해야 한다. `SENTRY_ENVIRONMENT`가 없으면 Spring profile로 fallback하지만 운영 오분류 방지를 위해 두 값을 모두 명시한다.
 - `SENTRY_AUTH_TOKEN`, `SENTRY_ORG`, `SENTRY_PROJECT`는 현재 런타임 이벤트 전송에 필요하지 않으며 추가하지 않는다. 향후 CI에서 Sentry release 생성이나 source context 업로드를 도입할 때만 별도 최소 권한 CI Secret으로 검토한다.
 - 실제 DSN·Secret·Token은 조회하거나 기록하지 않았다. 애플리케이션·테스트·배포 파일과 외부 API·AI/Callback·Redis/S3 계약은 변경하지 않았고, 문서 갱신 외 코드 변경이 없어 Gradle 테스트는 다시 실행하지 않았다.
+
+## Latest empty Summary feedback recovery plan (2026-08-11)
+
+- 별도 신규 Jira 이슈 키는 제공되지 않았으며, 기존 `TMI-25`에서 구현한 시험 단위 `POST /api/v1/exams/{examId}/grading/retry`와 Question/Summary Job 흐름을 활용하는 후속 계획이다. 상세 내용은 `docs/codex/FEEDBACK_GENERATION_RECOVERY_PLAN.md`에 있다.
+- 현재 Summary Callback은 `partFeedback` null/empty를 검사하지 않아 빈 객체도 `ExamSummary` 저장, Summary Job 완료와 ExamSession 완료로 이어질 수 있다. 계획은 빈/null Map이면 Summary를 저장하지 않고 Job을 `FAILED`, reason=`FEEDBACK_GENERATION_FAILED`로 만들며 Session을 `IN_PROGRESS`로 유지한다.
+- 프론트의 주 오류 수신 경계는 기존 `GET /api/v1/exams/{examId}/status`로 권장했다. 기존 `BaseResponse` 구조에서 exact code `FEEDBACK_GENERATION_FAILED`, message `피드백 생성에 실패했습니다.`를 non-2xx로 반환하고, Summary 조회도 같은 상태에서 동일 오류를 반환한다. AI Callback은 실패 상태를 영속화한 뒤 200 delivery acknowledgement를 반환하는 안을 권장한다.
+- Summary 시작 근거는 배정된 MockExam의 모든 필수 문항에 대한 실제 최초 `ExamResult` 존재로 강화한다. 현재 문제지는 카탈로그 계약 테스트로 1~11번을 고정하되 별도 하드코딩 목록이나 프론트 입력을 추가하지 않는다. `QuestionGradingJob=COMPLETED`만 있고 결과가 없는 문항은 `QUESTION_RESULT_MISSING` 복구 대상으로 취급한다.
+- 프론트 retry가 들어오면 실패한 Summary Job을 다음 generation의 `PENDING`으로 먼저 재무장한다. 모든 결과가 이미 있으면 Question dispatch 없이 Summary만 예약하고, 누락 문항이 있으면 해당 문항만 복구한 뒤 마지막 valid Callback에서 PENDING Summary를 한 번 예약한다.
+- 반복 재생성을 위해 내부 `generationAttempt`와 기존 `dispatchAttempt` 분리를 권장했다. Summary document/job ID와 JSON 계약은 유지하되 generation 2 이상 멱등 키를 구분해야 실제 AI 재생성이 보장되므로 Python AI의 `Idempotency-Key` 캐시 정책 확인이 구현 전 필수다. Callback JSON에 generation이 없어 stale Callback 완전 구분은 불가능하므로 valid Summary와 COMPLETED가 항상 우선하도록 단조성을 보장한다.
+- 기존에 이미 빈 Summary가 저장되고 Session이 COMPLETED인 데이터는 새 Callback 검증만으로 복구되지 않는다. 배포 전 읽기 전용 집계 후 별도 승인된 복구 runbook 범위를 정하며, 계획 작업에서 운영 데이터나 완료 Session을 변경하지 않았다.
+- 이번 turn은 계획·상태·작업 기록 문서만 변경했다. 애플리케이션·테스트·외부 시스템은 변경하지 않았고 Gradle 테스트도 실행하지 않았다. 실제 Secret·Token과 Callback payload를 조회하거나 기록하지 않았다.
+
+## Latest Summary generation fencing plan revision (2026-08-11)
+
+- 별도 신규 Jira 이슈 키는 제공되지 않았고, 기존 `TMI-25`의 시험 단위 grading retry를 활용하는 `docs/codex/FEEDBACK_GENERATION_RECOVERY_PLAN.md`에 사용자가 확정한 `generationAttempt` 계약과 동시성 보강안을 반영했다.
+- Question AI Request/Callback은 그대로 유지한다. Summary에만 `generation_attempt`를 추가하며 Learning Core가 generation을 생성·증가시키고 Python AI는 요청 값을 Callback에 그대로 echo한다. Callback 값이 누락되거나 현재 `SummaryGradingJob.generationAttempt`와 다르면 empty/valid 여부와 관계없이 stale no-op한다.
+- `generationAttempt`는 `FAILED/FEEDBACK_GENERATION_FAILED` 상태에서 사용자가 기존 grading retry API를 호출할 때만 1 증가한다. 새 generation은 `PENDING`, `dispatchAttempt=0`으로 시작하고 동일 generation의 transport timeout·전송 실패·retry는 generation을 유지한 채 dispatch attempt만 증가한다. legacy Mongo Job의 누락 필드는 generation 1로 해석한다.
+- Summary Scheduler, claim, dispatch 전 검증과 완료·실패 갱신에 generation fencing을 적용한다. 이전 generation worker는 새 generation의 status·dispatch attempt를 바꾸지 않고, 전송 직전 stale이면 외부 요청도 보내지 않는다. 이미 전송된 이전 요청의 Callback은 Callback generation fence로 차단한다.
+- Callback의 최초 generation 조회와 실제 Summary 저장 사이 경합도 막기 위해 저장 직전 `jobId + generation + status + version` completion claim 또는 Mongo transaction을 요구한다. 전체 COMPLETED 판정은 유효 Summary 저장 결과까지 확인해 Job만 완료된 중간 상태를 외부 완료로 노출하지 않는다.
+- 실제 최초 `ExamResult`가 없고 Question Job만 COMPLETED이면 `QUESTION_RESULT_MISSING`으로 분류한다. Job을 version/recovery-cycle 조건으로 PENDING re-open하고 `dispatchAttempt=0`으로 초기화해 새 복구 사이클의 max attempt 정책을 적용하며, Question wire 계약은 변경하지 않는다.
+- Summary Idempotency-Key는 generation 1에서 기존 Job ID, generation 2 이상에서 `:generation:<n>` suffix를 사용한다. 같은 generation transport retry는 같은 키를 쓴다. 프론트는 기존 status/Summary 조회의 HTTP 500 `FEEDBACK_GENERATION_FAILED` exact code로 기존 grading retry를 호출하고 다른 5xx/FAILED 동작은 유지한다.
+- 배포는 Python AI의 generation echo를 먼저 적용하되 전환 기간 동안 필드 없는 구버전 Summary 요청을 generation 1로 처리해 echo한 뒤 Learning Core를 배포한다. staging에서 generation별 키 독립 처리, 구버전/in-flight Callback, stale worker를 확인하고 기존 empty Summary는 별도 읽기 전용 집계와 승인된 복구 runbook으로 분리한다.
+- 이번 turn은 계획·상태·작업 기록 문서만 변경했다. 애플리케이션·테스트·외부 시스템을 변경하지 않았고 Gradle 테스트를 실행하지 않았다. 실제 Secret·Token·Callback payload를 조회하거나 기록하지 않았으며 공개 프론트 API·DTO·Redis/S3 계약도 변경하지 않았다.
+
+## Latest Summary generation recovery implementation (2026-08-11)
+
+- Jira `TMI-25` 후속 범위로 `docs/codex/FEEDBACK_GENERATION_RECOVERY_PLAN.md`의 Summary 재생성과 Question 결과 누락 복구를 구현했다. 신규 공개 API는 추가하지 않았고 기존 `POST /api/v1/exams/{examId}/grading/retry`의 body 없음 및 `GradingRetryResult` 계약을 유지한다.
+- `SummaryGradingJob`은 legacy 누락 값을 1로 해석하는 `generationAttempt`와 completion claim을 가진다. `FAILED/FEEDBACK_GENERATION_FAILED`에서 사용자가 retry할 때만 Mongo 조건부 update로 다음 generation을 열고 `dispatchAttempt=0`, `PENDING`으로 재무장한다. transport retry는 같은 generation에서 dispatch attempt만 증가한다.
+- Summary Request와 Callback에만 `generation_attempt`를 추가했다. generation 1은 기존 `summary:<examId>:v1`, generation 2 이상은 `summary:<examId>:v1:generation:<n>` Idempotency-Key를 사용한다. Scheduler task와 dispatch claim은 generation을 캡처하고 claim 전·AI 전송 직전·실패 갱신에서 현재 generation을 확인한다.
+- Summary Callback은 generation 누락·불일치를 empty/valid 모두 stale no-op한다. 현재 generation의 null/empty `partFeedback`은 Summary를 저장하거나 Session을 완료하지 않고 Job을 `FAILED/FEEDBACK_GENERATION_FAILED`로 만든다. valid Callback은 generation 조건의 completion claim을 먼저 획득한 뒤 결정적 Summary 저장, Job COMPLETED, Session COMPLETED, 기존 Redis status projection 순으로 수렴한다.
+- 실제 최초 `ExamResult`만 Summary 준비 근거로 사용한다. 결과 없이 `QuestionGradingJob=COMPLETED`이면 `QUESTION_RESULT_MISSING`으로 보고 원자적으로 PENDING re-open하며 `dispatchAttempt=0`과 새 내부 recovery cycle로 해당 문항만 다시 보낸다. stale 이전 cycle의 전송 실패는 새 cycle 상태를 변경하지 않는다.
+- 기존 status와 Summary 조회는 유효 Summary가 없는 현재 Summary Job의 `FAILED/FEEDBACK_GENERATION_FAILED`를 HTTP 500, code `FEEDBACK_GENERATION_FAILED`, message `피드백 생성에 실패했습니다.`의 기존 `BaseResponse`로 반환한다. 다른 5xx/FAILED 처리와 공개 프론트 DTO는 변경하지 않았다.
+- 공개 API URL·Method·기존 Request/Response DTO·`BaseResponse`, `user_id=examId`, `retryCount`, Question AI Request/Callback, Redis Key/TTL, S3 Object Key와 소유권 검증을 유지했다. 실제 외부 Python AI, MongoDB, Redis, S3, Sentry와 배포 환경은 호출하거나 변경하지 않았다.
+- 최종 `./gradlew clean test`는 tests/failures/errors/skipped `351/0/0/0`으로 성공했고 `git diff --check`도 성공했다. 기존 `ExamServiceImpl` unchecked 경고는 이번 범위와 무관하게 유지했다.
+- 배포 전 Python AI의 generation echo와 generation별 Idempotency-Key 독립 처리를 먼저 적용해야 한다. generation 없는 in-flight 구버전 Callback 가능성과 기존 empty/null Summary 데이터는 staging 확인 및 별도 승인된 읽기 전용 집계·복구 runbook 대상으로 남아 있다.
+
+## Latest daily work summary for 2026-08-11 through 2026-08-13 (2026-08-14)
+
+- 기존 작업 기록의 연속된 주제와 진행 순서를 날짜별로 재분류했다. 원래 WORKLOG 항목은 변경하거나 삭제하지 않았으며, 상세 정정 요약은 WORKLOG의 2026-08-14 항목에 있다.
+- **2026-08-11:** 별도 Jira 이슈 없이 Sentry 운영 보완 정책 확정, fail-closed event sanitizing, 예상하지 못한 5xx 단일 수집, scope 격리와 recording transport 검증을 구현했다. 전체 테스트 결과는 `332/0/0/0`이다.
+- **2026-08-12:** Jira `TMI-25` 후속 범위로 빈 Summary feedback 실패 처리, 사용자 retry 기반 `generationAttempt`, generation fencing과 누락 Question 결과 복구 계획을 확정했다. 계획·상태 문서만 변경한 단계다.
+- **2026-08-13:** Jira `TMI-25` 후속 Summary 재생성과 Question 결과 누락 복구를 구현하고 stale worker/Callback 및 동시 retry 회귀 테스트를 보강했다. 전체 테스트 결과는 `351/0/0/0`이다.
+- 공개 API·DTO·`BaseResponse`, `retryCount`, AI/Callback `user_id=examId`, Redis Key/TTL, S3 Object Key와 시험 소유권 검증 계약은 유지됐다.
+- 남은 배포 확인 사항은 Python AI의 `generation_attempt` echo와 generation별 Idempotency-Key 독립 처리, in-flight legacy Callback, 기존 empty/null Summary 데이터의 읽기 전용 집계 및 승인된 복구 runbook이다.
+- 이번 날짜별 정리는 문서만 변경했으며 Gradle 테스트는 다시 실행하지 않았다. 외부 시스템·Jira 상태·Git commit·push는 변경하지 않았다.
+
+## Latest in-chat blog draft delivery (2026-08-14)
+
+- 사용자의 정정에 따라 2026-08-11부터 2026-08-13까지의 작업 내용을 저장소 문서가 아닌 대화창에서 사용할 블로그 글 초안으로 제공한다.
+- 구성은 8월 11일 Sentry 운영 보완, 8월 12일 Jira `TMI-25` 후속 Summary 복구 설계, 8월 13일 Summary generation 및 누락 Question 결과 복구 구현·검증 순서다.
+- 애플리케이션 동작과 공개 API·DTO·`BaseResponse`, AI/Callback `user_id=examId`, `retryCount`, Redis Key/TTL, S3 Object Key 및 소유권 검증 계약은 변경하지 않았다.
+- 이번 turn은 응답 작성과 작업 기록 갱신만 수행했으며 Gradle 테스트는 실행하지 않았다. 외부 시스템·Jira 상태·Git commit·push도 변경하지 않았다.
+
+## Latest part score retry inclusion analysis (2026-08-17)
+
+- 별도 Jira 이슈 키 없이 `GET /api/v1/exams/{examId}/summary`의 `partScores` 산정 경로를 확인했다.
+- 현재 `ExamServiceImpl.getExamSummary()`는 시험의 모든 `ExamResult` 중 `questionNumber`와 `score`가 있는 모든 문서를 파트별로 합산하며, `retryCount`를 필터링하지 않는다. 따라서 최초 응시와 재시도 점수가 모두 `partScores`에 더해지는 현상이 맞다.
+- `totalSolvedQuestions`는 `retryCount == 0`만 카운트하고, `totalScore`는 종합 문서에 저장된 값을 사용하므로 위 영향은 `partScores`에 한정된다.
+- 코드를 수정하지 않았고 공개 API·DTO·`BaseResponse`, AI/Callback, `retryCount`, Redis/S3 계약을 변경하지 않았다. 정적 분석과 문서 기록만 수행해 Gradle 테스트는 실행하지 않았다.
+- 후속 수정 전에 최초 응시만 사용할지, 문항별 최신 재시도나 최고 점수를 사용할지 산정 정책을 확정해야 한다.
+
+## Latest initial-attempt-only part score implementation (2026-08-17)
+
+- 별도 Jira 이슈 키 없이 `GET /api/v1/exams/{examId}/summary`의 `partScores`를 `retryCount == 0`인 최초 응시 결과만 파트별로 합산하도록 변경했다.
+- `retryCount>0` 재시도 결과와 `retryCount=null` legacy 결과는 `partScores`에서 제외된다. `totalScore`와 `totalSolvedQuestions` 로직은 변경하지 않았다.
+- 회귀 테스트로 최초 응시 점수만 합산되고 재시도와 null 회차가 제외되는 것을 검증했다. 최종 `./gradlew clean test`는 tests/failures/errors/skipped `352/0/0/0`, `git diff --check`는 성공했다.
+- 공개 API URL·Method·DTO 필드·`BaseResponse`, AI/Callback `user_id=examId`, `retryCount` 의미, Redis/S3와 소유권 검증 계약은 유지했다.
+- 배포 전 실제 데이터에 `retryCount=null`인 최초 응시 문서가 존재하는지 확인할 수 있다. 명시적 요청은 `retryCount=0`만 포함하는 것이므로 현재 구현은 null을 최초 응시로 간주하지 않는다.
+
+### Completion record sync (2026-08-17)
+
+- 종료 hook에서 요구한 WORKLOG 보완 항목을 추가했다. 현재 구현·테스트 결과·외부 계약·legacy `retryCount=null` 위험은 위 최신 상태와 동일하며, 이 보완으로 코드나 외부 시스템은 추가 변경되지 않았다.
+
+## Latest initial-attempt part score implementation plan (2026-08-17)
+
+- 별도 Jira 이슈 키 없이 이미 반영된 `partScores` 최초 응시 집계의 구현 계획을 정리했다.
+- 외부 API·DTO·`BaseResponse`는 유지하고 `getExamSummary()`의 점수 합산 스트림에서 `retryCount == 0`만 통과시키는 최소 변경이다.
+- 최초 응시·재시도·null 회차를 함께 사용하는 회귀 테스트와 전체 Gradle 테스트로 검증하며, legacy null 문서 존재 여부를 배포 전 확인 사항으로 유지한다.
+- 이번 계획 정리 turn에서는 작업 기록 문서 외의 코드나 외부 시스템을 추가 변경하지 않았다.
+
+## Latest initial-attempt part score implementation confirmation (2026-08-17)
+
+- 별도 Jira 이슈 키 없이 사용자의 구현 요청에 따라 현재 작업 트리의 구현·회귀 테스트·전체 테스트 상태를 확정했다.
+- `partScores`는 `retryCount == 0`인 최초 응시만 합산하고 재시도와 null 회차는 제외한다. 공개 API 구조와 기타 외부 계약은 유지된다.
+- `./gradlew clean test`는 tests/failures/errors/skipped `352/0/0/0`, `git diff --check`는 성공했다. 기존 unchecked 경고 외에 추가 문제는 없다.
+- 이미 요청한 애플리케이션·테스트 변경이 작업 트리에 존재했으므로 이번 확인에서는 코드를 추가 변경하지 않았다. legacy `retryCount=null` 최초 응시 문서는 집계에서 제외되는 상태다.

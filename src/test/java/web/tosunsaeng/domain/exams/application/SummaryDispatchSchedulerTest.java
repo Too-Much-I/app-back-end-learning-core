@@ -95,8 +95,8 @@ class SummaryDispatchSchedulerTest {
         );
         SummaryDispatchScheduler scheduler = scheduler(taskExecutor);
 
-        assertTrue(scheduler.schedulePending(JOB_ID));
-        assertTrue(scheduler.schedulePending(JOB_ID));
+        assertTrue(scheduler.schedulePending(JOB_ID, 1));
+        assertTrue(scheduler.schedulePending(JOB_ID, 1));
         assertEquals(2, taskExecutor.taskCount());
 
         taskExecutor.runAll();
@@ -133,7 +133,7 @@ class SummaryDispatchSchedulerTest {
                 .build()));
         SummaryDispatchScheduler scheduler = scheduler(taskExecutor);
 
-        assertTrue(scheduler.schedulePending(JOB_ID));
+        assertTrue(scheduler.schedulePending(JOB_ID, 1));
         taskExecutor.runAll();
 
         ArgumentCaptor<SummaryDispatchClaim> claimCaptor =
@@ -150,7 +150,7 @@ class SummaryDispatchSchedulerTest {
         when(examSessionRepository.findById(EXAM_ID)).thenReturn(Optional.empty());
         SummaryDispatchScheduler scheduler = scheduler(taskExecutor);
 
-        assertTrue(scheduler.schedulePending(JOB_ID));
+        assertTrue(scheduler.schedulePending(JOB_ID, 1));
         taskExecutor.runAll();
 
         assertAll(
@@ -168,7 +168,7 @@ class SummaryDispatchSchedulerTest {
         when(examSessionRepository.findById(EXAM_ID)).thenReturn(Optional.of(abandonedSession()));
         SummaryDispatchScheduler scheduler = scheduler(taskExecutor);
 
-        assertTrue(scheduler.schedulePending(JOB_ID));
+        assertTrue(scheduler.schedulePending(JOB_ID, 1));
         taskExecutor.runAll();
 
         assertAll(
@@ -189,7 +189,7 @@ class SummaryDispatchSchedulerTest {
         );
         SummaryDispatchScheduler scheduler = scheduler(taskExecutor);
 
-        assertTrue(scheduler.schedulePending(JOB_ID));
+        assertTrue(scheduler.schedulePending(JOB_ID, 1));
         taskExecutor.runAll();
 
         assertAll(
@@ -198,7 +198,7 @@ class SummaryDispatchSchedulerTest {
                 () -> assertEquals(SummaryDispatchScheduler.EXAM_ABANDONED, store.get().getFailureReason())
         );
         verify(summaryJobRepository).failClaimedAttempt(
-                JOB_ID, 1, NOW, SummaryDispatchScheduler.EXAM_ABANDONED);
+                JOB_ID, 1, 1, NOW, SummaryDispatchScheduler.EXAM_ABANDONED);
         verify(dispatchService, never()).dispatchSummary(any());
     }
 
@@ -210,7 +210,7 @@ class SummaryDispatchSchedulerTest {
         };
         SummaryDispatchScheduler scheduler = scheduler(rejectingExecutor);
 
-        boolean scheduled = scheduler.schedulePending(JOB_ID);
+        boolean scheduled = scheduler.schedulePending(JOB_ID, 1);
 
         assertAll(
                 () -> assertFalse(scheduled),
@@ -219,10 +219,77 @@ class SummaryDispatchSchedulerTest {
                 () -> assertTrue(output.getOut().contains(
                         "요약 채점 실행 예약 거절 "
                                 + "event=grading.summary.schedule outcome=rejected reason=executor_rejected "
-                                + "jobId=" + JOB_ID + " mode=PENDING_ONLY"
+                                + "jobId=" + JOB_ID + " generationAttempt=1 mode=PENDING_ONLY"
                 ))
         );
         verifyNoInteractions(summaryJobRepository, dispatchService);
+    }
+
+    @Test
+    void scheduledPreviousGenerationDoesNotClaimCurrentGeneration() {
+        CapturingTaskExecutor taskExecutor = new CapturingTaskExecutor();
+        AtomicReference<SummaryGradingJob> store = installRepositoryStore(
+                SummaryGradingJob.pending(JOB_ID, EXAM_ID, NOW)
+        );
+        SummaryDispatchScheduler scheduler = scheduler(taskExecutor);
+        assertTrue(scheduler.schedulePending(JOB_ID, 1));
+
+        SummaryGradingJob generationTwo = SummaryGradingJob.builder()
+                .jobId(JOB_ID)
+                .examId(EXAM_ID)
+                .mockExamId("mock_exam_002")
+                .summaryVersion(1)
+                .generationAttempt(2)
+                .status(GradingJobStatus.PENDING)
+                .dispatchAttempt(0)
+                .pendingAt(NOW.plusSeconds(1))
+                .build();
+        store.set(copy(generationTwo, store.get().getVersion() + 1));
+
+        taskExecutor.runAll();
+
+        assertAll(
+                () -> assertEquals(2, store.get().effectiveGenerationAttempt()),
+                () -> assertEquals(GradingJobStatus.PENDING, store.get().getStatus()),
+                () -> assertEquals(0, store.get().getDispatchAttempt())
+        );
+        verify(summaryJobRepository, never()).save(any(SummaryGradingJob.class));
+        verify(dispatchService, never()).dispatchSummary(any());
+    }
+
+    @Test
+    void claimedPreviousGenerationIsFencedBeforeAiDispatch() {
+        CapturingTaskExecutor taskExecutor = new CapturingTaskExecutor();
+        AtomicReference<SummaryGradingJob> store = installRepositoryStore(
+                SummaryGradingJob.pending(JOB_ID, EXAM_ID, NOW)
+        );
+        when(summaryJobRepository.save(any(SummaryGradingJob.class))).thenAnswer(invocation -> {
+            SummaryGradingJob generationOneClaim = invocation.getArgument(0);
+            SummaryGradingJob claimed = copy(generationOneClaim, store.get().getVersion() + 1);
+            SummaryGradingJob generationTwo = SummaryGradingJob.builder()
+                    .jobId(JOB_ID)
+                    .examId(EXAM_ID)
+                    .mockExamId("mock_exam_002")
+                    .summaryVersion(1)
+                    .generationAttempt(2)
+                    .status(GradingJobStatus.PENDING)
+                    .dispatchAttempt(0)
+                    .pendingAt(NOW.plusSeconds(1))
+                    .build();
+            store.set(copy(generationTwo, claimed.getVersion() + 1));
+            return claimed;
+        });
+        SummaryDispatchScheduler scheduler = scheduler(taskExecutor);
+
+        assertTrue(scheduler.schedulePending(JOB_ID, 1));
+        taskExecutor.runAll();
+
+        assertAll(
+                () -> assertEquals(2, store.get().effectiveGenerationAttempt()),
+                () -> assertEquals(GradingJobStatus.PENDING, store.get().getStatus()),
+                () -> assertEquals(0, store.get().getDispatchAttempt())
+        );
+        verify(dispatchService, never()).dispatchSummary(any());
     }
 
     @Test
@@ -250,13 +317,13 @@ class SummaryDispatchSchedulerTest {
 
         ExecutorService worker = Executors.newSingleThreadExecutor();
         try {
-            assertTrue(scheduler.schedulePending(JOB_ID));
+            assertTrue(scheduler.schedulePending(JOB_ID, 1));
             Future<?> attemptOne = worker.submit(taskExecutor.takeNext());
             assertTrue(attemptOneStarted.await(5, TimeUnit.SECONDS));
 
             Instant retryAt = NOW.plus(Duration.ofMinutes(3));
             clock.set(retryAt);
-            assertTrue(scheduler.scheduleRetry(JOB_ID));
+            assertTrue(scheduler.scheduleRetry(JOB_ID, 1));
             taskExecutor.runAll();
             releaseAttemptOne.countDown();
             attemptOne.get(5, TimeUnit.SECONDS);
@@ -273,6 +340,7 @@ class SummaryDispatchSchedulerTest {
             );
             verify(summaryJobRepository).failClaimedAttempt(
                     JOB_ID,
+                    1,
                     1,
                     retryAt,
                     SummaryDispatchScheduler.SUMMARY_DISPATCH_FAILED
@@ -297,7 +365,7 @@ class SummaryDispatchSchedulerTest {
         ))
                 .when(dispatchService).dispatchSummary(any(SummaryDispatchClaim.class));
 
-        assertTrue(scheduler.schedulePending(JOB_ID));
+        assertTrue(scheduler.schedulePending(JOB_ID, 1));
         taskExecutor.runAll();
 
         SummaryGradingJob stored = store.get();
@@ -325,6 +393,7 @@ class SummaryDispatchSchedulerTest {
         verify(summaryJobRepository).failClaimedAttempt(
                 JOB_ID,
                 1,
+                1,
                 NOW,
                 SummaryDispatchScheduler.SUMMARY_DISPATCH_FAILED
         );
@@ -341,7 +410,7 @@ class SummaryDispatchSchedulerTest {
         ));
         SummaryDispatchScheduler scheduler = scheduler(taskExecutor);
 
-        assertTrue(scheduler.scheduleRetry(JOB_ID));
+        assertTrue(scheduler.scheduleRetry(JOB_ID, 1));
         taskExecutor.runAll();
 
         verify(summaryJobRepository, never()).save(any(SummaryGradingJob.class));
@@ -398,13 +467,15 @@ class SummaryDispatchSchedulerTest {
                     return copy(saved, saved.getVersion());
                 });
         lenient().when(summaryJobRepository.failClaimedAttempt(
-                        eq(JOB_ID), anyInt(), any(Instant.class), anyString()))
+                        eq(JOB_ID), anyInt(), anyInt(), any(Instant.class), anyString()))
                 .thenAnswer(invocation -> {
-                    int claimedAttempt = invocation.getArgument(1);
-                    Instant failedAt = invocation.getArgument(2);
-                    String reason = invocation.getArgument(3);
+                    int claimedGeneration = invocation.getArgument(1);
+                    int claimedAttempt = invocation.getArgument(2);
+                    Instant failedAt = invocation.getArgument(3);
+                    String reason = invocation.getArgument(4);
                     SummaryGradingJob current = store.get();
                     if (current.getStatus() != GradingJobStatus.PROCESSING
+                            || current.effectiveGenerationAttempt() != claimedGeneration
                             || current.getDispatchAttempt() != claimedAttempt) {
                         return 0L;
                     }
@@ -425,6 +496,7 @@ class SummaryDispatchSchedulerTest {
                 .jobId(JOB_ID)
                 .examId(EXAM_ID)
                 .summaryVersion(1)
+                .generationAttempt(1)
                 .status(status)
                 .dispatchAttempt(dispatchAttempt)
                 .pendingAt(statusAt)
@@ -442,6 +514,7 @@ class SummaryDispatchSchedulerTest {
                 .examId(source.getExamId())
                 .mockExamId(source.getMockExamId())
                 .summaryVersion(source.getSummaryVersion())
+                .generationAttempt(source.getGenerationAttempt())
                 .status(source.getStatus())
                 .dispatchAttempt(source.getDispatchAttempt())
                 .pendingAt(source.getPendingAt())
@@ -450,6 +523,8 @@ class SummaryDispatchSchedulerTest {
                 .completedAt(source.getCompletedAt())
                 .failedAt(source.getFailedAt())
                 .failureReason(source.getFailureReason())
+                .completionClaimedGeneration(source.getCompletionClaimedGeneration())
+                .completionClaimedAt(source.getCompletionClaimedAt())
                 .version(version)
                 .build();
     }

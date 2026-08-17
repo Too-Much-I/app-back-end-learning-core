@@ -6,14 +6,24 @@ import java.time.Instant;
 
 public record SummaryDispatchClaim(
         String jobId,
+        int generationAttempt,
         int dispatchAttempt,
         Instant claimedAt,
         String examId,
         String mockExamId
 ) {
 
+    public SummaryDispatchClaim(
+            String jobId,
+            int dispatchAttempt,
+            Instant claimedAt,
+            String examId,
+            String mockExamId) {
+        this(jobId, 1, dispatchAttempt, claimedAt, examId, mockExamId);
+    }
+
     public SummaryDispatchClaim(String jobId, int dispatchAttempt, Instant claimedAt, String examId) {
-        this(jobId, dispatchAttempt, claimedAt, examId, null);
+        this(jobId, 1, dispatchAttempt, claimedAt, examId, null);
     }
 
     public static SummaryDispatchClaim from(SummaryGradingJob job) {
@@ -23,6 +33,7 @@ public record SummaryDispatchClaim(
     public static SummaryDispatchClaim from(SummaryGradingJob job, String mockExamId) {
         return new SummaryDispatchClaim(
                 job.getJobId(),
+                job.effectiveGenerationAttempt(),
                 job.getDispatchAttempt(),
                 job.getLastDispatchedAt(),
                 job.getExamId(),

@@ -139,8 +139,8 @@ class ExamGradingServiceTest {
                         .build()));
         lenient().when(mockExamCatalogService.getRequiredExam(GradingKeys.LEGACY_MOCK_EXAM_ID))
                 .thenAnswer(invocation -> mockExam(expectedQuestionNumbers));
-        lenient().when(summaryDispatchScheduler.schedulePending(anyString())).thenReturn(true);
-        lenient().when(summaryDispatchScheduler.scheduleRetry(anyString())).thenReturn(true);
+        lenient().when(summaryDispatchScheduler.schedulePending(anyString(), anyInt())).thenReturn(true);
+        lenient().when(summaryDispatchScheduler.scheduleRetry(anyString(), anyInt())).thenReturn(true);
 
         service = new ExamGradingService(
                 questionJobRepository,
@@ -547,8 +547,8 @@ class ExamGradingServiceTest {
         ExamResponseDTO.GradingRetryResult result = service.retryExam(EXAM_ID);
 
         assertEquals(SummaryAction.NOT_READY, result.getSummaryAction());
-        verify(summaryDispatchScheduler, never()).schedulePending(anyString());
-        verify(summaryDispatchScheduler, never()).scheduleRetry(anyString());
+        verify(summaryDispatchScheduler, never()).schedulePending(anyString(), anyInt());
+        verify(summaryDispatchScheduler, never()).scheduleRetry(anyString(), anyInt());
     }
 
     @Test
@@ -719,6 +719,7 @@ class ExamGradingServiceTest {
             verify(questionJobRepository).failClaimedAttempt(
                     GradingKeys.questionJobId(EXAM_ID, 1, 0),
                     1,
+                    0,
                     retryAt,
                     "QUESTION_DISPATCH_FAILED"
             );
@@ -741,9 +742,9 @@ class ExamGradingServiceTest {
                 () -> assertEquals(1, stored.getSummaryVersion()),
                 () -> assertEquals(NOW, stored.getCompletedAt()),
                 () -> assertTrue(output.getOut().contains(
-                        "event=grading.summary.job outcome=completed jobId=summary:"
+                                "event=grading.summary.job outcome=completed jobId=summary:"
                                 + EXAM_ID + ":v1 examId=" + EXAM_ID
-                                + " dispatchAttempt=0 fromStatus=MISSING "
+                                + " generationAttempt=1 dispatchAttempt=0 fromStatus=MISSING "
                                 + "toStatus=COMPLETED callbackLatencyMs=-1"
                 ))
         );
@@ -771,7 +772,8 @@ class ExamGradingServiceTest {
                         )
                 ),
                 () -> assertTrue(output.getOut().contains(
-                        "dispatchAttempt=2 fromStatus=PROCESSING toStatus=COMPLETED "
+                        "generationAttempt=1 dispatchAttempt=2 "
+                                + "fromStatus=PROCESSING toStatus=COMPLETED "
                                 + "callbackLatencyMs=90000"
                 ))
         );
@@ -785,7 +787,7 @@ class ExamGradingServiceTest {
         service.ensureSummaryStartedIfReady(EXAM_ID);
         service.ensureSummaryStartedIfReady(EXAM_ID);
 
-        verify(summaryDispatchScheduler, never()).schedulePending(anyString());
+        verify(summaryDispatchScheduler, never()).schedulePending(anyString(), anyInt());
         assertTrue(summaryJobs.isEmpty());
     }
 
@@ -798,7 +800,8 @@ class ExamGradingServiceTest {
         service.ensureSummaryStartedIfReady(EXAM_ID);
 
         verify(summaryJobRepository, times(1)).insert(any(SummaryGradingJob.class));
-        verify(summaryDispatchScheduler, times(2)).schedulePending(GradingKeys.summaryJobId(EXAM_ID));
+        verify(summaryDispatchScheduler, times(2)).schedulePending(
+                GradingKeys.summaryJobId(EXAM_ID), 1);
         verify(dispatchService, never()).dispatchSummary(any());
         SummaryGradingJob stored = storedSummary();
         assertAll(
@@ -835,8 +838,8 @@ class ExamGradingServiceTest {
         service.ensureSummaryStartedIfReady(EXAM_ID);
         service.ensureSummaryStartedIfReady(EXAM_ID);
 
-        verify(summaryDispatchScheduler, never()).schedulePending(anyString());
-        verify(summaryDispatchScheduler, never()).scheduleRetry(anyString());
+        verify(summaryDispatchScheduler, never()).schedulePending(anyString(), anyInt());
+        verify(summaryDispatchScheduler, never()).scheduleRetry(anyString(), anyInt());
         verify(dispatchService, never()).dispatchSummary(any());
     }
 
@@ -848,7 +851,7 @@ class ExamGradingServiceTest {
         ExamResponseDTO.GradingRetryResult result = service.retryExam(EXAM_ID);
 
         assertEquals(SummaryAction.WAITING, result.getSummaryAction());
-        verify(summaryDispatchScheduler, never()).scheduleRetry(anyString());
+        verify(summaryDispatchScheduler, never()).scheduleRetry(anyString(), anyInt());
     }
 
     @Test
@@ -862,7 +865,7 @@ class ExamGradingServiceTest {
                 () -> assertEquals(SummaryAction.WAITING, result.getSummaryAction()),
                 () -> assertEquals(GradingJobStatus.PROCESSING, storedSummary().getStatus())
         );
-        verify(summaryDispatchScheduler, never()).scheduleRetry(anyString());
+        verify(summaryDispatchScheduler, never()).scheduleRetry(anyString(), anyInt());
     }
 
     @Test
@@ -886,7 +889,7 @@ class ExamGradingServiceTest {
                                 + "fromStatus=FAILED toStatus=FAILED"
                 ))
         );
-        verify(summaryDispatchScheduler, never()).scheduleRetry(anyString());
+        verify(summaryDispatchScheduler, never()).scheduleRetry(anyString(), anyInt());
     }
 
     @ParameterizedTest
@@ -899,20 +902,239 @@ class ExamGradingServiceTest {
 
         assertEquals(SummaryAction.RETRIED, result.getSummaryAction());
         assertEquals(1, storedSummary().getDispatchAttempt());
-        verify(summaryDispatchScheduler).scheduleRetry(GradingKeys.summaryJobId(EXAM_ID));
+        assertEquals(1, storedSummary().effectiveGenerationAttempt());
+        verify(summaryDispatchScheduler).scheduleRetry(GradingKeys.summaryJobId(EXAM_ID), 1);
         verify(dispatchService, never()).dispatchSummary(any());
     }
 
     @Test
-    void retryDoesNotDispatchCompletedSummaryAgain() {
+    void feedbackFailureRetryCreatesNextGenerationAndResetsDispatchAttempt() {
+        putCompletedQuestions(expectedQuestionNumbers);
+        putSummary(feedbackFailedSummary(1, 3));
+
+        ExamResponseDTO.GradingRetryResult result = service.retryExam(EXAM_ID);
+
+        SummaryGradingJob stored = storedSummary();
+        assertAll(
+                () -> assertEquals(SummaryAction.RETRIED, result.getSummaryAction()),
+                () -> assertEquals(2, stored.effectiveGenerationAttempt()),
+                () -> assertEquals(GradingJobStatus.PENDING, stored.getStatus()),
+                () -> assertEquals(0, stored.getDispatchAttempt()),
+                () -> assertNull(stored.getFailureReason())
+        );
+        verify(summaryDispatchScheduler).schedulePending(GradingKeys.summaryJobId(EXAM_ID), 2);
+        verify(summaryDispatchScheduler, never()).scheduleRetry(anyString(), anyInt());
+    }
+
+    @Test
+    void repeatedEmptyFeedbackOpensExactlyOneNewGenerationPerUserRetry() {
+        putCompletedQuestions(expectedQuestionNumbers);
+        putSummary(feedbackFailedSummary(1, 2));
+
+        ExamResponseDTO.GradingRetryResult generationTwo = service.retryExam(EXAM_ID);
+        assertTrue(service.failSummaryGeneration(
+                EXAM_ID,
+                2,
+                ExamGradingService.FEEDBACK_GENERATION_FAILED
+        ));
+        ExamResponseDTO.GradingRetryResult generationThree = service.retryExam(EXAM_ID);
+
+        assertAll(
+                () -> assertEquals(SummaryAction.RETRIED, generationTwo.getSummaryAction()),
+                () -> assertEquals(SummaryAction.RETRIED, generationThree.getSummaryAction()),
+                () -> assertEquals(3, storedSummary().effectiveGenerationAttempt()),
+                () -> assertEquals(0, storedSummary().getDispatchAttempt()),
+                () -> assertEquals(GradingJobStatus.PENDING, storedSummary().getStatus())
+        );
+        verify(summaryDispatchScheduler).schedulePending(GradingKeys.summaryJobId(EXAM_ID), 2);
+        verify(summaryDispatchScheduler).schedulePending(GradingKeys.summaryJobId(EXAM_ID), 3);
+    }
+
+    @Test
+    void delayedPreviousGenerationFailureCannotFailCurrentGeneration() {
+        putCompletedQuestions(expectedQuestionNumbers);
+        putSummary(feedbackFailedSummary(1, 1));
+        service.retryExam(EXAM_ID);
+
+        boolean updated = service.failSummaryGeneration(
+                EXAM_ID,
+                1,
+                ExamGradingService.FEEDBACK_GENERATION_FAILED
+        );
+
+        assertAll(
+                () -> assertFalse(updated),
+                () -> assertEquals(2, storedSummary().effectiveGenerationAttempt()),
+                () -> assertEquals(GradingJobStatus.PENDING, storedSummary().getStatus()),
+                () -> assertNull(storedSummary().getFailureReason())
+        );
+    }
+
+    @Test
+    void validCompletionClaimWinsAgainstEmptyCallbackInSameGeneration() {
+        putSummary(summaryJob(GradingJobStatus.PROCESSING, 1, NOW.minusSeconds(10)));
+
+        assertTrue(service.claimSummaryCompletion(EXAM_ID, 1));
+        boolean failed = service.failSummaryGeneration(
+                EXAM_ID,
+                1,
+                ExamGradingService.FEEDBACK_GENERATION_FAILED
+        );
+
+        assertAll(
+                () -> assertFalse(failed),
+                () -> assertEquals(GradingJobStatus.PROCESSING, storedSummary().getStatus()),
+                () -> assertTrue(storedSummary().isCompletionClaimedFor(1)),
+                () -> assertNull(storedSummary().getFailureReason())
+        );
+    }
+
+    @Test
+    void retryDoesNotOverwriteAClaimedValidSummaryCompletion() {
+        putCompletedQuestions(expectedQuestionNumbers);
+        putSummary(SummaryGradingJob.builder()
+                .jobId(GradingKeys.summaryJobId(EXAM_ID))
+                .examId(EXAM_ID)
+                .summaryVersion(1)
+                .generationAttempt(1)
+                .status(GradingJobStatus.PROCESSING)
+                .dispatchAttempt(3)
+                .processingStartedAt(NOW.minus(Duration.ofMinutes(5)))
+                .completionClaimedGeneration(1)
+                .completionClaimedAt(NOW.minus(Duration.ofMinutes(5)))
+                .build());
+
+        ExamResponseDTO.GradingRetryResult result = service.retryExam(EXAM_ID);
+
+        assertAll(
+                () -> assertEquals(SummaryAction.WAITING, result.getSummaryAction()),
+                () -> assertEquals(GradingJobStatus.PROCESSING, storedSummary().getStatus()),
+                () -> assertTrue(storedSummary().isCompletionClaimedFor(1)),
+                () -> assertNull(storedSummary().getFailureReason())
+        );
+        verify(summaryDispatchScheduler, never()).scheduleRetry(anyString(), anyInt());
+    }
+
+    @Test
+    void concurrentFeedbackRetriesAdvanceGenerationOnlyOnce() throws Exception {
+        putCompletedQuestions(expectedQuestionNumbers);
+        putSummary(feedbackFailedSummary(1, 1));
+
+        List<ExamResponseDTO.GradingRetryResult> results = runConcurrently(
+                () -> service.retryExam(EXAM_ID),
+                () -> service.retryExam(EXAM_ID)
+        );
+
+        assertAll(
+                () -> assertEquals(2, storedSummary().effectiveGenerationAttempt()),
+                () -> assertEquals(1, results.stream()
+                        .filter(result -> result.getSummaryAction() == SummaryAction.RETRIED)
+                        .count()),
+                () -> assertEquals(1, results.stream()
+                        .filter(result -> result.getSummaryAction() == SummaryAction.WAITING)
+                        .count())
+        );
+        verify(summaryDispatchScheduler, times(1)).schedulePending(
+                GradingKeys.summaryJobId(EXAM_ID), 2);
+    }
+
+    @Test
+    void legacySummaryJobWithoutGenerationAdvancesFromOneToTwo() {
+        putCompletedQuestions(expectedQuestionNumbers);
+        putSummary(SummaryGradingJob.builder()
+                .jobId(GradingKeys.summaryJobId(EXAM_ID))
+                .examId(EXAM_ID)
+                .summaryVersion(1)
+                .status(GradingJobStatus.FAILED)
+                .dispatchAttempt(1)
+                .failedAt(NOW.minusSeconds(10))
+                .failureReason(ExamGradingService.FEEDBACK_GENERATION_FAILED)
+                .build());
+
+        ExamResponseDTO.GradingRetryResult result = service.retryExam(EXAM_ID);
+
+        assertAll(
+                () -> assertEquals(SummaryAction.RETRIED, result.getSummaryAction()),
+                () -> assertEquals(2, storedSummary().effectiveGenerationAttempt()),
+                () -> assertEquals(0, storedSummary().getDispatchAttempt())
+        );
+    }
+
+    @Test
+    void completedQuestionWithoutResultReopensFreshRecoveryCycle() {
+        putQuestion(questionJob(
+                1,
+                0,
+                GradingJobStatus.COMPLETED,
+                3,
+                NOW.minusSeconds(30)
+        ));
+
+        ExamResponseDTO.GradingRetryResult result = service.retryExam(EXAM_ID);
+
+        QuestionGradingJob stored = storedQuestion(1, 0);
+        ArgumentCaptor<QuestionDispatchClaim> claimCaptor =
+                ArgumentCaptor.forClass(QuestionDispatchClaim.class);
+        verify(dispatchService).dispatchQuestion(claimCaptor.capture());
+        assertAll(
+                () -> assertEquals(List.of(1), result.getRetriedQuestionNumbers()),
+                () -> assertEquals(SummaryAction.NOT_READY, result.getSummaryAction()),
+                () -> assertEquals(GradingJobStatus.PROCESSING, stored.getStatus()),
+                () -> assertEquals(1, stored.getDispatchAttempt()),
+                () -> assertEquals(1, stored.effectiveRecoveryCycle()),
+                () -> assertEquals(1, claimCaptor.getValue().recoveryCycle())
+        );
+    }
+
+    @Test
+    void concurrentMissingResultRecoveryDispatchesOneFreshCycle() throws Exception {
+        putQuestion(questionJob(
+                1,
+                0,
+                GradingJobStatus.COMPLETED,
+                3,
+                NOW.minusSeconds(30)
+        ));
+
+        List<ExamResponseDTO.GradingRetryResult> results = runConcurrently(
+                () -> service.retryExam(EXAM_ID),
+                () -> service.retryExam(EXAM_ID)
+        );
+
+        assertAll(
+                () -> assertEquals(1, storedQuestion(1, 0).effectiveRecoveryCycle()),
+                () -> assertEquals(1, storedQuestion(1, 0).getDispatchAttempt()),
+                () -> assertEquals(1, results.stream()
+                        .filter(result -> result.getRetriedQuestionNumbers().contains(1))
+                        .count())
+        );
+        verify(dispatchService, times(1)).dispatchQuestion(any(QuestionDispatchClaim.class));
+    }
+
+    @Test
+    void feedbackFailureIsExposedOnlyWhileNoValidSummaryExists() {
+        putSummary(feedbackFailedSummary(2, 1));
+
+        ExamsException exception = assertThrows(
+                ExamsException.class,
+                () -> service.throwIfFeedbackGenerationFailed(EXAM_ID)
+        );
+        assertSame(ErrorStatus._FEEDBACK_GENERATION_FAILED, exception.getCode());
+
+        when(examSummaryRepository.existsByExamId(EXAM_ID)).thenReturn(true);
+        service.throwIfFeedbackGenerationFailed(EXAM_ID);
+    }
+
+    @Test
+    void completedSummaryJobWithoutStoredResultIsNotReportedAsCompleted() {
         putCompletedQuestions(expectedQuestionNumbers);
         putSummary(summaryJob(GradingJobStatus.COMPLETED, 1, NOW.minusSeconds(10)));
 
         ExamResponseDTO.GradingRetryResult result = service.retryExam(EXAM_ID);
 
-        assertEquals(SummaryAction.ALREADY_COMPLETED, result.getSummaryAction());
-        assertEquals(ExamStatus.COMPLETED, result.getOverallStatus());
-        verify(summaryDispatchScheduler, never()).scheduleRetry(anyString());
+        assertEquals(SummaryAction.WAITING, result.getSummaryAction());
+        assertEquals(ExamStatus.FAILED, result.getOverallStatus());
+        verify(summaryDispatchScheduler, never()).scheduleRetry(anyString(), anyInt());
     }
 
     @Test
@@ -926,12 +1148,16 @@ class ExamGradingServiceTest {
         assertEquals(ExamStatus.FAILED, service.calculateAndCacheOverallStatus(EXAM_ID));
 
         putQuestion(questionJob(1, 0, GradingJobStatus.COMPLETED, 1, NOW));
-        assertEquals(ExamStatus.PROCESSING, service.calculateAndCacheOverallStatus(EXAM_ID));
+        assertEquals(ExamStatus.FAILED, service.calculateAndCacheOverallStatus(EXAM_ID));
 
         putSummary(summaryJob(GradingJobStatus.COMPLETED, 1, NOW));
+        assertEquals(ExamStatus.FAILED, service.calculateAndCacheOverallStatus(EXAM_ID));
+
+        putCompletedQuestions(List.of(1));
+        when(examSummaryRepository.existsByExamId(EXAM_ID)).thenReturn(true);
         assertEquals(ExamStatus.COMPLETED, service.calculateAndCacheOverallStatus(EXAM_ID));
 
-        verify(valueOperations, times(5)).set(
+        verify(valueOperations, times(6)).set(
                 eq("exam:status:" + EXAM_ID),
                 anyString(),
                 eq(1L),
@@ -980,22 +1206,43 @@ class ExamGradingServiceTest {
             }
         });
         lenient().when(questionJobRepository.failClaimedAttempt(
-                        anyString(), anyInt(), any(Instant.class), anyString()))
+                        anyString(), anyInt(), anyInt(), any(Instant.class), anyString()))
                 .thenAnswer(invocation -> {
                     synchronized (questionJobs) {
                         String jobId = invocation.getArgument(0);
                         int claimedAttempt = invocation.getArgument(1);
-                        Instant failedAt = invocation.getArgument(2);
-                        String reason = invocation.getArgument(3);
+                        int recoveryCycle = invocation.getArgument(2);
+                        Instant failedAt = invocation.getArgument(3);
+                        String reason = invocation.getArgument(4);
                         QuestionGradingJob current = questionJobs.get(jobId);
                         if (current == null
                                 || current.getStatus() != GradingJobStatus.PROCESSING
+                                || current.effectiveRecoveryCycle() != recoveryCycle
                                 || current.getDispatchAttempt() != claimedAttempt) {
                             return 0L;
                         }
                         QuestionGradingJob failed = copy(current, current.getVersion());
                         failed.fail(failedAt, reason);
                         questionJobs.put(jobId, copy(failed, current.getVersion() + 1));
+                        return 1L;
+                    }
+                });
+        lenient().when(questionJobRepository.reopenCompletedMissingResult(
+                        anyString(), anyInt(), any(Instant.class)))
+                .thenAnswer(invocation -> {
+                    synchronized (questionJobs) {
+                        String jobId = invocation.getArgument(0);
+                        int expectedRecoveryCycle = invocation.getArgument(1);
+                        Instant pendingAt = invocation.getArgument(2);
+                        QuestionGradingJob current = questionJobs.get(jobId);
+                        if (current == null
+                                || current.getStatus() != GradingJobStatus.COMPLETED
+                                || current.effectiveRecoveryCycle() != expectedRecoveryCycle) {
+                            return 0L;
+                        }
+                        QuestionGradingJob reopened = copy(current, current.getVersion());
+                        reopened.reopenMissingResult(pendingAt);
+                        questionJobs.put(jobId, copy(reopened, current.getVersion() + 1));
                         return 1L;
                     }
                 });
@@ -1031,11 +1278,105 @@ class ExamGradingServiceTest {
                 return copy(stored, stored.getVersion());
             }
         });
+        lenient().when(summaryJobRepository.failGeneration(
+                        anyString(), anyInt(), any(Instant.class), anyString()))
+                .thenAnswer(invocation -> {
+                    synchronized (summaryJobs) {
+                        String jobId = invocation.getArgument(0);
+                        int generationAttempt = invocation.getArgument(1);
+                        Instant failedAt = invocation.getArgument(2);
+                        String reason = invocation.getArgument(3);
+                        SummaryGradingJob current = summaryJobs.get(jobId);
+                        if (current == null
+                                || current.effectiveGenerationAttempt() != generationAttempt
+                                || current.getStatus() == GradingJobStatus.COMPLETED
+                                || current.isCompletionClaimedFor(generationAttempt)) {
+                            return 0L;
+                        }
+                        SummaryGradingJob failed = copy(current, current.getVersion());
+                        failed.fail(failedAt, reason);
+                        summaryJobs.put(jobId, copy(failed, current.getVersion() + 1));
+                        return 1L;
+                    }
+                });
+        lenient().when(summaryJobRepository.rearmFeedbackGeneration(
+                        anyString(), anyInt(), anyInt(), anyString(), any(Instant.class)))
+                .thenAnswer(invocation -> {
+                    synchronized (summaryJobs) {
+                        String jobId = invocation.getArgument(0);
+                        int expectedGeneration = invocation.getArgument(1);
+                        int nextGeneration = invocation.getArgument(2);
+                        String expectedReason = invocation.getArgument(3);
+                        Instant pendingAt = invocation.getArgument(4);
+                        SummaryGradingJob current = summaryJobs.get(jobId);
+                        if (current == null
+                                || current.effectiveGenerationAttempt() != expectedGeneration
+                                || current.getStatus() != GradingJobStatus.FAILED
+                                || !Objects.equals(current.getFailureReason(), expectedReason)
+                                || current.isCompletionClaimedFor(expectedGeneration)) {
+                            return 0L;
+                        }
+                        SummaryGradingJob rearmed = copy(current, current.getVersion());
+                        rearmed.rearmFeedbackGeneration(nextGeneration, pendingAt);
+                        summaryJobs.put(jobId, copy(rearmed, current.getVersion() + 1));
+                        return 1L;
+                    }
+                });
+        lenient().when(summaryJobRepository.claimCompletion(
+                        anyString(), anyInt(), any(Instant.class)))
+                .thenAnswer(invocation -> {
+                    synchronized (summaryJobs) {
+                        String jobId = invocation.getArgument(0);
+                        int generationAttempt = invocation.getArgument(1);
+                        Instant claimedAt = invocation.getArgument(2);
+                        SummaryGradingJob current = summaryJobs.get(jobId);
+                        if (current == null
+                                || current.effectiveGenerationAttempt() != generationAttempt) {
+                            return 0L;
+                        }
+                        SummaryGradingJob claimed = copy(current, current.getVersion());
+                        claimed.claimCompletion(generationAttempt, claimedAt);
+                        summaryJobs.put(jobId, copy(claimed, current.getVersion() + 1));
+                        return 1L;
+                    }
+                });
+        lenient().when(summaryJobRepository.completeClaimedGeneration(
+                        anyString(), anyInt(), any(Instant.class)))
+                .thenAnswer(invocation -> {
+                    synchronized (summaryJobs) {
+                        String jobId = invocation.getArgument(0);
+                        int generationAttempt = invocation.getArgument(1);
+                        Instant completedAt = invocation.getArgument(2);
+                        SummaryGradingJob current = summaryJobs.get(jobId);
+                        if (current == null
+                                || current.effectiveGenerationAttempt() != generationAttempt
+                                || !current.isCompletionClaimedFor(generationAttempt)
+                                || current.getStatus() == GradingJobStatus.COMPLETED) {
+                            return 0L;
+                        }
+                        SummaryGradingJob completed = copy(current, current.getVersion());
+                        completed.complete(completedAt);
+                        summaryJobs.put(jobId, copy(completed, current.getVersion() + 1));
+                        return 1L;
+                    }
+                });
     }
 
     private void putCompletedQuestions(List<Integer> questionNumbers) {
         questionNumbers.forEach(questionNumber ->
                 putQuestion(questionJob(questionNumber, 0, GradingJobStatus.COMPLETED, 1, NOW.minusSeconds(10))));
+        List<ExamResult> initialResults = questionNumbers.stream()
+                .map(questionNumber -> ExamResult.builder()
+                        .examId(EXAM_ID)
+                        .questionNumber(questionNumber)
+                        .retryCount(0)
+                        .build())
+                .toList();
+        lenient().when(examResultRepository.findByExamId(EXAM_ID)).thenReturn(initialResults);
+        questionNumbers.forEach(questionNumber -> lenient().when(
+                        examResultRepository.existsByExamIdAndQuestionNumberAndRetryCountIn(
+                                eq(EXAM_ID), eq(questionNumber), any()))
+                .thenReturn(true));
     }
 
     private void putQuestion(QuestionGradingJob job) {
@@ -1068,6 +1409,7 @@ class ExamGradingServiceTest {
                 .fileKey(GradingKeys.questionFileKey(EXAM_ID, questionNumber, retryCount))
                 .status(status)
                 .dispatchAttempt(dispatchAttempt)
+                .recoveryCycle(0)
                 .pendingAt(statusAt)
                 .processingStartedAt(status == GradingJobStatus.PROCESSING ? statusAt : null)
                 .lastDispatchedAt(dispatchAttempt > 0 ? statusAt : null)
@@ -1082,6 +1424,7 @@ class ExamGradingServiceTest {
                 .jobId(GradingKeys.summaryJobId(EXAM_ID))
                 .examId(EXAM_ID)
                 .summaryVersion(1)
+                .generationAttempt(1)
                 .status(status)
                 .dispatchAttempt(dispatchAttempt)
                 .pendingAt(statusAt)
@@ -1090,6 +1433,22 @@ class ExamGradingServiceTest {
                 .completedAt(status == GradingJobStatus.COMPLETED ? statusAt : null)
                 .failedAt(status == GradingJobStatus.FAILED ? statusAt : null)
                 .failureReason(status == GradingJobStatus.FAILED ? "TEST_FAILURE" : null)
+                .build();
+    }
+
+    private SummaryGradingJob feedbackFailedSummary(int generationAttempt, int dispatchAttempt) {
+        return SummaryGradingJob.builder()
+                .jobId(GradingKeys.summaryJobId(EXAM_ID))
+                .examId(EXAM_ID)
+                .summaryVersion(1)
+                .generationAttempt(generationAttempt)
+                .status(GradingJobStatus.FAILED)
+                .dispatchAttempt(dispatchAttempt)
+                .pendingAt(NOW.minusSeconds(30))
+                .processingStartedAt(NOW.minusSeconds(20))
+                .lastDispatchedAt(NOW.minusSeconds(20))
+                .failedAt(NOW.minusSeconds(10))
+                .failureReason(ExamGradingService.FEEDBACK_GENERATION_FAILED)
                 .build();
     }
 
@@ -1103,6 +1462,7 @@ class ExamGradingServiceTest {
                 .mockExamId(source.getMockExamId())
                 .status(source.getStatus())
                 .dispatchAttempt(source.getDispatchAttempt())
+                .recoveryCycle(source.getRecoveryCycle())
                 .pendingAt(source.getPendingAt())
                 .processingStartedAt(source.getProcessingStartedAt())
                 .lastDispatchedAt(source.getLastDispatchedAt())
@@ -1119,6 +1479,7 @@ class ExamGradingServiceTest {
                 .examId(source.getExamId())
                 .mockExamId(source.getMockExamId())
                 .summaryVersion(source.getSummaryVersion())
+                .generationAttempt(source.getGenerationAttempt())
                 .status(source.getStatus())
                 .dispatchAttempt(source.getDispatchAttempt())
                 .pendingAt(source.getPendingAt())
@@ -1127,6 +1488,8 @@ class ExamGradingServiceTest {
                 .completedAt(source.getCompletedAt())
                 .failedAt(source.getFailedAt())
                 .failureReason(source.getFailureReason())
+                .completionClaimedGeneration(source.getCompletionClaimedGeneration())
+                .completionClaimedAt(source.getCompletionClaimedAt())
                 .version(version)
                 .build();
     }

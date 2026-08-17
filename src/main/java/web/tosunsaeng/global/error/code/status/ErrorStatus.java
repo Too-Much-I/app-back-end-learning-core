@@ -24,6 +24,7 @@ public enum ErrorStatus implements BaseErrorCode {
     _EXAM_ALREADY_COMPLETED(HttpStatus.CONFLICT, "EXAM_4008", "이미 완료된 시험입니다."),
     _EXAM_CATALOG_CONFIGURATION_ERROR(HttpStatus.INTERNAL_SERVER_ERROR, "EXAM_5001", "모의고사 카탈로그 설정이 올바르지 않습니다."),
     _EXAM_SESSION_CONFIGURATION_ERROR(HttpStatus.INTERNAL_SERVER_ERROR, "EXAM_5002", "모의고사 세션 데이터 설정이 올바르지 않습니다."),
+    _FEEDBACK_GENERATION_FAILED(HttpStatus.INTERNAL_SERVER_ERROR, "FEEDBACK_GENERATION_FAILED", "피드백 생성에 실패했습니다."),
     _AI_SERVER_CONNECTION_ERROR(HttpStatus.INTERNAL_SERVER_ERROR, "EXAM_4001", "AI 채점 서버와 통신할 수 없습니다. 잠시 후 다시 시도해주세요."),
     _QUESTION_NOT_FOUND(HttpStatus.NOT_FOUND, "EXAM_4002", "해당 문제를 찾을 수 없습니다."),
     _AI_SERVER_PROCESSING_NOW(HttpStatus.BAD_REQUEST, "EXAM_4006", "현재 채점이 진행 중입니다. 잠시 후 다시 시도해 주세요.");

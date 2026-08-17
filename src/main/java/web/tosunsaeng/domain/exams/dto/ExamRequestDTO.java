@@ -19,6 +19,7 @@ public class ExamRequestDTO {
     public static class AiResultReq {
         @JsonProperty("user_id") private String examId;
         @JsonProperty("mock_exam_id") private String mockExamId;
+        @JsonProperty("generation_attempt") private Integer generationAttempt;
 
         // 요약 데이터
         @JsonProperty("suggested_total_score") private Integer totalScore;

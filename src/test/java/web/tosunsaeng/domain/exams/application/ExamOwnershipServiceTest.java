@@ -366,6 +366,51 @@ class ExamOwnershipServiceTest {
     }
 
     @Test
+    void examSummaryPartScoresIncludeOnlyInitialAttempts() {
+        stubOwnedSession();
+        ExamSummary summary = ExamSummary.builder()
+                .examId(EXAM_ID)
+                .userId(OWNER_USER_ID)
+                .totalScore(180)
+                .build();
+        ExamResult initialResult = ExamResult.builder()
+                .examId(EXAM_ID)
+                .userId(OWNER_USER_ID)
+                .partNumber(1)
+                .questionNumber(1)
+                .retryCount(0)
+                .score(5.0)
+                .build();
+        ExamResult retriedResult = ExamResult.builder()
+                .examId(EXAM_ID)
+                .userId(OWNER_USER_ID)
+                .partNumber(1)
+                .questionNumber(1)
+                .retryCount(1)
+                .score(9.0)
+                .build();
+        ExamResult legacyResultWithoutRetryCount = ExamResult.builder()
+                .examId(EXAM_ID)
+                .userId(OWNER_USER_ID)
+                .partNumber(2)
+                .questionNumber(3)
+                .score(4.0)
+                .build();
+        when(examResultRepository.findByExamId(EXAM_ID))
+                .thenReturn(List.of(initialResult, retriedResult, legacyResultWithoutRetryCount));
+        when(examSummaryRepository.findFirstByExamIdOrderByIdDesc(EXAM_ID))
+                .thenReturn(Optional.of(summary));
+
+        ExamResponseDTO.SummaryResult result = examService.getExamSummary(EXAM_ID);
+
+        assertAll(
+                () -> assertEquals(5.0, result.getPartScores().get("part1")),
+                () -> assertFalse(result.getPartScores().containsKey("part2")),
+                () -> assertEquals(1, result.getTotalSolvedQuestions())
+        );
+    }
+
+    @Test
     void latestOverallFeedbackFromSeparateCollectionIsUsed() {
         stubOwnedSession();
         ExamSummary latestSummary = ExamSummary.builder()

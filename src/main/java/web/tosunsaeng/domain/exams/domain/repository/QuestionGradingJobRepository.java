@@ -27,7 +27,22 @@ public interface QuestionGradingJobRepository extends MongoRepository<QuestionGr
     )
     List<QuestionGradingJob> findRetriedQuestionCandidatesByExamIdIn(Collection<String> examIds);
 
-    @Query("{ '_id': ?0, 'status': 'PROCESSING', 'dispatchAttempt': ?1 }")
-    @Update("{ '$set': { 'status': 'FAILED', 'failedAt': ?2, 'failureReason': ?3 }, '$inc': { 'version': 1 } }")
-    long failClaimedAttempt(String jobId, int dispatchAttempt, Instant failedAt, String failureReason);
+    @Query("{ '_id': ?0, 'status': 'PROCESSING', 'dispatchAttempt': ?1, "
+            + "'$expr': { '$eq': [ { '$ifNull': [ '$recoveryCycle', 0 ] }, ?2 ] } }")
+    @Update("{ '$set': { 'status': 'FAILED', 'failedAt': ?3, 'failureReason': ?4 }, "
+            + "'$inc': { 'version': 1 } }")
+    long failClaimedAttempt(
+            String jobId,
+            int dispatchAttempt,
+            int recoveryCycle,
+            Instant failedAt,
+            String failureReason);
+
+    @Query("{ '_id': ?0, 'status': 'COMPLETED', "
+            + "'$expr': { '$eq': [ { '$ifNull': [ '$recoveryCycle', 0 ] }, ?1 ] } }")
+    @Update("{ '$set': { 'status': 'PENDING', 'dispatchAttempt': 0, 'pendingAt': ?2, "
+            + "'processingStartedAt': null, 'lastDispatchedAt': null, 'completedAt': null, "
+            + "'failedAt': null, 'failureReason': null }, "
+            + "'$inc': { 'recoveryCycle': 1, 'version': 1 } }")
+    long reopenCompletedMissingResult(String jobId, int expectedRecoveryCycle, Instant pendingAt);
 }
