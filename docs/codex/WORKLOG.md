@@ -2098,3 +2098,15 @@
 - 최종 `./gradlew clean test`를 재실행했고 tests/failures/errors/skipped `352/0/0/0`으로 성공했다. `git diff --check`도 성공했고 기존 `ExamServiceImpl` unchecked 경고만 남았다.
 - 공개 API URL·Method·Request/Response DTO·`BaseResponse`, `totalScore`·`totalSolvedQuestions`, AI/Callback `user_id=examId`, `retryCount` 의미, Redis/S3와 소유권 계약을 유지했다. 실제 외부 인프라·데이터, Git commit·push는 변경하지 않았고 Secret·Token을 조회하거나 기록하지 않았다.
 - 이번 turn에서는 요청한 코드와 테스트가 이미 현재 작업 트리에 존재해 애플리케이션 코드를 추가로 변경하지 않고 전체 검증과 작업 기록 갱신을 완료했다.
+
+## 2026-08-17 — staging GitHub Actions 테스트 실패 수정
+
+<!-- codex-turn:01a00fe8-7a65-7a20-976a-881330830841 -->
+
+- 별도 Jira 이슈 키 없이 최신 staging GitHub Actions 실행 `32034974696`을 읽기 전용으로 확인했다. 실제 실패 step은 action의 Node.js 20 사용 중단 경고가 아니라 `Run tests`였고, `TosunsaengApplicationTests.sentryUsesSafeErrorOnlyConfiguration()` 1건이 실패했다.
+- 원인은 workflow job 전역의 `SENTRY_RELEASE=app-back-end-learning-core@${{ github.sha }}`가 Spring test profile의 `sentry.release=app-back-end-learning-core@test`보다 높은 우선순위로 적용된 것이다. 그 결과 CI에서 테스트 assertion이 commit release 값을 받아 실패했다.
+- `.github/workflows/deploy-staging.yml`의 `Run tests` step에만 `SENTRY_RELEASE=app-back-end-learning-core@test`를 명시해 테스트 설정을 격리했다. 배포 step에서는 기존 job 전역 commit release를 유지한다.
+- Node.js 20 사용 중단 및 `setup-java v4` deprecated 경고를 제거하기 위해 `actions/checkout@v4`와 `actions/setup-java@v4`를 각각 `@v5`로 올렸다. 기타 AWS·Docker·ECS action과 배포 순서는 변경하지 않았다.
+- CI와 동일하게 `SENTRY_RELEASE=app-back-end-learning-core@test` 환경에서 `./gradlew clean test --no-daemon`을 실행했고 tests/failures/errors/skipped `352/0/0/0`으로 성공했다. Ruby YAML parser 검증과 `git diff --check`도 성공했다. `actionlint`는 현재 환경에 설치되지 않아 실행하지 못했다.
+- 공개 API·DTO·`BaseResponse`, AI/Callback, Redis/S3, ECS cluster·service·task definition·health URL 계약을 변경하지 않았다. workflow를 commit·push하거나 배포를 재실행하지 않았고 Secret·Token을 조회하거나 기록하지 않았다.
+- 남은 확인 사항은 사용자가 변경을 commit·push한 뒤 GitHub-hosted `ubuntu-latest` runner에서 v5 action 초기화, 352개 테스트, AWS OIDC, ECR build/push, ECS 안정화와 health check가 순차적으로 성공하는지 확인하는 것이다.

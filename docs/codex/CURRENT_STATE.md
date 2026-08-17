@@ -1055,3 +1055,10 @@
 - `partScores`는 `retryCount == 0`인 최초 응시만 합산하고 재시도와 null 회차는 제외한다. 공개 API 구조와 기타 외부 계약은 유지된다.
 - `./gradlew clean test`는 tests/failures/errors/skipped `352/0/0/0`, `git diff --check`는 성공했다. 기존 unchecked 경고 외에 추가 문제는 없다.
 - 이미 요청한 애플리케이션·테스트 변경이 작업 트리에 존재했으므로 이번 확인에서는 코드를 추가 변경하지 않았다. legacy `retryCount=null` 최초 응시 문서는 집계에서 제외되는 상태다.
+
+## Latest staging GitHub Actions test failure fix (2026-08-17)
+
+- 별도 Jira 이슈 키 없이 GitHub Actions run `32034974696`의 job·step·실패 로그를 읽기 전용으로 확인했다. `checkout@v4`·`setup-java@v4` 경고는 실패 원인이 아니었고, job 전역 `SENTRY_RELEASE` 오버라이드로 `TosunsaengApplicationTests` 1건이 실패한 것이 직접 원인이었다.
+- `Run tests` step의 `SENTRY_RELEASE`를 `app-back-end-learning-core@test`로 격리했고, checkout·setup-java를 Node.js 24 기반 v5 action으로 올렸다. 배포 후속 step의 commit SHA release와 AWS·ECR·ECS·health check 흐름은 유지된다.
+- CI 동일 테스트 release 환경의 `./gradlew clean test --no-daemon`은 tests/failures/errors/skipped `352/0/0/0`으로 성공했다. YAML parse와 `git diff --check`도 성공했고 `actionlint`는 미설치로 실행하지 못했다.
+- 사용자가 commit·push한 뒤 실제 GitHub Actions에서 v5 action 초기화부터 ECS health check까지 전체 배포를 재검증해야 한다. Codex는 workflow run을 재실행하거나 Git commit·push·배포 변경을 수행하지 않았다.
