@@ -198,6 +198,7 @@ class ExamReadApiContractTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.result.part").value(4))
                 .andExpect(jsonPath("$.result.questionNumber").value(8))
+                .andExpect(jsonPath("$.result.text").value("Part 4 question"))
                 .andExpect(jsonPath("$.result.tableContext.resume_owner")
                         .value("Maya Bennett"))
                 .andExpect(jsonPath(
@@ -222,6 +223,7 @@ class ExamReadApiContractTest {
                                 .questionInfo(ExamResponseDTO.QuestionDTO.builder()
                                         .part(4)
                                         .questionNumber(8)
+                                        .text("When did Dr. Kim graduate from university?")
                                         .tableContext(storedTableContext)
                                         .build())
                                 .build())
@@ -234,6 +236,8 @@ class ExamReadApiContractTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.result.question.questionInfo.part").value(4))
                 .andExpect(jsonPath("$.result.question.questionInfo.questionNumber").value(8))
+                .andExpect(jsonPath("$.result.question.questionInfo.text")
+                        .value("When did Dr. Kim graduate from university?"))
                 .andExpect(jsonPath(
                         "$.result.question.questionInfo.tableContext.education_history[0].graduation_year"
                 ).value(2022))

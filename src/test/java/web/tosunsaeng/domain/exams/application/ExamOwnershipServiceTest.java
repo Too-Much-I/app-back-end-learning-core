@@ -285,6 +285,7 @@ class ExamOwnershipServiceTest {
         assertAll(
                 () -> assertEquals(4, result.getPart()),
                 () -> assertEquals(8, result.getQuestionNumber()),
+                () -> assertEquals("Part 4 prompt", result.getText()),
                 () -> assertSame(storedTableContext, result.getTableContext()),
                 () -> assertEquals(
                         objectMapper.valueToTree(storedTableContext),
@@ -544,7 +545,7 @@ class ExamOwnershipServiceTest {
     }
 
     @Test
-    void partFourQuestionInfoReturnsStoredOpaqueTableContextWithoutTableImage() {
+    void partFourQuestionInfoReturnsQuestionTextAndStoredOpaqueTableContextWithoutTableImage() {
         String storedUrl = "https://cdn.example.com/mock-exam/001/part4/q8.png";
         Map<String, Object> tableContext = Map.of(
                 "resume_owner", "Maya Bennett",
@@ -576,15 +577,16 @@ class ExamOwnershipServiceTest {
         assertAll(
                 () -> assertEquals(4, questionInfo.getPart()),
                 () -> assertEquals(8, questionInfo.getQuestionNumber()),
+                () -> assertEquals("Legacy table question text", questionInfo.getText()),
                 () -> assertSame(tableContext, questionInfo.getTableContext()),
-                () -> assertEquals(3, questionInfoJson.size()),
+                () -> assertEquals(4, questionInfoJson.size()),
+                () -> assertEquals("Legacy table question text", questionInfoJson.get("text").asText()),
                 () -> assertEquals(
                         objectMapper.valueToTree(tableContext),
                         questionInfoJson.get("tableContext")
                 ),
                 () -> assertFalse(questionInfoJson.has("tableImageUrl")),
                 () -> assertFalse(questionInfoJson.has("table_image_url")),
-                () -> assertFalse(questionInfoJson.has("text")),
                 () -> assertFalse(questionInfoJson.has("referenceText")),
                 () -> assertFalse(questionInfoJson.has("partIntroText")),
                 () -> assertFalse(questionInfoJson.has("audioUrl")),

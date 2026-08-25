@@ -51,6 +51,7 @@ public class ExamConverter {
             return ExamResponseDTO.QuestionDTO.builder()
                     .part(question.getPartNumber())
                     .questionNumber(question.getQuestionNumber())
+                    .text(question.getQuestion())
                     .tableContext(question.getTableContext())
                     .build();
         }
