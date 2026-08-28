@@ -43,6 +43,19 @@ class AuthConfigurationTest {
     }
 
     @Test
+    void negativeJwtClockSkewFails() {
+        withProfile("local")
+                .withPropertyValues(
+                        "app.auth.mode=jwt",
+                        "app.auth.identity.issuer=http://localhost:8081",
+                        "app.auth.identity.jwk-set-uri=http://localhost:8081/.well-known/jwks.json",
+                        "app.auth.identity.audience=tosunsaeng-learning-core",
+                        "app.auth.identity.clock-skew=-PT1S"
+                )
+                .run(context -> assertFailure(context, "JWT clock skew must be non-negative"));
+    }
+
+    @Test
     void missingModeUsesLegacyDefaultInLocalProfile() {
         withProfile("local").run(context -> {
             assertThat(context).hasNotFailed();
