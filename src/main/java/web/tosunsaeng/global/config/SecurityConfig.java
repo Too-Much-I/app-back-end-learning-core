@@ -1,20 +1,27 @@
 package web.tosunsaeng.global.config;
 
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
+import org.springframework.beans.factory.ObjectProvider;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.Import;
 import org.springframework.context.annotation.Profile;
+import org.springframework.core.annotation.Order;
+import org.springframework.http.HttpMethod;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configurers.AbstractHttpConfigurer;
 import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.oauth2.jose.jws.SignatureAlgorithm;
 import org.springframework.security.oauth2.jwt.JwtDecoder;
-import org.springframework.security.oauth2.jwt.JwtValidators;
+import org.springframework.security.oauth2.jwt.JwtIssuerValidator;
+import org.springframework.security.oauth2.jwt.JwtTimestampValidator;
 import org.springframework.security.oauth2.jwt.NimbusJwtDecoder;
 import org.springframework.security.oauth2.core.DelegatingOAuth2TokenValidator;
 import org.springframework.security.oauth2.core.OAuth2TokenValidator;
 import org.springframework.security.web.SecurityFilterChain;
+import org.springframework.security.oauth2.server.resource.web.authentication.BearerTokenAuthenticationFilter;
+import org.springframework.security.web.util.matcher.AntPathRequestMatcher;
 import org.springframework.web.cors.CorsConfiguration;
 import web.tosunsaeng.global.config.auth.AuthConfiguration;
 import web.tosunsaeng.global.config.auth.AuthProperties;
@@ -22,6 +29,7 @@ import web.tosunsaeng.global.config.auth.AuthStartupValidator;
 import web.tosunsaeng.global.config.security.JwtAudienceValidator;
 import web.tosunsaeng.global.config.security.JwtSubjectValidator;
 import web.tosunsaeng.global.config.security.SecurityErrorResponseHandler;
+import web.tosunsaeng.domain.withdrawal.security.UserWithdrawnAccessGateFilter;
 
 import java.util.List;
 
@@ -41,6 +49,7 @@ public class SecurityConfig {
 
     // Legacy is intentionally available only for local compatibility and automated tests.
     @Bean
+    @Order(2)
     @Profile({"local", "test"})
     @ConditionalOnProperty(prefix = "app.auth", name = "mode", havingValue = "legacy", matchIfMissing = true)
     public SecurityFilterChain legacySecurityFilterChain(
@@ -52,11 +61,13 @@ public class SecurityConfig {
     }
 
     @Bean
+    @Order(2)
     @ConditionalOnProperty(prefix = "app.auth", name = "mode", havingValue = "jwt")
     public SecurityFilterChain jwtSecurityFilterChain(
             HttpSecurity http,
             JwtDecoder jwtDecoder,
-            SecurityErrorResponseHandler errorHandler) throws Exception {
+            SecurityErrorResponseHandler errorHandler,
+            ObjectProvider<UserWithdrawnAccessGateFilter> denyGateFilterProvider) throws Exception {
         configureCommonSecurity(http);
         http
                 .authorizeHttpRequests(auth -> auth
@@ -70,6 +81,33 @@ public class SecurityConfig {
                         .accessDeniedHandler(errorHandler)
                         .jwt(jwt -> jwt.decoder(jwtDecoder)));
 
+        denyGateFilterProvider.ifAvailable(filter ->
+                http.addFilterAfter(filter, BearerTokenAuthenticationFilter.class));
+
+        return http.build();
+    }
+
+    @Bean
+    @Order(1)
+    @ConditionalOnProperty(prefix = "app.user-withdrawn", name = "consumer-enabled", havingValue = "true")
+    public SecurityFilterChain userWithdrawnWorkloadSecurityFilterChain(
+            HttpSecurity http,
+            @Qualifier("userWithdrawnWorkloadJwtDecoder") JwtDecoder workloadJwtDecoder,
+            SecurityErrorResponseHandler errorHandler) throws Exception {
+        configureCommonSecurity(http);
+        http
+                .securityMatcher(new AntPathRequestMatcher(
+                        "/internal/v1/events/withdrawn",
+                        HttpMethod.POST.name()
+                ))
+                .authorizeHttpRequests(auth -> auth.anyRequest().authenticated())
+                .exceptionHandling(exceptions -> exceptions
+                        .authenticationEntryPoint(errorHandler)
+                        .accessDeniedHandler(errorHandler))
+                .oauth2ResourceServer(resourceServer -> resourceServer
+                        .authenticationEntryPoint(errorHandler)
+                        .accessDeniedHandler(errorHandler)
+                        .jwt(jwt -> jwt.decoder(workloadJwtDecoder)));
         return http.build();
     }
 
@@ -83,10 +121,11 @@ public class SecurityConfig {
                 .jwsAlgorithm(SignatureAlgorithm.RS256)
                 .build();
 
-        OAuth2TokenValidator<org.springframework.security.oauth2.jwt.Jwt> issuerAndTimestampValidator =
-                JwtValidators.createDefaultWithIssuer(identity.getIssuer());
+        JwtTimestampValidator timestampValidator = new JwtTimestampValidator(identity.getClockSkew());
+        JwtIssuerValidator issuerValidator = new JwtIssuerValidator(identity.getIssuer());
         decoder.setJwtValidator(new DelegatingOAuth2TokenValidator<>(
-                issuerAndTimestampValidator,
+                timestampValidator,
+                issuerValidator,
                 new JwtAudienceValidator(identity.getAudience()),
                 new JwtSubjectValidator()
         ));

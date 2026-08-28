@@ -2,6 +2,8 @@ package web.tosunsaeng.global.config.auth;
 
 import org.springframework.boot.context.properties.ConfigurationProperties;
 
+import java.time.Duration;
+
 @ConfigurationProperties(prefix = "app.auth")
 public class AuthProperties {
 
@@ -41,6 +43,7 @@ public class AuthProperties {
         private String issuer;
         private String jwkSetUri;
         private String audience;
+        private Duration clockSkew = Duration.ofSeconds(60);
 
         public String getIssuer() {
             return issuer;
@@ -64,6 +67,14 @@ public class AuthProperties {
 
         public void setAudience(String audience) {
             this.audience = audience;
+        }
+
+        public Duration getClockSkew() {
+            return clockSkew;
+        }
+
+        public void setClockSkew(Duration clockSkew) {
+            this.clockSkew = clockSkew;
         }
     }
 }

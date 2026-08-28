@@ -1,6 +1,6 @@
 # App Learning Core
 
-기존 토선생 웹 POC와 외부 API 계약을 유지하는 앱용 Learning Core 서비스다. Java 21과 Spring Boot를 사용하며 MongoDB, Redis, AWS S3, Python AI 채점 서버와 연동한다.
+앱 전용 Learning Core 서비스다. Java 21과 Spring Boot를 사용하며 MongoDB, Redis, AWS S3, Python AI 채점 서버와 연동한다. 기존 웹 POC에서 시작했지만 웹 백엔드와 웹 프론트는 별도 저장소·별도 배포 서비스이며 이 저장소에 웹 애플리케이션 코드는 포함하지 않는다. `web.tosunsaeng`은 복제 당시 유지된 Java package namespace일 뿐 제품 범위를 뜻하지 않는다.
 
 ## 인증 모드
 
@@ -13,7 +13,7 @@
 | `staging` | `jwt` | Legacy 기동과 로컬 Identity 설정을 거부한다. |
 | `prod` | `jwt` | Legacy 기동과 로컬 Identity 설정을 거부한다. |
 
-Legacy 모드는 로컬·테스트에서 기존 웹 호환 흐름을 확인하기 위한 용도이며 고정 개발 UUID를 사용한다. 앱용 Learning Core의 staging·prod에서는 사용할 수 없다. 기존 웹 POC 서버는 별도 저장소이므로 이 설정의 영향을 받지 않는다.
+Legacy 모드는 로컬·테스트에서 Identity 없이 앱 개발 흐름을 확인하기 위한 용도이며 고정 개발 UUID를 사용한다. 앱용 Learning Core의 staging·prod에서는 사용할 수 없다. 기존 웹 POC 서버는 별도 저장소이므로 이 설정의 영향을 받지 않는다.
 
 ### 로컬 Legacy 모드
 
@@ -73,7 +73,7 @@ Startup 검증은 설정 형식만 확인하며 JWKS endpoint로 네트워크 �
 - `/v3/api-docs`, `/v3/api-docs/**`
 - `/actuator/health`, `/actuator/health/**` (Actuator가 실제로 제공되는 경우)
 
-그 밖의 기존 사용자용 API는 JWT 모드에서 `authenticated()`다. Legacy 모드에서는 기존 웹 호환을 위해 `permitAll` 흐름을 유지한다.
+그 밖의 기존 사용자용 API는 JWT 모드에서 `authenticated()`다. Legacy 모드에서는 로컬·테스트 앱 개발을 위해 `permitAll` 흐름을 유지한다.
 
 과거 HMAC 기반 `JwtAuthenticationFilter`와 `JwtTokenProvider`는 사용되지 않아 제거했다. JJWT 의존성과 `jwt.secret` 설정도 제거했으며 `JWT_SECRET_KEY`는 더 이상 필요하지 않다. Learning Core에는 Identity RSA Private Key나 공유 JWT Secret을 저장하지 않는다.
 

@@ -40,6 +40,22 @@ app:
       issuer: ${IDENTITY_ISSUER:}
       jwk-set-uri: ${IDENTITY_JWK_SET_URI:}
       audience: ${IDENTITY_AUDIENCE:}
+      clock-skew: ${IDENTITY_CLOCK_SKEW:PT60S}
+  user-withdrawn:
+    consumer-enabled: ${USER_WITHDRAWN_CONSUMER_ENABLED:false}
+    deny-gate-enabled: ${USER_WITHDRAWN_DENY_GATE_ENABLED:false}
+    max-accepted-access-token-lifetime: ${USER_WITHDRAWN_MAX_ACCESS_TOKEN_LIFETIME:}
+    allowed-verifier-clock-skew: ${USER_WITHDRAWN_ALLOWED_VERIFIER_CLOCK_SKEW:}
+    inbox-retention: ${USER_WITHDRAWN_INBOX_RETENTION:}
+    maximum-future-event-skew: ${USER_WITHDRAWN_MAXIMUM_FUTURE_EVENT_SKEW:}
+    workload:
+      issuer: ${USER_WITHDRAWN_WORKLOAD_ISSUER:}
+      jwk-set-uri: ${USER_WITHDRAWN_WORKLOAD_JWK_SET_URI:}
+      audience: ${USER_WITHDRAWN_WORKLOAD_AUDIENCE:}
+      principal-claim: ${USER_WITHDRAWN_WORKLOAD_PRINCIPAL_CLAIM:}
+      principal-value: ${USER_WITHDRAWN_WORKLOAD_PRINCIPAL_VALUE:}
+      max-token-lifetime: ${USER_WITHDRAWN_WORKLOAD_MAX_TOKEN_LIFETIME:}
+      clock-skew: ${USER_WITHDRAWN_WORKLOAD_CLOCK_SKEW:}
   redis:
     key-prefix: ${REDIS_KEY_PREFIX:learning-core}
   s3:
