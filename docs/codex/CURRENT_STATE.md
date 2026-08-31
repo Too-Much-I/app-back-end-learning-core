@@ -7,6 +7,7 @@
 ## Current branch
 
 - `develop`
+- 2026-08-31 앱 문제 응답의 Part 4 표 처리 현황을 분석했다. MongoDB `table_context`는 `Map<String,Object>`로 읽어 시험 생성·문항 prompt·문항 결과 응답의 `tableContext` JSON에 가공 없이 전달하며 서버가 고정 schema, HTML 또는 Markdown으로 렌더링하지 않는다. `table_image_url`은 내부 entity에만 남고 공개 응답에서 제외된다. Part 4 tableContext가 null이면 catalog configuration error이며 빈 object는 허용한다. AI 채점 요청에는 table_context와 table_image_url을 보내지 않는다. 신규 Jira 키는 없다.
 - 2026-08-28 종료 훅 동기화: 현재 저장소 기준 1차 업데이트 체크리스트 작성·검증 결과를 현재 turn 기록으로 WORKLOG 끝에 추가했다. Identity `TMI-109`·`TMI-111`과 Billing `TMI-110`·`TMI-112`·`TMI-113` 완료, Learning Core Billing saga·Challenge backend·모바일/workload/staging E2E 잔여 판정은 동일하다. 애플리케이션·Jira·외부 계약은 변경하지 않았다.
 - 2026-08-28 현재 저장소 기준 1차 업데이트 진행 상태를 `docs/codex/FIRST_UPDATE_PROGRESS_CHECKLIST.md`로 다시 정리했다. Identity `TMI-109`·`TMI-111`과 Billing `TMI-110`·`TMI-112`·`TMI-113`은 구현·병합 기록에 따라 완료로 반영했다. Billing에는 TrialClaim, `FREE_EXAM_ONCE` grant/ledger와 Reservation reserve/confirm/cancel/status/expiry 기반이 있으나 Learning Core Billing client·필수 `Idempotency-Key`·reserve/commit/confirm saga는 아직 없다. Challenge는 프론트·AI v1 계약과 콘텐츠가 준비됐지만 Learning Core backend·AI 양방향 구현은 미착수다. 따라서 실제 모바일 SNS, workload/Lattice, replica set·multi-instance, 무료시험·Challenge staging E2E와 canary가 끝나기 전 production 출시는 차단한다. 신규 Jira와 애플리케이션 코드는 변경하지 않았다.
 - 2026-08-28 전체 프론트 API 인계서를 Identity·Learning Core·Billing의 모든 `@RestController`와 Security 설정에 다시 대조했다. Identity 앱 API 17개와 Learning Core 앱 API 11개는 누락 없이 유지된다. Billing은 공개 앱 API가 0개지만 `TMI-110` eligibility consumer, `TMI-112` TrialClaim·FREE_EXAM_ONCE initial reserve, `TMI-113` confirm/cancel/status·expiry lifecycle이 구현된 상태여서 기존 “Reservation 미구현” 설명을 정정했다. Learning Core Billing saga·필수 `Idempotency-Key`, AttemptGroup event·owner rebind·Lattice staging E2E는 여전히 남아 있다. Billing 내부 Reservation endpoint 4개를 프론트 호출 금지 표에 추가하고 Challenge는 `TMI-102`·`TMI-105`·`TMI-106` 관련 승인된 v1 계약·API 미구현 상태로 통일했다. 기존 시험 upload URL의 5분 signature/`expiresIn=60` 불일치와 `.wav` key 대비 Content-Type·codec 미고정 위험을 명시했다. 애플리케이션·Jira는 변경하지 않았다.
@@ -1526,3 +1527,26 @@
 - 현재 저장소에서의 다음 구현 대상은 Learning Core outbox/publisher지만, Billing consumer가 준비되기 전 publisher를 활성화하지 않는다. TMI-116 자체의 프론트 key·Mongo migration·Lattice/IAM/SG·staging saga E2E는 별도 운영 활성화 gate로 먼저 또는 병행해야 한다.
 - 이번 설명에서는 Jira `TMI-116`, 애플리케이션 코드, Billing 저장소와 AWS를 변경하지 않았다. 신규 Jira는 아직 만들지 않았다.
 - 종료 훅 기준으로도 다음 개발 대상은 AttemptGroup 상태 consumer/outbox/publisher이며, consumer-first 활성화와 TMI-116 staging gate 병행 원칙을 유지한다.
+
+## TMI-116 독립 리뷰 P1/P2 검증 (2026-08-31)
+
+- 리뷰 1은 유효하다. `BillingExamCreationSaga.start()`가 operation보다 Session을 먼저 조회하고 `ENTITLEMENT_CONFIRMING`이면 `EXAM_CREATION_PROCESSING`을 즉시 반환해, 기존 operation이 `SESSION_COMMITTED`여도 confirm/status reconciliation에 다시 진입하지 못한다. operation을 먼저 drive하고 terminal command purge 뒤에만 Session durable replay를 fallback해야 한다.
+- 리뷰 2도 유효하다. commit 단계는 `DuplicateKeyException`과 `OptimisticLockingFailureException`만 동시성으로 분류하며 그 밖의 Mongo transient/unknown Transaction 예외에서 한 번 re-read한 operation이 아직 `RESERVED`면 shared reservation을 cancel할 수 있다. transient/unknown 결과는 cancel하지 않고 operation과 `(userId, creationOperationId)` Session 재조회 및 same-key retry로 수렴해야 한다.
+- 리뷰 3도 유효하다. 현재 ObjectMapper는 unknown·duplicate·trailing token은 막지만 scalar coercion과 enum ordinal, creator field missing/null을 완전히 차단하지 않는다. confirm 성공 검증도 `attemptGroupStatus=OPEN`과 non-null `confirmedAt`을 요구하지 않는다. global coercion 차단과 endpoint/status별 필수·조건부 semantic validation이 필요하다.
+- PR 범위 지적도 유효하다. 작업 트리에 TMI-116과 무관한 10초 챌린지·비용 문서가 섞여 있고 `FRONTEND_API_HANDOFF.md`는 Idempotency-Key 부분은 관련되지만 전체 파일 포함 의도를 확인해야 한다. 사용자 변경을 되돌리지 말고 selective staging/별도 commit으로 분리해야 한다.
+- 이번 턴은 Jira `TMI-116` 리뷰 진단만 수행했으며 아직 코드를 수정하지 않았다. 현재 상태에서는 PR 전 세 finding 수정과 회귀 테스트가 필요하다.
+
+## ENTITLEMENT_CONFIRMING·SESSION_COMMITTED 관계 설명 (2026-08-31)
+
+- `ENTITLEMENT_CONFIRMING`은 Session 생성 충돌이 아니라 Billing reserve 뒤 Learning Core의 local Session commit은 성공했지만 Billing confirm은 아직 확정되지 않은 정상 중간 상태다.
+- `commitReservedSession()`의 단일 Mongo Transaction이 새 Session을 `ENTITLEMENT_CONFIRMING`·`entitlementState=CONFIRMING`으로 insert하고 같은 Transaction에서 operation을 `RESERVED → SESSION_COMMITTED`로 저장한다. 따라서 Transaction이 정상 동작하면 두 상태는 함께 나타나며 rollback이면 둘 다 나타나지 않는다.
+- 이후 Billing confirm과 local finalize가 성공하면 두 번째 Transaction에서 Session은 `IN_PROGRESS`·`CONFIRMED`, operation은 `SUCCEEDED`가 된다. confirm/status 실패 시 정상적으로 `ENTITLEMENT_CONFIRMING + SESSION_COMMITTED` 쌍이 남고 same-key retry가 이를 복구해야 한다.
+- 이 설명은 Jira `TMI-116` P1 finding의 근거를 명확히 한 것이며 Java·테스트·Jira 상태는 변경하지 않았다.
+
+## TMI-116 P1/P2 리뷰 finding 구현 완료 (2026-08-31)
+
+- `BillingExamCreationSaga.start()`는 동일 `(userId, operationId)` operation을 Session보다 먼저 복구한다. operation이 존재하면 `SESSION_COMMITTED` confirm/status reconciliation을 우선 실행하고, operation이 없을 때만 Session을 장기 durable replay fallback으로 사용한다.
+- Session commit 예외는 관측 결과를 `ADVANCED`, `SESSION_VISIBLE`, `NOT_VISIBLE`로 나눈다. Mongo transient/unknown 결과에서는 reservation을 취소하지 않고, operation이 이미 `SESSION_COMMITTED` 또는 `SUCCEEDED`이면 다음 상태로 진행하며 그 밖에는 same-key `EXAM_CREATION_PROCESSING` 재시도를 반환한다. 명시적인 local `IllegalStateException`에서 operation·Session이 모두 보이지 않을 때만 기존 cancel 보상 흐름을 유지한다.
+- Billing 성공 응답은 scalar·숫자 enum coercion을 차단하고 reserve/confirm/cancel/status별 필수 문자열·enum·timestamp를 검증한다. Saga도 confirm의 `attemptGroupStatus=OPEN`·`confirmedAt`, status의 reservation kind·attempt group·session·mock exam·terminal timestamp, cancel timestamp를 fail-closed로 검증한다.
+- 공개 시험 생성 API URL·Method·Request·성공 Response·`BaseResponse`와 기존 AI·S3·Redis 계약은 변경하지 않았다. Billing 저장소와 AWS도 변경하지 않았다.
+- 회귀 테스트를 추가했고 `./gradlew clean test` 전체 432개가 통과했다. 남은 운영 gate는 실제 replica set에서의 failure injection, Lattice/IAM/SG 연결과 staging E2E이며 Jira `TMI-116` 상태와 Git commit/push는 변경하지 않았다.

@@ -324,6 +324,17 @@ public class SigV4BillingReservationClient implements BillingReservationClient {
             String mockExamId,
             Instant expiresAt
     ) {
+        private ReserveResponse {
+            requireText(operationId, "operationId");
+            requireText(reservationId, "reservationId");
+            requireValue(reservationKind, "reservationKind");
+            requireValue(reservationStatus, "reservationStatus");
+            requireText(attemptGroupId, "attemptGroupId");
+            requireText(sessionId, "sessionId");
+            requireText(mockExamId, "mockExamId");
+            requireValue(expiresAt, "expiresAt");
+        }
+
         ReservationSnapshot toSnapshot() {
             return new ReservationSnapshot(
                     operationId, reservationId, reservationKind, reservationStatus,
@@ -341,6 +352,16 @@ public class SigV4BillingReservationClient implements BillingReservationClient {
             String sessionId,
             Instant confirmedAt
     ) {
+        private ConfirmResponse {
+            requireText(operationId, "operationId");
+            requireText(reservationId, "reservationId");
+            requireValue(reservationStatus, "reservationStatus");
+            requireText(attemptGroupId, "attemptGroupId");
+            requireValue(attemptGroupStatus, "attemptGroupStatus");
+            requireText(sessionId, "sessionId");
+            requireValue(confirmedAt, "confirmedAt");
+        }
+
         ReservationSnapshot toSnapshot() {
             return new ReservationSnapshot(
                     operationId, reservationId, null, reservationStatus,
@@ -355,6 +376,13 @@ public class SigV4BillingReservationClient implements BillingReservationClient {
             ReservationStatus reservationStatus,
             Instant canceledAt
     ) {
+        private CancelResponse {
+            requireText(operationId, "operationId");
+            requireText(reservationId, "reservationId");
+            requireValue(reservationStatus, "reservationStatus");
+            requireValue(canceledAt, "canceledAt");
+        }
+
         ReservationSnapshot toSnapshot() {
             return new ReservationSnapshot(
                     operationId, reservationId, null, reservationStatus,
@@ -376,12 +404,42 @@ public class SigV4BillingReservationClient implements BillingReservationClient {
             Instant expiresAt,
             Instant terminalAt
     ) {
+        private StatusResponse {
+            requireText(operationId, "operationId");
+            requireText(reservationId, "reservationId");
+            requireValue(reservationKind, "reservationKind");
+            requireValue(reservationStatus, "reservationStatus");
+            requireText(attemptGroupId, "attemptGroupId");
+            requireText(sessionId, "sessionId");
+            requireText(mockExamId, "mockExamId");
+            if (reservationStatus == ReservationStatus.RESERVED) {
+                requireValue(expiresAt, "expiresAt");
+            } else {
+                requireValue(terminalAt, "terminalAt");
+            }
+            if (reservationStatus == ReservationStatus.CONFIRMED) {
+                requireValue(attemptGroupStatus, "attemptGroupStatus");
+            }
+        }
+
         ReservationSnapshot toSnapshot() {
             return new ReservationSnapshot(
                     operationId, reservationId, reservationKind, reservationStatus,
                     attemptGroupId, attemptGroupStatus, sessionId, mockExamId,
                     expiresAt, terminalAt
             );
+        }
+    }
+
+    private static void requireText(String value, String field) {
+        if (value == null || value.isBlank()) {
+            throw new IllegalArgumentException("Billing response field is missing: " + field);
+        }
+    }
+
+    private static void requireValue(Object value, String field) {
+        if (value == null) {
+            throw new IllegalArgumentException("Billing response field is missing: " + field);
         }
     }
 }

@@ -4503,3 +4503,62 @@
 - 다음 vertical slice는 Billing `POST /internal/v1/attempt-group-events` consumer와 Learning Core의 `GRADING`·`COMPLETED`·`RETAKE_AVAILABLE` durable outbox/publisher다. 안전한 배포는 consumer 선배포 후 publisher 활성화 순서다.
 - TMI-116의 프론트 key, Mongo migration, Lattice/IAM/SG와 staging failure-injection E2E는 별도 운영 gate로 병행한다.
 - 이번 종료 기록에서는 Java·외부 계약·Billing 저장소·AWS·Git commit/push를 변경하지 않았으며 Secret과 Token을 기록하지 않았다. 코드 변경이 없어 Gradle 테스트를 재실행하지 않았다.
+
+## 2026-08-31 — TMI-116 독립 리뷰 P1/P2 검증
+
+<!-- codex-turn:01a055a1-20a0-7e91-b3a7-2e38fb9c56f0 -->
+
+- 날짜: 2026-08-31
+- 브랜치: `feat/TMI-116-billing-reservation-exam-saga`
+- Jira: `TMI-116`; 상태는 변경하지 않았다.
+- 작업 목표: 사용자가 전달한 confirm 영구 정체, concurrent reservation 오취소, Billing 성공 응답 strict 검증 및 PR 범위 지적을 현재 코드와 Billing ADR에 대조한다.
+- Finding 1: 유효한 P1이다. `start()`의 Session-first durable replay가 confirming Session에서 즉시 processing을 반환해 `SESSION_COMMITTED` operation의 confirm/status 복구 루프를 영구 차단한다. operation-first drive와 command purge 이후 Session fallback이 필요하다.
+- Finding 2: 유효한 P1이다. 명시된 두 예외 외 Mongo transient/unknown Transaction 결과는 generic Runtime 경로에서 단 한 번 re-read 후 아직 `RESERVED`이면 cancel된다. 같은 key concurrent commit이 아직 가시화되지 않은 reservation을 취소할 수 있으므로 unknown 결과에는 cancel을 금지하고 operation/Session 재조회와 same-key retry로 수렴해야 한다.
+- Finding 3: 유효한 P2다. Jackson mapper는 scalar coercion·enum ordinal과 missing/null creator property를 완전히 거절하지 않으며 confirm semantic validation에 `attemptGroupStatus=OPEN`과 필수 confirmed timestamp가 빠져 있다. status/cancel의 조건부 timestamp를 포함한 endpoint별 검증과 malformed fixture 테스트가 필요하다.
+- PR hygiene: 비용 추정·10초 챌린지 문서는 TMI-116과 무관하다. frontend handoff의 Idempotency-Key 변경은 관련 있지만 파일 전체 포함은 의도를 확인하고, 사용자 변경을 보존한 채 selective staging 또는 별도 commit으로 분리해야 한다.
+- 변경 파일·테스트: 이번 요청은 진단이므로 Java·테스트·외부 계약을 수정하지 않고 기록 문서만 갱신했다. 코드 변경이 없어 Gradle 테스트를 실행하지 않았고 AWS·Git commit/push·Secret·Token을 변경하거나 기록하지 않았다.
+- 다음 작업: 사용자가 수정을 요청하면 세 finding의 regression test를 먼저 추가하고 operation-first recovery, unknown commit no-cancel, strict response validation을 구현한 뒤 전체 `./gradlew clean test`를 실행한다.
+
+## 2026-08-31 — ENTITLEMENT_CONFIRMING·SESSION_COMMITTED 관계 설명
+
+<!-- codex-turn:01a055bb-5235-7f21-a5a3-57f85cb2aa67 -->
+
+- 날짜: 2026-08-31
+- 브랜치: `feat/TMI-116-billing-reservation-exam-saga`
+- Jira: `TMI-116`; 상태는 변경하지 않았다.
+- 작업 목표: `ENTITLEMENT_CONFIRMING`이 충돌 상태인지와 동시에 operation이 `SESSION_COMMITTED`가 될 수 있는지 설명한다.
+- 결론: `ENTITLEMENT_CONFIRMING`은 충돌이 아니라 local Session commit 완료·Billing confirm 미확정 상태다. `commitReservedSession()`의 같은 Mongo Transaction에서 Session insert와 operation `SESSION_COMMITTED` 저장을 수행하므로 정상적인 중간 pair다.
+- 정상 전이: `RESERVED + Session 없음`에서 Transaction 성공 후 `SESSION_COMMITTED + ENTITLEMENT_CONFIRMING`, Billing confirm/finalize 성공 후 `SUCCEEDED + IN_PROGRESS/CONFIRMED`가 된다. confirm/status가 실패하면 중간 pair가 남아 same-key recovery 대상이 된다.
+- 불변식: Transaction rollback이면 새 Session insert와 operation 전이가 함께 rollback돼야 한다. 한쪽만 존재하면 Transaction 미지원·unknown outcome·수동 데이터 변경 등 비정상 정합성 문제로 취급해야 한다.
+- 변경 파일·테스트: 이번 설명에서는 Java·테스트·외부 계약을 수정하지 않고 기록 문서만 갱신했다. 코드 변경이 없어 Gradle 테스트를 실행하지 않았고 AWS·Git commit/push·Secret·Token을 변경하거나 기록하지 않았다.
+
+## 2026-08-31 — 앱 문제 응답의 Part 4 표 처리 현황 분석
+
+<!-- codex-turn:01a055ae-7860-77d2-adec-ea270e5008bd -->
+
+- 날짜: 2026-08-31
+- 브랜치: `feat/TMI-116-billing-reservation-exam-saga`
+- Jira: 이번 분석의 신규 Jira 키는 없으며 Jira를 조회하거나 변경하지 않았다.
+- 문제 생성 응답과 `GET /api/v1/exams/{examId}/questions/{questionNumber}/prompt`, 문항 결과 응답에서 Part 4 표는 MongoDB `table_context`를 비정형 `Map<String,Object>`로 읽어 `tableContext` JSON 객체로 그대로 전달한다.
+- 서버는 table_context를 title/items 같은 고정 schema로 변환하거나 HTML·Markdown으로 렌더링하지 않는다. 앱이 전달된 중첩 object·array 구조를 해석해 표를 표시해야 한다.
+- Mongo `table_image_url` 필드는 내부 entity에 남아 있지만 공개 QuestionDTO에 필드가 없어 앱 응답에서 제외된다. Part 4는 tableContext가 null이면 `EXAM_CATALOG_CONFIGURATION_ERROR`로 실패하고 빈 object는 허용한다.
+- 일반 `imageUrl`은 기본 QuestionDTO mapping에 유지되지만 Part 4 문항 결과의 축약 questionInfo에는 text와 tableContext만 포함된다. AI 채점 multipart에도 table_image_url과 table_context를 보내지 않는다.
+- 분석과 기록만 수행했으며 애플리케이션·테스트·AWS·Mongo 데이터·Jira·외부 API 계약을 변경하지 않았고 Secret·Token을 기록하지 않았다.
+- 코드 변경이 없어 Gradle 테스트는 실행하지 않았으며 `git diff --check`와 marker 단일 포함을 검증한다.
+
+## 2026-08-31 — TMI-116 P1/P2 리뷰 finding 구현
+
+<!-- codex-turn:01a055bd-c248-7960-a926-28646e1d99ea -->
+
+- 날짜: 2026-08-31
+- 브랜치: `feat/TMI-116-billing-reservation-exam-saga`
+- Jira: `TMI-116`; 이슈 상태는 변경하지 않았다.
+- 작업 목표: confirm 복구 영구 정체 P1, Mongo unknown commit 시 shared reservation 오취소 P1, Billing 성공 응답 strict 검증 부족 P2를 구현한다.
+- 변경 파일: `BillingExamCreationSaga.java`, `BillingSagaConfiguration.java`, `SigV4BillingReservationClient.java`, 대응 Saga·SigV4 client 테스트와 현재 기록 문서를 수정했다.
+- operation-first 복구: 동일 key operation을 먼저 조회·drive하고 operation이 없을 때만 Session durable replay를 사용한다. 이로써 `ENTITLEMENT_CONFIRMING + SESSION_COMMITTED` 상태의 재요청이 processing에서 고착되지 않고 confirm/status reconciliation으로 복구된다.
+- commit 안전성: transaction 예외 뒤 operation과 `(userId, creationOperationId)` Session을 재조회한다. operation 전이가 관측되면 다음 단계로 진행하고 Session만 보이면 processing으로 수렴한다. transient/unknown Runtime과 동시성 예외에서는 reservation cancel을 금지했으며, 확정적인 local `IllegalStateException`에서 operation·Session이 모두 보이지 않을 때만 기존 cancel 보상을 수행한다.
+- strict 계약: Jackson scalar coercion과 enum ordinal을 차단하고 문자열·날짜 입력 shape를 강화했다. reserve/confirm/cancel/status response record에 endpoint별 필수 field 검증을 추가하고, Saga에서 confirm `attemptGroupStatus=OPEN`·필수 timestamp 및 status/cancel identity·terminal timestamp를 검증하며 timestamp의 현재 시각 fallback을 제거했다.
+- 테스트: `ENTITLEMENT_CONFIRMING + SESSION_COMMITTED` 복구, unknown commit no-cancel, unknown commit 후 관측된 전이 계속 진행, confirm group status/timestamp fail-closed, 숫자→문자열 coercion·숫자 enum·필수 confirm field 누락 거절 회귀 테스트를 추가했다.
+- 실행 결과: 집중 테스트 18개 통과 후 `./gradlew clean test`를 실행했고 전체 432개 테스트가 통과했다. `git diff --check`도 통과했다.
+- 유지 계약: 기존 공개 API URL·Method·Request/Response·`BaseResponse`, AI `user_id=examId`, callback, retryCount, S3와 Redis 계약은 변경하지 않았다. Billing 저장소·AWS·Jira·Git commit/push도 변경하지 않았다.
+- 남은 위험: Mock 기반 테스트이므로 실제 Mongo replica set의 transient transaction label·unknown commit failure injection, VPC Lattice/IAM/SG 연결과 staging reserve/commit/confirm/status E2E는 운영 활성화 전에 별도로 검증해야 한다. PR에는 기존에 섞인 비용 추정·10초 챌린지 등 TMI-116 무관 문서를 selective staging 또는 별도 commit으로 분리해야 한다.

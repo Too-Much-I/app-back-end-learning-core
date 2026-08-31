@@ -5,6 +5,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.dao.DataAccessResourceFailureException;
 import org.springframework.dao.OptimisticLockingFailureException;
 import web.tosunsaeng.domain.exams.billing.BillingClientException;
 import web.tosunsaeng.domain.exams.billing.BillingReservationClient;
@@ -150,7 +151,7 @@ class BillingExamCreationSagaTest {
                     return operation;
                 });
         when(sessionRepository.findByUserIdAndCreationOperationId(USER_ID, OPERATION_ID))
-                .thenReturn(Optional.empty(), Optional.of(confirmedSession()));
+                .thenReturn(Optional.of(confirmedSession()));
         when(mockExamCatalogService.getRequiredExam(MOCK_EXAM_ID)).thenReturn(mockExam);
 
         ExamSessionManager.Assignment result = saga.start(USER_ID, OPERATION_ID);
@@ -176,9 +177,6 @@ class BillingExamCreationSagaTest {
                     operation.markCanceled(CONFIRMED, CONFIRMED.plusSeconds(604800));
                     return operation;
                 });
-        when(sessionRepository.findByUserIdAndCreationOperationId(USER_ID, OPERATION_ID))
-                .thenReturn(Optional.empty());
-
         ExamsException failure = assertThrows(
                 ExamsException.class,
                 () -> saga.start(USER_ID, OPERATION_ID)
@@ -230,6 +228,138 @@ class BillingExamCreationSagaTest {
         assertEquals(ErrorStatus._EXAM_CREATION_PROCESSING, failure.getCode());
         verify(billingClient, never()).cancel(any(), any(), any());
         verify(billingClient, never()).confirm(any(), any(), any(), any(), any());
+    }
+
+    @Test
+    void committedOperationIsRecoveredBeforeConfirmingSessionReplay() {
+        ExamCreationOperation operation = committedOperation();
+        when(operationRepository.findByUserIdAndOperationId(USER_ID, OPERATION_ID))
+                .thenReturn(Optional.of(operation));
+        when(operationRepository.findById(operation.getCommandId()))
+                .thenReturn(Optional.of(operation));
+        when(billingClient.confirm(
+                OPERATION_ID, RESERVATION_ID, USER_ID, SESSION_ID, COMMITTED))
+                .thenReturn(confirmed());
+        when(transactionService.finalizeConfirmed(operation.getCommandId(), CONFIRMED))
+                .thenAnswer(invocation -> {
+                    operation.markSucceeded(CONFIRMED, CONFIRMED.plusSeconds(604800));
+                    return operation;
+                });
+        when(sessionRepository.findByUserIdAndCreationOperationId(USER_ID, OPERATION_ID))
+                .thenAnswer(invocation -> operation.getState()
+                        == web.tosunsaeng.domain.exams.domain.enums.ExamCreationState.SUCCEEDED
+                        ? Optional.of(confirmedSession())
+                        : Optional.of(confirmingSession()));
+        when(mockExamCatalogService.getRequiredExam(MOCK_EXAM_ID)).thenReturn(mockExam);
+
+        ExamSessionManager.Assignment result = saga.start(USER_ID, OPERATION_ID);
+
+        assertEquals(SESSION_ID, result.session().getExamId());
+        verify(billingClient).confirm(
+                OPERATION_ID, RESERVATION_ID, USER_ID, SESSION_ID, COMMITTED);
+    }
+
+    @Test
+    void unknownMongoCommitOutcomeNeverCancelsSharedReservation() {
+        ExamCreationOperation operation = reservedOperation();
+        when(operationRepository.findByUserIdAndOperationId(USER_ID, OPERATION_ID))
+                .thenReturn(Optional.of(operation));
+        when(operationRepository.findById(operation.getCommandId()))
+                .thenReturn(Optional.of(operation));
+        when(transactionService.commitReservedSession(operation.getCommandId(), NOW, ZoneOffset.UTC))
+                .thenThrow(new DataAccessResourceFailureException("unknown commit result"));
+        when(sessionRepository.findByUserIdAndCreationOperationId(USER_ID, OPERATION_ID))
+                .thenReturn(Optional.empty());
+
+        ExamsException failure = assertThrows(
+                ExamsException.class,
+                () -> saga.start(USER_ID, OPERATION_ID)
+        );
+
+        assertEquals(ErrorStatus._EXAM_CREATION_PROCESSING, failure.getCode());
+        verify(billingClient, never()).cancel(any(), any(), any());
+    }
+
+    @Test
+    void unknownMongoCommitOutcomeContinuesWhenCommittedOperationIsVisible() {
+        ExamCreationOperation operation = reservedOperation();
+        when(operationRepository.findByUserIdAndOperationId(USER_ID, OPERATION_ID))
+                .thenReturn(Optional.of(operation));
+        when(operationRepository.findById(operation.getCommandId()))
+                .thenReturn(Optional.of(operation));
+        when(transactionService.commitReservedSession(operation.getCommandId(), NOW, ZoneOffset.UTC))
+                .thenAnswer(invocation -> {
+                    operation.markSessionCommitted(COMMITTED);
+                    throw new DataAccessResourceFailureException("commit acknowledgment lost");
+                });
+        when(billingClient.confirm(
+                OPERATION_ID, RESERVATION_ID, USER_ID, SESSION_ID, COMMITTED))
+                .thenReturn(confirmed());
+        when(transactionService.finalizeConfirmed(operation.getCommandId(), CONFIRMED))
+                .thenAnswer(invocation -> {
+                    operation.markSucceeded(CONFIRMED, CONFIRMED.plusSeconds(604800));
+                    return operation;
+                });
+        when(sessionRepository.findByUserIdAndCreationOperationId(USER_ID, OPERATION_ID))
+                .thenReturn(Optional.of(confirmedSession()));
+        when(mockExamCatalogService.getRequiredExam(MOCK_EXAM_ID)).thenReturn(mockExam);
+
+        ExamSessionManager.Assignment result = saga.start(USER_ID, OPERATION_ID);
+
+        assertEquals(SESSION_ID, result.session().getExamId());
+        verify(billingClient, never()).cancel(any(), any(), any());
+        verify(billingClient).confirm(
+                OPERATION_ID, RESERVATION_ID, USER_ID, SESSION_ID, COMMITTED);
+    }
+
+    @Test
+    void confirmWithoutOpenAttemptGroupFailsClosed() {
+        ExamCreationOperation operation = committedOperation();
+        when(operationRepository.findByUserIdAndOperationId(USER_ID, OPERATION_ID))
+                .thenReturn(Optional.of(operation));
+        when(operationRepository.findById(operation.getCommandId()))
+                .thenReturn(Optional.of(operation));
+        when(billingClient.confirm(
+                OPERATION_ID, RESERVATION_ID, USER_ID, SESSION_ID, COMMITTED))
+                .thenReturn(new BillingReservationClient.ReservationSnapshot(
+                        OPERATION_ID, RESERVATION_ID, null,
+                        BillingReservationClient.ReservationStatus.CONFIRMED,
+                        GROUP_ID, BillingReservationClient.AttemptGroupStatus.COMPLETED,
+                        SESSION_ID, null, null, CONFIRMED
+                ));
+
+        ExamsException failure = assertThrows(
+                ExamsException.class,
+                () -> saga.start(USER_ID, OPERATION_ID)
+        );
+
+        assertEquals(ErrorStatus._BILLING_TEMPORARILY_UNAVAILABLE, failure.getCode());
+        verify(transactionService, never()).finalizeConfirmed(any(), any());
+    }
+
+    @Test
+    void confirmWithoutConfirmedAtFailsClosed() {
+        ExamCreationOperation operation = committedOperation();
+        when(operationRepository.findByUserIdAndOperationId(USER_ID, OPERATION_ID))
+                .thenReturn(Optional.of(operation));
+        when(operationRepository.findById(operation.getCommandId()))
+                .thenReturn(Optional.of(operation));
+        when(billingClient.confirm(
+                OPERATION_ID, RESERVATION_ID, USER_ID, SESSION_ID, COMMITTED))
+                .thenReturn(new BillingReservationClient.ReservationSnapshot(
+                        OPERATION_ID, RESERVATION_ID, null,
+                        BillingReservationClient.ReservationStatus.CONFIRMED,
+                        GROUP_ID, BillingReservationClient.AttemptGroupStatus.OPEN,
+                        SESSION_ID, null, null, null
+                ));
+
+        ExamsException failure = assertThrows(
+                ExamsException.class,
+                () -> saga.start(USER_ID, OPERATION_ID)
+        );
+
+        assertEquals(ErrorStatus._BILLING_TEMPORARILY_UNAVAILABLE, failure.getCode());
+        verify(transactionService, never()).finalizeConfirmed(any(), any());
     }
 
     @Test
@@ -381,6 +511,23 @@ class BillingExamCreationSagaTest {
                 .attemptGroupId(GROUP_ID)
                 .entitlementState(ExamEntitlementState.CONFIRMED)
                 .entitlementConfirmedAt(CONFIRMED)
+                .build();
+    }
+
+    private static ExamSession confirmingSession() {
+        return ExamSession.builder()
+                .examId(SESSION_ID)
+                .userId(USER_ID)
+                .createdAt(LocalDateTime.ofInstant(NOW, ZoneOffset.UTC))
+                .mockExamId(MOCK_EXAM_ID)
+                .cycleNumber(1)
+                .active(true)
+                .status(ExamSessionStatus.ENTITLEMENT_CONFIRMING)
+                .creationOperationId(OPERATION_ID)
+                .billingReservationId(RESERVATION_ID)
+                .billingReservationKind(BillingReservationKind.INITIAL)
+                .attemptGroupId(GROUP_ID)
+                .entitlementState(ExamEntitlementState.CONFIRMING)
                 .build();
     }
 }

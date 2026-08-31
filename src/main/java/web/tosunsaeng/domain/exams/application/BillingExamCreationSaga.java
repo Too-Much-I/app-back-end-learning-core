@@ -64,13 +64,18 @@ public class BillingExamCreationSaga {
             throw new IllegalStateException("Billing exam creation saga is disabled");
         }
         String operationId = ExamCreationIdempotencyKey.parse(rawOperationId);
-        ExamSession durableReplay = sessionRepository
-                .findByUserIdAndCreationOperationId(userId, operationId)
+        ExamCreationOperation operation = operationRepository
+                .findByUserIdAndOperationId(userId, operationId)
                 .orElse(null);
-        if (durableReplay != null) {
-            return replayFromSession(userId, operationId, durableReplay);
+        if (operation == null) {
+            ExamSession durableReplay = sessionRepository
+                    .findByUserIdAndCreationOperationId(userId, operationId)
+                    .orElse(null);
+            if (durableReplay != null) {
+                return replayFromSession(userId, operationId, durableReplay);
+            }
+            operation = findOrPrepare(userId, operationId);
         }
-        ExamCreationOperation operation = findOrPrepare(userId, operationId);
 
         for (int step = 0; step < MAX_STATE_STEPS; step++) {
             operation = reload(operation.getCommandId());
@@ -165,18 +170,43 @@ public class BillingExamCreationSaga {
             transactionService.commitReservedSession(
                     operation.getCommandId(), now(), clock.getZone());
         } catch (DuplicateKeyException | OptimisticLockingFailureException concurrent) {
-            // A same-key request may be committing the fixed Session concurrently.
-            // Never cancel the shared Billing reservation until that transaction is observable.
-            throw new ExamsException(ErrorStatus._EXAM_CREATION_PROCESSING, 1);
-        } catch (RuntimeException localFailure) {
-            ExamCreationOperation reloaded = reload(operation.getCommandId());
-            if (reloaded.getState() == ExamCreationState.SESSION_COMMITTED
-                    || reloaded.getState() == ExamCreationState.SUCCEEDED) {
+            if (observeCommitOutcome(operation) == CommitObservation.ADVANCED) {
                 return;
             }
-            cancelAfterCommitFailure(reloaded);
+            throw new ExamsException(ErrorStatus._EXAM_CREATION_PROCESSING, 1);
+        } catch (IllegalStateException definiteLocalFailure) {
+            CommitObservation observation = observeCommitOutcome(operation);
+            if (observation == CommitObservation.ADVANCED) {
+                return;
+            }
+            if (observation == CommitObservation.SESSION_VISIBLE) {
+                throw new ExamsException(ErrorStatus._EXAM_CREATION_PROCESSING, 1);
+            }
+            cancelAfterCommitFailure(operation);
             throw new ExamsException(ErrorStatus._BILLING_TEMPORARILY_UNAVAILABLE, 1);
+        } catch (RuntimeException unknownCommitOutcome) {
+            if (observeCommitOutcome(operation) == CommitObservation.ADVANCED) {
+                return;
+            }
+            // A transient or unknown Mongo commit result may become visible later. The Billing
+            // reservation is shared by every same-key replay, so it must never be canceled here.
+            throw new ExamsException(ErrorStatus._EXAM_CREATION_PROCESSING, 1);
         }
+    }
+
+    private CommitObservation observeCommitOutcome(ExamCreationOperation operation) {
+        ExamCreationOperation reloaded = operationRepository.findById(operation.getCommandId())
+                .orElse(null);
+        if (reloaded != null
+                && (reloaded.getState() == ExamCreationState.SESSION_COMMITTED
+                || reloaded.getState() == ExamCreationState.SUCCEEDED)) {
+            return CommitObservation.ADVANCED;
+        }
+        return sessionRepository.findByUserIdAndCreationOperationId(
+                        operation.getUserId(), operation.getOperationId())
+                .isPresent()
+                ? CommitObservation.SESSION_VISIBLE
+                : CommitObservation.NOT_VISIBLE;
     }
 
     private void cancelAfterCommitFailure(ExamCreationOperation operation) {
@@ -186,11 +216,7 @@ public class BillingExamCreationSaga {
                     operation.getReservationId(),
                     operation.getUserId()
             );
-            validateOperationAndReservation(operation, canceled);
-            if (canceled.reservationStatus()
-                    != BillingReservationClient.ReservationStatus.CANCELED) {
-                throw new IllegalStateException("Billing cancel did not return CANCELED");
-            }
+            validateCanceled(operation, canceled);
             transactionService.markCanceled(
                     operation.getCommandId(),
                     terminalTime(canceled)
@@ -239,7 +265,7 @@ public class BillingExamCreationSaga {
         BillingReservationClient.ReservationSnapshot status;
         try {
             status = billingClient.status(operation.getUserId(), operation.getOperationId());
-            validateStatusIdentity(operation, status);
+            validateStatusSnapshot(operation, status);
         } catch (BillingClientException statusFailure) {
             throw publicFailure(statusFailure);
         } catch (RuntimeException contractFailure) {
@@ -273,7 +299,7 @@ public class BillingExamCreationSaga {
         BillingReservationClient.ReservationSnapshot status;
         try {
             status = billingClient.status(operation.getUserId(), operation.getOperationId());
-            validateStatusIdentity(operation, status);
+            validateStatusSnapshot(operation, status);
         } catch (BillingClientException failure) {
             throw publicFailure(failure);
         } catch (RuntimeException contractFailure) {
@@ -288,11 +314,7 @@ public class BillingExamCreationSaga {
                 try {
                     BillingReservationClient.ReservationSnapshot canceled = billingClient.cancel(
                             operation.getOperationId(), operation.getReservationId(), operation.getUserId());
-                    validateOperationAndReservation(operation, canceled);
-                    if (canceled.reservationStatus()
-                            != BillingReservationClient.ReservationStatus.CANCELED) {
-                        throw new IllegalStateException("Billing cancel did not return CANCELED");
-                    }
+                    validateCanceled(operation, canceled);
                     transactionService.markCanceled(
                             operation.getCommandId(), terminalTime(canceled));
                 } catch (BillingClientException failure) {
@@ -367,7 +389,10 @@ public class BillingExamCreationSaga {
         validateOperationAndReservation(operation, snapshot);
         if (snapshot.reservationStatus() != BillingReservationClient.ReservationStatus.CONFIRMED
                 || !Objects.equals(snapshot.sessionId(), operation.getSessionId())
-                || !Objects.equals(snapshot.attemptGroupId(), operation.getAttemptGroupId())) {
+                || !Objects.equals(snapshot.attemptGroupId(), operation.getAttemptGroupId())
+                || snapshot.attemptGroupStatus()
+                != BillingReservationClient.AttemptGroupStatus.OPEN
+                || snapshot.terminalAt() == null) {
             throw new IllegalStateException("Billing confirm response is invalid");
         }
     }
@@ -380,13 +405,41 @@ public class BillingExamCreationSaga {
                 || snapshot.reservationStatus() == null
                 || !Objects.equals(snapshot.operationId(), operation.getOperationId())
                 || !Objects.equals(snapshot.sessionId(), operation.getSessionId())
-                || (snapshot.mockExamId() != null
-                && !Objects.equals(snapshot.mockExamId(), operation.getMockExamId()))) {
+                || !Objects.equals(snapshot.mockExamId(), operation.getMockExamId())) {
             throw new IllegalStateException("Billing operation response does not match");
         }
         if (operation.getReservationId() != null
                 && !Objects.equals(snapshot.reservationId(), operation.getReservationId())) {
             throw new IllegalStateException("Billing reservation response does not match");
+        }
+    }
+
+    private void validateStatusSnapshot(
+            ExamCreationOperation operation,
+            BillingReservationClient.ReservationSnapshot snapshot
+    ) {
+        validateStatusIdentity(operation, snapshot);
+        if (!Objects.equals(snapshot.reservationKind(), operation.getReservationKind())
+                || !Objects.equals(snapshot.attemptGroupId(), operation.getAttemptGroupId())
+                || (snapshot.reservationStatus()
+                == BillingReservationClient.ReservationStatus.RESERVED
+                && snapshot.expiresAt() == null)
+                || (snapshot.reservationStatus()
+                != BillingReservationClient.ReservationStatus.RESERVED
+                && snapshot.terminalAt() == null)) {
+            throw new IllegalStateException("Billing status response is invalid");
+        }
+    }
+
+    private void validateCanceled(
+            ExamCreationOperation operation,
+            BillingReservationClient.ReservationSnapshot snapshot
+    ) {
+        validateOperationAndReservation(operation, snapshot);
+        if (snapshot.reservationStatus()
+                != BillingReservationClient.ReservationStatus.CANCELED
+                || snapshot.terminalAt() == null) {
+            throw new IllegalStateException("Billing cancel response is invalid");
         }
     }
 
@@ -466,7 +519,10 @@ public class BillingExamCreationSaga {
     }
 
     private Instant terminalTime(BillingReservationClient.ReservationSnapshot snapshot) {
-        return snapshot.terminalAt() == null ? now() : snapshot.terminalAt();
+        if (snapshot.terminalAt() == null) {
+            throw new IllegalStateException("Billing terminal timestamp is missing");
+        }
+        return snapshot.terminalAt();
     }
 
     private ExamSessionManager.Assignment replayFromSession(
@@ -507,5 +563,11 @@ public class BillingExamCreationSaga {
         } catch (IllegalArgumentException invalid) {
             return false;
         }
+    }
+
+    private enum CommitObservation {
+        ADVANCED,
+        SESSION_VISIBLE,
+        NOT_VISIBLE
     }
 }
