@@ -20,6 +20,7 @@ public interface ExamSessionRepository extends MongoRepository<ExamSession, Stri
     @Query(
             value = "{ 'userId': ?0, '$or': ["
                     + "{ 'status': 'IN_PROGRESS' },"
+                    + "{ 'status': 'ENTITLEMENT_CONFIRMING' },"
                     + "{ '$and': ["
                     + "{ '$or': [ { 'status': null }, { 'status': { '$exists': false } } ] },"
                     + "{ '$or': [ { 'active': true }, { 'active': null },"
@@ -60,10 +61,25 @@ public interface ExamSessionRepository extends MongoRepository<ExamSession, Stri
             + "{ 'completedAt': { '$exists': false } } ] },"
             + "{ '$or': ["
             + "{ 'status': 'IN_PROGRESS' },"
+            + "{ 'status': 'ENTITLEMENT_CONFIRMING' },"
             + "{ '$and': ["
             + "{ '$or': [ { 'status': null }, { 'status': { '$exists': false } } ] },"
             + "{ '$or': [ { 'active': true }, { 'active': null },"
             + "{ 'active': { '$exists': false } } ] } ] } ] } ] }")
     @Update("{ '$set': { 'status': 'ABANDONED', 'active': false } }")
     long abandonIfInProgress(String examId);
+
+    @Query("{ '_id': ?0, 'status': 'ENTITLEMENT_CONFIRMING', 'active': true }")
+    @Update("{ '$set': { 'status': 'IN_PROGRESS', 'entitlementState': 'CONFIRMED', "
+            + "'entitlementConfirmedAt': ?1 } }")
+    long confirmEntitlementIfConfirming(String examId, java.time.Instant confirmedAt);
+
+    @Query("{ '_id': ?0, 'status': 'ENTITLEMENT_CONFIRMING' }")
+    @Update("{ '$set': { 'status': 'ABANDONED', 'active': false } }")
+    long abandonIfEntitlementConfirming(String examId);
+
+    java.util.Optional<ExamSession> findByUserIdAndCreationOperationId(
+            String userId,
+            String creationOperationId
+    );
 }

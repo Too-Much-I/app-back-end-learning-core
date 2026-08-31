@@ -18,6 +18,7 @@ import web.tosunsaeng.domain.exams.domain.repository.SpeechAceResultRepository;
 import web.tosunsaeng.domain.exams.dto.ExamRequestDTO;
 import web.tosunsaeng.domain.exams.dto.ExamResponseDTO;
 import web.tosunsaeng.domain.exams.exception.ExamsException;
+import web.tosunsaeng.domain.exams.billing.BillingSagaProperties;
 import web.tosunsaeng.global.auth.CurrentUserProvider;
 import web.tosunsaeng.global.error.code.status.ErrorStatus;
 
@@ -41,6 +42,8 @@ public class ExamServiceImpl implements ExamService {
     private final software.amazon.awssdk.services.s3.presigner.S3Presigner s3Presigner;
     private final ExamGradingService gradingService;
     private final ExamSessionManager examSessionManager;
+    private final BillingExamCreationSaga billingExamCreationSaga;
+    private final BillingSagaProperties billingSagaProperties;
 
     private final ExamResultRepository examResultRepository;
     private final ExamSummaryRepository examSummaryRepository;
@@ -136,6 +139,10 @@ public class ExamServiceImpl implements ExamService {
             throw new ExamsException(ErrorStatus._FORBIDDEN);
         }
 
+        if (examSession.isEntitlementConfirming()) {
+            throw new ExamsException(ErrorStatus._EXAM_CREATION_PROCESSING, 1);
+        }
+
         return examSession;
     }
 
@@ -190,10 +197,12 @@ public class ExamServiceImpl implements ExamService {
 
     // 새로운 정규 모의고사 세션을 생성하고 초기 시험 지문 및 S3 오디오 스트리밍 주소를 조립합니다.
     @Override
-    public ExamResponseDTO.CreateSessionResult createExamSession() {
+    public ExamResponseDTO.CreateSessionResult createExamSession(String idempotencyKey) {
         long startedAt = System.nanoTime();
         String userId = currentUserProvider.getCurrentUserId();
-        ExamSessionManager.Assignment assignment = examSessionManager.startNew(userId);
+        ExamSessionManager.Assignment assignment = billingSagaProperties.isCreationSagaEnabled()
+                ? billingExamCreationSaga.start(userId, idempotencyKey)
+                : examSessionManager.startNew(userId);
         String examId = assignment.session().getExamId();
         String redisKey = "exam:status:" + examId;
 

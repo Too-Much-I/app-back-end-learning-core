@@ -24,6 +24,12 @@ spring:
       max-request-size: 10MB
 
 app:
+  billing:
+    creation-saga-enabled: ${BILLING_CREATION_SAGA_ENABLED:false}
+    base-url: ${BILLING_BASE_URL:}
+    region: ${BILLING_AWS_REGION:ap-northeast-2}
+    connect-timeout: ${BILLING_CONNECT_TIMEOUT:PT2S}
+    read-timeout: ${BILLING_READ_TIMEOUT:PT5S}
   grading:
     pending-timeout: ${GRADING_PENDING_TIMEOUT:PT1M}
     processing-timeout: ${GRADING_PROCESSING_TIMEOUT:PT3M}

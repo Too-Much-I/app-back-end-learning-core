@@ -30,6 +30,7 @@ import web.tosunsaeng.domain.exams.domain.repository.ExamSummaryRepository;
 import web.tosunsaeng.domain.exams.domain.repository.SpeechAceResultRepository;
 import web.tosunsaeng.domain.exams.dto.ExamResponseDTO;
 import web.tosunsaeng.domain.exams.exception.ExamsException;
+import web.tosunsaeng.domain.exams.billing.BillingSagaProperties;
 import web.tosunsaeng.global.auth.CurrentUserProvider;
 import web.tosunsaeng.global.error.code.status.ErrorStatus;
 
@@ -104,6 +105,12 @@ class ExamServiceImplTest {
     @Mock
     private ExamSessionManager examSessionManager;
 
+    @Mock
+    private BillingExamCreationSaga billingExamCreationSaga;
+
+    @Mock
+    private BillingSagaProperties billingSagaProperties;
+
     @InjectMocks
     private ExamServiceImpl examService;
 
@@ -133,7 +140,7 @@ class ExamServiceImplTest {
                 .cycleNumber(1)
                 .active(true)
                 .build();
-        when(examSessionManager.startNew(LEGACY_USER_ID))
+        lenient().when(examSessionManager.startNew(LEGACY_USER_ID))
                 .thenReturn(new ExamSessionManager.Assignment(assignedSession, mockExam, true));
 
         lenient().when(s3Presigner.presignGetObject(any(GetObjectPresignRequest.class)))
@@ -189,6 +196,32 @@ class ExamServiceImplTest {
                 speechAceResultRepository,
                 azureResultRepository
         );
+    }
+
+    @Test
+    void createExamSessionUsesBillingSagaOnlyWhenFeatureFlagIsEnabled() {
+        String operationId = "018f6f36-2f42-4bf5-8c17-0be35de4872c";
+        when(billingSagaProperties.isCreationSagaEnabled()).thenReturn(true);
+        when(billingExamCreationSaga.start(LEGACY_USER_ID, operationId))
+                .thenReturn(new ExamSessionManager.Assignment(
+                        assignedSession,
+                        MockExam.builder()
+                                .mockExamId("mock_exam_003")
+                                .title("Test mock exam")
+                                .questions(List.of(Question.builder()
+                                        .partNumber(1)
+                                        .questionNumber(1)
+                                        .question("Test question")
+                                        .build()))
+                                .build(),
+                        false
+                ));
+
+        ExamResponseDTO.CreateSessionResult result = examService.createExamSession(operationId);
+
+        assertEquals(assignedSession.getExamId(), result.getExamId());
+        verify(billingExamCreationSaga).start(LEGACY_USER_ID, operationId);
+        verify(examSessionManager, never()).startNew(LEGACY_USER_ID);
     }
 
     @Test

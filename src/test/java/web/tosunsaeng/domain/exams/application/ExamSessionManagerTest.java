@@ -88,6 +88,34 @@ class ExamSessionManagerTest {
     }
 
     @Test
+    void billingPreparationKeepsExistingAttemptGroupMockExamWithoutMutatingSessions() {
+        ExamSession existing = ExamSession.builder()
+                .examId("exam_group_active")
+                .userId(USER_ID)
+                .mockExamId("mock_exam_002")
+                .cycleNumber(3)
+                .active(true)
+                .status(ExamSessionStatus.IN_PROGRESS)
+                .attemptGroupId("018f6f36-2f42-4bf5-8c17-0be35de4872e")
+                .build();
+        when(examSessionRepository.findActiveOrLegacyCandidatesByUserId(USER_ID))
+                .thenReturn(List.of(existing));
+        when(mockExamCatalogService.getRequiredExam("mock_exam_002"))
+                .thenReturn(mockExam(2));
+
+        ExamSessionManager.PreparedAssignment prepared = manager.prepareForBilling(USER_ID);
+
+        assertAll(
+                () -> assertEquals("mock_exam_002", prepared.mockExam().getMockExamId()),
+                () -> assertEquals(3, prepared.cycleNumber()),
+                () -> assertEquals(LocalDateTime.of(2026, 7, 29, 6, 30), prepared.preparedAt()),
+                () -> assertTrue(prepared.sessionId().matches("^ex_[0-9a-f]{10}_0729_0630$"))
+        );
+        verify(examSessionRepository, never()).abandonIfInProgress(any());
+        verify(examSessionRepository, never()).insert(any(ExamSession.class));
+    }
+
+    @Test
     void completionCountsContinueToSelectLeastCompletedPaper() {
         stubNewAssignment(List.of(), List.of(
                 new ExamSessionCompletionQuery.CompletionCount("mock_exam_001", 1)

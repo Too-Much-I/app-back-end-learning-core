@@ -24,8 +24,13 @@ public class ExamRestController {
 
     @Operation(summary = "모의고사 세션 생성 API", description = "체험 시작 시 새로운 세션을 발급하고 문제를 반환합니다.")
     @PostMapping("")
-    public BaseResponse<ExamResponseDTO.CreateSessionResult> createSession() {
-        return BaseResponse.onSuccess(SuccessStatus.OK, examService.createExamSession());
+    public BaseResponse<ExamResponseDTO.CreateSessionResult> createSession(
+            @RequestHeader(value = "Idempotency-Key", required = false) String idempotencyKey
+    ) {
+        return BaseResponse.onSuccess(
+                SuccessStatus.OK,
+                examService.createExamSession(idempotencyKey)
+        );
     }
 
     @Operation(

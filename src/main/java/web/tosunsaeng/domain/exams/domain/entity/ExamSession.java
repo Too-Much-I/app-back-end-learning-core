@@ -7,7 +7,10 @@ import lombok.NoArgsConstructor;
 import org.springframework.data.annotation.Id;
 import org.springframework.data.mongodb.core.mapping.Document;
 import web.tosunsaeng.domain.exams.domain.enums.ExamSessionStatus;
+import web.tosunsaeng.domain.exams.domain.enums.BillingReservationKind;
+import web.tosunsaeng.domain.exams.domain.enums.ExamEntitlementState;
 
+import java.time.Instant;
 import java.time.LocalDateTime;
 
 @Document(collection = "exam_sessions")
@@ -34,6 +37,18 @@ public class ExamSession {
 
     private LocalDateTime completedAt;
 
+    private String creationOperationId;
+
+    private String billingReservationId;
+
+    private BillingReservationKind billingReservationKind;
+
+    private String attemptGroupId;
+
+    private ExamEntitlementState entitlementState;
+
+    private Instant entitlementConfirmedAt;
+
     public boolean isActive() {
         return Boolean.TRUE.equals(active);
     }
@@ -53,6 +68,10 @@ public class ExamSession {
 
     public boolean isInProgress() {
         return effectiveStatus() == ExamSessionStatus.IN_PROGRESS;
+    }
+
+    public boolean isEntitlementConfirming() {
+        return effectiveStatus() == ExamSessionStatus.ENTITLEMENT_CONFIRMING;
     }
 
     public boolean isCompleted() {
