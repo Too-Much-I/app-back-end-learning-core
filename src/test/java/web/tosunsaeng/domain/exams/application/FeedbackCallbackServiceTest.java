@@ -116,6 +116,8 @@ class FeedbackCallbackServiceTest {
                 s3Presigner,
                 gradingService,
                 examSessionManager,
+                org.mockito.Mockito.mock(BillingExamCreationSaga.class),
+                new web.tosunsaeng.domain.exams.billing.BillingSagaProperties(),
                 examResultRepository,
                 examSummaryRepository,
                 examSessionRepository,

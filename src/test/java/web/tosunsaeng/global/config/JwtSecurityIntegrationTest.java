@@ -42,6 +42,8 @@ import web.tosunsaeng.domain.exams.application.ExamReadService;
 import web.tosunsaeng.domain.exams.application.ExamServiceImpl;
 import web.tosunsaeng.domain.exams.application.ExamGradingService;
 import web.tosunsaeng.domain.exams.application.ExamSessionManager;
+import web.tosunsaeng.domain.exams.application.BillingExamCreationSaga;
+import web.tosunsaeng.domain.exams.billing.BillingSagaProperties;
 import web.tosunsaeng.domain.exams.application.ModelAnswerCatalogService;
 import web.tosunsaeng.domain.exams.application.MockExamCatalogService;
 import web.tosunsaeng.domain.exams.domain.entity.ExamResult;
@@ -54,6 +56,7 @@ import web.tosunsaeng.domain.exams.domain.enums.ExamStatus;
 import web.tosunsaeng.domain.exams.domain.enums.GradingJobStatus;
 import web.tosunsaeng.domain.exams.domain.repository.AzureResultRepository;
 import web.tosunsaeng.domain.exams.domain.repository.ExamResultRepository;
+import web.tosunsaeng.domain.exams.domain.repository.ExamCreationOperationRepository;
 import web.tosunsaeng.domain.exams.domain.repository.ExamSessionRepository;
 import web.tosunsaeng.domain.exams.domain.repository.ExamSummaryRepository;
 import web.tosunsaeng.domain.exams.domain.repository.MockExamRepository;
@@ -149,6 +152,12 @@ class JwtSecurityIntegrationTest {
     private ExamSessionManager examSessionManager;
 
     @MockitoBean
+    private BillingExamCreationSaga billingExamCreationSaga;
+
+    @MockitoBean
+    private BillingSagaProperties billingSagaProperties;
+
+    @MockitoBean
     private ExamResultRepository examResultRepository;
 
     @MockitoBean
@@ -156,6 +165,9 @@ class JwtSecurityIntegrationTest {
 
     @MockitoBean
     private ExamSessionRepository examSessionRepository;
+
+    @MockitoBean
+    private ExamCreationOperationRepository examCreationOperationRepository;
 
     @MockitoBean
     private MockExamCatalogService mockExamCatalogService;

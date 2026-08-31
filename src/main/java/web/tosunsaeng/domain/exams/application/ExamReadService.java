@@ -186,6 +186,9 @@ public class ExamReadService {
             );
             throw new ExamsException(ErrorStatus._FORBIDDEN);
         }
+        if (session.isEntitlementConfirming()) {
+            throw new ExamsException(ErrorStatus._EXAM_CREATION_PROCESSING, 1);
+        }
         return session;
     }
 

@@ -145,7 +145,7 @@ class ExamReadApiContractTest {
     @Test
     void createSessionResponseExposesStoredOpaquePartFourTableContext() throws Exception {
         Map<String, Object> storedTableContext = partFourTableContext();
-        when(examService.createExamSession()).thenReturn(
+        when(examService.createExamSession(null)).thenReturn(
                 ExamResponseDTO.CreateSessionResult.builder()
                         .examId("ex_part4")
                         .title("Part 4 mock exam")
@@ -174,8 +174,32 @@ class ExamReadApiContractTest {
                 .andExpect(jsonPath("$.result.questions[0].tableContext.title").doesNotExist())
                 .andExpect(jsonPath("$.result.questions[0].tableImageUrl").doesNotExist());
 
-        verify(examService).createExamSession();
+        verify(examService).createExamSession(null);
         verifyNoInteractions(examReadService);
+    }
+
+    @Test
+    void createSessionForwardsIdempotencyKeyWithoutChangingResponseShape() throws Exception {
+        String operationId = "018f6f36-2f42-4bf5-8c17-0be35de4872c";
+        when(examService.createExamSession(operationId)).thenReturn(
+                ExamResponseDTO.CreateSessionResult.builder()
+                        .examId("ex_idempotent")
+                        .title("Idempotent exam")
+                        .questions(List.of())
+                        .build()
+        );
+
+        mockMvc.perform(post("/api/v1/exams")
+                        .header("Idempotency-Key", operationId))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.result.examId").value("ex_idempotent"))
+                .andExpect(jsonPath("$.result.title").value("Idempotent exam"))
+                .andExpect(jsonPath("$.result.questions").isArray())
+                .andExpect(jsonPath("$.result.userId").doesNotExist())
+                .andExpect(jsonPath("$.result.reservationId").doesNotExist())
+                .andExpect(jsonPath("$.result.attemptGroupId").doesNotExist());
+
+        verify(examService).createExamSession(operationId);
     }
 
     @Test

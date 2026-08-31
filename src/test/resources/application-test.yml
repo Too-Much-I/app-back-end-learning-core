@@ -16,6 +16,12 @@ spring:
         bucket: test-learning-core-bucket
 
 app:
+  billing:
+    creation-saga-enabled: false
+    base-url: ""
+    region: ap-northeast-2
+    connect-timeout: PT1S
+    read-timeout: PT1S
   auth:
     mode: legacy
     legacy-user-id: 00000000-0000-0000-0000-000000000001

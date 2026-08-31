@@ -2,7 +2,7 @@
 
 - 작성일: 2026-08-24
 - Jira: 신규 키 없음
-- 상태: 최소 Billing/Entitlement 확정, SNS provider·10초 챌린지 제품 계약 승인 필요
+- 상태: 최소 Billing/Entitlement와 10초 챌린지 프론트·AI v1 계약·Learning Core 저장소 구현 범위 승인 완료, SNS provider·실제 구현·운영 검증 필요
 
 ## 1. 범위 변경
 
@@ -26,7 +26,7 @@
 
 - Identity JWT 사용자 식별, 시험 Session, 시험지 배정, S3 음성 제출, AI 채점, Callback 멱등성, 결과·polling이 구현돼 있다.
 - 전화번호당 무료 1회를 강제하는 `TrialClaim`/Entitlement 연동은 없다.
-- 10초 챌린지 domain, API, content, attempt와 scoring은 아직 없다.
+- 10초 챌린지 runtime domain, API, attempt와 scoring은 아직 없다. 콘텐츠는 Learning Core가 사용하는 MongoDB cluster `to-teacher-app`의 `challenge_10s_questions` collection에 `dayNumber`별 세 문제 embedded document로 저장돼 있다.
 
 ### Billing
 
@@ -106,7 +106,7 @@ Identity가 verified-phone eligibility candidate를 Entitlement에 멱등 전달
 
 10초 챌린지는 시험과 별도 aggregate로 시작한다.
 
-권장 MVP:
+승인된 MVP:
 
 - 로그인한 MEMBER 대상
 - KST 날짜당 오늘의 challenge 1세트, 세 문제
@@ -115,16 +115,18 @@ Identity가 verified-phone eligibility candidate를 Entitlement에 멱등 전달
 - 같은 KST 날짜에는 모든 사용자에게 동일한 3문제를 제공하고 1→2→3 순서로 진행
 - 세 문제 완료는 필수가 아니며 월별 history에서 날짜별 실제 풀이 여부와 풀이 문제 수를 노출
 - 기존 시험 `retryCount`, ExamSession, Summary Job을 재사용하지 않고 별도 `ChallengeAttempt`로 저장
-- AI 피드백 계약도 시험 Callback과 섞지 않고 challenge 전용 versioned 계약 사용
+- AI 피드백 계약도 시험 Callback과 섞지 않고 challenge 전용 versioned 계약을 사용한다. 승인된 wire 명세는 `docs/contracts/ten-second-challenge-ai-api.md` v1을 따른다.
 - 첫 릴리스에는 credit·무료시험·경제적 reward를 연결하지 않고 문제별 완료 이력과 AI 피드백을 저장
+- 별도 Mongo cluster를 만들지 않고 Learning Core의 기존 `to-teacher-app` 연결과 운영 credential boundary를 재사용
+- `challenge_10s_questions.korean`을 공개 `promptKo`로 변환하고 `referenceAnswer`는 제출·만료 terminal 전까지 숨김
+- attempt 생성 시 선택된 `dayNumber`, `questionId`, 문제 문장·참고 답안·difficulty를 snapshot해 catalog 변경과 무관하게 제출·과거 결과를 재현. difficulty는 프론트에 그대로 반환하지만 AI 요청에서는 제외
 
-구현 전 확정할 항목:
+구현 전 검증할 항목:
 
-1. M4A/AAC의 sample rate·channel과 최대 파일 크기
-2. client timeout을 server에 terminal로 알리는 API 형식
-3. AI 점수·피드백 수준과 결과 노출 시점
-4. Guest preview 허용 여부
-5. streak를 즉시 제공할지 후속으로 미룰지
+1. AI 계약 v1의 M4A/AAC 허용 profile·최대 2 MiB·서비스 인증·timeout/retry를 실제 모바일 fixture와 staging contract test로 검증
+2. 승인된 프론트 `aiResult`·no-speech·사전 정의 답안 projection을 구현하고 결과 노출 문구를 E2E 검증
+3. MEMBER 전용 authorization을 구현하고 Guest `403`을 검증
+4. streak를 즉시 제공할지 후속으로 미룰지
 
 ## 5. 우선 결정할 제품 계약
 
@@ -141,9 +143,13 @@ Identity가 verified-phone eligibility candidate를 Entitlement에 멱등 전달
 ### 결정 3 — 10초 챌린지 MVP
 
 - 확정: KST 일 3문제, 전 사용자 공통 문제, 1→2→3 순차 진행, 녹음 길이 최대 10초, 한국어→영어 발화 audio, 문제당 1 attempt
-- 확정: attempt는 생성 당시 challengeDate에 귀속하고 생성 시점부터 5분 동안 제출 허용
-- 권장: MEMBER 전용, 경제적 reward 없음
-- audio 형식은 `.m4a` M4A 컨테이너·AAC 코덱·`Content-Type: audio/mp4`로 확정됐다. sample rate·channel·최대 파일 크기와 AI 의미·문법·발음 feedback 필드는 제품 결정이 필요하다.
+- 확정: attempt는 생성 당시 challengeDate에 귀속하고 생성 시점부터 1시간 동안 제출 허용
+- 확정: 녹음 시작 직전에 attempt를 먼저 생성하고, 녹음 완료 후 같은 attemptId로 S3 Presigned PUT URL을 별도 발급·재발급한다. S3 object key는 attempt 생성 시 서버 내부에서 고정한다.
+- 확정: 콘텐츠는 기존 `to-teacher-app` cluster의 `challenge_10s_questions` collection을 사용하고 별도 cluster를 만들지 않는다. Mongo 내부 식별자와 `referenceAnswer`는 문제 조회 응답에 노출하지 않는다.
+- 확정: `app.challenge.enabled=true`로 처음 성공 기동한 KST 날짜를 Mongo `challenge_10s_catalog_state` singleton에 원자적으로 저장하고 그날을 dayNumber 1로 사용한다. 재배포 시 초기화하지 않고 콘텐츠는 순환하지 않는다.
+- 확정: difficulty 정수값은 공개 문제·terminal 결과 DTO에 그대로 전달하고 AI 요청에는 포함하지 않는다.
+- 확정: MEMBER 전용, Guest preview와 경제적 reward 없음
+- audio와 AI 계약은 `docs/contracts/ten-second-challenge-ai-api.md` v1에 M4A/AAC-LC, 16/44.1/48 kHz, mono/stereo, 최대 2 MiB, AI 내부 16 kHz mono 정규화와 transcript·verdict·corrected answer·의미/문법/발음 feedback으로 승인했다. 구현과 staging contract test는 남아 있다.
 
 ## 6. 구현 순서
 
@@ -170,10 +176,12 @@ Identity가 verified-phone eligibility candidate를 Entitlement에 멱등 전달
 
 ### Phase 3 — 10초 챌린지 MVP
 
-1. ChallengeDefinition·ChallengeAttempt와 일자 unique 정책을 구현한다.
-2. content 제공, 시작, upload, submit, status/result API를 구현한다.
-3. S3/AI 계약과 timeout·중복 submit·늦은 Callback을 멱등 처리한다.
-4. 실제 모바일 countdown·background/재실행 E2E를 수행한다.
+1. `challenge_10s_questions` repository, `dayNumber`/question catalog validator와 production index migration을 구현한다.
+2. `challenge_10s_catalog_state` one-time initializer와 KST `challengeDate → dayNumber` 비순환 resolver, missing content fail-closed 정책을 구현한다.
+3. ChallengeAttempt·grading job과 `(userId, challengeDate, questionNumber)` unique 정책, 문제 snapshot을 구현한다.
+4. content 제공, attempt 시작, upload-url, S3 PUT 확인, submit, status/result API를 구현한다.
+5. S3/AI 계약과 timeout·중복 submit·늦은 Callback을 멱등 처리한다.
+6. 실제 모바일 countdown·background/재실행·자정 rollover E2E를 수행한다.
 
 ### Phase 4 — 통합 출시
 
@@ -185,7 +193,7 @@ Identity가 verified-phone eligibility candidate를 Entitlement에 멱등 전달
 
 1. 이미 작성된 Identity 탈퇴 lifecycle 1단계 계획의 Jira 초안을 검토·승인해 첫 구현 작업으로 만든다.
 2. 1차 SNS provider를 Google+Apple로 고정하고 Kakao의 동시 출시 여부를 결정한다.
-3. 10초 챌린지의 M4A/AAC sample rate·channel·최대 파일 크기와 AI feedback 필드를 `TEN_SECOND_CHALLENGE_API_CONTRACT_DECISIONS.md`에서 확정한다.
+3. 승인된 `docs/contracts/ten-second-challenge-ai-api.md` v1을 기준으로 양쪽 구현·audio fixture·인증·feedback·retry contract test를 수행한다.
 4. Billing 최소 Entitlement consumer와 Challenge MVP를 각각 별도 Jira로 분리한다.
 
 서버 구현의 첫 작업은 신규 SNS endpoint 추가가 아니라 이미 작성된 Identity 탈퇴 lifecycle 1단계와 실제 Firebase staging/mobile 준비다.

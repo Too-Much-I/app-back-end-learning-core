@@ -1,5 +1,24 @@
 # MongoDB maintenance scripts
 
+## TMI-116 Billing 시험 생성 saga indexes
+
+`tmi-116-migrate-billing-exam-saga.js`는 Billing saga feature flag를 켜기 전에
+`exam_creation_operations`와 `exam_sessions`에 필요한 unique, lookup, TTL index를 생성한다.
+대상 database를 명시적으로 선택한 `mongosh` 세션에서 실행하고 staging/prod에서는
+백업과 기존 중복 데이터 점검 후 적용한다. 애플리케이션은 staging/prod에서 flag가 켜졌을 때
+필수 index가 없거나 호환되지 않으면 시작을 중단한다.
+
+필수 환경변수는 `MONGODB_URI`, `MONGODB_DATABASE`다. 기본 실행은 dry-run이며 정확히
+`TMI116_BILLING_SAGA_INDEXES_APPLY=true`일 때만 index를 생성한다. URI와 credential은
+출력하지 않는다.
+
+```bash
+mongosh "$MONGODB_URI" --file scripts/mongodb/tmi-116-migrate-billing-exam-saga.js
+
+TMI116_BILLING_SAGA_INDEXES_APPLY=true \
+mongosh "$MONGODB_URI" --file scripts/mongodb/tmi-116-migrate-billing-exam-saga.js
+```
+
 ## Completed-history and retry-attempt read indexes
 
 `create-exam-read-indexes.js` validates and optionally creates the compound indexes used by the

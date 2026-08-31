@@ -38,26 +38,45 @@ public class ExamSessionManager {
         return startNew(userId, 1);
     }
 
+    public PreparedAssignment prepareForBilling(String userId) {
+        List<ExamSession> activeSessions = findInProgressSessions(userId);
+        ExamSession replacement = activeSessions.stream()
+                .filter(candidate -> candidate.getAttemptGroupId() != null
+                        && !candidate.getAttemptGroupId().isBlank())
+                .findFirst()
+                .orElse(null);
+
+        if (replacement != null) {
+            String mockExamId = GradingKeys.effectiveMockExamId(replacement.getMockExamId());
+            MockExam mockExam = mockExamCatalogService.getRequiredExam(mockExamId);
+            int cycleNumber = replacement.getCycleNumber() == null
+                    ? Math.toIntExact(completionCounts(userId).getOrDefault(mockExamId, 0L) + 1)
+                    : replacement.getCycleNumber();
+            LocalDateTime now = LocalDateTime.ofInstant(clock.instant(), clock.getZone());
+            return new PreparedAssignment(newExamId(now), mockExam, cycleNumber, now);
+        }
+
+        SelectedExam selected = selectExam(userId);
+        LocalDateTime now = LocalDateTime.ofInstant(clock.instant(), clock.getZone());
+        return new PreparedAssignment(
+                newExamId(now),
+                selected.mockExam(),
+                Math.toIntExact(selected.completionCount() + 1),
+                now
+        );
+    }
+
     private Assignment startNew(String userId, int attempt) {
         List<String> abandonedExamIds = abandonInProgressSessions(userId);
 
-        List<MockExamCatalogService.CatalogExam> catalog = mockExamCatalogService.findAssignableExams();
-        Map<String, Long> completionCounts = completionCounts(userId);
-        MockExamCatalogService.CatalogExam selected = catalog.stream()
-                .min(Comparator
-                        .comparingLong((MockExamCatalogService.CatalogExam candidate) ->
-                                completionCounts.getOrDefault(candidate.mockExam().getMockExamId(), 0L))
-                        .thenComparingInt(MockExamCatalogService.CatalogExam::sequence))
-                .orElseThrow();
-
-        long completionCount = completionCounts.getOrDefault(selected.mockExam().getMockExamId(), 0L);
+        SelectedExam selected = selectExam(userId);
         LocalDateTime now = LocalDateTime.ofInstant(clock.instant(), clock.getZone());
         ExamSession newSession = ExamSession.builder()
                 .examId(newExamId(now))
                 .userId(userId)
                 .createdAt(now)
                 .mockExamId(selected.mockExam().getMockExamId())
-                .cycleNumber(Math.toIntExact(completionCount + 1))
+                .cycleNumber(Math.toIntExact(selected.completionCount() + 1))
                 .active(true)
                 .status(ExamSessionStatus.IN_PROGRESS)
                 .completedAt(null)
@@ -124,7 +143,7 @@ public class ExamSessionManager {
         return List.copyOf(abandonedExamIds);
     }
 
-    private List<ExamSession> findInProgressSessions(String userId) {
+    public List<ExamSession> findInProgressSessions(String userId) {
         List<ExamSession> candidates = examSessionRepository.findActiveOrLegacyCandidatesByUserId(userId);
         if (candidates == null || candidates.isEmpty()) {
             return List.of();
@@ -133,7 +152,8 @@ public class ExamSessionManager {
         List<ExamSession> reusable = new ArrayList<>();
         for (ExamSession candidate : candidates) {
             if (candidate.getStatus() != null) {
-                if (candidate.isInProgress() && candidate.getCompletedAt() == null) {
+                if ((candidate.isInProgress() || candidate.isEntitlementConfirming())
+                        && candidate.getCompletedAt() == null) {
                     reusable.add(candidate);
                 }
                 continue;
@@ -208,11 +228,37 @@ public class ExamSessionManager {
         return counts;
     }
 
+    private SelectedExam selectExam(String userId) {
+        List<MockExamCatalogService.CatalogExam> catalog = mockExamCatalogService.findAssignableExams();
+        Map<String, Long> completionCounts = completionCounts(userId);
+        MockExamCatalogService.CatalogExam selected = catalog.stream()
+                .min(Comparator
+                        .comparingLong((MockExamCatalogService.CatalogExam candidate) ->
+                                completionCounts.getOrDefault(candidate.mockExam().getMockExamId(), 0L))
+                        .thenComparingInt(MockExamCatalogService.CatalogExam::sequence))
+                .orElseThrow();
+        return new SelectedExam(
+                selected.mockExam(),
+                completionCounts.getOrDefault(selected.mockExam().getMockExamId(), 0L)
+        );
+    }
+
     private static String newExamId(LocalDateTime now) {
         String uuidPart = UUID.randomUUID().toString().replace("-", "").substring(0, 10);
         return "ex_" + uuidPart + "_" + now.format(EXAM_ID_TIME_FORMAT);
     }
 
     public record Assignment(ExamSession session, MockExam mockExam, boolean created) {
+    }
+
+    public record PreparedAssignment(
+            String sessionId,
+            MockExam mockExam,
+            Integer cycleNumber,
+            LocalDateTime preparedAt
+    ) {
+    }
+
+    private record SelectedExam(MockExam mockExam, long completionCount) {
     }
 }
