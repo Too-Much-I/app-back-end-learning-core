@@ -116,6 +116,34 @@ class ExamSessionManagerTest {
     }
 
     @Test
+    void billingPreparationUsesLatestRetakeAvailableAsExactReplacementSource() {
+        ExamSession retake = ExamSession.builder()
+                .examId("exam_retake")
+                .userId(USER_ID)
+                .mockExamId("mock_exam_002")
+                .cycleNumber(4)
+                .active(false)
+                .status(ExamSessionStatus.RETAKE_AVAILABLE)
+                .attemptGroupId("018f6f36-2f42-4bf5-8c17-0be35de4872e")
+                .build();
+        when(examSessionRepository.findActiveOrLegacyCandidatesByUserId(USER_ID))
+                .thenReturn(List.of());
+        when(examSessionRepository.findLatestRetakeAvailableByUserId(USER_ID))
+                .thenReturn(java.util.Optional.of(retake));
+        when(mockExamCatalogService.getRequiredExam("mock_exam_002"))
+                .thenReturn(mockExam(2));
+
+        ExamSessionManager.PreparedAssignment prepared = manager.prepareForBilling(USER_ID);
+
+        assertAll(
+                () -> assertEquals("exam_retake", prepared.replacementSourceSessionId()),
+                () -> assertEquals(retake.getAttemptGroupId(), prepared.expectedAttemptGroupId()),
+                () -> assertEquals("mock_exam_002", prepared.expectedMockExamId()),
+                () -> assertEquals(4, prepared.cycleNumber())
+        );
+    }
+
+    @Test
     void completionCountsContinueToSelectLeastCompletedPaper() {
         stubNewAssignment(List.of(), List.of(
                 new ExamSessionCompletionQuery.CompletionCount("mock_exam_001", 1)

@@ -799,7 +799,7 @@ public class ExamGradingService {
 
     private ExamSession requireInProgressSession(String examId) {
         ExamSession session = requireNotAbandonedSession(examId);
-        if (session.isCompleted()) {
+        if (!session.isInProgress()) {
             throw new ExamsException(ErrorStatus._EXAM_ALREADY_COMPLETED);
         }
         return session;
@@ -811,12 +811,15 @@ public class ExamGradingService {
         if (session.isAbandoned()) {
             throw new ExamsException(ErrorStatus._EXAM_ABANDONED);
         }
+        if (session.isRetakeAvailable()) {
+            throw new ExamsException(ErrorStatus._EXAM_ALREADY_COMPLETED);
+        }
         return session;
     }
 
     private boolean canProcessSession(String examId) {
         return examSessionRepository.findById(examId)
-                .map(session -> !session.isAbandoned())
+                .map(session -> !session.isAbandoned() && !session.isRetakeAvailable())
                 .orElse(false);
     }
 

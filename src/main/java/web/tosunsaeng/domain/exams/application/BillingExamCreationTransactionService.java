@@ -2,6 +2,7 @@ package web.tosunsaeng.domain.exams.application;
 
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.beans.factory.annotation.Qualifier;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.support.TransactionOperations;
 import web.tosunsaeng.domain.exams.domain.entity.ExamCreationOperation;
@@ -9,6 +10,8 @@ import web.tosunsaeng.domain.exams.domain.entity.ExamSession;
 import web.tosunsaeng.domain.exams.domain.enums.ExamCreationState;
 import web.tosunsaeng.domain.exams.domain.enums.ExamEntitlementState;
 import web.tosunsaeng.domain.exams.domain.enums.ExamSessionStatus;
+import web.tosunsaeng.domain.exams.attemptgroup.domain.AttemptGroupProjectionStatus;
+import web.tosunsaeng.domain.exams.attemptgroup.infrastructure.AttemptGroupEventProperties;
 import web.tosunsaeng.domain.exams.domain.repository.ExamCreationOperationRepository;
 import web.tosunsaeng.domain.exams.domain.repository.ExamSessionRepository;
 
@@ -28,18 +31,36 @@ public class BillingExamCreationTransactionService {
     private final ExamSessionRepository sessionRepository;
     private final ExamSessionManager sessionManager;
     private final ObjectProvider<TransactionOperations> transactionOperationsProvider;
+    private final AttemptGroupEventProperties attemptGroupProperties;
 
+    @Autowired
     public BillingExamCreationTransactionService(
             ExamCreationOperationRepository operationRepository,
             ExamSessionRepository sessionRepository,
             ExamSessionManager sessionManager,
             @Qualifier("billingTransactionOperations")
-            ObjectProvider<TransactionOperations> transactionOperationsProvider
+            ObjectProvider<TransactionOperations> transactionOperationsProvider,
+            AttemptGroupEventProperties attemptGroupProperties
     ) {
         this.operationRepository = operationRepository;
         this.sessionRepository = sessionRepository;
         this.sessionManager = sessionManager;
         this.transactionOperationsProvider = transactionOperationsProvider;
+        this.attemptGroupProperties = attemptGroupProperties;
+    }
+
+    BillingExamCreationTransactionService(
+            ExamCreationOperationRepository operationRepository,
+            ExamSessionRepository sessionRepository,
+            ExamSessionManager sessionManager,
+            ObjectProvider<TransactionOperations> transactionOperationsProvider
+    ) {
+        this(operationRepository, sessionRepository, sessionManager, transactionOperationsProvider,
+                new AttemptGroupEventProperties(
+                        false, false, "", "ap-northeast-2", Duration.ofMinutes(30),
+                        Duration.ofSeconds(1), 20, Duration.ofSeconds(30), Duration.ofMinutes(15),
+                        Duration.ofSeconds(2), Duration.ofSeconds(5),
+                        Duration.ofDays(30), Duration.ofDays(90)));
     }
 
     public ExamCreationOperation commitReservedSession(String commandId, Instant committedAt, ZoneId zone) {
@@ -74,6 +95,9 @@ public class BillingExamCreationTransactionService {
                     .attemptGroupId(operation.getAttemptGroupId())
                     .entitlementState(ExamEntitlementState.CONFIRMING)
                     .entitlementConfirmedAt(null)
+                    .attemptGroupProjectionStatus(attemptGroupProperties.writerEnabled()
+                            ? AttemptGroupProjectionStatus.OPEN : null)
+                    .attemptGroupProjectionVersion(attemptGroupProperties.writerEnabled() ? 0L : null)
                     .build();
             sessionRepository.insert(session);
             operation.markSessionCommitted(committedAt);

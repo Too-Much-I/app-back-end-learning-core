@@ -2,11 +2,24 @@
 
 ## Last updated
 
-- 2026-08-28
+- 2026-09-01
 
 ## Current branch
 
 - `develop`
+- 2026-09-01 Jira `TMI-118`의 backfill 의미를 설명했다. 이번 backfill은 AttemptGroup outbox 기능이 생기기 전에 생성된 기존 CONFIRMED Billing-linked ExamSession 중 projection 상태가 없는 데이터만 대상으로, 먼저 dry-run으로 현재 시험 증거를 판정하고 운영자가 승인한 Session에 `attemptGroupProjectionStatus=OPEN`, projection version 0을 초기화한 뒤 coordinator가 GRADING·COMPLETED·RETAKE_AVAILABLE 상태와 outbox event를 생성하도록 연결하는 일회성 데이터 이관이다. 신규 Session은 정상 writer 흐름이 자동 처리하므로 대상이 아니며, 현재 local profile Atlas에는 대상이 0개여서 실행할 backfill이 없다. 설명과 문서만 갱신했고 애플리케이션 코드·DB·외부 계약은 변경하지 않았다.
+- 2026-09-01 Jira `TMI-118` 추가 작업 여부 최종 확인: local profile Atlas의 backfill 후보와 CONFIRMED Billing-linked Session이 모두 0개이므로 현재 연결 DB를 위한 추가 제품 코드, 세션별 allowlist와 backfill apply는 필요 없다. staging/production이 별도 DB라면 각 환경 inventory를 별도로 확인해야 하며, Billing TMI-117 consumer 배포, Mongo Transaction·index, Lattice IAM, publisher idle 선활성, writer canary와 상태·오류 E2E는 배포·운영 단계의 필수 잔여 작업이다. 이번 확인은 문서만 동기화했고 애플리케이션 코드·DB·AWS·Jira·Git 상태와 외부 계약을 변경하지 않았다. 직전 `./gradlew clean test` 439개 성공 상태를 유지하며 문서 diff는 `git diff --check`로 검증한다.
+- 2026-09-01 Jira `TMI-118`의 추가 작업 필요 여부를 정리했다. 현재 local profile Atlas에는 CONFIRMED Billing-linked Session이 0개이므로 이 DB를 위한 backfill runner·allowlist·apply 추가 작업은 필요 없다. 다만 이 결과만으로 staging/production rollout이 끝난 것은 아니며, 별도 DB를 사용하면 각 환경 inventory count, Billing TMI-117 consumer 배포·활성, Mongo transaction/index, Lattice IAM, publisher 선활성 후 writer canary와 상태·오류 E2E가 남아 있다. 따라서 추가 애플리케이션 기능 개발은 현재 필수가 아니지만 배포·운영 검증은 필수다. 애플리케이션 코드는 변경하지 않았고 공개 계약과 직전 439개 테스트 성공 상태는 유지된다.
+- 2026-09-01 종료 훅 동기화: Jira `TMI-118` backfill inventory를 `.env.docker.local` local profile의 Atlas 연결에서 읽기 전용으로 실행한 결과 후보 0개, CONFIRMED Billing-linked Session 전체 0개였다. 현재 연결 대상에는 backfill apply가 필요 없으며 DB 문서는 변경하지 않았다. staging/production이 별도 연결이면 writer 활성화 전 각 환경을 별도로 조회해야 한다. URI·credential·userId·Session ID와 Secret/Token은 출력·기록하지 않았고 애플리케이션 코드는 변경하지 않았다.
+- 2026-09-01 사용자 승인으로 `.env.docker.local`의 local profile이 가리키는 Atlas DB에 TMI-118 backfill inventory를 읽기 전용 실행했다. Secret·URI·사용자·Session ID는 출력하지 않고 집계만 조회했으며 `CONFIRMED + nonblank attemptGroupId + projection null/missing` 후보는 0개였다. 추가 분해 조회에서도 CONFIRMED Billing-linked Session 전체가 0개여서 현재 이 연결 대상에는 backfill이 필요하지 않다. 이 결과는 local profile 연결에만 해당하며 staging/production이 별도 URI를 사용한다면 각 환경은 writer 활성화 전에 별도로 count 0을 확인해야 한다. DB 변경, backfill apply와 애플리케이션 코드는 수행·변경하지 않았고 공개 계약과 직전 439개 테스트 성공 상태는 유지된다.
+- 2026-09-01 Jira `TMI-118` rollout 전 기존 backfill 후보 조회 시점을 설명했다. 지금 필요한 작업은 apply가 아니라 환경별 read-only inventory count다. `BILLING_CREATION_SAGA_ENABLED`가 한 번이라도 true였던 staging/prod에서는 writer 활성화 전에 `exam_sessions`의 `entitlementState=CONFIRMED`, nonblank attemptGroupId, projection null/missing 조건을 조회해야 한다. count 0이면 backfill 없이 신규 writer cutover만 진행하고, count가 있으면 writer 활성화 전 dry-run report·분류·canary batch 계획을 확정한다. Billing saga가 해당 환경에서 한 번도 활성화되지 않았다면 후보가 생길 수 없지만 count 0을 확인해 기록하는 것을 권장한다. 조회는 DB 상태를 변경하지 않으며 애플리케이션 코드는 변경하지 않았다. 공개 계약과 직전 439개 테스트 성공 상태는 유지된다.
+- 2026-09-01 Jira `TMI-118` 기존 Session backfill은 운영자가 Mongo 문서를 하나씩 수동 확인하는 방식이 아님을 설명했다. 먼저 repository가 `CONFIRMED + attemptGroupId 존재 + projection null/missing` 후보 전체를 inventory하고, 후보 ID 집합을 batch dry-run해 결과를 `completed`, `gradingReady`, failureCode와 추가 조사 대상으로 분류한 뒤 승인된 그룹을 한 번에 allowlist apply하는 방식이 권장된다. 데이터가 적으면 개별 확인하고, 많으면 완전한 strict evidence 대상은 batch 승인하며 failure/integrity 후보만 개별 조사한다. 현재 내부 service는 후보 조회·명시적 ID 집합 dry-run/apply까지만 있고 보고서·CLI/admin runner는 없으므로 실제 기존 후보가 존재하면 TMI-118 staging rollout 전에 일회성 운영 runner 또는 command를 추가해야 한다. 기존 후보가 없으면 backfill 자체를 실행하지 않는다. 애플리케이션 코드는 변경하지 않았고 공개 계약과 직전 439개 테스트 성공 상태는 유지된다.
+- 2026-09-01 Jira `TMI-118`의 기존 Billing-linked Session allowlist backfill을 사용자에게 설명했다. writer 활성화 전에 만들어져 `attemptGroupProjectionStatus`가 없는 CONFIRMED Session은 reconciler가 자동 처리하지 않는다. 운영자가 명시한 Session ID 집합만 `AttemptGroupBackfillService.dryRun`으로 현재 evidence 기준 GRADING 준비·COMPLETED·failureCode 후보를 읽기 전용 확인하고, 승인 후 `apply`가 Transaction에서 projection을 OPEN/version 0으로 초기화한 뒤 coordinator를 실행해 상태+outbox를 생성한다. 이는 legacy Summary·feedback 불완전성으로 잘못 COMPLETED/RETAKE 처리하거나 대량 event를 한꺼번에 전송하는 위험을 줄인다. 현재 서비스는 공개·admin API나 자동 runner가 없는 내부 실행 경계이므로 실제 staging backfill 실행 방법과 allowlist는 별도 운영 절차로 확정해야 한다. 애플리케이션 코드는 변경하지 않았고 공개 계약과 직전 전체 439개 테스트 성공 상태는 그대로다.
+- 2026-09-01 Jira `TMI-118`의 `AttemptGroupOutboxStore`가 Mongo `findAndModify`와 CAS로 수행하는 작업을 사용자에게 설명했다. `findAndModify`는 PENDING 또는 lease 만료 IN_FLIGHT event 하나를 찾는 것과 새 leaseToken·owner·until·attemptCount를 기록하는 것을 단일 원자 연산으로 묶어 여러 ECS Task의 동시 claim을 막는다. 이후 성공, retry, DEAD_LETTER와 BLOCKED_AUTH 갱신은 `_id + status=IN_FLIGHT + leaseToken` 조건의 update로 처리해 현재 처리권을 보유한 worker만 상태를 바꾸도록 한다. 만료 lease는 다른 worker가 회수하며, 잘못된 trace context도 동일 leaseToken CAS를 통과한 worker가 한 번만 fallback context로 교체한다. 애플리케이션 코드는 변경하지 않았고 공개 계약과 직전 439개 전체 테스트 성공 상태는 유지된다.
+- 2026-09-01 Jira `TMI-118` publisher의 lease 의미를 사용자에게 설명했다. lease는 여러 Learning Core ECS Task 중 한 Task가 outbox event를 일정 시간 독점 처리하도록 Mongo에 `leaseOwner`, random `leaseToken`, `leaseUntil`을 기록하는 시간제 처리권이다. 정상 완료 시 동일 token 보유자만 DELIVERED/retry/dead-letter/auth 상태를 갱신하고, Task가 중간 종료되면 30초 기본 lease 만료 뒤 다른 Task가 event를 회수한다. 따라서 영구 lock 없이 동시 중복 처리를 줄이고 장애 복구가 가능하며, 아주 드문 HTTP 성공 후 local 갱신 실패에 따른 재전송은 Billing의 eventId/digest 멱등성이 최종 방어한다. 애플리케이션 코드는 변경하지 않았고 공개 계약과 직전 전체 439개 테스트 성공 상태는 그대로다.
+- 2026-09-01 Jira `TMI-118` 구현 파일을 역할별로 재검토하고 사용자 설명용 구조를 정리했다. 핵심 흐름은 `ExamServiceImpl` submit/Callback trigger → `AttemptGroupEvidenceEvaluator` evidence 판정 → `AttemptGroupStateCoordinator`의 Session+outbox Transaction → `AttemptGroupOutboxPublisher` lease claim → W3C publish span/traceparent → `SigV4AttemptGroupEventClient`의 Billing 전송이다. 상태·payload·outbox domain, coordinator/reconciler/Summary transaction/backfill application, Mongo lease/auth circuit/index/config/trace/SigV4 infrastructure, RETAKE replacement를 위한 기존 Exam/Billing 수정 파일과 테스트 책임을 대조했다. 애플리케이션 코드는 변경하지 않았고 공개 API·AI·S3·Redis 계약과 이전 `./gradlew clean test` 439개 성공 상태는 그대로다. 이번 설명 작업에서는 문서만 갱신했으며 신규 테스트는 실행하지 않았다.
+- 2026-09-01 Jira `TMI-118` Learning Core AttemptGroup durable outbox/publisher를 로컬 구현했다. Billing-linked·CONFIRMED Session만 writer가 관리하며 필수 retry 0 제출 시 GRADING, strict `exam_summaries` evidence 시 COMPLETED, retry 소진·정합성 위반·PT30M deadline 시 고정 failureCode의 RETAKE_AVAILABLE로 전이한다. Session projection+outbox는 Mongo Transaction/optimistic CAS와 Session별 GRADING/TERMINAL unique slot으로 묶었다. Summary Callback의 Summary insert·Job 완료·terminal+outbox도 writer 대상에서 같은 Transaction으로 수렴한다. lease publisher는 같은 eventId/payload를 유지하고 재시도별 새 W3C CLIENT span·traceparent 주입 뒤 SigV4 `vpc-lattice-svcs` 서명, HTTP 분류, DELIVERED 30일·DEAD_LETTER 90일, 401/403 BLOCKED_AUTH 전역 circuit·15분 단일 probe를 구현했다. RETAKE_AVAILABLE Session은 다음 시험 생성 operation에 source Session/group/mockExam을 snapshot해 exact Billing REPLACEMENT만 허용한다. writer/publisher 기본값은 off이며 기존 linked Session은 자동 backfill하지 않고 명시적 allowlist dry-run/apply만 제공한다. 공개 API·BaseResponse·AI·S3·Redis 계약은 변경하지 않았고 `./gradlew clean test` 439개가 성공했다. staging에서는 Billing consumer image/flag, Mongo replica-set·index, Lattice IAM과 INITIAL/REPLACEMENT·401/403·timeout failure-injection E2E가 남아 있으므로 아직 production 활성화 상태가 아니다.
+- 2026-08-31 세 앱 서버 현재 `develop`과 최근 Jira·테스트 기록을 기준으로 `docs/codex/FIRST_UPDATE_PROGRESS_CHECKLIST.md`를 최신화했다. Identity `TMI-114` 가입 중단 Firebase cleanup은 PR #36·600 tests·Jira 완료, Billing `TMI-115` BenefitDefinition과 `TMI-117` AttemptGroup consumer는 각각 PR #3·#4에 병합됐고 `TMI-117`은 137 tests·Jira 완료다. Learning Core `TMI-116` Billing Reservation 시험 생성 saga는 PR #24로 병합되고 P1/P2 보완 후 전체 432 tests가 성공했지만 feature flag 기본 off이며 Jira 상태 전환, 실제 Mongo migration·Lattice/IAM/SG·staging E2E가 남아 있다. 무료시험의 가장 큰 코드 공백은 Learning Core AttemptGroup durable outbox/publisher와 Billing owner rebind이고 Challenge backend도 미구현이므로 production release는 계속 차단한다. 애플리케이션·Jira·외부 계약은 이번 점검에서 변경하지 않았다.
 - 2026-08-31 앱 문제 응답의 Part 4 표 처리 현황을 분석했다. MongoDB `table_context`는 `Map<String,Object>`로 읽어 시험 생성·문항 prompt·문항 결과 응답의 `tableContext` JSON에 가공 없이 전달하며 서버가 고정 schema, HTML 또는 Markdown으로 렌더링하지 않는다. `table_image_url`은 내부 entity에만 남고 공개 응답에서 제외된다. Part 4 tableContext가 null이면 catalog configuration error이며 빈 object는 허용한다. AI 채점 요청에는 table_context와 table_image_url을 보내지 않는다. 신규 Jira 키는 없다.
 - 2026-08-28 종료 훅 동기화: 현재 저장소 기준 1차 업데이트 체크리스트 작성·검증 결과를 현재 turn 기록으로 WORKLOG 끝에 추가했다. Identity `TMI-109`·`TMI-111`과 Billing `TMI-110`·`TMI-112`·`TMI-113` 완료, Learning Core Billing saga·Challenge backend·모바일/workload/staging E2E 잔여 판정은 동일하다. 애플리케이션·Jira·외부 계약은 변경하지 않았다.
 - 2026-08-28 현재 저장소 기준 1차 업데이트 진행 상태를 `docs/codex/FIRST_UPDATE_PROGRESS_CHECKLIST.md`로 다시 정리했다. Identity `TMI-109`·`TMI-111`과 Billing `TMI-110`·`TMI-112`·`TMI-113`은 구현·병합 기록에 따라 완료로 반영했다. Billing에는 TrialClaim, `FREE_EXAM_ONCE` grant/ledger와 Reservation reserve/confirm/cancel/status/expiry 기반이 있으나 Learning Core Billing client·필수 `Idempotency-Key`·reserve/commit/confirm saga는 아직 없다. Challenge는 프론트·AI v1 계약과 콘텐츠가 준비됐지만 Learning Core backend·AI 양방향 구현은 미착수다. 따라서 실제 모바일 SNS, workload/Lattice, replica set·multi-instance, 무료시험·Challenge staging E2E와 canary가 끝나기 전 production 출시는 차단한다. 신규 Jira와 애플리케이션 코드는 변경하지 않았다.
@@ -1550,3 +1563,315 @@
 - Billing 성공 응답은 scalar·숫자 enum coercion을 차단하고 reserve/confirm/cancel/status별 필수 문자열·enum·timestamp를 검증한다. Saga도 confirm의 `attemptGroupStatus=OPEN`·`confirmedAt`, status의 reservation kind·attempt group·session·mock exam·terminal timestamp, cancel timestamp를 fail-closed로 검증한다.
 - 공개 시험 생성 API URL·Method·Request·성공 Response·`BaseResponse`와 기존 AI·S3·Redis 계약은 변경하지 않았다. Billing 저장소와 AWS도 변경하지 않았다.
 - 회귀 테스트를 추가했고 `./gradlew clean test` 전체 432개가 통과했다. 남은 운영 gate는 실제 replica set에서의 failure injection, Lattice/IAM/SG 연결과 staging E2E이며 Jira `TMI-116` 상태와 Git commit/push는 변경하지 않았다.
+
+## TMI-116 로컬 develop 반영 확인 (2026-08-31)
+
+- 현재 checkout은 로컬 `develop`이며 `HEAD`, `develop`, `origin/develop`이 모두 PR `#24` merge commit `d95d18b42a47383c2237fdb7eae536b7495136fb`를 가리킨다.
+- merge commit에는 TMI-116 최신 feature commit `c3e3c8296316b1e49014413eb3dc32efaad76aba`가 포함돼 있으므로 원격뿐 아니라 현재 로컬 코드에도 TMI-116 P1/P2 보완이 반영됐다.
+- 애플리케이션 코드·Jira `TMI-116` 상태·AWS·Git commit/push는 변경하지 않았고, 코드 변경이 없어 테스트를 재실행하지 않았다.
+
+## 멘토링용 저장소 구조 조사 준비 상태 (2026-08-31)
+
+- 별도 Jira 이슈 키 없이 앱 Learning Core의 구조·기능·정보 체계·네이밍·컨벤션·기술 진화 방향을 분석하는 멘토링 산출물의 사전 구성을 정리했다.
+- 예정 산출물은 한국어 중심의 draw.io 4종(컨셉맵, 아키텍처, Feature Map, IA)과 Markdown 표·문서 3종(네이밍 사전, 컨벤션과 code smell, 진화수렴·디팩토 비교)이다.
+- 분석 범위는 현재 저장소의 구현 코드, 테스트, 설정, 계약·운영 문서와 migration script다. 기존 웹 POC는 제외하고, 실행 중인 기능·feature flag 기능·문서상 계획을 시각적으로 구분한다.
+- 현재 확인된 주요 축은 시험·채점, Billing Reservation 시험 생성 saga, 회원 탈퇴 이벤트, 인증·보안·관측성, MongoDB·Redis·S3·Python AI·Billing 외부 연동이다. 10초 챌린지는 승인 계약 문서는 있으나 실제 구현 여부를 전수 조사한 뒤 별도 상태로 표시해야 한다.
+- 아직 실제 draw.io와 본 조사 문서는 생성하지 않았다. 애플리케이션 코드와 외부 계약은 변경하지 않았고 기록 문서만 갱신했으므로 테스트는 실행하지 않았다.
+
+## 멘토링 구조 조사 범위 확장 결정 (2026-08-31)
+
+- 별도 Jira 이슈 없이 구조 조사 범위를 웹을 제외한 앱 서버 전체인 Learning Core·Identity·Billing으로 확장하는 방향을 권고했다.
+- 조사 자체는 세 저장소를 같은 시점의 하나의 시스템으로 수행한다. 산출물은 통합 시스템 관점과 서버별 내부 관점을 분리해, 서비스 경계가 사라지거나 한 장의 복잡한 도식으로 뭉개지지 않게 구성한다.
+- 컨셉맵·시스템 아키텍처·Feature Map·IA는 공통 상위 관점을 제공하고 필요하면 서버별 상세 페이지를 둔다. 네이밍 사전과 컨벤션은 공통 기준, 저장소별 용례·편차, 서비스 간 계약 용어를 비교할 수 있게 작성한다.
+- 기존 웹 POC와 웹 프론트·백엔드는 계속 조사·변경 범위에서 제외한다. 아직 실제 전수 조사와 draw.io·본 문서 작성은 시작하지 않았으며 애플리케이션 코드와 외부 계약은 변경하지 않았다.
+
+## 웹 제외 앱 서버 통합 구조 조사 완료 (2026-08-31)
+
+- 별도 신규 Jira 없이 Learning Core `develop@d95d18b`, Identity `feat/TMI-116-billing-reservation-exam-saga@8c4f3ca`, Billing `develop@39e424d`를 기준으로 세 앱 서버의 코드·테스트·설정·계약·ADR·현재 상태를 통합 조사했다. 관련 구현 문맥은 `TMI-115`·`TMI-116`이며 Jira 상태는 변경하지 않았다.
+- `docs/architecture/app-server-mentoring.drawio`에 통합 컨셉맵, 시스템 아키텍처, Feature Map, 앱 IA, 세 서비스 상세와 서비스 간 Gap을 포함한 8개 페이지를 작성했다.
+- `APP_SERVER_SYSTEM_OVERVIEW.md`, `APP_SERVER_NAMING_DICTIONARY.md`, `APP_SERVER_CONVENTIONS_AND_CODE_SMELLS.md`, `APP_SERVER_EVOLUTION_CONVERGENCE_REVIEW.md`에 기능 상태, 식별자·suffix 정의, 실제 컨벤션과 위반, 진화수렴 방향·fitness function을 기록했다.
+- 서비스 분리와 data ownership은 대체로 적절하다. 현재 우선순위는 Identity→Billing SigV4 transport 정렬, Billing AttemptGroup consumer와 Learning Core outbox/publisher, saga 운영 gate, AI Callback 인증·strict boundary, Learning Core 내부 capability 분리다.
+- Billing saga는 코드가 구현됐지만 기본 off와 staging gate가 남는다. 10초 챌린지와 AttemptGroup 상태 파이프라인은 계약·계획은 있으나 현재 실행 코드가 없음을 별도 상태로 표시했다.
+- 공개 API·AI·S3·Redis·JWT·Billing wire 계약과 애플리케이션 코드는 변경하지 않았다. draw.io XML 8개 페이지와 whitespace를 검증했으며 코드 변경이 없어 Gradle 테스트는 실행하지 않았다.
+
+## 멘토링 draw.io 문서 사용 안내 (2026-08-31)
+
+- 첨부된 `<mxfile>` 텍스트는 `docs/architecture/app-server-mentoring.drawio`와 동일한 완전한 8페이지 draw.io 문서다.
+- diagrams.net에서 `.drawio` 파일을 직접 열면 하단 페이지 탭으로 통합 컨셉맵, 시스템 아키텍처, Feature Map, 앱 IA와 서비스별 상세 페이지를 이동하며 편집할 수 있다.
+- 이번 안내에서는 애플리케이션 코드와 외부 계약을 변경하지 않았고 Gradle 테스트를 실행하지 않았다.
+
+## 현재 앱 서버 개발 방식 정리 (2026-08-31)
+
+- 별도 Jira 이슈 없이 현재 세 앱 서버의 개발 방식을 계약 우선의 점진적·진화적 개발로 설명했다.
+- 서비스는 Identity·Learning Core·Billing의 business capability와 data ownership으로 나누고, 기능은 vertical slice로 구현하면서 멱등 command, durable state, saga, outbox/inbox, feature flag와 운영 gate를 함께 설계한다.
+- 현재 방향은 무조건 최신 기술을 도입하기보다 기존 앱·AI 계약을 보호하고 장애·중복·재시작에도 같은 결과로 수렴하게 만드는 실용적 구조다.
+- 다음 성숙 단계의 주요 과제는 Learning Core 내부 모듈화, 미완성 event pipeline 종결, cross-service E2E와 tracing·문서 freshness 강화다.
+- 애플리케이션 코드와 외부 계약은 변경하지 않았고 Gradle 테스트는 실행하지 않았다.
+
+## AI 활용 개발 방식 정리 (2026-08-31)
+
+- 별도 Jira 이슈 없이 사용자의 AI 활용 방식을 repository-grounded·artifact-driven·human-in-the-loop 개발로 정리했다.
+- AI가 코드 작성 전에 저장소 전체를 조사해 컨셉맵, 아키텍처, Feature Map, IA, 네이밍·컨벤션·기술 비교 문서로 외재화하고, 사용자가 이를 다시 읽고 직접 옮겨 그리며 이해와 판단을 형성하는 방식이다.
+- AI는 조사자·지도 제작자·리뷰어·구현 보조자이고, 사용자는 범위·제품 의도·계약·우선순위와 최종 승인권을 유지한다.
+- 주의점은 AI 산출물의 근거 확인, 문서와 코드의 동기화, AI에게 이해 자체를 외주화하지 않는 것이다. 애플리케이션 코드와 외부 계약은 변경하지 않았고 Gradle 테스트를 실행하지 않았다.
+
+## AI 개발 루프의 스킬 도입 방향 (2026-08-31)
+
+- 별도 Jira 이슈 없이 공식 OpenAI Codex 스킬 문서를 기준으로 현재 AI 활용 방식에 스킬을 적용하는 방향을 정리했다.
+- 반복되는 저장소 조사·멘토링 산출물 생성, 외부 계약 검증, vertical slice 계획, 출시 준비 검토는 스킬화 가치가 높다.
+- 상시 프로젝트 제약은 `AGENTS.md`, 정확한 계약은 `docs/contracts`, 조건부 절차는 Skill, 결정적 검사는 script로 분리한다. 모든 지식을 하나의 스킬에 복제하지 않는다.
+- 첫 도입은 `repo-cartographer`와 `contract-guardian` 두 개를 작게 만들고 실제 사용 결과로 trigger·입출력·template을 보정한 뒤 나머지를 확장하는 것을 권장한다.
+- 이번 작업에서는 스킬 생성이나 설치, 애플리케이션 코드와 외부 계약 변경을 수행하지 않았고 Gradle 테스트를 실행하지 않았다.
+
+## 토선생 개발 병행 학습 방향 (2026-08-31)
+
+- 별도 Jira 이슈 없이 AI를 활용하면서 직접 코딩 역량을 키우기 위한 프로젝트 내 학습 루프를 정리했다.
+- 실제 기능마다 일부 작은 핵심 로직과 테스트를 사용자가 먼저 작성하고, AI는 질문·힌트·리뷰·실패 사례 생성에 우선 사용한다.
+- 권장 루프는 코드 읽기와 결과 예측 → 30~60분 직접 구현 → AI 리뷰 → 수정 이유 설명 → 다음 날 무자료 재구현 → 주간 회고다.
+- 학습 주제는 Java/Spring 일반론을 넓게 훑기보다 현재 변경과 맞닿은 테스트, 상태 전이, 멱등성, Spring 경계, Mongo transaction·index 등에서 주당 하나씩 선택한다.
+- 애플리케이션 코드와 외부 계약은 변경하지 않았고 Gradle 테스트를 실행하지 않았다.
+
+## AI 구현·별도 학습 이중 트랙 방향 (2026-08-31)
+
+- 별도 Jira 이슈 없이 현재 출시 속도를 유지하기 위해 production 구현은 AI에게 적극 맡기고, 학습은 최근 구현 코드에서 작은 개념을 추출해 별도로 수행하는 방식으로 조정했다.
+- 학습은 프로젝트와 무관한 병렬 강의가 아니라 이번 주 코드의 테스트·상태 전이·Spring·Mongo·멱등성 중 하나를 toy example, 무자료 재구현, 코드 설명으로 연습한다.
+- 권장 최소 리듬은 구현 후 5분 후보 기록, 주 2~3회 20~40분 직접 연습, 주 1회 60분 코드 해부이며 production 일정과 학습 실패를 분리한다.
+- 애플리케이션 코드와 외부 계약은 변경하지 않았고 Gradle 테스트를 실행하지 않았다.
+
+## 코딩 외 최소 학습 범위 (2026-08-31)
+
+- 별도 Jira 이슈 없이 직접 코딩 외에 추가로 유지해야 할 최소 학습 범위를 정리했다.
+- 요구사항·계약·아키텍처·문서화는 현재 AI 협업 과정에서 이미 반복 학습되고 있으므로 별도 커리큘럼보다 현행 산출물 검토를 유지한다.
+- 별도로 강화할 핵심은 디버깅과 운영 관찰이다. 기능별 정상·실패 요청 직접 실행, 주 1회 end-to-end 요청 추적, 월 1회 장애 시나리오 분석을 권장한다.
+- 기반 이론은 전 범위를 미리 공부하기보다 실제 코드와 장애에서 등장한 HTTP, transaction, index, JWT, timeout 등을 just-in-time으로 학습한다.
+- 애플리케이션 코드와 외부 계약은 변경하지 않았고 Gradle 테스트를 실행하지 않았다.
+
+## 긴 개발 문서의 읽기 원칙 (2026-08-31)
+
+- 별도 Jira 이슈 없이 긴 AI 산출물을 모두 정독하는 대신 정독·훑기·필요 시 조회로 계층화하는 방식을 정리했다.
+- 현재 변경의 계약, 결정, 위험, 검증 방법은 정독하고 배경 설명과 대안 비교는 훑으며 네이밍 사전·전체 inventory·과거 WORKLOG는 검색 가능한 reference로 사용한다.
+- 앞으로 AI 문서는 결론, 반드시 읽을 항목, 결정 필요 사항, 위험, 상세 근거의 순서로 작성하도록 요청하는 것이 적절하다.
+- 사용자가 현재 변경의 목적, 보호 계약, 변경 범위, 실패 방식, 검증 방법을 설명할 수 있는지를 정독 완료 기준으로 삼는다.
+- 애플리케이션 코드와 외부 계약은 변경하지 않았고 Gradle 테스트를 실행하지 않았다.
+
+## 10초 챌린지 AI Callback 목적지 확인 (2026-08-31)
+
+- 승인된 v1 계약상 AI는 `POST {LEARNING_CORE_INTERNAL_BASE_URL}/internal/v1/challenges/grading/callback`으로 결과를 전달한다.
+- 필수 header는 AI→Learning Core 전용 `Authorization: Bearer <AI_TO_LEARNING_CORE_CREDENTIAL>`, `X-Challenge-Contract-Version: v1`, `Content-Type: application/json`이다. 사용자 Access Token과 기존 시험 Feedback Callback, `BaseResponse`는 사용하지 않는다.
+- `LEARNING_CORE_INTERNAL_BASE_URL`의 실제 host는 같은 ECS cluster의 private Service Connect 또는 동등한 private discovery 주소를 배포 설정으로 주입해야 하며 요청 Body가 Callback URL을 지정하지 않는다.
+- 현재 `develop`에는 Challenge Callback Controller가 아직 구현·배포되지 않았다. 따라서 경로 계약은 확정됐지만 실제 호출 가능한 base URL과 credential secret 주입은 Challenge backend 배포 전에 환경별로 확정해야 한다.
+- 관련 계약 Jira는 `TMI-102`, `TMI-105`, `TMI-106`이며 이번 확인에서 Jira 상태·애플리케이션 코드·외부 계약은 변경하지 않았다.
+
+## 10초 챌린지 사용자 Token과 서비스 인증 구분 (2026-08-31)
+
+- 앱의 사용자 Access Token은 앱→Learning Core 공개 Challenge API에서만 사용하고 Learning Core가 AI 요청에 전달하지 않는다.
+- Learning Core→AI 평가 요청은 별도 전용 Bearer credential, AI→Learning Core Callback은 그와 다른 방향별 전용 Bearer credential로 인증한다.
+- AI→Learning Core credential은 AI ECS task 환경에 secret store로 주입하므로 AI가 사용자 Token을 알거나 Callback마다 전달받을 필요가 없다.
+- AI 요청과 Callback에는 계약상 `attempt_id`, `job_id`, `grading_attempt` 등 Challenge 작업 식별자만 사용하며 실제 userId와 사용자 Access Token은 포함하지 않는다.
+- 관련 계약 Jira는 `TMI-102`, `TMI-105`, `TMI-106`이며 이번 설명에서 코드·계약·Jira 상태는 변경하지 않았다.
+- 종료 훅 기준으로도 사용자 Access Token 비전달, 방향별 service credential의 ECS secret 주입 원칙을 유지하며 실제 credential 값은 기록하지 않았다.
+
+## Billing TMI-117 완료 확인과 Learning Core 후속 작업 (2026-08-31)
+
+- Billing `develop@37a3e1d`에 PR `#4`의 TMI-117 feature commit `96a5727`이 merge됐고 Jira `TMI-117`은 완료 상태다. `POST /internal/v1/attempt-group-events`, strict schema v1 decoder, inbox 멱등성, active Session fencing, Mongo Transaction/CAS, 보안·관측성·replica-set 테스트가 구현돼 있다.
+- Billing 기록상 `./gradlew clean test` 전체 137개가 성공했으며 merge diff의 `git diff --check`도 통과했다. 현재 Learning Core에는 AttemptGroup outbox/writer/publisher가 아직 없다.
+- 다음 개발 대상은 Learning Core의 `AttemptGroupStatusChanged` durable outbox와 lease 기반 SigV4 publisher다. `GRADING`, `COMPLETED`, `RETAKE_AVAILABLE` 판정과 outbox 생성을 local state transition과 같은 Mongo Transaction/CAS로 묶고 Session당 terminal event 하나만 허용해야 한다.
+- Billing consumer 코드는 준비됐으므로 Learning Core 개발은 시작할 수 있다. 다만 Billing consumer가 staging에 먼저 배포·활성화되고 Lattice/IAM/SG route가 검증되기 전에는 Learning Core publisher를 활성화하지 않는다.
+- 현재 TMI-116 예외 범위는 AttemptGroup outbox/publisher를 명시적으로 제외하므로 TMI-117을 재사용하지 않고 Learning Core 전용 PLAN·신규 Jira와 해당 작업의 명시적 허용 범위를 먼저 확정해야 한다.
+- 이번 확인에서 Learning Core/Billing 애플리케이션 코드, Jira, AWS와 Git commit/push는 변경하지 않았다.
+
+## AttemptGroup outbox DELIVERED·DEAD_LETTER 보존 근거 (2026-08-31)
+
+- `DELIVERED` 30일은 Learning Core 발행과 Billing 수신을 eventId·traceId로 대조하고, 응답 유실·중복·상태 불일치 사고를 조사할 수 있는 짧은 운영 증거 기간이다. 정상 전달된 문서를 영구 보존하지 않아 저장 비용과 userId/sessionId 보유 기간을 제한한다.
+- `DEAD_LETTER` 90일은 계약 오류·관계 충돌·인증 장애처럼 자동 재시도가 중단된 미해결 event를 조사·수정하고 같은 eventId/payload로 수동 replay할 시간을 더 길게 제공한다. 해결되지 않은 event를 정상 전달 문서보다 먼저 삭제하면 Billing projection 복구 근거를 잃는다.
+- Billing inbox의 보존 기간이 120일이므로 30일·90일은 그보다 짧다. 이 기간 안의 replay는 Billing의 same eventId/digest 멱등성 창 안에서 안전하게 수렴한다.
+- `PENDING`은 아직 전달되지 않은 업무 event이므로 TTL 삭제하지 않는다. 보존 기간은 authorization이나 업무 상태의 근거가 아니라 운영 기본값이며, on-call 대응 SLA·감사·개인정보 정책에 따라 계약 변경 절차로 조정할 수 있다.
+- 관련 작업은 Billing `TMI-117`과 후속 Learning Core outbox/publisher이며 이번 설명에서 코드·Jira·계약값은 변경하지 않았다.
+
+## 세 앱 서버 문서 계층·완료 보고 규칙 (2026-08-31)
+
+- 별도 Jira 없이 Learning Core·Identity·Billing `AGENTS.md`에 공통 문서 가독성 및 구현 완료 보고 규칙을 반영했다.
+- 계획·조사·분석·리뷰 문서는 5줄 결론 → 반드시 읽을 내용 → 사용자 결정 → 위험·미확인 → 현재 작업 설명 → 상세 근거 부록 순서로 작성하고 파일 근거와 구현 사실·계획·추론을 구분한다.
+- 구현 완료 후에는 변경 파일·동작, 유지/변경 외부 계약, 테스트와 결과, 남은 위험, 배포 전 확인, 예상 밖 diff, 다음 확인 사항을 빠짐없이 보고한다.
+- 애플리케이션 코드와 외부 계약은 변경하지 않았다. 규칙·기록 문서 변경만 있어 Gradle 테스트는 실행하지 않고 세 저장소 `git diff --check`로 검증한다.
+
+## IntelliJ 학습 프로젝트 구성 방향 (2026-09-01)
+
+- 별도 Jira 없이 토선생 학습용 프로젝트는 Java 21+Gradle+JUnit의 가벼운 `java-lab`으로 시작하는 방향을 권고했다.
+- 상태 전이·검증·멱등성·테스트는 Spring 없이 연습하고, Spring MVC·DI·Validation·Transaction·Repository가 학습 대상일 때만 `spring-lab`을 별도로 추가한다.
+- production 저장소에 연습 코드를 섞지 않고 MongoDB·Redis·AWS 같은 운영 의존성도 처음부터 추가하지 않는다.
+- 실제 학습 프로젝트는 아직 생성하지 않았으며 Learning Core 애플리케이션과 외부 계약은 변경하지 않았다.
+
+## AttemptGroup 분산 trace·구조화 관측 계약 검토 (2026-08-31)
+
+- 관련 완료 이슈는 Billing `TMI-117`이며 Learning Core outbox/publisher 후속 Jira는 아직 없다. 제안한 W3C Trace Context, baggage 제외, event payload·digest와 trace metadata 분리, publish attempt별 새 span, trace 장애 시 업무 전달 계속 원칙은 타당하다.
+- outbox에는 raw inbound header 대신 검증된 `traceId`, parent `spanId`, `traceFlags`만 transport metadata로 저장하는 것을 v1 기본안으로 권장한다. `tracestate`는 실제 backend 요구가 생기기 전에는 저장하지 않고, 필요해지면 W3C propagator 검증·크기 제한·로그 금지를 적용한다.
+- 모든 재시도에서도 동일 traceId가 필수라면 각 publish attempt를 저장된 origin context의 자식인 sibling span으로 생성해야 한다. OpenTelemetry link만 사용하면 새 traceId가 될 수 있으므로 `parent 또는 link`라는 선택지는 계약에서 제거하거나 traceId 연속성 요구를 완화해야 한다.
+- Billing은 현재 inbound W3C traceId를 이어받지만 production code에서 `attempt_group_event_consume`라는 별도 span을 만들지는 않는다. 정확한 span 이름이 계약이면 HTTP server span 아래 별도 internal span 또는 ObservationConvention을 추가해야 하며, 로그의 `operation` 값과 span name을 구분해야 한다.
+- 401/403은 개별 event의 영구 payload 실패가 아니라 전역 인증 설정 장애이므로 즉시 DEAD_LETTER 처리하지 않고 `BLOCKED_AUTH` 또는 PENDING+긴 backoff와 publisher circuit/alert로 격리한 뒤 같은 eventId로 재개하는 안을 권장한다. `invalid_trace_context`는 delivery outcome이 아니라 missing/invalid 고정 counter로 기록한다.
+- SigV4와 tracing의 header mutation 순서를 계획에 고정해야 한다. 최종 publish/client span context를 inject한 뒤 SigV4 서명하고 이후 `traceparent`를 변경하지 않거나, trace header를 서명 대상에서 명시적으로 제외해야 한다. 자동 HTTP client instrumentation이 context를 재주입해 서명을 깨거나 예상 span 계층을 바꾸지 않는 contract test가 필요하다.
+- Learning Core에는 아직 tracing bridge와 AttemptGroup publisher가 없고 현재 TMI-116 예외는 이 범위를 명시적으로 제외한다. 구현 전 신규 Learning Core Jira·PLAN·AGENTS 예외를 만들고, 이번 검토 보정사항과 필수 테스트를 반영해야 한다.
+- 이번 작업은 분석 및 기록 문서 갱신만 수행했다. 애플리케이션 코드·공개 API·event JSON·Billing 코드·AWS·Jira·Git commit/push는 변경하지 않았고 Gradle 테스트는 실행하지 않았다.
+
+## AttemptGroup publish 재시도 span 관계 설명 (2026-08-31)
+
+- 관련 완료 이슈는 Billing `TMI-117`이며 Learning Core 후속 Jira는 아직 없다. 하나의 `traceId`는 사건 전체의 폴더 번호, 각 `spanId`는 origin·publish 시도·Billing 처리 같은 개별 작업 번호로 설명했다.
+- 최초 publish와 재시도를 모두 저장된 origin span의 자식으로 만들면 publish attempt들이 sibling이 되고 같은 traceId 안에서 서로 다른 spanId를 가진다. 재시도를 직전 실패 attempt의 자식으로 만들지 않아 독립된 재시도라는 의미도 유지한다.
+- OpenTelemetry link는 다른 trace에서 원본 trace를 참조할 수 있게 하는 연결일 뿐 같은 traceId를 상속시키지 않는다. 따라서 “모든 재시도와 Billing 처리를 같은 traceId로 검색”하는 현재 목표에는 parent 관계가 필요하다.
+- origin context가 없을 때도 이후 재시도까지 같은 traceId가 필요하다면 첫 전송 전에 fallback delivery root context를 한 번 생성·보존하고 각 attempt를 그 자식으로 만들어야 한다. 그렇지 않으면 missing-context 재시도마다 새 trace가 생길 수 있다.
+- 설명과 기록 문서만 갱신했으며 애플리케이션·외부 계약·Billing 코드·AWS·Jira·Git commit/push는 변경하지 않았다. 코드 변경이 없어 Gradle 테스트는 실행하지 않았다.
+
+## AttemptGroup 서비스 경계 span 설명 종료 상태 (2026-08-31)
+
+- 관련 완료 이슈는 Billing `TMI-117`이며 Learning Core 후속 Jira는 아직 없다.
+- 최종 설명은 서비스 경계마다 기존 spanId를 변경하는 것이 아니라 같은 traceId를 상속한 새 spanId를 생성한다는 것이다.
+- Billing의 W3C trace 연결은 현재 동작하지만 `attempt_group_event_consume`은 로그 operation일 뿐 production span name으로 고정되지 않았다. 명확한 업무 단계가 필요하면 HTTP server span 아래 별도 internal span을 추가한다.
+- 애플리케이션·외부 계약·Billing 코드·AWS·Jira·Git commit/push는 변경하지 않았으며 코드 변경이 없어 Gradle 테스트를 실행하지 않았다.
+
+## AttemptGroup 서비스 경계 span과 Billing span name 설명 (2026-08-31)
+
+- 관련 완료 이슈는 Billing `TMI-117`이며 Learning Core 후속 Jira는 아직 없다. 새로운 서버나 처리 단계로 넘어갈 때 기존 spanId를 수정하는 것이 아니라 같은 traceId 아래 새로운 span과 새로운 spanId를 생성한다는 의미로 정리했다.
+- 현재 Billing은 inbound `traceparent`를 통해 Learning Core와 같은 traceId를 이어받고 새로운 HTTP server spanId도 자동 생성하므로 분산 trace 연결 자체는 동작한다.
+- 다만 Billing trace 화면의 실제 span name은 Spring HTTP server 관측 이름일 수 있고 로그의 `operation=attempt_group_event_consume` 값이 자동으로 span name이 되지는 않는다.
+- 업무 처리 단계를 명확히 보이게 하려면 Billing HTTP server span 아래 `attempt_group_event_consume` internal span을 하나 더 생성하는 안을 권장한다. 그러면 HTTP 수신과 실제 event 처리 시간이 분리된다.
+- 설명과 기록 문서만 갱신했으며 애플리케이션·외부 계약·Billing 코드·AWS·Jira·Git commit/push는 변경하지 않았다. 코드 변경이 없어 Gradle 테스트는 실행하지 않았다.
+
+## AttemptGroup outbox trace metadata 저장 방식 설명 (2026-08-31)
+
+- 관련 완료 이슈는 Billing `TMI-117`이며 Learning Core 후속 Jira는 아직 없다. 동일한 사건은 하나의 `traceId`로 묶고 origin·publish attempt·Billing consume은 서로 다른 `spanId`로 구분한다는 이해를 재확인했다.
+- W3C `traceparent`는 version, traceId, 현재 spanId와 flags를 한 문자열로 포장한 전송용 header다. outbox에는 외부에서 받은 문자열을 그대로 저장하지 않고 propagator가 검증·분해한 `traceId`, parent `spanId`, `traceFlags`만 transport metadata로 보존한다.
+- publisher는 저장 metadata로 parent context를 복원한 뒤 새 publish spanId를 만들고, 같은 traceId와 새 spanId가 담긴 새로운 `traceparent`를 HTTP 요청에 inject한다. 원본 header를 replay하면 publish span이 trace에서 사라지는 문제가 생긴다.
+- trace metadata는 event JSON·canonical digest·idempotency key와 분리하고 baggage는 저장하지 않는다. v1에서는 필요성이 확인되지 않은 `tracestate`도 생략하는 권장안을 유지한다.
+- 설명과 기록 문서만 갱신했으며 애플리케이션·외부 계약·Billing 코드·AWS·Jira·Git commit/push는 변경하지 않았다. 코드 변경이 없어 Gradle 테스트는 실행하지 않았다.
+
+## AttemptGroup Billing 업무 span과 인증 장애 처리 설명 (2026-08-31)
+
+- 관련 완료 이슈는 Billing `TMI-117`이며 Learning Core 후속 Jira는 아직 없다.
+- 3번은 로그 내용을 더 길게 만드는 작업이 아니라 Billing HTTP server span 아래 `attempt_group_event_consume` 업무 span을 추가해 trace timeline에서 HTTP 수신과 decode·DB 반영 시간 및 실패 위치를 구분하는 관측성 보완이다.
+- 4번은 400·409·422처럼 event 자체가 잘못된 영구 오류와 401·403처럼 IAM·SigV4·route 등 publisher 전역 인증 설정이 잘못된 장애를 분리하는 정책이다.
+- 401·403에서는 개별 event를 DEAD_LETTER로 보내지 않고 `auth_failure`를 기록·경보하며 publisher circuit을 열고 event를 `BLOCKED_AUTH` 또는 장기 backoff PENDING으로 보존한다. 인증 복구 후 같은 eventId로 재개한다.
+- 설명과 기록 문서만 갱신했으며 애플리케이션·외부 계약·Billing 코드·AWS·Jira·Git commit/push는 변경하지 않았다. 코드 변경이 없어 Gradle 테스트를 실행하지 않았다.
+
+## AttemptGroup span 추가와 오류 분류 의미 재확인 (2026-08-31)
+
+- 관련 완료 이슈는 Billing `TMI-117`이며 Learning Core 후속 Jira는 아직 없다.
+- 3번은 로그 line을 append하는 것이 아니라 기존 Billing HTTP server span 아래 `attempt_group_event_consume` internal span 하나를 추가하는 것이다. 구조화 로그 필드는 늘리지 않는다.
+- 시간 분리는 Learning Core publish/client span, Billing HTTP server span과 Billing consume span을 함께 비교해 판단한다. consume span은 decode·멱등성 판단·Mongo 반영이라는 업무 처리 구간을 나타낸다.
+- 4번은 오류 이름만 자세히 나누는 것이 아니라 HTTP category별 상태 전이와 후속 행동을 고정한다. network·408·425·429·5xx는 retry, 400·409·422는 DEAD_LETTER, 401·403은 전역 auth 차단·경보·복구 후 재개로 처리한다.
+- 설명과 기록 문서만 갱신했으며 애플리케이션·외부 계약·Billing 코드·AWS·Jira·Git commit/push는 변경하지 않았다. 코드 변경이 없어 Gradle 테스트를 실행하지 않았다.
+
+## AttemptGroup span·오류 분류 설명 종료 상태 (2026-08-31)
+
+- 관련 완료 이슈는 Billing `TMI-117`이며 Learning Core 후속 Jira는 아직 없다.
+- 최종 이해는 3번이 로그 추가가 아닌 Billing consume internal span 추가이고, 4번이 오류별 명칭뿐 아니라 retry·dead-letter·auth-block 후속 동작까지 구분하는 정책이라는 것이다.
+- 애플리케이션·외부 계약·Billing 코드·AWS·Jira·Git commit/push는 변경하지 않았으며 코드 변경이 없어 Gradle 테스트를 실행하지 않았다.
+
+## AttemptGroup trace header와 SigV4 순서 설명 (2026-08-31)
+
+- 관련 완료 이슈는 Billing `TMI-117`이며 Learning Core 후속 Jira는 아직 없다.
+- 5번은 publisher가 새 span을 만든 뒤 최종 `traceparent`를 요청에 붙이고, 그 완성된 요청을 SigV4로 서명한 다음 header를 변경하지 않고 전송하도록 순서를 고정하는 것이다.
+- SigV4 서명 뒤 자동 tracing instrumentation이 `traceparent`를 새로 쓰면 Billing이 받은 요청과 서명 대상이 달라져 401·403 인증 실패가 날 수 있다. 따라서 이 client의 trace inject 소유자는 하나로 제한한다.
+- 재시도마다 새 publish spanId와 시각이 생기므로 eventId·payload는 유지하되 `traceparent`와 SigV4 서명은 매번 새로 생성한다. 서명된 HTTP 요청 자체를 재사용하지 않는다.
+- 설명과 기록 문서만 갱신했으며 애플리케이션·외부 계약·Billing 코드·AWS·Jira·Git commit/push는 변경하지 않았다. 코드 변경이 없어 Gradle 테스트를 실행하지 않았다.
+
+## AttemptGroup SigV4 순서 설명 종료 상태 (2026-08-31)
+
+- 관련 완료 이슈는 Billing `TMI-117`이며 Learning Core 후속 Jira는 아직 없다.
+- 최종 원칙은 publish span과 `traceparent`를 먼저 확정하고 SigV4로 서명한 뒤 전송 전 header를 변경하지 않는 것이다. 재시도는 같은 eventId·payload를 유지하면서 새 span과 새 서명을 생성한다.
+- 애플리케이션·외부 계약·Billing 코드·AWS·Jira·Git commit/push는 변경하지 않았으며 코드 변경이 없어 Gradle 테스트를 실행하지 않았다.
+
+## AttemptGroup SigV4 최종 단계 확인 (2026-08-31)
+
+- 관련 완료 이슈는 Billing `TMI-117`이며 Learning Core 후속 Jira는 아직 없다.
+- SigV4는 URI·method·body·일반 header와 `traceparent`가 모두 확정된 뒤 전송 직전의 마지막 논리적 변경 단계에서 수행한다.
+- 서명 후 SDK signed request를 실제 HTTP request로 변환하는 작업은 가능하지만 서명된 header·body·path를 변경하거나 자동 tracing이 `traceparent`를 다시 inject해서는 안 된다.
+- 설명과 기록 문서만 갱신했으며 애플리케이션·외부 계약·Billing 코드·AWS·Jira·Git commit/push는 변경하지 않았다. 코드 변경이 없어 Gradle 테스트를 실행하지 않았다.
+
+## AttemptGroup SigV4 마지막 서명 원칙 종료 상태 (2026-08-31)
+
+- 관련 완료 이슈는 Billing `TMI-117`이며 Learning Core 후속 Jira는 아직 없다.
+- 최종 확인은 URL·method·body·header와 `traceparent`를 먼저 확정하고 SigV4 서명을 마지막 논리적 변경 단계로 수행한 뒤 요청을 변경하지 않고 전송한다는 것이다.
+- 애플리케이션·외부 계약·Billing 코드·AWS·Jira·Git commit/push는 변경하지 않았으며 코드 변경이 없어 Gradle 테스트를 실행하지 않았다.
+
+## AttemptGroup 분산 trace 계약 최종 확정 판단 (2026-08-31)
+
+- 관련 완료 이슈는 Billing `TMI-117`이며 Learning Core 후속 Jira는 아직 없다. 지금까지 검토한 trace propagation·span·오류 분류·SigV4 원칙은 권장안 기준으로 계약을 동결할 수 있는 상태다.
+- 동일 traceId와 단계별 새 spanId, origin 공통 parent의 retry sibling, 검증된 `traceId`·`parentSpanId`·`traceFlags` outbox metadata, baggage·raw header·v1 tracestate 제외를 확정안으로 둔다.
+- Learning Core는 publish attempt별 `attempt_group_outbox_publish` span, Billing은 HTTP server span 아래 `attempt_group_event_consume` internal span을 사용한다. missing/invalid context는 최초 fallback trace anchor를 CAS로 한 번 보존하고 counter 후 delivery를 계속한다.
+- publisher outcome은 `delivered`, `retry_scheduled`, `dead_letter`, `auth_failure`, `lease_lost`로 고정하고 `temporary_failure`는 제거한다. network·408·425·429·5xx는 retry, 400·409·422는 dead-letter, 401·403은 `BLOCKED_AUTH`·전역 circuit·alert·복구 후 재개다.
+- 최종 요청에 trace header를 inject한 뒤 SigV4를 마지막 논리적 변경 단계에서 수행하며, 재시도마다 같은 eventId·payload와 새 span·새 서명을 사용한다. 구현 전 Learning Core 신규 Jira·PLAN·AGENTS 명시적 예외가 필요하다.
+- 이번 판단은 분석과 기록 갱신만 수행했으며 애플리케이션·외부 계약·Billing 코드·AWS·Jira·Git commit/push는 변경하지 않았다. 코드 변경이 없어 Gradle 테스트를 실행하지 않았다.
+
+## AttemptGroup 분산 trace 계약 동결 종료 상태 (2026-08-31)
+
+- 관련 완료 이슈는 Billing `TMI-117`이며 Learning Core 후속 Jira는 아직 없다.
+- trace context 저장·재시도 span·Billing consume span·오류별 상태와 행동·SigV4 최종 서명 순서를 포함한 관측 계약을 권장안으로 동결했다.
+- 다음 단계는 Learning Core 신규 Jira·PLAN과 AGENTS 명시적 예외 작성이며 이번 작업에서는 애플리케이션 코드·외부 계약·AWS·Jira·Git commit/push를 변경하지 않았다.
+
+## AttemptGroup trace Billing 전달 범위 확인 (2026-08-31)
+
+- 관련 완료 이슈는 Billing `TMI-117`이며 Billing 보완 또는 Learning Core 후속 Jira는 아직 없다.
+- Billing은 W3C-only propagator, inbound traceId 연속성, 고정 구조화 로그와 저카디널리티 metric이 이미 구현돼 있어 event JSON·endpoint·status 계약 변경은 필요 없다.
+- Billing 필수 보완은 production HTTP server span 아래 `attempt_group_event_consume` internal span을 실제 decode·service 처리 범위에 생성하고, 현재 테스트의 수동 span이 아니라 실제 controller 요청에서 같은 traceId·서로 다른 spanId·정확한 span name을 검증하는 것이다.
+- 401·403의 `BLOCKED_AUTH`·circuit·재개와 trace inject 후 SigV4 최종 서명은 Learning Core publisher 책임이다. Billing은 인증 실패 status를 안정적으로 반환하고 raw trace header·payload·식별자·credential을 log/span/metric에 남기지 않는 기존 경계를 유지한다.
+- 선택 보완으로 missing·invalid를 함께 기록하는 metric 이름의 의미를 명확히 하고 baggage 미전파와 inner span 예외 종료·민감정보 비기록 테스트를 추가할 수 있다. exporter/backend·dashboard·alert는 별도 운영 범위다.
+- 이번 확인은 읽기 전용 분석과 기록 갱신만 수행했으며 Billing·Learning Core 애플리케이션, 외부 계약, AWS, Jira와 Git commit/push를 변경하지 않았다. 코드 변경이 없어 Gradle 테스트를 실행하지 않았다.
+
+## AttemptGroup trace Billing 전달 종료 상태 (2026-08-31)
+
+- 관련 완료 이슈는 Billing `TMI-117`이며 Billing 보완과 Learning Core 후속 Jira는 아직 없다.
+- Billing 전달 필수사항은 production `attempt_group_event_consume` internal span과 실제 Controller 기반 trace/span contract test이며 endpoint·event payload·status 계약 변경은 없다.
+- Learning Core 전용 outbox·retry·auth-block·SigV4 책임과 Billing 보완 범위를 분리해 전달했으며 이번 작업에서는 애플리케이션 코드·AWS·Jira·Git commit/push를 변경하지 않았다.
+
+## Billing AttemptGroup consume span 구현 확인과 Learning Core 다음 작업 (2026-09-01)
+
+- 관련 완료 이슈는 Billing `TMI-117`이며 Learning Core outbox/publisher 후속 Jira는 아직 없다.
+- Billing 로컬 `develop@37a3e1d`의 미커밋 변경에서 production Controller가 strict decode와 service 처리를 `attempt_group_event_consume` span으로 감싸고, Micrometer helper가 정상·RuntimeException·Error 경로에서 span을 종료·오류 기록하는 구현을 확인했다.
+- embedded Tomcat 통합 테스트는 same inbound traceId, HTTP SERVER와 INTERNAL consume의 서로 다른 spanId·descendant 관계, 정확한 span name, decoder/service scope, baggage 미전파, 정상·409 예외 종료와 금지 attribute 부재를 검증한다.
+- Billing 현재 작업 트리에서 `./gradlew clean test`를 재실행해 138개 성공, 실패·오류·skip 0을 확인했고 `git diff --check`도 통과했다. 다만 변경은 아직 commit·push·PR·merge되지 않아 배포 가능한 저장소 상태는 아니다.
+- 다음 즉시 순서는 Billing trace 보완 commit·PR·merge·consumer 배포 후 Learning Core 신규 Jira·PLAN·AGENTS 예외를 확정하는 것이다. 그 다음 Exam 상태 전이와 같은 Mongo Transaction/CAS에서 `GRADING` 또는 terminal outbox를 저장하고 lease publisher가 W3C span·SigV4로 Billing에 전달하도록 구현한다.
+- 구현 계획에서는 GRADING의 정확한 local trigger, COMPLETED evidence 세 boolean의 source of truth, RETAKE_AVAILABLE failureCode mapping과 Session당 terminal event 하나의 불변식을 코드 경계에 매핑해야 한다. publisher feature flag는 기본 off로 유지한다.
+- 이번 작업은 Billing 읽기 전용 검토와 Learning Core 기록 갱신만 수행했다. Billing·Learning Core 애플리케이션, 공개 API·AI·S3·Redis·event wire, AWS, Jira와 Git commit/push는 변경하지 않았다.
+
+## Billing consume span 검증 종료 상태 (2026-09-01)
+
+- 관련 완료 이슈는 Billing `TMI-117`이며 Learning Core 후속 Jira는 아직 없다.
+- Billing 로컬 구현과 전체 138개 테스트 성공을 확인했으나 변경은 미커밋이므로 commit·PR·merge·배포가 선행돼야 한다.
+- 이후 Learning Core 신규 Jira·PLAN·AGENTS 예외를 만들고 Exam 상태와 outbox 동시 저장 및 lease·W3C·SigV4 publisher를 구현하는 순서로 확정했다.
+
+## Billing trace 보완 merge 확인과 Learning Core outbox 계획 (2026-09-01)
+
+- Billing `develop`과 `origin/develop`은 PR #5 merge commit `a34766e`로 일치하고 작업 트리는 clean이다. `b1f6fbd`의 production `attempt_group_event_consume` span, 실제 HTTP trace/span·baggage·privacy·오류 테스트가 병합돼 Learning Core publisher의 consumer-first 선행 조건을 충족했다.
+- `docs/codex/ATTEMPT_GROUP_OUTBOX_PUBLISHER_IMPLEMENTATION_PLAN.md`를 추가했다. 모든 필수 retry 0 submit의 GRADING, strict 결과·점수·Summary evidence의 COMPLETED, 최종 복구 실패의 RETAKE_AVAILABLE을 ExamSession 상태와 outbox의 동일 Mongo Transaction/CAS로 만들고 Session당 terminal event 하나를 보장하는 계획이다.
+- publisher는 lease 기반 multi-instance claim, same eventId/canonical payload retry, DELIVERED 30일·DEAD_LETTER 90일·미전달/BLOCKED_AUTH 무TTL, W3C same trace/different span, trace inject 뒤 SigV4 최종 서명을 사용한다.
+- 구현 전 신규 Learning Core Jira와 현재 TMI-116 제외 범위를 해소하는 `AGENTS.md` 명시적 예외가 필요하다. 사용자 확정이 필요한 핵심값은 권장 `GRADING` deadline `PT30M`이고, 신규 Billing-linked Session의 Summary source는 `exam_summaries` only를 권장한다.
+- 이번 작업은 Billing 읽기 전용 merge 확인과 Learning Core 계획·상태·작업 기록 문서만 변경했다. 애플리케이션, 공개 API·AI·S3·Redis·Billing event wire, AWS, Jira와 Git commit/push는 변경하지 않았다.
+
+## AttemptGroup 구현 전 선택지 정리 (2026-09-01)
+
+- 관련 선행 이슈는 Billing `TMI-117`이며 Learning Core 신규 구현 Jira는 아직 없다.
+- 구현 전 필수 선택을 GRADING deadline, 최종 실패 확정 방식, Summary 완료 source로 구분했다. 권장 조합은 `PT30M`, 완료 evidence 우선 뒤 retry 소진·정합성 오류를 즉시 terminal 처리하고 deadline을 정체 safety net으로 사용하는 단계적 확정, 신규 Billing-linked Session의 `exam_summaries` only다.
+- 운영 활성화 전 선택은 401/403 인증 복구와 기존 linked Session backfill이다. 권장안은 `BLOCKED_AUTH`·전역 circuit 뒤 15분마다 한 event만 half-open probe하고, 기존 Session은 전체 자동 스캔 대신 inventory/dry-run 후 allowlist backfill하는 방식이다.
+- poll 1초, batch 20, lease 30초와 writer/publisher 기본 off는 설정으로 조절 가능한 기술 기본값이므로 별도 제품 결정 없이 권장값으로 둘 수 있다.
+- 선택지·장단점은 `docs/codex/ATTEMPT_GROUP_OUTBOX_PUBLISHER_IMPLEMENTATION_PLAN.md` 3절에 반영했다. 애플리케이션, 외부 계약, AWS, Jira와 Git commit/push는 변경하지 않았다.
+
+## AttemptGroup 정책 확정과 AGENTS 영구 허용 (2026-09-01)
+
+- 관련 선행 이슈는 Billing `TMI-117`이며 Learning Core 구현 Jira는 아직 생성되지 않았다.
+- 사용자가 `1B·2C·3A·4A·5C`를 승인했다. GRADING deadline은 `PT30M`, 완료 evidence 우선·retry 소진과 정합성 오류 즉시 종료·deadline safety net의 단계적 실패 확정, 신규 Billing-linked `exam_summaries` only, 401/403의 15분 단일 half-open, inventory/dry-run 후 allowlist backfill이 확정값이다.
+- 특정 Jira에만 묶인 예외를 반복하지 않고 `AGENTS.md`에 AttemptGroup 상태 판정·durable outbox·lease publisher·제한된 reconciliation·RETAKE replacement 연결을 영구 허용하는 규칙을 추가했다. 신규 Jira는 범위 허가가 아니라 작업 추적과 완료 관리 목적으로 생성하면 된다.
+- 영구 허용은 Learning Core 내부 구현에만 적용한다. 공개 API·AI·S3·Redis 계약, Billing consumer/저장소, UserMerged·owner rebind·결제 보상, 실제 AWS 리소스 생성·배포는 범위 밖이다.
+- 계획서의 정책 상태, Phase 0과 완료 조건을 영구 허용 기준으로 갱신했다. 애플리케이션·AWS·Jira·Git commit/push와 Secret/Token은 변경하지 않았다.
+
+## TMI-118 AttemptGroup outbox/publisher Jira 생성 (2026-09-01)
+
+- Learning Core 후속 구현 Jira `TMI-118` `[Learning Core] AttemptGroup durable outbox/publisher 구현`을 `작업` 유형, 상태 `해야 할 일`로 생성했다.
+- 이슈에는 GRADING/COMPLETED/RETAKE_AVAILABLE 판정, `PT30M` 단계적 실패 확정, strict `exam_summaries` evidence, Session당 terminal 하나, Mongo Transaction/CAS, lease·retry·retention·BLOCKED_AUTH, W3C trace와 최종 SigV4, RETAKE replacement 연결과 전체 완료 조건을 기록했다.
+- 선행 이슈 `TMI-116`과 `TMI-117`, 공개 API·AI·S3·Redis 계약 불변, Billing·결제·인프라 제외 범위와 production 활성화 gate를 명시했다.
+- 계획서의 Jira 상태와 Phase 0·완료 체크리스트를 `TMI-118` 기준으로 갱신했다. 애플리케이션 구현, AWS 리소스와 Git commit/push는 수행하지 않았다.
+
+## TMI-118 Jira 생성 종료 기록 동기화 (2026-09-01)
+
+- `TMI-118` `[Learning Core] AttemptGroup durable outbox/publisher 구현`은 `작업` 유형과 `해야 할 일` 상태로 생성 완료됐다.
+- 확정 정책, 구현·제외 범위, 완료 조건과 production 활성화 제한은 Jira와 `docs/codex/ATTEMPT_GROUP_OUTBOX_PUBLISHER_IMPLEMENTATION_PLAN.md`에 동기화돼 있다.
+- 이번 종료 동기화는 CURRENT_STATE와 WORKLOG marker 보완만 수행했으며 애플리케이션·AWS·Jira 내용·Git commit/push와 Secret/Token은 변경하지 않았다.
