@@ -69,11 +69,18 @@ public class AttemptGroupStateCoordinator {
             throw new IllegalStateException("AttemptGroup writer requires Mongo transactions");
         }
         try {
-            transactions.executeWithoutResult(status -> reconcileInTransaction(examId));
+            transactions.executeWithoutResult(status -> reconcileWithinTransaction(examId));
         } catch (DuplicateKeyException | OptimisticLockingFailureException race) {
             // The unique event slot and ExamSession version make concurrent writers converge.
             log.debug("AttemptGroup 상태 동시 전환 감지 outcome=converged");
         }
+    }
+
+    void reconcileWithinTransaction(String examId) {
+        if (!properties.writerEnabled()) {
+            return;
+        }
+        reconcileInTransaction(examId);
     }
 
     public boolean manages(String examId) {

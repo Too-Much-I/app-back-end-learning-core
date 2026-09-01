@@ -4563,6 +4563,22 @@
 - 유지 계약: 기존 공개 API URL·Method·Request/Response·`BaseResponse`, AI `user_id=examId`, callback, retryCount, S3와 Redis 계약은 변경하지 않았다. Billing 저장소·AWS·Jira·Git commit/push도 변경하지 않았다.
 - 남은 위험: Mock 기반 테스트이므로 실제 Mongo replica set의 transient transaction label·unknown commit failure injection, VPC Lattice/IAM/SG 연결과 staging reserve/commit/confirm/status E2E는 운영 활성화 전에 별도로 검증해야 한다. PR에는 기존에 섞인 비용 추정·10초 챌린지 등 TMI-116 무관 문서를 selective staging 또는 별도 commit으로 분리해야 한다.
 
+## 2026-09-01 — TMI-118 Jira 완료 전환
+
+<!-- codex-turn:01a05b67-4319-7441-a178-1d8d7333970f -->
+
+- 날짜: 2026-09-01
+- 현재 브랜치: `develop`
+- Jira: `TMI-118` `[Learning Core] AttemptGroup durable outbox/publisher 구현`
+- 수행 작업: Jira의 현재 상태와 workflow transition을 확인하고 사용자 요청에 따라 transition ID 41 `완료`를 적용했다.
+- Jira 결과: TMI-118이 `해야 할 일`에서 `완료`로 전환됐으며 Jira 응답의 status category가 `done`임을 확인했다.
+- Git 확인: 구현 commit `63d0f7d`은 로컬·원격 `feat/TMI-118-attempt-group-outbox-publisher`에 존재한다. `git merge-base --is-ancestor 63d0f7d develop` 결과는 false이므로 현재 develop에는 아직 병합되지 않았다.
+- 판단: Jira는 사용자 요청대로 완료 상태로 유지한다. feature branch의 PR/merge와 production writer 활성화는 Jira 상태 전환과 별개의 후속 단계다.
+- 변경 파일: 상태 기록을 위해 `docs/codex/CURRENT_STATE.md`, `docs/codex/WORKLOG.md`만 수정했다. 애플리케이션·테스트·설정 코드는 변경하지 않았다.
+- 유지한 계약: 공개 API, BaseResponse, AI·S3·Redis와 Billing schema v1을 변경하지 않았다.
+- 테스트·검증: 애플리케이션 변경이 없어 Gradle 테스트를 다시 실행하지 않았다. 문서 변경은 `git diff --check`와 marker 1회 확인으로 검증한다.
+- 보안·범위: Secret·Token과 사용자·Session 식별값을 기록하지 않았다. DB·AWS·Git commit·push·PR·merge·배포는 변경하지 않았고 Jira 상태 전환 외의 외부 변경은 없다.
+
 ## 2026-08-31 — TMI-116 로컬 develop 반영 확인
 
 <!-- codex-turn:01a0561a-135f-70c2-982b-dbf9eab4b0b1 -->
@@ -6351,3 +6367,164 @@
 - 유지한 계약: 공개 API, BaseResponse, AI·S3·Redis와 Billing schema v1을 변경하지 않았다.
 - 테스트·검증: 설명 문서만 변경해 Gradle 테스트를 다시 실행하지 않았으며 직전 전체 439개 성공 상태를 유지한다. 문서 변경은 `git diff --check`와 marker 1회 확인으로 검증한다.
 - 보안·범위: Secret·Token과 사용자·Session 식별값을 기록하지 않았고 Git commit·push·PR·merge·배포, Jira 상태와 AWS 리소스를 변경하지 않았다.
+
+## 2026-09-01 — TMI-118 로컬 develop 반영 재확인
+
+- 날짜: 2026-09-01
+- 현재 브랜치: `develop`
+- Jira: `TMI-118` `[Learning Core] AttemptGroup durable outbox/publisher 구현`; 현재 Jira 상태는 `완료`다.
+- 확인 결과: 현재 `HEAD`, 로컬 `develop`, `origin/develop`이 모두 PR #25 merge commit `c00d872179414864f0820e88721c9b0babe2cc35`를 가리킨다.
+- 포함 관계: 구현 commit `63d0f7d68f804875859b1c8897130458b1d8083a`에 대해 develop ancestor 검사가 성공했다. 로컬 feature branch도 같은 구현 commit을 유지한다.
+- 파일 확인: 현재 worktree의 `src/main/java/web/tosunsaeng/domain/exams/attemptgroup`에 publisher, coordinator, evidence evaluator, backfill service와 관련 domain·infrastructure 소스가 존재한다.
+- 결론: TMI-118은 원격 feature branch에만 있는 상태가 아니라 현재 로컬 develop과 origin/develop 모두에 병합·반영돼 있다.
+- 변경 파일: 확인 결과 기록을 위해 `docs/codex/CURRENT_STATE.md`, `docs/codex/WORKLOG.md`만 갱신했다. 애플리케이션·테스트·설정 코드는 변경하지 않았다.
+- 유지한 계약: 공개 API, BaseResponse, AI·S3·Redis와 Billing schema v1을 변경하지 않았다.
+- 테스트·검증: 코드 변경이 없어 Gradle 테스트를 재실행하지 않았다. Git ref·ancestor·현재 source path를 읽기 전용으로 확인하고 문서 변경은 `git diff --check`로 검증한다.
+- 보안·범위: Secret·Token을 기록하지 않았고 DB·AWS·Jira·Git commit·push·PR·merge·배포를 변경하지 않았다. 예상 밖의 애플리케이션 변경은 없다.
+
+## 2026-09-01 — TMI-118 로컬 반영 확인 종료 훅 동기화
+
+<!-- codex-turn:01a05b69-518e-7b82-a0ae-36eca6577358 -->
+
+- 날짜: 2026-09-01
+- 현재 브랜치: `develop`
+- Jira: `TMI-118` `[Learning Core] AttemptGroup durable outbox/publisher 구현`; 현재 상태는 `완료`다.
+- 확인 결과: `HEAD`, 로컬 `develop`, `origin/develop`이 PR #25 merge commit `c00d872179414864f0820e88721c9b0babe2cc35`로 일치하고 구현 commit `63d0f7d68f804875859b1c8897130458b1d8083a`이 develop에 포함돼 있다.
+- 파일 결과: 현재 worktree에 AttemptGroup publisher, coordinator, evaluator, backfill과 domain·infrastructure 소스가 실제로 존재한다.
+- 변경 범위: 종료 훅 요구에 따라 `docs/codex/CURRENT_STATE.md`, `docs/codex/WORKLOG.md`만 보강했다. 애플리케이션·테스트·설정과 외부 계약은 변경하지 않았다.
+- 테스트·검증: 코드 변경이 없어 Gradle 테스트를 재실행하지 않았고, Git ref·ancestor·소스 경로 확인 결과를 유지한다. 문서는 `git diff --check`와 marker 1회 검사로 검증한다.
+- 보안·운영: Secret·Token을 기록하지 않았으며 DB·AWS·Jira 상태·Git commit·push·PR·merge·배포를 추가로 변경하지 않았다.
+
+## 2026-09-01 — TMI-118 이후 다음 작업 우선순위 재검토
+
+<!-- codex-turn:01a05b6e-04a9-7661-8e45-de9eca7d6862 -->
+
+- 날짜: 2026-09-01
+- 현재 브랜치: `develop`
+- 관련 Jira: 완료된 `TMI-118`, 선행 Identity `TMI-98`, 구현·병합됐으나 Jira가 `해야 할 일`인 `TMI-116`을 확인했다. Billing owner rebind 전용 Jira는 아직 확인되지 않았다.
+- 결론: 다음 제품 개발 1순위는 Billing의 탈퇴·재가입 `UserMerged` retained subject owner rebind다. Billing의 TrialClaim, entitlement/grant, Reservation과 AttemptGroup 소유권을 source Guest에서 최종 Member로 멱등 이전하는 작업이다.
+- 이유: owner rebind가 없으면 계정 merge 뒤 Member가 기존 무료 권리와 사용 이력을 잃거나, source·target이 분리돼 무료 권리 중복 판단과 Reservation/AttemptGroup 복구가 어긋날 수 있다.
+- 권장 착수 순서: Billing 저장소의 현재 owner 필드·unique index·Identity UserMerged schema를 재조사하고 계약·충돌 정책·transaction 경계를 계획서로 고정한 뒤 신규 Jira를 생성해 구현한다.
+- 후속 순서: Identity→Billing eligibility publisher의 SigV4/Lattice 정렬과 TMI-116 migration·failure-injection E2E, Learning Core UserMerged consumer, Challenge backend·AI 양방향 구현, 전체 모바일/staging E2E와 canary다.
+- Jira 조회: TMI 프로젝트의 summary에 `owner rebind` 또는 `UserMerged`가 포함된 이슈를 JQL로 조회했으며 Identity `TMI-98`만 확인됐다. 최신 이슈 목록에서도 TMI-118이 가장 최신이므로 owner rebind 신규 Jira가 필요하다.
+- 변경 파일: 분석 기록을 위해 `docs/codex/CURRENT_STATE.md`, `docs/codex/WORKLOG.md`만 갱신했다. 애플리케이션·테스트·설정과 외부 계약은 변경하지 않았다.
+- 테스트·검증: 코드 변경이 없어 Gradle 테스트를 재실행하지 않았다. 문서는 `git diff --check`와 marker 1회 검사로 검증한다.
+- 보안·범위: Secret·Token을 기록하지 않았고 Jira 생성·상태 전환, DB·AWS·Git commit·push·PR·merge·배포를 수행하지 않았다.
+
+## 2026-09-01 — TMI-116 Jira 완료 전환
+
+- 날짜: 2026-09-01
+- 현재 브랜치: `develop`
+- Jira: `TMI-116` `[Learning Core] Billing Reservation 시험 생성 saga 구현`
+- 수행 작업: Jira의 현재 상태가 `해야 할 일`임을 확인하고 사용자 요청에 따라 transition ID 41 `완료`를 적용했다.
+- 결과: TMI-116이 `완료`로 전환됐으며 Jira 응답의 status category가 `done`임을 확인했다.
+- 완료 근거: 구현은 PR #24로 develop에 병합됐고 confirm 복구, unknown commit no-cancel과 Billing 성공 응답 strict 검증 보완 후 `./gradlew clean test` 전체 432개 성공 기록이 있다.
+- 변경 파일: Jira 전환 결과를 반영하기 위해 `docs/codex/CURRENT_STATE.md`, `docs/codex/WORKLOG.md`만 갱신했다. 애플리케이션·테스트·설정은 수정하지 않았다.
+- 유지한 계약: 공개 API, BaseResponse, AI `user_id=examId`, retryCount, S3·Redis와 Billing wire 계약을 변경하지 않았다.
+- 테스트·검증: 코드 변경이 없어 Gradle 테스트를 재실행하지 않았으며 Jira 전환 응답과 문서 `git diff --check`로 검증한다.
+- 남은 운영 경계: feature flag 활성화 전 실제 Mongo migration·replica-set failure injection, Lattice/IAM/SG와 reserve/commit/confirm staging E2E가 필요하다.
+- 보안·범위: Secret·Token을 기록하지 않았고 DB·AWS·Git commit·push·PR·merge·배포는 변경하지 않았다.
+
+## 2026-09-01 — TMI-116 Jira 완료 종료 훅 동기화
+
+<!-- codex-turn:01a05b6f-53a8-72d1-8c6a-c34f36bf52ae -->
+
+- 날짜: 2026-09-01
+- 현재 브랜치: `develop`
+- Jira: `TMI-116` `[Learning Core] Billing Reservation 시험 생성 saga 구현`; `완료` 상태다.
+- 결과: 사용자 요청으로 transition ID 41을 적용했고 Jira 응답의 status category `done`을 확인했다.
+- 완료 근거: PR #24 develop 병합과 P1/P2 보완 후 `./gradlew clean test` 432개 성공 기록을 유지한다.
+- 변경 범위: 종료 훅 기록을 위해 `docs/codex/CURRENT_STATE.md`, `docs/codex/WORKLOG.md`만 보강했다. 애플리케이션·테스트·설정과 외부 계약은 변경하지 않았다.
+- 테스트·검증: 코드 변경이 없어 Gradle 테스트를 재실행하지 않았으며 문서는 `git diff --check`와 marker 1회 검사로 확인한다.
+- 보안·운영: Secret·Token을 기록하지 않았고 DB·AWS·Jira 상태·Git commit·push·PR·merge·배포를 추가 변경하지 않았다.
+
+## 2026-09-01 — TMI-118 Summary Transaction 및 통합 검증 gap 리뷰
+
+<!-- codex-turn:01a05b74-c954-7ae0-aa67-d98720f6d664 -->
+
+- 날짜: 2026-09-01
+- 현재 브랜치: `develop`
+- Jira: 완료 상태인 `TMI-118` `[Learning Core] AttemptGroup durable outbox/publisher 구현`의 병합 코드를 사후 리뷰했다.
+- P1 결론: `AttemptGroupSummaryCompletionService.persistAndComplete()`는 Mongo Transaction callback 안에서 `summaryRepository.insert()`의 `DuplicateKeyException`을 잡고 같은 Transaction으로 `completeSummary()`와 `coordinator.reconcile()`을 계속한다. Mongo duplicate key는 Transaction을 abort하므로 이 catch는 멱등 replay를 만들지 못하고 이후 작업·commit 실패로 이어질 수 있다.
+- 인접 위험: `AttemptGroupStateCoordinator.reconcile()`의 execute 바깥 race catch는 독립 Transaction에서는 rollback 뒤 예외를 받으므로 안전하지만, Summary의 기존 Transaction에 참여하면 참여 실패가 outer를 rollback-only로 만든 뒤 예외만 삼킬 수 있다. 따라서 예상 duplicate를 Transaction 안에서 삼키지 말고 전체 unit을 Transaction 밖에서 재실행·수렴시켜야 한다.
+- 권장 수정: Transaction 안에서 결정적 Summary를 먼저 조회·검증하고 없을 때 insert한다. insert race의 duplicate는 callback 밖으로 전파해 rollback을 끝낸 뒤 새 Transaction으로 전체 Summary+Job+Session+outbox 단위를 재시도한다. unknown commit은 durable Summary·Job·Session·outbox 상태를 Transaction 밖에서 재조회해 완료면 성공, 미완료면 bounded full-unit retry로 수렴시킨다.
+- 테스트 gap: AttemptGroup 전용 테스트는 Mockito 기반이며 `TransactionOperations`, outbox store, HTTP client와 tracer를 mock한다. `AttemptGroupSummaryCompletionService` 전용 테스트와 Testcontainers/embedded replica-set 의존성도 없다.
+- 필요한 검증: replica-set commit/rollback, duplicate와 unknown commit result 수렴, COMPLETED/RETAKE terminal race, multi-instance lease expiry reclaim와 stale token fencing, traceparent 주입 후 SigV4 최종 서명, Learning Core/Billing 동일 traceId·서로 다른 spanId, baggage 미전파와 금지 개인정보·payload·credential 부재를 실제 경계에서 검증해야 한다.
+- 우선순위: Billing UserMerged owner rebind의 wire 계약·활성 Reservation 정책 ADR은 다음 제품 작업으로 유효하지만, 현재 P1 hotfix와 replica-set 핵심 integration test를 먼저 완료한 뒤 진행하는 것이 안전하다. Billing owner rebind 전용 Jira는 아직 없다.
+- 변경 파일: 리뷰 기록을 위해 `docs/codex/CURRENT_STATE.md`, `docs/codex/WORKLOG.md`만 갱신했다. 애플리케이션·테스트·설정 코드는 수정하지 않았다.
+- 유지한 계약: 공개 API, BaseResponse, AI `user_id=examId`, retryCount, S3·Redis와 Billing wire 계약을 변경하지 않았다.
+- 테스트·검증: 코드 변경 없는 정적 리뷰이므로 Gradle 테스트를 실행하지 않았다. 관련 구현·테스트·Gradle 의존성을 대조하고 문서는 `git diff --check`와 marker 1회 검사로 검증한다.
+- 보안·범위: Secret·Token을 기록하지 않았고 Jira 상태, DB·AWS·Git commit·push·PR·merge·배포를 변경하지 않았다.
+
+## 2026-09-01 — TMI-118 Summary Transaction P1 hotfix 구현
+
+- 날짜: 2026-09-01
+- 브랜치: 사용자 요청에 따라 `develop@c00d872`에서 새 로컬 브랜치 `codex/fix-tmi-118-summary-transaction`을 생성하고 전환했다.
+- Jira: `TMI-118` `[Learning Core] AttemptGroup durable outbox/publisher 구현`; Jira 상태는 변경하지 않았다.
+- 수정 파일: `AttemptGroupSummaryCompletionService.java`, `AttemptGroupStateCoordinator.java`와 신규 `AttemptGroupSummaryCompletionServiceTest.java`, `AttemptGroupStateCoordinatorTransactionTest.java`를 변경·추가했다.
+- Summary 저장: Transaction 안에서 결정적 Summary ID를 먼저 조회하고 existing의 id·examId·userId·mockExamId identity를 검증한다. 없을 때만 insert하고 같은 ID의 다른 owner/시험 관계는 fail-closed한다.
+- 전체 재시도: duplicate key, optimistic conflict와 원인 chain의 Mongo `TransientTransactionError`·`UnknownTransactionCommitResult` label을 abort된 Transaction 밖에서 분류하고, rollback 이후 최대 3회의 새 Transaction으로 Summary 저장·Job 완료·Session terminal·outbox 전체 단위를 다시 실행한다.
+- rollback 보완: `completeSummary()`가 false면 TransactionStatus를 rollback-only로 설정해 Summary만 저장되고 Job이 미완료인 부분 commit을 막는다.
+- coordinator 경계: standalone `reconcile()`은 자기 Transaction 종료 후 race를 기존처럼 수렴시킨다. Summary outer Transaction에서는 package-local `reconcileWithinTransaction()`을 호출해 duplicate/optimistic 예외를 삼키지 않고 바깥 전체-unit retry 경계로 전파한다.
+- 신규 테스트: duplicate insert 첫 Transaction 실패 후 두 번째 전체 재시도, Summary Job false rollback과 coordinator 미호출, unknown commit wrapper 재시도, 기존 Summary identity conflict fail-closed, participating coordinator duplicate 전파를 검증하는 5개 테스트를 추가했다.
+- 실행 테스트: 집중 테스트 5개가 성공했고 `./gradlew clean test` 전체 444개가 failures/errors 없이 성공했다. `git diff --check`도 통과했다.
+- 유지한 계약: 공개 API URL·Method·Request/Response·BaseResponse, AI `user_id=examId`, Callback JSON, retryCount, Redis Key, S3 Object Key·Presigned URL과 Billing schema v1을 변경하지 않았다.
+- 남은 위험: 이번 테스트는 transaction control-flow 회귀를 mock으로 검증한다. 실제 replica-set commit/rollback·unknown commit failure injection, terminal race, multi-instance lease reclaim, SigV4 최종 서명, Learning Core/Billing traceId·spanId와 baggage/privacy 통합 검증은 배포 전 별도로 수행해야 한다.
+- 배포 전 확인: writer/publisher는 기본 off를 유지하며 Billing consumer, Mongo index·Transaction, Lattice IAM과 cross-service E2E 없이 production flag를 활성화하지 않는다.
+- 예상 밖 diff: 기존 작업 기록 문서 변경은 보존했다. 이번 hotfix에서 예상 밖의 애플리케이션·설정·외부 계약 변경은 없으며 build output은 추적 대상이 아니다.
+- 다음 작업 전 확인: hotfix PR·develop 병합 후 replica-set 핵심 integration suite를 추가하고, 그 다음 Billing UserMerged owner rebind ADR·계획서·신규 Jira로 진행한다.
+- 보안·Git 범위: Secret·Token을 기록하지 않았고 DB·AWS·Jira, Git commit·push·PR·merge·배포를 변경하지 않았다.
+
+## 2026-09-01 — TMI-118 Transaction 결함 쉬운 설명
+
+<!-- codex-turn:01a05b79-e347-7990-889f-136feb87e3c9 -->
+
+- 날짜: 2026-09-01
+- 현재 브랜치: `develop`
+- Jira: 완료 상태인 `TMI-118`의 사후 리뷰 P1 두 건을 사용자에게 쉬운 흐름으로 설명했다.
+- 공통 원리: Mongo Transaction은 한 묶음의 작업 봉투다. duplicate key가 발생하면 Mongo가 봉투 전체를 abort하며, Java에서 예외를 catch해도 이미 폐기된 Transaction은 다시 유효해지지 않는다.
+- 1번 결함: Summary insert duplicate를 catch하고 같은 Transaction에서 Summary Job 완료, Session 전이와 outbox 생성을 계속한다. 코드는 계속 실행되는 것처럼 보여도 이후 명령 또는 최종 commit이 실패해 전체 변경이 저장되지 않는다.
+- 2번 결함: coordinator의 TransactionTemplate은 Summary outer Transaction 안에서 호출되면 새 Transaction을 만들지 않고 같은 Transaction에 참여한다. outbox duplicate나 optimistic conflict가 outer를 rollback-only로 만든 뒤 coordinator가 예외를 삼키면, 바깥 로직은 성공처럼 계속되다가 마지막 commit에서 전체 rollback된다.
+- 차이: 1번은 동일 callback이 abort된 Transaction을 직접 계속 쓰는 문제이고, 2번은 내부 서비스가 자기 Transaction만 실패한 것으로 오해하지만 실제로 바깥 Transaction까지 함께 죽는 문제다.
+- 해결 방향: duplicate/race 예외를 Transaction 밖까지 전파해 rollback을 끝낸 다음, durable 상태를 재조회하고 Summary+Job+Session+outbox 전체를 새로운 Transaction으로 재시도한다.
+- 변경 파일: 설명 기록을 위해 `docs/codex/CURRENT_STATE.md`, `docs/codex/WORKLOG.md`만 갱신했다. 애플리케이션·테스트·설정은 수정하지 않았다.
+- 유지한 계약: 공개 API, BaseResponse, AI·S3·Redis와 Billing wire 계약을 변경하지 않았다.
+- 테스트·검증: 설명·정적 분석만 수행해 Gradle 테스트를 실행하지 않았다. 문서는 `git diff --check`와 marker 1회 검사로 확인한다.
+- 보안·범위: Secret·Token을 기록하지 않았고 Jira 상태, DB·AWS·Git commit·push·PR·merge·배포를 변경하지 않았다.
+
+## 2026-09-01 — TMI-118 Summary Transaction hotfix 최종 동기화
+
+- 브랜치: `codex/fix-tmi-118-summary-transaction`
+- Jira: `TMI-118`; Jira 상태는 변경하지 않았다.
+- 최종 결과: abort된 Mongo Transaction 내부에서 duplicate를 삼키지 않고 rollback 뒤 Summary·Job·Session·outbox 전체를 새 Transaction으로 최대 3회 재시도하도록 구현했다. nested coordinator는 outer Transaction 전용 경계에서 race 예외를 전파한다.
+- 회귀 방어: Summary Job 완료 실패 rollback, 기존 Summary identity 검증, duplicate와 unknown commit 전체 재시도, nested terminal duplicate 전파 테스트 5개를 추가했다.
+- 검증: `./gradlew clean test` 전체 444개 성공, `git diff --check` 통과다.
+- 변경 범위: 애플리케이션 2개 파일, 신규 테스트 2개 파일과 필수 기록 문서만 변경했다. 공개 API·AI·S3·Redis·Billing 계약과 설정은 유지했다.
+- 잔여 gate: 실제 replica-set·unknown commit failure injection, multi-instance lease, SigV4와 cross-service trace/privacy 통합 검증은 별도 후속 작업이다.
+- 보안·Git: Secret·Token을 기록하지 않았고 DB·AWS·Jira·commit·push·PR·merge·배포는 변경하지 않았다.
+
+## 2026-09-01 — TMI-118 Summary Transaction hotfix 종료 훅 동기화
+
+<!-- codex-turn:01a05b7c-681e-7943-8dbd-920bf394b0b8 -->
+
+- 날짜: 2026-09-01
+- 브랜치: `codex/fix-tmi-118-summary-transaction`
+- Jira: `TMI-118` `[Learning Core] AttemptGroup durable outbox/publisher 구현`; Jira 상태는 변경하지 않았다.
+- 구현 결과: abort된 Mongo Transaction에서 duplicate를 삼키던 흐름을 제거하고 rollback 뒤 Summary·Job·Session·outbox 전체를 새 Transaction으로 최대 3회 재시도한다. Summary Job false는 rollback-only 처리하며 nested coordinator race는 outer 경계로 전파한다.
+- 테스트 결과: 회귀 테스트 5개를 추가했고 `./gradlew clean test` 전체 444개와 `git diff --check`가 성공했다.
+- 변경 범위: 애플리케이션 2개, 신규 테스트 2개와 작업 기록 문서만 변경했다. 외부 API·BaseResponse·AI·S3·Redis·Billing 계약과 설정은 유지했다.
+- 잔여 위험: 실제 replica-set failure injection, multi-instance lease, SigV4와 cross-service trace/privacy 통합 검증은 후속 gate다.
+- 보안·Git: Secret·Token을 기록하지 않았고 DB·AWS·Jira 상태, commit·push·PR·merge·배포를 변경하지 않았다.
+
+## 2026-09-01 — TMI-118 hotfix commit·push 명령 안내
+
+<!-- codex-turn:01a05b84-b832-7c40-b305-154a0726fc83 -->
+
+- 날짜: 2026-09-01
+- 브랜치: `codex/fix-tmi-118-summary-transaction`
+- Jira: `TMI-118` `[Learning Core] AttemptGroup durable outbox/publisher 구현`
+- 확인 상태: 변경 파일은 Summary completion/coordinator 애플리케이션 2개, 신규 application package 테스트 2개와 `docs/codex/CURRENT_STATE.md`, `docs/codex/WORKLOG.md`다. `git diff --check`가 통과했다.
+- 안내 내용: `git add .`를 사용하지 않고 위 파일을 정확히 stage한 뒤 commit message `fix(TMI-118): retry aborted summary transactions`를 사용하고 현재 branch를 `origin`에 `-u` 옵션으로 push하는 명령을 제공한다.
+- 테스트 근거: 직전 `./gradlew clean test` 전체 444개 성공 상태를 유지한다.
+- 변경 범위: 이번 작업은 명령 안내와 기록 문서 갱신뿐이며 애플리케이션·테스트·설정 코드는 추가 수정하지 않았다.
+- 보안·Git: Secret·Token을 기록하지 않았고 commit·push·PR·merge·배포를 직접 실행하지 않았다.
