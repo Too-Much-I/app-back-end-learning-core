@@ -3,6 +3,7 @@ package web.tosunsaeng.domain.exams.application;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.dao.DuplicateKeyException;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.stereotype.Service;
@@ -19,6 +20,8 @@ import web.tosunsaeng.domain.exams.dto.ExamRequestDTO;
 import web.tosunsaeng.domain.exams.dto.ExamResponseDTO;
 import web.tosunsaeng.domain.exams.exception.ExamsException;
 import web.tosunsaeng.domain.exams.billing.BillingSagaProperties;
+import web.tosunsaeng.domain.exams.attemptgroup.application.AttemptGroupStateCoordinator;
+import web.tosunsaeng.domain.exams.attemptgroup.application.AttemptGroupSummaryCompletionService;
 import web.tosunsaeng.global.auth.CurrentUserProvider;
 import web.tosunsaeng.global.error.code.status.ErrorStatus;
 
@@ -41,6 +44,11 @@ public class ExamServiceImpl implements ExamService {
     private final RedisTemplate<String, Object> redisTemplate;
     private final software.amazon.awssdk.services.s3.presigner.S3Presigner s3Presigner;
     private final ExamGradingService gradingService;
+    @Autowired(required = false)
+    private AttemptGroupStateCoordinator attemptGroupStateCoordinator;
+
+    @Autowired(required = false)
+    private AttemptGroupSummaryCompletionService attemptGroupSummaryCompletionService;
     private final ExamSessionManager examSessionManager;
     private final BillingExamCreationSaga billingExamCreationSaga;
     private final BillingSagaProperties billingSagaProperties;
@@ -164,7 +172,7 @@ public class ExamServiceImpl implements ExamService {
         if (examSession.isAbandoned()) {
             throw new ExamsException(ErrorStatus._EXAM_ABANDONED);
         }
-        if (examSession.isCompleted()) {
+        if (examSession.isCompleted() || examSession.isRetakeAvailable()) {
             throw new ExamsException(ErrorStatus._EXAM_ALREADY_COMPLETED);
         }
     }
@@ -174,12 +182,12 @@ public class ExamServiceImpl implements ExamService {
             Integer questionNumber,
             Integer retryCount,
             String jobId) {
-        if (!examSession.isAbandoned()) {
+        if (!examSession.isAbandoned() && !examSession.isRetakeAvailable()) {
             return false;
         }
         log.debug(
-                "폐기된 시험 세션의 채점 콜백 무시 event=grading.callback "
-                        + "outcome=ignored reason=exam_abandoned "
+                "terminal 시험 세션의 채점 콜백 무시 event=grading.callback "
+                        + "outcome=ignored reason=exam_terminal "
                         + "examId={} questionNumber={} retryCount={} jobId={}",
                 examSession.getExamId(), questionNumber, retryCount, jobId
         );
@@ -310,6 +318,9 @@ public class ExamServiceImpl implements ExamService {
     public ExamResponseDTO.SubmitResult submitAudio(String examId, Integer questionNumber, Integer retryCount) {
         requireOwnedNotAbandonedSession(examId);
         ExamStatus status = gradingService.submitQuestion(examId, questionNumber, retryCount);
+        if (GradingKeys.canonicalRetryCount(retryCount) == 0) {
+            reconcileAttemptGroup(examId);
+        }
         return ExamConverter.toSubmitResult(status);
     }
 
@@ -389,6 +400,7 @@ public class ExamServiceImpl implements ExamService {
                         ExamGradingService.FEEDBACK_GENERATION_FAILED
                 );
                 gradingService.calculateAndCacheOverallStatus(examId);
+                reconcileAttemptGroup(examId);
                 return;
             }
 
@@ -402,13 +414,29 @@ public class ExamServiceImpl implements ExamService {
                 return;
             }
 
+            ExamSummary summary = ExamConverter.toExamSummary(
+                    req,
+                    examSession.getUserId(),
+                    resultId,
+                    mockExamId
+            );
+            if (attemptGroupSummaryCompletionService != null
+                    && attemptGroupSummaryCompletionService.supports(examId)) {
+                boolean completed = attemptGroupSummaryCompletionService.persistAndComplete(
+                        summary, examId, generationAttempt);
+                if (completed) {
+                    log.info(
+                            "요약 채점 콜백 저장 완료 event=grading.callback "
+                                    + "outcome=stored callbackType=summary "
+                                    + "examId={} jobId={} generationAttempt={}",
+                            examId, callbackJobId, generationAttempt
+                    );
+                    gradingService.calculateAndCacheOverallStatus(examId);
+                }
+                return;
+            }
+
             try {
-                ExamSummary summary = ExamConverter.toExamSummary(
-                        req,
-                        examSession.getUserId(),
-                        resultId,
-                        mockExamId
-                );
                 examSummaryRepository.insert(summary);
                 log.info(
                         "요약 채점 콜백 저장 완료 event=grading.callback "
@@ -467,12 +495,24 @@ public class ExamServiceImpl implements ExamService {
 
         gradingService.completeQuestion(examId, req.getQuestionNumber(), retryCount);
         gradingService.ensureSummaryStartedIfReady(examId);
+        if (retryCount == 0) {
+            reconcileAttemptGroup(examId);
+        }
     }
 
     private void completeSummaryCallback(String examId, int generationAttempt) {
         if (gradingService.completeSummary(examId, generationAttempt)) {
-            examSessionManager.completeIfIncomplete(examId);
+            reconcileAttemptGroup(examId);
+            if (attemptGroupStateCoordinator == null || !attemptGroupStateCoordinator.manages(examId)) {
+                examSessionManager.completeIfIncomplete(examId);
+            }
             gradingService.calculateAndCacheOverallStatus(examId);
+        }
+    }
+
+    private void reconcileAttemptGroup(String examId) {
+        if (attemptGroupStateCoordinator != null) {
+            attemptGroupStateCoordinator.reconcile(examId);
         }
     }
 

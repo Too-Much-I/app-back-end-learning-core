@@ -4,5 +4,6 @@ public enum ExamSessionStatus {
     ENTITLEMENT_CONFIRMING,
     IN_PROGRESS,
     COMPLETED,
+    RETAKE_AVAILABLE,
     ABANDONED
 }

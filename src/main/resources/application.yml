@@ -30,6 +30,20 @@ app:
     region: ${BILLING_AWS_REGION:ap-northeast-2}
     connect-timeout: ${BILLING_CONNECT_TIMEOUT:PT2S}
     read-timeout: ${BILLING_READ_TIMEOUT:PT5S}
+  attempt-group-events:
+    writer-enabled: ${ATTEMPT_GROUP_EVENT_WRITER_ENABLED:false}
+    publisher-enabled: ${ATTEMPT_GROUP_EVENT_PUBLISHER_ENABLED:false}
+    billing-base-url: ${BILLING_BASE_URL:}
+    aws-region: ${BILLING_AWS_REGION:ap-northeast-2}
+    grading-deadline: ${ATTEMPT_GROUP_GRADING_DEADLINE:PT30M}
+    poll-interval: ${ATTEMPT_GROUP_POLL_INTERVAL:PT1S}
+    batch-size: ${ATTEMPT_GROUP_BATCH_SIZE:20}
+    lease-duration: ${ATTEMPT_GROUP_LEASE_DURATION:PT30S}
+    auth-probe-interval: ${ATTEMPT_GROUP_AUTH_PROBE_INTERVAL:PT15M}
+    connect-timeout: ${ATTEMPT_GROUP_CONNECT_TIMEOUT:PT2S}
+    read-timeout: ${ATTEMPT_GROUP_READ_TIMEOUT:PT5S}
+    delivered-retention: ${ATTEMPT_GROUP_DELIVERED_RETENTION:P30D}
+    dead-letter-retention: ${ATTEMPT_GROUP_DEAD_LETTER_RETENTION:P90D}
   grading:
     pending-timeout: ${GRADING_PENDING_TIMEOUT:PT1M}
     processing-timeout: ${GRADING_PROCESSING_TIMEOUT:PT3M}

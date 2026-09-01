@@ -296,6 +296,78 @@ AI Callback에서는 examId로 ExamSession을 조회하여 실제 userId를 찾�
 - feature flag를 staging/prod에서 켜기 전에 프론트 header 선배포와 Mongo index·Lattice security·장애 복구 E2E를 완료한다.
 - 이 예외는 Jira TMI-116에만 적용되며 완료 후 또는 다른 작업에 자동 적용되지 않는다.
 
+# AttemptGroup 상태 outbox/publisher 구현 허용 규칙
+
+사용자 결정에 따라 Learning Core의 AttemptGroup 상태 판정, durable outbox와 Billing publisher는 신규 구현 범위에 포함한다. 이 허용은 특정 Jira 한 건에만 묶지 않으며, 후속 버그 수정·테스트·운영 안정화에도 동일한 경계를 적용한다.
+
+승인된 구현 계획과 외부 계약은 다음 문서를 따른다.
+
+- 구현 계획: `docs/codex/ATTEMPT_GROUP_OUTBOX_PUBLISHER_IMPLEMENTATION_PLAN.md`
+- 상태·과금 결정: `docs/codex/BILLING_ENTITLEMENT_CONTRACT_DECISIONS.md`
+- Billing event 계약: Billing 저장소 `docs/contracts/BILLING_SERVICE_INTEGRATION_CONTRACT.md`
+- trace 전달 계약: Billing 저장소 `docs/contracts/LEARNING_CORE_ATTEMPT_GROUP_TRACE_HANDOFF.md`
+
+TMI-116에서 AttemptGroup outbox/publisher를 제외한 것은 해당 Jira의 구현 범위를 제한한 것이다. 이 절의 후속 영구 허용 범위를 취소하거나 금지하는 의미로 해석하지 않는다.
+
+## AttemptGroup 허용 범위
+
+- 모든 필수 `retryCount=0` submit과 durable Question Job을 기준으로 `GRADING` 상태를 판정한다.
+- 필수 retry 0 feedback, 유효 점수와 Summary가 모두 조회 가능할 때만 `COMPLETED`를 판정한다.
+- 자동 복구 불가능한 최종 실패를 승인된 failureCode와 `RETAKE_AVAILABLE`로 판정한다.
+- ExamSession의 local AttemptGroup projection·terminal metadata와 outbox event를 같은 Mongo Transaction/CAS로 저장한다.
+- 같은 Session에는 `COMPLETED` 또는 `RETAKE_AVAILABLE` terminal event 하나만 허용한다.
+- Summary Callback의 외부 계약을 유지하면서 Summary·Job·Session terminal·outbox의 로컬 DB 단계를 Transaction으로 재구성할 수 있다.
+- RETAKE_AVAILABLE Session을 같은 Billing consumption·attemptGroupId·mockExamId의 REPLACEMENT 생성 saga에 연결하기 위한 내부 metadata와 검증을 추가할 수 있다.
+- outbox collection, index, lease claim, retry, retention, dead-letter, auth circuit과 제한된 reconciliation scheduler를 추가할 수 있다.
+- Billing `POST /internal/v1/attempt-group-events` client와 SigV4 `vpc-lattice-svcs` 전송을 추가할 수 있다.
+- W3C trace context 최소 metadata 저장, publish attempt별 새 span, 구조화 로그와 저카디널리티 metric을 추가할 수 있다.
+- writer와 publisher feature flag, startup validator, local/test fake client와 관련 테스트를 추가할 수 있다.
+
+이 절의 reconciliation은 submit·Callback과 local 상태 전이 뒤 누락된 AttemptGroup outbox를 복구하는 범위로 제한한다. Billing Reservation 생성 saga 전체의 background reconciliation, 결제 보상 command와 owner rebind까지 자동으로 허용하지 않는다.
+
+## AttemptGroup 확정 정책
+
+- GRADING deadline은 `PT30M`이다.
+- 완료 evidence가 있으면 `COMPLETED`가 항상 우선한다.
+- 자동 복구 불가 정합성 위반은 `RESULT_INTEGRITY_VIOLATION`으로 종료한다.
+- retry가 소진되고 active dispatch·Callback completion claim이 없으면 `REQUIRED_RESULTS_UNAVAILABLE` 또는 `SUMMARY_UNAVAILABLE`로 종료한다.
+- 그 밖의 정체는 deadline 뒤 `GRADING_DEADLINE_EXCEEDED`로 종료한다.
+- 신규 Billing-linked Session의 Summary 완료 source는 결정적 `exam_summaries` 문서만 사용한다. `exam_results.totalScore` legacy fallback은 자동 terminal 판정에 사용하지 않는다.
+- 401·403은 event를 `BLOCKED_AUTH`로 보존하고 전역 circuit을 차단한 뒤 15분마다 한 event만 half-open probe한다.
+- 기존 Billing-linked Session은 전체 자동 backfill하지 않는다. inventory/dry-run 뒤 명시적으로 승인된 allowlist만 backfill한다.
+- publisher 기본값은 poll 1초, batch 20, lease 30초이며 설정으로 조절할 수 있다.
+
+## AttemptGroup event와 trace 규칙
+
+- event target은 `GRADING`, `COMPLETED`, `RETAKE_AVAILABLE`만 사용한다.
+- RETAKE_AVAILABLE failureCode는 `REQUIRED_RESULTS_UNAVAILABLE`, `SUMMARY_UNAVAILABLE`, `GRADING_DEADLINE_EXCEEDED`, `RESULT_INTEGRITY_VIOLATION`만 사용한다.
+- retry마다 같은 eventId와 canonical payload를 유지한다.
+- `DELIVERED`는 30일, `DEAD_LETTER`는 90일 보존하고 PENDING·IN_FLIGHT·BLOCKED_AUTH에는 TTL을 두지 않는다.
+- outbox에는 검증된 `traceId`, `parentSpanId`, `traceFlags`만 저장한다. raw `traceparent`, raw `tracestate`와 baggage를 저장하지 않는다.
+- 각 publish attempt는 저장된 context를 parent로 새 span을 만들며 같은 traceId와 서로 다른 spanId를 사용한다.
+- publish span의 `traceparent`를 inject한 뒤 SigV4를 마지막 논리적 변경 단계에서 수행하고 서명 뒤 request를 변경하지 않는다.
+- trace context 문제는 새 fallback trace와 counter로 수렴시키며 업무 event 전달을 막거나 DEAD_LETTER로 보내지 않는다.
+
+## AttemptGroup 금지 범위
+
+- 기존 공개 API URL, HTTP Method, Parameter, Request/Response DTO와 `BaseResponse`를 변경하지 않는다.
+- 실제 userId, reservationId, attemptGroupId와 내부 outbox 상태를 공개 Request/Response에 추가하지 않는다.
+- 기존 시험 `retryCount`, Redis Key, S3 Object Key, Presigned URL, 음성 submit과 Polling 계약을 변경하지 않는다.
+- Python AI request/Callback의 `user_id=examId`, URL과 JSON 계약을 변경하지 않는다.
+- Billing consumer, Billing AttemptGroup 상태 머신과 Billing 저장소 코드를 Learning Core 작업 범위로 수정하지 않는다.
+- UserMerged·owner rebind, 결제·subscription·coupon, entitlement 환불/보상과 Challenge 기능을 이 허용 범위에 포함하지 않는다.
+- 실제 AWS Lattice/IAM/SG/ECS 리소스 생성·배포와 static AWS credential 추가를 수행하지 않는다.
+- 사용자·Session·AttemptGroup 식별자, event payload·digest, 인증 header, provider/AI 원문을 일반 log·span attribute·metric tag에 기록하지 않는다.
+
+## AttemptGroup rollout과 테스트
+
+- writer와 publisher feature flag는 모두 기본 off다.
+- publisher를 먼저 idle 활성화하고 인증·연결을 확인한 뒤 writer를 활성화한다.
+- Mongo replica-set Transaction, index migration, Billing consumer 배포, Lattice security와 failure-injection E2E 전에는 production writer를 활성화하지 않는다.
+- 상태 판정, terminal race, Transaction rollback·unknown commit, lease 경쟁, retry/status 분류, auth circuit, retention, W3C trace와 privacy 테스트를 추가한다.
+- 실제 MongoDB, Redis, S3, Billing, AWS credential과 trace backend에 의존하지 않는 Mock·fixture 또는 격리된 테스트 구성을 사용한다.
+- 구현 완료 후 `./gradlew clean test`를 실행하고 공개 API·AI·S3·Redis 계약 불변을 확인한다.
+
 # 10초 챌린지 구현 허용 규칙
 
 사용자 결정에 따라 10초 챌린지는 Learning Core의 신규 구현 범위에 포함한다.
@@ -466,6 +538,22 @@ Codex는 파일 수정과 테스트까지만 수행한다.
 - Secret과 Token은 WORKLOG와 CURRENT_STATE에 기록하지 않는다.
 - Git commit과 push는 사용자가 직접 수행한다.
 
+# 계획·조사 문서 작성 규칙
+
+계획, 조사, 분석, 리뷰 문서는 상세 내용을 빠짐없이 확인하되 사용자가 중요한 내용을 먼저 읽을 수 있도록 다음 계층으로 작성한다.
+
+1. 5줄 결론
+2. 사용자가 반드시 읽어야 하는 내용
+3. 사용자가 결정해야 하는 사항
+4. 주요 위험과 미확인 사항
+5. 현재 작업과 직접 관련된 설명
+6. 상세 조사 근거와 전체 표를 담은 부록
+
+- 각 결론에는 가능한 경우 관련 코드, 설정, 테스트 또는 계약 문서의 파일 근거를 연결한다.
+- 확인된 구현 사실, 문서상 계획, Codex의 분석·추론을 명확히 구분한다.
+- 상세 조사 결과를 삭제하거나 축약해서 잃지 말고 긴 목록, 비교표와 보조 근거는 부록으로 이동한다.
+- 정확한 field, enum, timeout, retry, 보안·과금 조건과 금지 규칙은 요약만으로 대체하지 않고 관련 계약 원문을 연결한다.
+
 # 작업 완료 보고 규칙
 
 각 작업이 끝나면 다음 내용을 보고한다.
@@ -476,7 +564,13 @@ Codex는 파일 수정과 테스트까지만 수행한다.
 4. 실행한 테스트
 5. 테스트 결과
 6. 남아 있는 위험 요소
-7. 다음 작업 전에 확인할 사항
+7. 배포 전에 확인할 사항
+8. 실제 diff에서 예상 밖으로 변경된 파일이나 범위가 있는지 여부
+9. 다음 작업 전에 확인할 사항
+
+- 구현 작업 완료 보고에서는 위 항목을 생략하지 않는다.
+- 예상 밖의 변경이 없으면 없다고 명시하고, 있으면 사용자 변경과 이번 작업 변경을 구분해 설명한다.
+- 테스트를 실행하지 않았다면 그 이유와 대신 수행한 검증을 기록한다.
 
 # 코드 리뷰 우선순위
 

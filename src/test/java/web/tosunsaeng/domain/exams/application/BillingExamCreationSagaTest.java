@@ -92,7 +92,6 @@ class BillingExamCreationSagaTest {
         ExamCreationOperation operation = stubPreparedOperation();
         when(billingClient.reserve(OPERATION_ID, USER_ID, SESSION_ID, MOCK_EXAM_ID))
                 .thenReturn(reserved());
-        when(sessionManager.findInProgressSessions(USER_ID)).thenReturn(List.of());
         when(operationRepository.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
         when(transactionService.commitReservedSession(operation.getCommandId(), NOW, ZoneOffset.UTC))
                 .thenAnswer(invocation -> {

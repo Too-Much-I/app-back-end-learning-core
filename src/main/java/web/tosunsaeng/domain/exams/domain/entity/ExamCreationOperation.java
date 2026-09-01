@@ -30,6 +30,9 @@ public class ExamCreationOperation {
     private String reservationId;
     private BillingReservationKind reservationKind;
     private String attemptGroupId;
+    private String replacementSourceSessionId;
+    private String expectedAttemptGroupId;
+    private String expectedMockExamId;
     private Instant reservationExpiresAt;
     private Instant sessionCommittedAt;
     private Instant confirmedAt;
@@ -51,9 +54,25 @@ public class ExamCreationOperation {
             Integer cycleNumber,
             Instant now
     ) {
+        return prepared(userId, operationId, sessionId, mockExamId, cycleNumber,
+                null, null, null, now);
+    }
+
+    public static ExamCreationOperation prepared(
+            String userId,
+            String operationId,
+            String sessionId,
+            String mockExamId,
+            Integer cycleNumber,
+            String replacementSourceSessionId,
+            String expectedAttemptGroupId,
+            String expectedMockExamId,
+            Instant now
+    ) {
         return new ExamCreationOperation(
                 UUID.randomUUID().toString(), userId, operationId, sessionId, mockExamId,
-                cycleNumber, ExamCreationState.PREPARED, null, null, null, null,
+                cycleNumber, ExamCreationState.PREPARED, null, null, null,
+                replacementSourceSessionId, expectedAttemptGroupId, expectedMockExamId, null,
                 null, null, null, true, now, now, null, null, null
         );
     }

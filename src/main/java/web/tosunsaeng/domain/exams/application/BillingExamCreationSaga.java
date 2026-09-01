@@ -112,6 +112,9 @@ public class BillingExamCreationSaga {
                 prepared.sessionId(),
                 prepared.mockExam().getMockExamId(),
                 prepared.cycleNumber(),
+                prepared.replacementSourceSessionId(),
+                prepared.expectedAttemptGroupId(),
+                prepared.expectedMockExamId(),
                 now
         );
         try {
@@ -367,17 +370,16 @@ public class BillingExamCreationSaga {
             throw new IllegalStateException("Billing reserve response is invalid");
         }
 
-        List<ExamSession> billingLinked = sessionManager.findInProgressSessions(operation.getUserId())
-                .stream()
-                .filter(session -> !isBlank(session.getAttemptGroupId()))
-                .toList();
-        if (snapshot.reservationKind() == BillingReservationKind.INITIAL && !billingLinked.isEmpty()) {
+        boolean replacementExpected = !isBlank(operation.getReplacementSourceSessionId())
+                && !isBlank(operation.getExpectedAttemptGroupId())
+                && !isBlank(operation.getExpectedMockExamId());
+        if (snapshot.reservationKind() == BillingReservationKind.INITIAL && replacementExpected) {
             throw new IllegalStateException("Billing returned INITIAL for an existing group");
         }
         if (snapshot.reservationKind() == BillingReservationKind.REPLACEMENT
-                && billingLinked.stream().noneMatch(session ->
-                Objects.equals(session.getAttemptGroupId(), snapshot.attemptGroupId())
-                        && Objects.equals(session.getMockExamId(), operation.getMockExamId()))) {
+                && (!replacementExpected
+                || !Objects.equals(operation.getExpectedAttemptGroupId(), snapshot.attemptGroupId())
+                || !Objects.equals(operation.getExpectedMockExamId(), operation.getMockExamId()))) {
             throw new IllegalStateException("Billing replacement group does not match local state");
         }
     }

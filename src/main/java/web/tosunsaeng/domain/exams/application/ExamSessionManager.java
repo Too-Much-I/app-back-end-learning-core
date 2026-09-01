@@ -46,6 +46,11 @@ public class ExamSessionManager {
                 .findFirst()
                 .orElse(null);
 
+        if (replacement == null) {
+            replacement = examSessionRepository.findLatestRetakeAvailableByUserId(userId)
+                    .orElse(null);
+        }
+
         if (replacement != null) {
             String mockExamId = GradingKeys.effectiveMockExamId(replacement.getMockExamId());
             MockExam mockExam = mockExamCatalogService.getRequiredExam(mockExamId);
@@ -53,7 +58,9 @@ public class ExamSessionManager {
                     ? Math.toIntExact(completionCounts(userId).getOrDefault(mockExamId, 0L) + 1)
                     : replacement.getCycleNumber();
             LocalDateTime now = LocalDateTime.ofInstant(clock.instant(), clock.getZone());
-            return new PreparedAssignment(newExamId(now), mockExam, cycleNumber, now);
+            return new PreparedAssignment(
+                    newExamId(now), mockExam, cycleNumber, now,
+                    replacement.getExamId(), replacement.getAttemptGroupId(), mockExamId);
         }
 
         SelectedExam selected = selectExam(userId);
@@ -62,7 +69,10 @@ public class ExamSessionManager {
                 newExamId(now),
                 selected.mockExam(),
                 Math.toIntExact(selected.completionCount() + 1),
-                now
+                now,
+                null,
+                null,
+                null
         );
     }
 
@@ -255,8 +265,19 @@ public class ExamSessionManager {
             String sessionId,
             MockExam mockExam,
             Integer cycleNumber,
-            LocalDateTime preparedAt
+            LocalDateTime preparedAt,
+            String replacementSourceSessionId,
+            String expectedAttemptGroupId,
+            String expectedMockExamId
     ) {
+        public PreparedAssignment(
+                String sessionId,
+                MockExam mockExam,
+                Integer cycleNumber,
+                LocalDateTime preparedAt
+        ) {
+            this(sessionId, mockExam, cycleNumber, preparedAt, null, null, null);
+        }
     }
 
     private record SelectedExam(MockExam mockExam, long completionCount) {
