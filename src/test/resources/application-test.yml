@@ -18,6 +18,7 @@ spring:
 app:
   billing:
     creation-saga-enabled: false
+    phone-continuation-enabled: false
     base-url: ""
     region: ap-northeast-2
     connect-timeout: PT1S

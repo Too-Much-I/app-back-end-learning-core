@@ -8,6 +8,7 @@ import java.time.Duration;
 public class BillingSagaProperties {
 
     private boolean creationSagaEnabled;
+    private boolean phoneContinuationEnabled;
     private String baseUrl = "";
     private String region = "ap-northeast-2";
     private Duration connectTimeout = Duration.ofSeconds(2);
@@ -19,6 +20,14 @@ public class BillingSagaProperties {
 
     public void setCreationSagaEnabled(boolean creationSagaEnabled) {
         this.creationSagaEnabled = creationSagaEnabled;
+    }
+
+    public boolean isPhoneContinuationEnabled() {
+        return phoneContinuationEnabled;
+    }
+
+    public void setPhoneContinuationEnabled(boolean phoneContinuationEnabled) {
+        this.phoneContinuationEnabled = phoneContinuationEnabled;
     }
 
     public String getBaseUrl() {

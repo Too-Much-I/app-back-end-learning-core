@@ -14,6 +14,7 @@ import web.tosunsaeng.domain.exams.domain.entity.ExamCreationOperation;
 import web.tosunsaeng.domain.exams.domain.entity.ExamSession;
 import web.tosunsaeng.domain.exams.domain.entity.MockExam;
 import web.tosunsaeng.domain.exams.domain.enums.BillingReservationKind;
+import web.tosunsaeng.domain.exams.domain.enums.BillingContinuationReason;
 import web.tosunsaeng.domain.exams.domain.enums.ExamEntitlementState;
 import web.tosunsaeng.domain.exams.domain.enums.ExamSessionStatus;
 import web.tosunsaeng.domain.exams.domain.repository.ExamCreationOperationRepository;
@@ -28,6 +29,7 @@ import java.time.ZoneId;
 import java.time.ZoneOffset;
 import java.util.List;
 import java.util.Optional;
+import java.util.concurrent.atomic.AtomicReference;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -65,10 +67,11 @@ class BillingExamCreationSagaTest {
 
     private BillingExamCreationSaga saga;
     private MockExam mockExam;
+    private BillingSagaProperties properties;
 
     @BeforeEach
     void setUp() {
-        BillingSagaProperties properties = new BillingSagaProperties();
+        properties = new BillingSagaProperties();
         properties.setCreationSagaEnabled(true);
         mockExam = MockExam.builder()
                 .mockExamId(MOCK_EXAM_ID)
@@ -85,6 +88,180 @@ class BillingExamCreationSagaTest {
                 transactionService,
                 Clock.fixed(NOW, ZoneOffset.UTC)
         );
+    }
+
+    @Test
+    void phoneContinuationSnapshotsDiscoveryBeforeReserve() {
+        properties.setPhoneContinuationEnabled(true);
+        BillingReservationClient.PhoneContinuationSnapshot continuation =
+                new BillingReservationClient.PhoneContinuationSnapshot(
+                        BillingContinuationReason.PHONE_REJOIN,
+                        "018f6f36-2f42-4bf5-8c17-0be35de4872f",
+                        GROUP_ID,
+                        MOCK_EXAM_ID
+                );
+        when(operationRepository.findByUserIdAndOperationId(USER_ID, OPERATION_ID))
+                .thenReturn(Optional.empty());
+        when(sessionRepository.findByUserIdAndCreationOperationId(USER_ID, OPERATION_ID))
+                .thenReturn(Optional.empty());
+        when(operationRepository.findByUserIdAndActiveGuardTrue(USER_ID))
+                .thenReturn(Optional.empty());
+        when(sessionRepository.existsByUserId(USER_ID)).thenReturn(false);
+        when(billingClient.findPhoneContinuation(USER_ID))
+                .thenReturn(Optional.of(continuation));
+        when(sessionManager.preparePhoneReplacement(GROUP_ID, MOCK_EXAM_ID))
+                .thenReturn(new ExamSessionManager.PreparedAssignment(
+                        SESSION_ID, mockExam, 1,
+                        LocalDateTime.ofInstant(NOW, ZoneOffset.UTC),
+                        null, GROUP_ID, MOCK_EXAM_ID
+                ));
+        AtomicReference<ExamCreationOperation> inserted = new AtomicReference<>();
+        when(operationRepository.insert(any(ExamCreationOperation.class)))
+                .thenAnswer(invocation -> {
+                    ExamCreationOperation operation = invocation.getArgument(0);
+                    inserted.set(operation);
+                    return operation;
+                });
+        when(operationRepository.findById(any())).thenAnswer(
+                invocation -> Optional.ofNullable(inserted.get())
+        );
+        when(billingClient.reservePhoneContinuation(
+                OPERATION_ID, USER_ID, SESSION_ID, MOCK_EXAM_ID,
+                BillingContinuationReason.PHONE_REJOIN,
+                continuation.continuationId(), GROUP_ID
+        )).thenThrow(new BillingClientException(
+                BillingClientException.Category.ENTITLEMENT_INSUFFICIENT, null
+        ));
+
+        ExamsException failure = assertThrows(
+                ExamsException.class,
+                () -> saga.start(USER_ID, OPERATION_ID)
+        );
+
+        assertEquals(ErrorStatus._ENTITLEMENT_INSUFFICIENT, failure.getCode());
+        assertEquals(BillingContinuationReason.PHONE_REJOIN,
+                inserted.get().getContinuationReason());
+        assertEquals(continuation.continuationId(), inserted.get().getContinuationId());
+        assertEquals(GROUP_ID, inserted.get().getExpectedAttemptGroupId());
+        assertEquals(MOCK_EXAM_ID, inserted.get().getExpectedMockExamId());
+        assertEquals(1, inserted.get().getCycleNumber());
+        verify(sessionManager, never()).prepareForBilling(USER_ID);
+    }
+
+    @Test
+    void phoneDiscoveryIsSkippedWhenTargetAlreadyHasAnySession() {
+        properties.setPhoneContinuationEnabled(true);
+        ExamCreationOperation operation = stubPreparedOperation();
+        when(sessionRepository.existsByUserId(USER_ID)).thenReturn(true);
+        when(billingClient.reserve(OPERATION_ID, USER_ID, SESSION_ID, MOCK_EXAM_ID))
+                .thenThrow(new BillingClientException(
+                        BillingClientException.Category.ENTITLEMENT_INSUFFICIENT, null
+                ));
+
+        assertThrows(ExamsException.class, () -> saga.start(USER_ID, OPERATION_ID));
+
+        verify(billingClient, never()).findPhoneContinuation(USER_ID);
+        verify(sessionManager).prepareForBilling(USER_ID);
+        assertEquals(false, operation.isPhoneContinuation());
+    }
+
+    @Test
+    void lostReserveResponseRecoversMatchingReservedStatus() {
+        ExamCreationOperation operation = stubPreparedOperation();
+        when(billingClient.reserve(OPERATION_ID, USER_ID, SESSION_ID, MOCK_EXAM_ID))
+                .thenThrow(new BillingClientException(
+                        BillingClientException.Category.TEMPORARILY_UNAVAILABLE, 2
+                ));
+        when(billingClient.status(USER_ID, OPERATION_ID)).thenReturn(reserved());
+        when(operationRepository.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
+        when(transactionService.commitReservedSession(operation.getCommandId(), NOW, ZoneOffset.UTC))
+                .thenThrow(new OptimisticLockingFailureException("concurrent"));
+        when(sessionRepository.findByUserIdAndCreationOperationId(USER_ID, OPERATION_ID))
+                .thenReturn(Optional.empty());
+
+        ExamsException failure = assertThrows(
+                ExamsException.class,
+                () -> saga.start(USER_ID, OPERATION_ID)
+        );
+
+        assertEquals(ErrorStatus._EXAM_CREATION_PROCESSING, failure.getCode());
+        assertEquals(web.tosunsaeng.domain.exams.domain.enums.ExamCreationState.RESERVED,
+                operation.getState());
+        assertEquals(RESERVATION_ID, operation.getReservationId());
+        verify(billingClient).status(USER_ID, OPERATION_ID);
+        verify(billingClient, never()).cancel(any(), any(), any());
+    }
+
+    @Test
+    void contractMismatchUsesAuthoritativeStatusReservationForCancelPending() {
+        ExamCreationOperation operation = preparedOperation();
+        when(operationRepository.findByUserIdAndOperationId(USER_ID, OPERATION_ID))
+                .thenReturn(Optional.of(operation));
+        when(operationRepository.findById(operation.getCommandId()))
+                .thenReturn(Optional.of(operation));
+        when(billingClient.reserve(OPERATION_ID, USER_ID, SESSION_ID, MOCK_EXAM_ID))
+                .thenReturn(new BillingReservationClient.ReservationSnapshot(
+                        OPERATION_ID,
+                        "../untrusted-response-id",
+                        BillingReservationKind.INITIAL,
+                        BillingReservationClient.ReservationStatus.RESERVED,
+                        GROUP_ID,
+                        null,
+                        SESSION_ID,
+                        MOCK_EXAM_ID,
+                        NOW.plusSeconds(300),
+                        null
+                ));
+        when(billingClient.status(USER_ID, OPERATION_ID)).thenReturn(reserved());
+        when(operationRepository.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
+
+        ExamsException failure = assertThrows(
+                ExamsException.class,
+                () -> saga.start(USER_ID, OPERATION_ID)
+        );
+
+        assertEquals(ErrorStatus._BILLING_TEMPORARILY_UNAVAILABLE, failure.getCode());
+        assertEquals(web.tosunsaeng.domain.exams.domain.enums.ExamCreationState.CANCEL_PENDING,
+                operation.getState());
+        assertEquals(RESERVATION_ID, operation.getReservationId());
+        verify(billingClient, never()).cancel(
+                any(), org.mockito.ArgumentMatchers.eq("../untrusted-response-id"), any());
+        verify(transactionService, never()).commitReservedSession(any(), any(), any());
+    }
+
+    @Test
+    void phoneReserveRecoveryRejectsStatusWithoutContinuationEcho() {
+        ExamCreationOperation operation = phonePreparedOperation();
+        when(operationRepository.findByUserIdAndOperationId(USER_ID, OPERATION_ID))
+                .thenReturn(Optional.of(operation));
+        when(operationRepository.findById(operation.getCommandId()))
+                .thenReturn(Optional.of(operation));
+        when(billingClient.reservePhoneContinuation(
+                OPERATION_ID, USER_ID, SESSION_ID, MOCK_EXAM_ID,
+                BillingContinuationReason.PHONE_REJOIN,
+                operation.getContinuationId(), GROUP_ID
+        )).thenThrow(new BillingClientException(
+                BillingClientException.Category.TEMPORARILY_UNAVAILABLE, 1
+        ));
+        when(billingClient.status(USER_ID, OPERATION_ID)).thenReturn(
+                new BillingReservationClient.ReservationSnapshot(
+                        OPERATION_ID, RESERVATION_ID, BillingReservationKind.REPLACEMENT,
+                        BillingReservationClient.ReservationStatus.RESERVED,
+                        GROUP_ID, null, SESSION_ID, MOCK_EXAM_ID,
+                        NOW.plusSeconds(300), null
+                )
+        );
+
+        ExamsException failure = assertThrows(
+                ExamsException.class,
+                () -> saga.start(USER_ID, OPERATION_ID)
+        );
+
+        assertEquals(ErrorStatus._BILLING_TEMPORARILY_UNAVAILABLE, failure.getCode());
+        assertEquals(web.tosunsaeng.domain.exams.domain.enums.ExamCreationState.PREPARED,
+                operation.getState());
+        verify(operationRepository, never()).save(operation);
+        verify(transactionService, never()).commitReservedSession(any(), any(), any());
     }
 
     @Test
@@ -401,8 +578,9 @@ class BillingExamCreationSagaTest {
         );
 
         assertEquals(ErrorStatus._BILLING_TEMPORARILY_UNAVAILABLE, failure.getCode());
-        verify(transactionService).markFailedTerminal(
-                operation.getCommandId(), "RESERVE_CONTRACT_MISMATCH", NOW);
+        verify(billingClient).status(USER_ID, OPERATION_ID);
+        verify(transactionService, never()).markFailedTerminal(any(), any(), any());
+        verify(billingClient, never()).cancel(any(), any(), any());
         verify(transactionService, never()).commitReservedSession(
                 any(String.class), any(Instant.class), any(ZoneId.class));
     }
@@ -429,6 +607,16 @@ class BillingExamCreationSagaTest {
     private static ExamCreationOperation preparedOperation() {
         return ExamCreationOperation.prepared(
                 USER_ID, OPERATION_ID, SESSION_ID, MOCK_EXAM_ID, 1, NOW);
+    }
+
+    private static ExamCreationOperation phonePreparedOperation() {
+        return ExamCreationOperation.prepared(
+                USER_ID, OPERATION_ID, SESSION_ID, MOCK_EXAM_ID, 1,
+                null, GROUP_ID, MOCK_EXAM_ID,
+                BillingContinuationReason.PHONE_REJOIN,
+                "018f6f36-2f42-4bf5-8c17-0be35de4872f",
+                NOW
+        );
     }
 
     private static ExamCreationOperation reservedOperation() {

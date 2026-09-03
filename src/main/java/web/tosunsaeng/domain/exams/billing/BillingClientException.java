@@ -31,6 +31,7 @@ public class BillingClientException extends RuntimeException {
         RESERVATION_CONFLICT,
         OPERATION_NOT_FOUND,
         RATE_LIMITED,
+        AUTH_FAILURE,
         TEMPORARILY_UNAVAILABLE,
         CONTRACT_ERROR
     }

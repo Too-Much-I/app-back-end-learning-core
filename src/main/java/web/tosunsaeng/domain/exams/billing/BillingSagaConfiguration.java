@@ -10,6 +10,7 @@ import com.fasterxml.jackson.databind.json.JsonMapper;
 import com.fasterxml.jackson.databind.type.LogicalType;
 import com.fasterxml.jackson.core.StreamReadFeature;
 import org.springframework.beans.factory.annotation.Qualifier;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Bean;
@@ -21,6 +22,8 @@ import org.springframework.data.mongodb.MongoTransactionManager;
 import org.springframework.transaction.support.TransactionOperations;
 import org.springframework.transaction.support.TransactionTemplate;
 import software.amazon.awssdk.auth.credentials.AwsCredentialsProvider;
+import io.micrometer.core.instrument.MeterRegistry;
+import io.micrometer.tracing.Tracer;
 
 @Configuration(proxyBeanMethods = false)
 @EnableConfigurationProperties(BillingSagaProperties.class)
@@ -58,9 +61,13 @@ public class BillingSagaConfiguration {
     public BillingReservationClient billingReservationClient(
             BillingSagaProperties properties,
             AwsCredentialsProvider credentialsProvider,
-            @Qualifier("billingContractObjectMapper") ObjectMapper objectMapper
+            @Qualifier("billingContractObjectMapper") ObjectMapper objectMapper,
+            ObjectProvider<Tracer> tracerProvider,
+            MeterRegistry meterRegistry
     ) {
-        return new SigV4BillingReservationClient(properties, credentialsProvider, objectMapper);
+        return new SigV4BillingReservationClient(
+                properties, credentialsProvider, objectMapper, tracerProvider, meterRegistry
+        );
     }
 
     @Bean(name = "billingMongoTransactionManager")

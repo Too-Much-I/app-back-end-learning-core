@@ -9,6 +9,7 @@ import org.springframework.data.annotation.Version;
 import org.springframework.data.mongodb.core.mapping.Document;
 import web.tosunsaeng.domain.exams.domain.enums.BillingReservationKind;
 import web.tosunsaeng.domain.exams.domain.enums.ExamCreationState;
+import web.tosunsaeng.domain.exams.domain.enums.BillingContinuationReason;
 
 import java.time.Instant;
 import java.util.UUID;
@@ -33,6 +34,8 @@ public class ExamCreationOperation {
     private String replacementSourceSessionId;
     private String expectedAttemptGroupId;
     private String expectedMockExamId;
+    private BillingContinuationReason continuationReason;
+    private String continuationId;
     private Instant reservationExpiresAt;
     private Instant sessionCommittedAt;
     private Instant confirmedAt;
@@ -55,7 +58,7 @@ public class ExamCreationOperation {
             Instant now
     ) {
         return prepared(userId, operationId, sessionId, mockExamId, cycleNumber,
-                null, null, null, now);
+                null, null, null, null, null, now);
     }
 
     public static ExamCreationOperation prepared(
@@ -69,12 +72,35 @@ public class ExamCreationOperation {
             String expectedMockExamId,
             Instant now
     ) {
+        return prepared(userId, operationId, sessionId, mockExamId, cycleNumber,
+                replacementSourceSessionId, expectedAttemptGroupId, expectedMockExamId,
+                null, null, now);
+    }
+
+    public static ExamCreationOperation prepared(
+            String userId,
+            String operationId,
+            String sessionId,
+            String mockExamId,
+            Integer cycleNumber,
+            String replacementSourceSessionId,
+            String expectedAttemptGroupId,
+            String expectedMockExamId,
+            BillingContinuationReason continuationReason,
+            String continuationId,
+            Instant now
+    ) {
         return new ExamCreationOperation(
                 UUID.randomUUID().toString(), userId, operationId, sessionId, mockExamId,
                 cycleNumber, ExamCreationState.PREPARED, null, null, null,
-                replacementSourceSessionId, expectedAttemptGroupId, expectedMockExamId, null,
+                replacementSourceSessionId, expectedAttemptGroupId, expectedMockExamId,
+                continuationReason, continuationId, null,
                 null, null, null, true, now, now, null, null, null
         );
+    }
+
+    public boolean isPhoneContinuation() {
+        return continuationReason == BillingContinuationReason.PHONE_REJOIN;
     }
 
     public boolean isTerminal() {
@@ -97,6 +123,22 @@ public class ExamCreationOperation {
         this.attemptGroupId = attemptGroupId;
         this.reservationExpiresAt = reservationExpiresAt;
         this.state = ExamCreationState.RESERVED;
+        this.updatedAt = now;
+    }
+
+    public void markCancelPendingFromPrepared(
+            String reservationId,
+            BillingReservationKind reservationKind,
+            String attemptGroupId,
+            Instant reservationExpiresAt,
+            Instant now
+    ) {
+        requireState(ExamCreationState.PREPARED);
+        this.reservationId = reservationId;
+        this.reservationKind = reservationKind;
+        this.attemptGroupId = attemptGroupId;
+        this.reservationExpiresAt = reservationExpiresAt;
+        this.state = ExamCreationState.CANCEL_PENDING;
         this.updatedAt = now;
     }
 
