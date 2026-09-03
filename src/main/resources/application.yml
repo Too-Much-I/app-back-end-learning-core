@@ -26,6 +26,7 @@ spring:
 app:
   billing:
     creation-saga-enabled: ${BILLING_CREATION_SAGA_ENABLED:false}
+    phone-continuation-enabled: ${BILLING_PHONE_CONTINUATION_ENABLED:false}
     base-url: ${BILLING_BASE_URL:}
     region: ${BILLING_AWS_REGION:ap-northeast-2}
     connect-timeout: ${BILLING_CONNECT_TIMEOUT:PT2S}

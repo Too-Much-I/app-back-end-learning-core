@@ -144,6 +144,28 @@ class ExamSessionManagerTest {
     }
 
     @Test
+    void phoneReplacementUsesExactBillingGroupAndMockWithoutReadingUserHistory() {
+        String groupId = "018f6f36-2f42-4bf5-8c17-0be35de4872e";
+        when(mockExamCatalogService.getRequiredExam("mock_exam_002"))
+                .thenReturn(mockExam(2));
+
+        ExamSessionManager.PreparedAssignment prepared = manager.preparePhoneReplacement(
+                groupId, "mock_exam_002"
+        );
+
+        assertAll(
+                () -> assertEquals("mock_exam_002", prepared.mockExam().getMockExamId()),
+                () -> assertEquals(1, prepared.cycleNumber()),
+                () -> assertNull(prepared.replacementSourceSessionId()),
+                () -> assertEquals(groupId, prepared.expectedAttemptGroupId()),
+                () -> assertEquals("mock_exam_002", prepared.expectedMockExamId()),
+                () -> assertTrue(prepared.sessionId().matches("^ex_[0-9a-f]{10}_0729_0630$"))
+        );
+        verify(examSessionRepository, never()).findActiveOrLegacyCandidatesByUserId(USER_ID);
+        verify(examSessionRepository, never()).findLatestRetakeAvailableByUserId(USER_ID);
+    }
+
+    @Test
     void completionCountsContinueToSelectLeastCompletedPaper() {
         stubNewAssignment(List.of(), List.of(
                 new ExamSessionCompletionQuery.CompletionCount("mock_exam_001", 1)

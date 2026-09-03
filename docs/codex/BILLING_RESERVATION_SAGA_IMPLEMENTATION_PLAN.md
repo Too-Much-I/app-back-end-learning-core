@@ -5,7 +5,7 @@
 - 대상 저장소: `Too-Much-I/app-back-end-learning-core`
 - Jira: `TMI-116`
 - 선행 Billing 구현: `TMI-110`, `TMI-112`, `TMI-113` 완료
-- 관련 계약: `docs/codex/BILLING_ENTITLEMENT_CONTRACT_DECISIONS.md`, Billing `docs/contracts/BILLING_SERVICE_INTEGRATION_CONTRACT.md`, Billing ADR-001·ADR-002
+- 관련 계약: `docs/codex/BILLING_ENTITLEMENT_CONTRACT_DECISIONS.md`, `docs/codex/PHONE_REJOIN_CONTINUATION_IMPLEMENTATION_PLAN.md`, Billing `docs/contracts/BILLING_SERVICE_INTEGRATION_CONTRACT.md`, Billing ADR-001·ADR-002·ADR-003
 
 ## 1. 정정된 작업 목표
 

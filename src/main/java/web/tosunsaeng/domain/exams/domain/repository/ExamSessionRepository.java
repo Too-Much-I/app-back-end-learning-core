@@ -11,6 +11,8 @@ import java.util.Optional;
 
 public interface ExamSessionRepository extends MongoRepository<ExamSession, String> {
 
+    boolean existsByUserId(String userId);
+
     @Query(
             value = "{ 'userId': ?0, 'completedAt': { '$exists': true, '$ne': null } }",
             sort = "{ 'completedAt': -1, '_id': -1 }"

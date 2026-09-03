@@ -24,6 +24,11 @@ public class BillingSagaConfigurationValidator implements ApplicationRunner {
 
     @Override
     public void run(ApplicationArguments args) {
+        if (properties.isPhoneContinuationEnabled() && !properties.isCreationSagaEnabled()) {
+            throw new IllegalStateException(
+                    "Billing phone continuation requires the creation saga"
+            );
+        }
         if (!properties.isCreationSagaEnabled()) {
             return;
         }

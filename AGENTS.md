@@ -296,6 +296,42 @@ AI Callback에서는 examId로 ExamSession을 조회하여 실제 userId를 찾�
 - feature flag를 staging/prod에서 켜기 전에 프론트 header 선배포와 Mongo index·Lattice security·장애 복구 E2E를 완료한다.
 - 이 예외는 Jira TMI-116에만 적용되며 완료 후 또는 다른 작업에 자동 적용되지 않는다.
 
+## Phone 재가입 시험 continuation 구현 허용 규칙
+
+- 사용자 결정에 따라 Learning Core의 phone 재가입 시험 continuation discovery와 기존 Billing 시험 생성 saga의 해당 확장은 신규 구현 범위에 포함한다.
+- 이 허용은 특정 Jira 한 건에만 묶지 않으며, 동일한 계약 경계 안의 후속 버그 수정·테스트·운영 안정화에도 적용한다.
+- Jira TMI-122는 최초 구현 이력이며 허용 범위의 유효기간을 제한하지 않는다.
+- 기준 구현 계획은 `docs/codex/PHONE_REJOIN_CONTINUATION_IMPLEMENTATION_PLAN.md`이며 Billing wire 계약은 Billing PR #8 merge commit `7138810`의 `docs/contracts/BILLING_SERVICE_INTEGRATION_CONTRACT.md`를 따른다.
+
+허용 범위는 다음과 같다.
+
+- target userId 소유 ExamSession이 전혀 없을 때 Billing `POST /internal/v1/reservations/continuations/phone`을 조회
+- body 없는 204를 기존 INITIAL 흐름으로, strict 200을 `PHONE_REJOIN` REPLACEMENT로 처리
+- `ExamCreationOperation`에 nullable continuation reason·ID와 expected AttemptGroup·mockExam snapshot 저장
+- 일반 reserve 3-field 계약을 유지하면서 phone continuation에만 `continuationReason`, `continuationId`, `expectedAttemptGroupId`를 모두 포함한 6-field 요청 사용
+- reserve·status optional continuation field의 reader-first decode와 operation snapshot strict 검증
+- reserve 응답 유실의 status 복구, stale context terminal 수렴과 계약 불일치의 status-first cancel 보상
+- 새 target examId·Session을 Billing의 기존 AttemptGroup·mockExamId에 연결하고 Session commit 뒤 기존 confirm 수행
+- 별도 default-off phone continuation feature flag와 startup validation
+- Billing 동기 호출의 W3C CLIENT span·traceparent 전파, baggage 미전파와 SigV4 최종 서명 순서 검증
+- 관련 unit·contract·component·Transaction 회귀 테스트와 문서 갱신
+
+다음 변경은 이 허용 범위에 포함하지 않는다.
+
+- 기존 `POST /api/v1/exams` URL, HTTP Method, Request Body, 성공 Response DTO와 `BaseResponse` 변경
+- 실제 userId, continuationId, reservationId와 attemptGroupId를 공개 Request/Response에 추가
+- source ExamSession owner 변경 또는 기존 답안·결과·Summary·upload/grading Job·audio 복사
+- `TrialOwnerRebindApproved` Learning Core consumer 추가
+- Guest `UserMerged` consumer 구현·계약 변경 또는 기존 UserMerged 계획 폐기
+- Billing owner rebind·Reservation·AttemptGroup 상태 머신과 Billing 저장소 코드 수정
+- 새로운 Grant·Claim·consumption, 결제·subscription·coupon 기능 구현
+- 기존 시험 `retryCount`, Redis Key, S3 Object Key, Presigned URL, submit·Polling과 AI `user_id=examId` 계약 변경
+- 실제 AWS Lattice/IAM/SG/ECS 리소스 생성·배포 또는 static AWS credential 추가
+
+- phone continuation flag는 기본 off이며 creation saga가 켜진 경우에만 활성화할 수 있다.
+- Billing 배포·Lattice exact route·staging E2E 전에 production flag를 활성화하지 않는다.
+- 새 continuation 유형, owner rebind lifecycle 또는 Billing 권리 정책을 추가할 때는 별도 계약과 명시적 승인이 필요하다.
+
 # AttemptGroup 상태 outbox/publisher 구현 허용 규칙
 
 사용자 결정에 따라 Learning Core의 AttemptGroup 상태 판정, durable outbox와 Billing publisher는 신규 구현 범위에 포함한다. 이 허용은 특정 Jira 한 건에만 묶지 않으며, 후속 버그 수정·테스트·운영 안정화에도 동일한 경계를 적용한다.

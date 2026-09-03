@@ -76,6 +76,18 @@ public class ExamSessionManager {
         );
     }
 
+    public PreparedAssignment preparePhoneReplacement(
+            String expectedAttemptGroupId,
+            String expectedMockExamId
+    ) {
+        MockExam mockExam = mockExamCatalogService.getRequiredExam(expectedMockExamId);
+        LocalDateTime now = LocalDateTime.ofInstant(clock.instant(), clock.getZone());
+        return new PreparedAssignment(
+                newExamId(now), mockExam, 1, now,
+                null, expectedAttemptGroupId, expectedMockExamId
+        );
+    }
+
     private Assignment startNew(String userId, int attempt) {
         List<String> abandonedExamIds = abandonInProgressSessions(userId);
 

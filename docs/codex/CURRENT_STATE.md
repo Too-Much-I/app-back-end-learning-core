@@ -2,11 +2,23 @@
 
 ## Last updated
 
-- 2026-09-01
+- 2026-09-03
 
 ## Current branch
 
-- `codex/fix-tmi-118-summary-transaction`
+- `feat/TMI-122-phone-rejoin-continuation`
+- 2026-09-03 Jira `TMI-122` phone 재가입 시험 continuation을 구현했다. `AGENTS.md`는 단건 예외 대신 확정 capability와 동일 경계의 후속 안정화를 영구 허용하도록 바꿨다. target user의 ExamSession이 0건이고 별도 flag가 켜진 경우에만 Billing discovery를 호출하며, 204는 기존 INITIAL, strict 200은 Billing 기존 AttemptGroup·mockExamId를 snapshot한 새 PHONE_REJOIN REPLACEMENT로 처리한다. operation에 continuation reason/id와 expected group/mock을 불변 저장하고, 일반 reserve 3필드와 phone reserve 6필드를 분리했으며 reserve/status echo 검증, 응답 유실 status 복구와 계약 불일치 status-first cancel fencing을 추가했다. Billing HTTP client는 호출별 CLIENT span의 traceparent를 서명 전 주입하고 SigV4를 마지막에 수행하며 식별자 없는 구조화 로그·저카디널리티 metric을 남긴다. flag 기본값은 off이고 phone flag 단독 활성화는 startup에서 거절한다. 공개 API·BaseResponse·AI·S3·Redis 계약과 source 시험 데이터는 변경하지 않았다. 관련 테스트와 전체 `./gradlew clean test`는 성공했고, production 활성화 전 Billing 배포·Lattice exact route·staging E2E가 남아 있다.
+- 2026-09-03 사용자와 TMI-122 범위를 Jira 단건 예외가 아니라 영구 허용 규칙으로 둘지 검토했다. 모든 Billing·owner rebind 변경을 포괄적으로 여는 것은 결제·권리·데이터 소유권 경계를 무력화하므로 권장하지 않지만, 확정 계약을 따르는 `phone 재가입 시험 continuation` capability와 그 후속 버그 수정·테스트·운영 안정화만 영구 허용하는 방식은 Jira 예외 누적보다 적절하다. 권장 구조는 현재 TMI-122 절을 `Phone 재가입 시험 continuation 허용 규칙`으로 바꾸고 TMI-122를 최초 구현 이력으로만 기록하며, 공개 API·source 데이터 비이전·Billing 저장소 비수정·default-off·SigV4/Lattice·staging gate 금지선은 유지하는 것이다. 이번 검토에서는 `AGENTS.md`를 추가 수정하지 않았고 구현도 계속 일시 중단 상태다.
+- 2026-09-03 사용자가 `AGENTS.md`의 기존 범위가 phone 재가입 owner continuation을 허용하지 않는다는 의미를 질문해 TMI-116·AttemptGroup 범위와 신규 TMI-122 예외의 관계를 설명했다. 기존 TMI-116 예외는 reserve·confirm·cancel·status 기반 최초 Billing saga 구현에만 적용되고 다른 Jira로 자동 확장되지 않으며, AttemptGroup 영구 허용도 UserMerged·owner rebind와 Billing Reservation saga 확장을 명시적으로 제외한다. 이는 제품 기능 금지가 아니라 Codex가 별도 승인 없이 작업 범위를 넓히지 못하게 하는 저장소 작업 거버넌스다. 사용자가 계획·Jira `TMI-122`·구현을 승인했으므로 직전 중단된 구현 턴에서 `AGENTS.md`에 phone continuation만 허용하는 제한적 예외를 추가했으며 애플리케이션 코드는 아직 변경하지 않았다.
+- 2026-09-03 Jira `TMI-122` `[Learning Core] phone 재가입 시험 continuation 연동`을 `작업` 유형, `해야 할 일` 상태로 생성했다. 목표·구현 범위·완료 조건·필수 테스트·배포 순서와 제외 범위를 `PHONE_REJOIN_CONTINUATION_IMPLEMENTATION_PLAN.md` 기준으로 기록했고, Billing `TMI-120`이 `TMI-122`를 선행 차단하는 Blocks 관계를 연결해 확인했다. 계획서의 Learning Core Jira 메타데이터와 Phase 0 체크리스트도 `TMI-122`로 갱신했다. `TMI-120`의 Jira 상태는 현재 `해야 할 일`이지만 Billing PR #8 merge commit `7138810`의 코드 병합 사실은 별도로 확인돼 있으며 이번 작업에서 상태를 변경하지 않았다. 애플리케이션 코드·설정·테스트·외부 계약은 변경하지 않았다.
+- 2026-09-03 Billing phone continuation 구현이 PR #8 merge commit `7138810`으로 Billing `develop`과 `origin/develop`에 일치하고 작업 트리가 clean인 것을 확인했다. 상류 구현 commit은 `b61ebb9`, Jira는 `TMI-120`이다. 확정된 Billing wire를 기준으로 `docs/codex/PHONE_REJOIN_CONTINUATION_IMPLEMENTATION_PLAN.md`를 작성했다. 계획은 phone 재가입과 Guest `UserMerged`를 분리하고, target Session 0건일 때만 discovery, 204 INITIAL/200 PHONE_REJOIN REPLACEMENT, operation 불변 snapshot, 3-field/6-field reserve, reserve 응답 유실 status 복구, contract mismatch status-first cancel, 204 전용 decoder, default-off flag, 새 client span traceparent 후 SigV4 최종 서명과 reader-first rollout을 확정한다. Learning Core 전용 Jira와 `AGENTS.md` 허용 범위 추가 후 구현해야 하며 애플리케이션 코드는 아직 변경하지 않았다.
+- 2026-09-03 Billing `TMI-120`의 phone 재가입 continuation 인계안을 Learning Core 현재 시험 생성 saga와 대조했다. 과거 Session·답안·결과를 이전하지 않고 Billing이 승인한 기존 AttemptGroup·mockExamId에 새 target `examId`를 연결하는 방향, 204 시 기존 INITIAL 유지, PHONE_REJOIN 세 field exact echo, 응답·status strict 검증, SigV4/Lattice와 reader-first rollout은 타당하다. 구현 전에는 이 작업이 Guest `UserMerged` consumer를 대체하지 않는 별도 phone lifecycle임을 명시하고, continuation 조회 조건을 `같은 operation의 최초 준비이며 target ExamSession이 전혀 없음`으로 고정하며, 조회 결과를 outbox가 아닌 `ExamCreationOperation`에 reserve 전에 영속화해야 한다. 또한 204 empty-body 전용 decoder, 별도 default-off flag, status의 continuation field 검증과 계약 불일치 시 untrusted reservationId 직접 cancel이 아닌 operation status 재조회 기반 보상을 계획에 추가해야 한다. 현재 시험 생성용 SigV4 client에는 trace context 주입이 없으므로 `traceparent 전파 유지`가 아니라 W3C header를 서명 전에 새로 inject하고 SigV4를 마지막 변경 단계로 두는 신규 구현으로 명시해야 한다. 코드·외부 계약·Billing 작업 트리는 변경하지 않았다.
+- 2026-09-02 1차 업데이트 간결 구성도의 토선생 앱 도형을 사용자가 제공한 토끼 PNG의 축소본을 base64로 내장한 이미지로 교체했다. AWS 리소스는 기존 공식 AWS4 아이콘을 유지하고 Atlas는 DB 실린더, 외부 AI Provider는 별도 외부 서비스 도형으로 구분했다. 아이콘과 텍스트를 독립 도형으로 분리하고 주요 8개 연결을 라벨 경계끼리 연결해 화살표가 글자 위를 통과하지 않도록 수정했다. 68,167 byte PNG가 draw.io 내부에 포함되어 원본 Desktop 경로 없이도 열린다. XML, base64 PNG, ID·레이어와 `git diff --check`를 검증했으며 애플리케이션 코드·AWS 리소스·외부 계약은 변경하지 않았다.
+- 2026-09-02 종료 기록 동기화: 1차 업데이트 간결 구성도의 AWS4 아이콘 적용 결과를 재확인했다. ALB·Fargate 4개·S3·ElastiCache의 7개 AWS 아이콘, 16개 도형·10개 연결선과 후면 edge layer가 유지된다. 이번 종료 동기화에서는 구성도·애플리케이션 코드·AWS 리소스·외부 계약을 추가 변경하지 않았다.
+- 2026-09-02 1차 업데이트 간결 구성도의 AWS 리소스에 diagrams.net AWS4 Architecture 아이콘을 적용했다. ALB는 Application Load Balancer 아이콘, Identity·Learning Core·AI·Billing은 각각 Fargate 아이콘, 음성 저장소는 S3 아이콘, Valkey는 ElastiCache 아이콘으로 표시했다. 앱과 MongoDB Atlas·외부 AI Provider처럼 AWS 관리 리소스가 아닌 요소는 일반 도형을 유지해 AWS 경계를 구분했다. 기존 16개 도형·10개 연결선과 후면 edge layer, 서비스 연결 관계는 유지했으며 코드·AWS 리소스·외부 계약은 변경하지 않았다.
+- 2026-09-02 1차 업데이트 AWS 구성도를 발표용으로 한 단계 더 단순화했다. VPC/Subnet/NAT, ECR, GitHub Actions와 운영·관측 세부 도형을 제거하고 토선생 앱→가비아 DNS·ALB→Identity/Learning Core의 사용자 진입, ECS Fargate의 Identity·Learning Core·AI·Billing 태스크 각 1개, S3·Valkey·MongoDB Atlas와 외부 AI Provider만 남겼다. Learning Core↔AI의 Service Connect와 Learning Core↔Billing의 VPC Lattice·SigV4는 연결선 라벨로 유지했다. 도형은 25개에서 16개, 연결선은 15개에서 10개로 줄었고 모든 연결선은 후면 `edge-layer`에 있다. 애플리케이션 코드·AWS 리소스·외부 계약은 변경하지 않았다.
+- 2026-09-02 간결 AWS 구성도를 현재 실배포가 아니라 1차 업데이트 완료 목표로 수정했다. Identity·Learning Core·Billing·AI를 ECS Fargate 서비스별 태스크 1개로 통일하고, AI는 Worker 없는 단일 FastAPI 서버로 표시했다. Learning Core↔AI는 Service Connect, Learning Core→VPC Lattice↔Billing은 SigV4/AWS_IAM 기반 비공개 통신으로 구분했으며 Billing을 ALB 공개 경로에 연결하지 않았다. Valkey의 AI Job Queue 표기를 제거하고 Learning 상태·Lock만 남겼으며 MongoDB Atlas와 ECR에 Billing을 반영했다. 현재 콘솔은 staging 접두어, Billing 미배포, AI Worker 4개 상태라는 차이는 하단 주의 문구로 보존했다. 애플리케이션 코드·AWS 리소스·외부 계약은 변경하지 않았다.
+- 2026-09-02 Jira `TMI-118` Summary Transaction hotfix가 commit `4781723`, PR #26 merge commit `4f9e74c`로 현재 로컬·원격 `develop`에 반영된 것을 확인했다. 따라서 다음 즉시 작업은 AttemptGroup rollout을 막고 있는 실제 경계 통합 검증이다. 격리된 replica-set Mongo에서 commit/rollback·duplicate·unknown commit·terminal race와 multi-instance lease reclaim/stale fencing을 검증하고, fake signer/HTTP component test로 traceparent 주입 후 SigV4 최종 서명과 금지 데이터 부재를 확인한 뒤 Learning Core/Billing staging에서 동일 traceId·서로 다른 spanId·baggage 미전파 E2E를 수행한다. 이 gate 이후 다음 제품 기능은 Billing `UserMerged` retained subject owner rebind ADR·계획서·신규 Jira다. 코드·Jira·DB·AWS는 변경하지 않았고 기존 미추적 draw.io 2개를 보존했다.
 - 2026-09-01 Jira `TMI-118` hotfix의 사용자 commit·push 명령을 현재 변경 파일 기준으로 정리했다. `git add .` 대신 애플리케이션 2개, 신규 테스트 2개와 필수 CURRENT_STATE·WORKLOG만 명시적으로 stage하고 `fix(TMI-118): retry aborted summary transactions` 메시지로 commit한 뒤 현재 브랜치 `codex/fix-tmi-118-summary-transaction`을 origin에 upstream 설정해 push하도록 안내한다. 명령 안내만 수행했고 Git commit·push는 실행하지 않았다.
 - 2026-09-01 종료 훅 동기화: Jira `TMI-118` Summary Transaction hotfix는 새 브랜치 `codex/fix-tmi-118-summary-transaction`에서 완료됐다. abort된 Transaction 밖의 전체-unit 재시도, Summary Job false rollback, nested coordinator 예외 전파와 회귀 테스트 5개를 적용했고 `./gradlew clean test` 전체 444개 및 `git diff --check`가 성공했다. 공개 API·AI·S3·Redis·Billing 계약은 유지했으며 commit·push·PR·merge·배포는 수행하지 않았다.
 - 2026-09-01 Jira `TMI-118` Summary Transaction P1 hotfix를 새 브랜치 `codex/fix-tmi-118-summary-transaction`에서 구현했다. Summary deterministic ID를 Transaction 안에서 먼저 조회·identity 검증하고 없을 때만 insert하며, duplicate/optimistic/TransientTransactionError/UnknownTransactionCommitResult는 abort된 Transaction 내부에서 삼키지 않고 rollback 뒤 최대 3회의 새 Transaction으로 Summary+Job+Session+outbox 전체 단위를 재시도한다. Summary Job 완료가 false면 Transaction을 rollback-only로 만들어 Summary 단독 commit을 막았다. coordinator에는 outer Transaction 전용 `reconcileWithinTransaction()`을 분리해 동시성 예외가 바깥 재시도 경계까지 전파되도록 했다. 중복 rollback 후 전체 재시도, false rollback, unknown commit, identity conflict와 nested duplicate 전파 테스트 5개를 추가했고 `./gradlew clean test` 전체 444개가 성공했다. 공개 API·BaseResponse·AI·S3·Redis·Billing wire 계약은 유지했다. 실제 replica-set failure injection, multi-instance lease, SigV4와 cross-service trace/privacy 통합 테스트는 별도 잔여 gate다.
@@ -1885,3 +1897,190 @@
 - `TMI-118` `[Learning Core] AttemptGroup durable outbox/publisher 구현`은 `작업` 유형과 `해야 할 일` 상태로 생성 완료됐다.
 - 확정 정책, 구현·제외 범위, 완료 조건과 production 활성화 제한은 Jira와 `docs/codex/ATTEMPT_GROUP_OUTBOX_PUBLISHER_IMPLEMENTATION_PLAN.md`에 동기화돼 있다.
 - 이번 종료 동기화는 CURRENT_STATE와 WORKLOG marker 보완만 수행했으며 애플리케이션·AWS·Jira 내용·Git commit/push와 Secret/Token은 변경하지 않았다.
+
+## 시스템 구성도 표현 도구 선택 (2026-09-01)
+
+- 시스템 전체의 서비스·저장소·외부 연동·신뢰 경계는 편집성과 자유 배치가 좋은 draw.io를 원본으로 사용하는 방향을 권고했다.
+- Mermaid는 별도의 요청 sequence·상태 전이·간단한 흐름처럼 코드와 함께 버전 관리할 도식에 사용한다.
+- 생성 이미지는 발표용 삽화에는 사용할 수 있지만 정확한 label, 연결 관계, 편집과 diff가 필요한 시스템 구성도의 source of truth로 사용하지 않는다.
+- 동일 도식을 여러 형식으로 중복 유지하지 않는다. 이번 작업에서 실제 도식과 애플리케이션·외부 계약은 변경하지 않았다.
+
+## 토선생 앱 시스템 구성도 draw.io (2026-09-01)
+
+- 별도 Jira 없이 `docs/architecture/tosunsaeng-app-system-configuration.drawio` 한 페이지 시스템 구성도를 추가했다.
+- 앱, Identity, Learning Core, Billing, Python AI, 서비스별 MongoDB, Redis와 S3를 배치하고 공개 HTTPS, JWT/JWKS, SigV4·VPC Lattice, Presigned PUT, AI 요청·Callback을 표현했다.
+- Billing 내부 전용 경계, `examId→userId`, `AI user_id=examId`, 실제 userId 비전송, 서비스별 데이터 소유권과 rollout gate를 명시했다.
+- draw.io XML, 1개 diagram, 29개 vertex, 14개 edge와 모든 source/target 참조를 검증했다. 애플리케이션과 외부 계약은 변경하지 않았다.
+
+## 시스템 구성도 연결선 정리 (2026-09-01)
+
+- 사용자 PNG에서 서비스 내부 도형을 관통하던 연결선을 확인하고 `tosunsaeng-app-system-configuration.drawio`의 주요 9개 edge에 고정 entry/exit와 경유점을 지정했다.
+- 앱·Identity·Learning Core·Billing 연결은 상단·서비스 하단 통로로, AI 요청은 데이터 저장소 사이 빈 통로로, Callback은 우측 외곽 통로로 분리했다.
+- 긴 연결선 label을 축약하고 offset을 적용했다. XML, 14개 edge, 9개 수동 route와 source/target 참조를 검증했으며 시스템 의미와 외부 계약은 변경하지 않았다.
+- 종료 훅 기준 WORKLOG marker와 현재 상태를 동기화했다. diagrams.net 육안 확인 외 남은 애플리케이션·배포 작업은 없다.
+
+## 시스템 구성도 관점 검토 (2026-09-01)
+
+- 현재 draw.io는 일반 제품 시스템 구성도보다 `앱 백엔드 기술 구성도` 성격이 강하며 백엔드 멘토링에는 적합하다고 판단했다.
+- 제품·비개발 독자를 위해서는 사용자, 앱 기능, 로그인→시험→녹음→AI 채점→결과 흐름과 세 서비스의 역할만 보이는 상위 페이지가 별도로 필요하다.
+- 권고 구조는 1페이지 `전체 시스템 구성도`, 2페이지 기존 `백엔드 기술 구성도`다. 실제로 확인되지 않은 프론트 인프라는 추정해 넣지 않는다.
+- 이번 검토에서 draw.io, 애플리케이션과 외부 계약은 변경하지 않았다.
+
+## 전체 시스템·AWS 구성도 (2026-09-01)
+
+- 별도 Jira 없이 `tosunsaeng-app-system-configuration.drawio`를 2페이지로 확장했다. 첫 페이지는 전체 시스템·AWS 구성도, 둘째 페이지는 기존 백엔드 기술 구성도다.
+- AWS 페이지는 현재 ALB+Identity/Learning Core ECS, GitHub Actions OIDC→ECR→ECS 배포와 S3를 실선으로 표시한다.
+- 아직 미배포인 Billing VPC Lattice AWS_IAM, private Fargate·no ALB/public IP와 환경별 role/SG/Secret/database 분리 목표는 주황 점선으로 표시한다.
+- 실제 ALB listener/target/DNS, subnet·SG·ARN, DB/Redis/NAT network path와 Secret 서비스는 read-only AWS inventory 필요 항목으로 남겼다.
+- XML, 2개 페이지, AWS 페이지 vertex 25개·edge 16개와 source/target 참조를 검증했다. 애플리케이션과 외부 계약은 변경하지 않았다.
+- AWS 페이지의 16개 연결선 중 14개에 고정 경유점을 두어 Identity→Lattice, Learning Core↔AI, 앱→S3와 데이터 의존성 선이 다른 서비스·managed resource 도형 위를 지나지 않게 분리했다.
+
+## 1차 업데이트 완료 기준 시스템·AWS 구성도 (2026-09-01)
+
+- `tosunsaeng-app-system-configuration.drawio` 첫 페이지는 현재/목표 비교가 아니라 1차 업데이트의 모든 release gate와 production canary가 완료된 시점의 단일 스냅샷이다.
+- 앱 기능은 SNS/Phone 로그인, 무료 모의고사, 기존 시험·AI 결과와 10초 챌린지를 포함한다. Identity는 Guest/MEMBER·JWT/JWKS·merge/withdrawal, Learning Core는 시험·무료 응시 saga·AI 채점·Challenge·AttemptGroup publisher를 담당한다.
+- AWS production 구조는 public ALB 뒤 Identity/Learning Core, private Billing Fargate, VPC Lattice `AWS_IAM`·SigV4, ECR 3개 서비스 image, S3 audio와 서비스별 MongoDB·Redis를 표시한다.
+- 기존 둘째 페이지 백엔드 기술 구성도와 첫 페이지의 고정 routing은 보존했다. XML 2페이지, 첫 페이지 vertex 25개·edge 16개, 누락 연결 참조 0개와 과도기 표기 제거를 검증했다.
+- 이 변경은 별도 Jira가 아니며 애플리케이션·외부 계약·AWS resource·배포·Git commit/push를 변경하지 않았다. 정확한 AWS resource ID는 inventory 없이 추정하지 않았다.
+
+## 앱 프론트·AI 근거 기반 전체 제품 구성도 (2026-09-01)
+
+- 최신 구성도는 3페이지다: `1. 제품·사용자 흐름`, `2. AWS·배포`, `3. 백엔드 기술 상세`. 첫 페이지가 기본 설명용이며 사용자 가치와 앱 화면·기능을 서비스보다 먼저 보여준다.
+- 앱 근거는 `Too-Much-I/app-front-end@4e6c5957`이다. Expo 57 React Native, 홈/모의고사/피드백, Guest 인증 복구, 11문항 녹음·업로드·Polling, WebView/native bridge, 재답변, 10초 챌린지, Amplitude·Clarity·Sentry와 EAS 전달 흐름을 반영했다.
+- AI 근거는 `Too-Much-I/web-ai@ee9db665`이다. AI는 AWS 외부가 아니라 ECS의 FastAPI API·Redis queue·4 worker이며 Q1 Azure, Q2~Q11 STT+Azure+LLM/VLM, checklist score, 한국어 피드백·요약 Callback을 수행한다.
+- `1차 업데이트 완료 기준`이므로 프론트의 현재 Challenge 개발 mock은 제거되고 실제 API가 연결된 상태, AI 저장소에 현재 없는 Challenge 전용 평가·Callback과 SNS/Phone login은 구현·E2E가 끝난 상태로 표현했다. 이는 현재 코드 사실이 아니라 완료 조건에 따른 계획 상태다.
+- XML 3페이지, 페이지별 vertex/edge `24/17`, `25/17`, `29/14`, 전체 연결 참조 누락 0개를 검증했다. 문서 외 코드·계약·AWS·Jira·배포는 변경하지 않았다.
+
+## 전체 제품·AWS 구성도 화살표 정리 (2026-09-01)
+
+- 제품 페이지의 의미와 내용은 유지하면서 edge를 17개에서 14개로 줄였다. AI 요청/Callback은 양방향 한 줄이며, 결과 회귀·데이터 설명선은 박스 설명으로 대체했다.
+- 앱의 Presigned PUT 선은 Identity와 Learning 사이 빈 통로를 수직으로 내려가 하단 전용 lane으로 S3에 연결되므로 서비스 도형을 관통하지 않는다.
+- AWS 페이지의 Learning Core↔AI 왕복선도 양방향 한 줄로 합쳐 edge가 16개가 됐다. 기존 고정 routing은 유지했다.
+- 최신 검증값은 페이지별 vertex/edge/routed `24/14/8`, `25/16/13`, `29/14/9`, 전체 누락 source/target 0개다.
+- 별도 Jira와 애플리케이션·계약·AWS·배포 변경은 없다. diagrams.net 실제 화면에서 label offset의 최종 육안 확인만 남는다.
+
+## 구성도 화살표 레이어 조정 (2026-09-01)
+
+- 세 페이지 모두 큰 영역 배경을 최하단, 연결선을 중간, 실제 기능·서비스 도형과 텍스트를 최상단에 두었다.
+- 화살표는 AWS/VPC/서비스 영역 색상 위에는 보이지만 개별 카드와 글자 뒤로 지나가며, 연결 경로·source/target·경유점은 유지했다.
+- 페이지별 vertex/edge는 `24/14`, `25/16`, `29/14`로 유지됐다. foreground보다 앞에 남은 edge, edge 위로 잘못 올라온 영역 배경과 누락 source/target은 모두 0개다.
+- 이번 변경은 별도 Jira가 아니며 애플리케이션·외부 계약·AWS·배포·Git commit/push 변경은 없다.
+- diagrams.net 실제 화면에서 카드 뒤 가림 동작을 육안 확인하는 단계만 남는다.
+
+## draw.io 실제 레이어 분리·렌더 검증 (2026-09-01)
+
+- XML 순서만 바꾸는 방식은 실제 renderer에서 edge z-order를 보장하지 못해 폐기했다.
+- 최신 파일은 각 페이지마다 top-level `배경`, `연결선`, `도형·텍스트` layer를 실제로 가진다. 모든 edge parent는 `edge-layer`이고 실제 카드는 foreground layer에 있다.
+- 제품·AWS 페이지는 복원·재검증했고, 백엔드 상세는 사용자 원본 `제목 없는 다이어그램.drawio`를 수정하지 않고 읽기 전용으로 결합했다.
+- Browser 스킬로 첫 페이지를 diagrams.net 편집기에 로드해 카드가 선보다 위에 렌더링되는 실제 화면을 확인했다.
+- 검증값은 페이지별 `3 layers / 24 vertices / 14 edges`, `3 / 21 / 14`, `3 / 28 / 15`이며 잘못된 edge parent와 누락 source/target은 모두 0개다.
+- 별도 Jira와 애플리케이션·외부 계약·AWS·배포·Git commit/push 변경은 없다. 로컬에서 수정 파일을 새로 열어 확인해야 한다.
+
+## 데일리 학습 콘텐츠 수행 방법 문구 (2026-09-01)
+
+- 수행 방법 표의 `개발 단계 > 데일리 학습 콘텐츠`에는 10초 챌린지를 중심으로 콘텐츠 자체 제작·전문가 검수, 매일 문제 제공, 음성 녹음, AI 분석, 교정·모범답안·피드백과 데이터 기반 개선 절차를 작성하는 방향을 권고했다.
+- 제출용 기본 문장과 글자 수가 짧을 때 사용할 축약형을 함께 제공한다.
+- 별도 Jira가 아니며 애플리케이션·외부 계약·draw.io·AWS·배포·Git commit/push 변경은 없다.
+
+## 중간 발표용 개발 문제점 2개 선정 (2026-09-01)
+
+- 중간 발표에는 `AI 채점 품질·신뢰도`와 `외부 AI API 비용·의존성` 두 가지를 사용하는 것으로 권장했다.
+- 해결 방안은 품질 sample 검수·지표 모니터링과 대체 모델 사전 검증·유연한 모델 선택 구조다.
+- 별도 Jira가 아니며 애플리케이션·외부 계약·draw.io·AWS·배포·Git commit/push 변경은 없다.
+
+## 전체 서비스 개발 문제점·해결 방안 제출 문구 종료 (2026-09-01)
+
+- 개발 측면 예상 문제점 7개와 동일 순서의 해결 방안 7개를 사용자가 제시한 문체로 작성 완료했다.
+- AI 품질·비용, 서비스 계약, 음성/비동기 안정성, 확장성, 데이터 보호와 콘텐츠 품질을 포함한다.
+- 별도 Jira가 아니며 애플리케이션·외부 계약·draw.io·AWS·배포·Git commit/push 변경은 없다.
+
+## 전체 서비스 개발 측면 예상 문제점 문체 정리 (2026-09-01)
+
+- 사용자가 제시한 형식에 맞춰 전체 서비스 개발 위험을 `발생 가능성` 문장과 같은 순서의 해결 방안 bullet로 정리했다.
+- AI 품질·비용, 서비스 계약, 음성/비동기 안정성, 개인정보와 확장성을 포함한다.
+- 별도 Jira가 아니며 애플리케이션·외부 계약·draw.io·AWS·배포·Git commit/push 변경은 없다.
+
+## 전체 서비스 문제점·해결 방안·결과물 문구 종료 (2026-09-01)
+
+- 토선생 전체 기능을 기준으로 개발 예상 문제점, 항목별 해결 방안과 결과물 형태의 제출용 문구 작성을 완료했다.
+- 상세 문단, 문제점과 해결 방안 대응표 및 축약형을 제공했다.
+- 별도 Jira가 아니며 애플리케이션·외부 계약·draw.io·AWS·배포·Git commit/push 변경은 없다.
+
+## 전체 서비스 예상 문제점·해결 방안·결과물 문구 (2026-09-01)
+
+- 예상 문제점과 결과물 형태의 범위를 데일리 콘텐츠에서 토선생 전체 서비스로 정정했다.
+- 전체 위험은 범위·서비스 계약·AI 품질·음성/비동기 안정성·콘텐츠 운영·개인정보·비용/확장성·배포 운영으로 분류하고 각 항목에 해결 방안을 연결했다.
+- 결과물은 모바일 앱, 앱 서버 3종, AI 서버, 콘텐츠 catalog, 학습 로드맵·챗봇, 계약·테스트·운영·배포 문서로 정리한다.
+- 별도 Jira가 아니며 애플리케이션·외부 계약·draw.io·AWS·배포·Git commit/push 변경은 없다.
+
+## 데일리 학습 콘텐츠 문구 작성 종료 (2026-09-01)
+
+- 데일리 학습 콘텐츠의 수행 방법, 개발 측면 예상 문제점과 결과물 형태에 대한 제출용 기본 문장 및 축약형 작성을 완료했다.
+- 문제점은 콘텐츠 품질·AI 일관성·음성/비동기 안정성·비용/개인정보로, 결과물은 앱 화면·catalog DB·API·AI 피드백·운영 문서로 정리했다.
+- 별도 Jira가 아니며 애플리케이션·외부 계약·draw.io·AWS·배포·Git commit/push 변경은 없다.
+
+## 데일리 학습 콘텐츠 예상 문제점·결과물 문구 (2026-09-01)
+
+- 개발 측면 문제점은 콘텐츠 지속 확보·난이도 품질, AI 판정 일관성, 음성 업로드, 비동기 지연·중복, 비용·개인정보 보호로 정리했다.
+- 결과물은 앱 화면, 콘텐츠 catalog DB, 백엔드·AI API 파이프라인, AI 피드백 결과와 테스트·운영 문서로 구분한다.
+- 별도 Jira가 아니며 애플리케이션·외부 계약·draw.io·AWS·배포·Git commit/push 변경은 없다.
+
+## 중간 발표용 개발 문제점 2개 최종 선정 (2026-09-01)
+
+- 중간 발표용으로 `AI 채점 품질·신뢰도`와 `외부 AI API 비용·의존성`을 최종 추천했다.
+- 해결 방향은 채점 표본 검수·품질 지표 모니터링과 대체 모델 검증·비용/성능 기반 모델 선택 구조다.
+- 별도 Jira가 아니며 애플리케이션·외부 계약·draw.io·AWS·배포·Git commit/push 변경은 없다.
+
+## 학습 로드맵·챗봇 무료/유료 설명 정리 (2026-09-02)
+
+- 무료 버전은 최초 목표 설정 시 입력한 목표 등급과 시험 준비 기간을 기준으로 사전 설계된 표준 학습 로드맵을 안내한다.
+- 유료 버전은 표준 로드맵에 사용자의 학습 이력, 모의고사 결과와 피드백을 결합하여 챗봇이 취약점·우선순위·세부 학습 방법을 맞춤 안내한다.
+- 유료 로드맵의 갱신 주기, 추천 범위, 설명 근거와 무료/유료 전환 조건은 후속 결정 사항이다.
+- 별도 Jira가 없으며 애플리케이션·외부 계약·draw.io·AWS·배포·Git commit/push 변경은 없다.
+
+## 학습 로드맵·챗봇 상세 설명 확장 (2026-09-02)
+
+- 기능 흐름을 목표 설정, 무료 표준 로드맵 매칭, 유료 학습 데이터 분석, 맞춤 코칭과 성과 기반 재조정으로 구체화했다.
+- 개인화는 사전 검증된 로드맵의 범위 안에서 이루어지며 데이터가 부족하면 표준 경로를 유지하는 품질 원칙을 포함했다.
+- 목표 등급·준비 기간 분류표, 갱신 시점과 챗봇 제안 항목은 후속 제품 결정 사항이다.
+- 별도 Jira가 없으며 애플리케이션·외부 계약·draw.io·AWS·배포·Git commit/push 변경은 없다.
+
+## 학습 로드맵·챗봇 상세 설명 완료 (2026-09-02)
+
+- 무료 표준 로드맵과 유료 데이터 기반 맞춤 코칭을 전체 기능 흐름, 갱신 방식과 품질 안전장치까지 포함한 최종 문안으로 작성했다.
+- 데이터가 부족하면 표준 경로를 유지하고 개인화 결과에는 학습 이력·모의고사·AI 피드백의 근거가 연결되도록 설명했다.
+- 로드맵 분류표, 갱신 시점, 추천 단위와 상품 전환 정책은 후속 제품 결정 사항이다.
+- 별도 Jira가 없으며 애플리케이션·외부 계약·draw.io·AWS·배포·Git commit/push 변경은 없다.
+
+## 실제 AWS 중심 간결 구성도 사전 확인 (2026-09-02)
+
+- 첨부 예시처럼 상위 AWS 리소스와 핵심 통신 흐름만 남긴 간결한 draw.io로 재작성할 예정이다.
+- 저장소에서는 GitHub Actions OIDC → ECR → ECS Fargate, S3 Presigned 업로드, MongoDB·Redis 사용을 확인했다.
+- 기존 문서의 ALB, VPC Lattice, private Billing, AI ECS와 관측 구조는 실제 콘솔 배포 상태 확인 전에는 계획·추론으로 구분한다.
+- 대상 환경·리전, ECS, ingress, VPC, Lattice, 데이터 저장소와 관측 리소스에 대한 사용자 답변 또는 로그인된 AWS 콘솔의 읽기 전용 확인이 다음 단계다.
+- 별도 Jira가 없으며 애플리케이션·외부 계약·draw.io·AWS·배포·Git commit/push 변경은 없다.
+
+## Production AWS 구성 확인 대기 (2026-09-02)
+
+- 대상은 서울 리전 Production 단일 환경이며 현재 배포 서비스는 Identity·Learning Core·AI이고 Billing은 제외한다.
+- 가비아 도메인 → 공유 ALB 구조이며 CloudFront·API Gateway·WAF는 사용하지 않는다. Cache는 Valkey이고 MongoDB Atlas는 클러스터로 분리돼 있다.
+- 사용자가 콘솔 읽기 전용 확인을 승인했으며 AWS 로그인 페이지를 열어 인증 완료를 기다리고 있다.
+- 로그인 후 ECS·ALB·VPC·S3·ECR·Valkey·CloudWatch 실배포 상태를 확인하여 간결한 draw.io로 작성한다.
+- 별도 Jira가 없으며 AWS 설정·애플리케이션·외부 계약·draw.io·배포·Git commit/push 변경은 없다.
+
+## 실제 AWS 기반 간결 Production 구성도 완료 (2026-09-02)
+
+- `docs/architecture/tosunsaeng-production-aws-simple.drawio` 한 페이지를 신규 작성했다. Billing과 미사용 서비스를 제외하고 앱→가비아 DNS→공유 ALB→Identity/Learning, Service Connect 기반 Learning↔AI, S3·Valkey·Atlas와 OIDC→ECR→ECS만 표현했다.
+- 실배포는 서울 리전의 단일 Fargate cluster에 Identity·Learning·AI task 각 1개이며, ALB는 Identity `8081`과 Learning `8080`만 공개한다. AI task에는 API 1개와 worker 4개가 함께 실행된다.
+- Public subnet 2개·Private subnet 2개·NAT Gateway 1개, S3 앱 음성 bucket, 단일 node형 Valkey와 CloudWatch Container Insights를 반영했다.
+- 실제 resource 이름은 `staging`이고 별도 production-named cluster·ALB는 확인되지 않아 구성도 하단에 명칭 확인 경고를 넣었다.
+- Valkey 단일 node·Multi-AZ 비활성·전송 암호화 비활성은 남은 운영 위험이며 AWS 설정은 변경하지 않았다.
+- 별도 Jira가 없고 코드·외부 계약·AWS 설정·배포·Git commit/push 변경은 없다.
+
+## 실제 AWS 기반 간결 구성도 검증 종료 (2026-09-02)
+
+- `docs/architecture/tosunsaeng-production-aws-simple.drawio` 작성과 XML·ID·diff 형식 검증을 완료했다.
+- 구성도는 한 페이지, 23개 vertex, 13개 edge이며 연결선은 별도 하위 레이어에 배치했다.
+- 발표 전 diagrams.net 육안 확인과 실제 `staging` resource 명칭을 Production 발표에서 어떻게 표현할지 결정해야 한다.
+- Valkey 단일 node·Multi-AZ·전송 암호화 상태는 운영 전 별도 검토가 필요하다.
+- 별도 Jira가 없으며 코드·외부 계약·AWS 설정·배포·Git commit/push 변경은 없다.

@@ -11,6 +11,7 @@ import web.tosunsaeng.domain.exams.billing.BillingSagaProperties;
 import web.tosunsaeng.domain.exams.domain.entity.ExamCreationOperation;
 import web.tosunsaeng.domain.exams.domain.entity.ExamSession;
 import web.tosunsaeng.domain.exams.domain.enums.BillingReservationKind;
+import web.tosunsaeng.domain.exams.domain.enums.BillingContinuationReason;
 import web.tosunsaeng.domain.exams.domain.enums.ExamCreationState;
 import web.tosunsaeng.domain.exams.domain.repository.ExamCreationOperationRepository;
 import web.tosunsaeng.domain.exams.domain.repository.ExamSessionRepository;
@@ -104,7 +105,24 @@ public class BillingExamCreationSaga {
             throw new ExamsException(ErrorStatus._EXAM_CREATION_PROCESSING, 1);
         }
 
-        ExamSessionManager.PreparedAssignment prepared = sessionManager.prepareForBilling(userId);
+        BillingReservationClient.PhoneContinuationSnapshot continuation = null;
+        ExamSessionManager.PreparedAssignment prepared;
+        if (properties.isPhoneContinuationEnabled()
+                && !sessionRepository.existsByUserId(userId)) {
+            try {
+                continuation = billingClient.findPhoneContinuation(userId).orElse(null);
+            } catch (BillingClientException failure) {
+                throw publicFailure(failure);
+            }
+        }
+        if (continuation == null) {
+            prepared = sessionManager.prepareForBilling(userId);
+        } else {
+            validatePhoneContinuation(continuation);
+            prepared = sessionManager.preparePhoneReplacement(
+                    continuation.attemptGroupId(), continuation.mockExamId()
+            );
+        }
         Instant now = now();
         ExamCreationOperation operation = ExamCreationOperation.prepared(
                 userId,
@@ -115,6 +133,8 @@ public class BillingExamCreationSaga {
                 prepared.replacementSourceSessionId(),
                 prepared.expectedAttemptGroupId(),
                 prepared.expectedMockExamId(),
+                continuation == null ? null : continuation.continuationReason(),
+                continuation == null ? null : continuation.continuationId(),
                 now
         );
         try {
@@ -127,20 +147,40 @@ public class BillingExamCreationSaga {
     }
 
     private void reserve(ExamCreationOperation operation) {
+        validatePreparedOperation(operation);
         BillingReservationClient.ReservationSnapshot snapshot;
         try {
-            snapshot = billingClient.reserve(
-                    operation.getOperationId(),
-                    operation.getUserId(),
-                    operation.getSessionId(),
-                    operation.getMockExamId()
-            );
+            snapshot = operation.isPhoneContinuation()
+                    ? billingClient.reservePhoneContinuation(
+                            operation.getOperationId(),
+                            operation.getUserId(),
+                            operation.getSessionId(),
+                            operation.getMockExamId(),
+                            operation.getContinuationReason(),
+                            operation.getContinuationId(),
+                            operation.getExpectedAttemptGroupId()
+                    )
+                    : billingClient.reserve(
+                            operation.getOperationId(),
+                            operation.getUserId(),
+                            operation.getSessionId(),
+                            operation.getMockExamId()
+                    );
         } catch (BillingClientException failure) {
             if (failure.category() == BillingClientException.Category.ENTITLEMENT_INSUFFICIENT
                     || failure.category() == BillingClientException.Category.IDEMPOTENCY_CONFLICT
-                    || failure.category() == BillingClientException.Category.CONTRACT_ERROR
-                    || failure.category() == BillingClientException.Category.INVALID_REQUEST) {
+                    || failure.category() == BillingClientException.Category.INVALID_REQUEST
+                    || (operation.isPhoneContinuation()
+                    && failure.category() == BillingClientException.Category.RESERVATION_CONFLICT)) {
                 markTerminalFailure(operation, failure.category().name());
+                throw publicFailure(failure);
+            }
+            if (failure.category() == BillingClientException.Category.TEMPORARILY_UNAVAILABLE
+                    || failure.category() == BillingClientException.Category.PROCESSING
+                    || failure.category() == BillingClientException.Category.OPERATION_NOT_FOUND
+                    || failure.category() == BillingClientException.Category.CONTRACT_ERROR) {
+                reconcilePreparedReserve(operation, failure);
+                return;
             }
             throw publicFailure(failure);
         }
@@ -148,7 +188,7 @@ public class BillingExamCreationSaga {
         try {
             validateReserved(operation, snapshot);
         } catch (RuntimeException contractFailure) {
-            markTerminalFailure(operation, "RESERVE_CONTRACT_MISMATCH");
+            reconcileReserveContractMismatch(operation);
             throw new ExamsException(ErrorStatus._BILLING_TEMPORARILY_UNAVAILABLE);
         }
 
@@ -163,6 +203,131 @@ public class BillingExamCreationSaga {
             operationRepository.save(operation);
         } catch (OptimisticLockingFailureException concurrent) {
             // Another replay advanced the same operation. The caller loop reloads it.
+        } catch (RuntimeException persistenceFailure) {
+            throw new ExamsException(ErrorStatus._BILLING_TEMPORARILY_UNAVAILABLE, 1);
+        }
+    }
+
+    private void validatePhoneContinuation(
+            BillingReservationClient.PhoneContinuationSnapshot continuation
+    ) {
+        if (continuation.continuationReason() != BillingContinuationReason.PHONE_REJOIN
+                || !isLowercaseUuidV4(continuation.continuationId())
+                || !isOpaqueText(continuation.attemptGroupId())
+                || !isOpaqueText(continuation.mockExamId())) {
+            throw new ExamsException(ErrorStatus._BILLING_TEMPORARILY_UNAVAILABLE);
+        }
+    }
+
+    private void validatePreparedOperation(ExamCreationOperation operation) {
+        boolean sourcePresent = !isBlank(operation.getReplacementSourceSessionId());
+        boolean groupPresent = !isBlank(operation.getExpectedAttemptGroupId());
+        boolean mockPresent = !isBlank(operation.getExpectedMockExamId());
+        if (operation.isPhoneContinuation()) {
+            if (sourcePresent
+                    || !groupPresent
+                    || !mockPresent
+                    || !Objects.equals(operation.getMockExamId(), operation.getExpectedMockExamId())
+                    || !isLowercaseUuidV4(operation.getContinuationId())) {
+                throw new ExamsException(ErrorStatus._BILLING_TEMPORARILY_UNAVAILABLE);
+            }
+            return;
+        }
+        if (operation.getContinuationReason() != null
+                || operation.getContinuationId() != null
+                || sourcePresent != groupPresent
+                || sourcePresent != mockPresent) {
+            throw new ExamsException(ErrorStatus._BILLING_TEMPORARILY_UNAVAILABLE);
+        }
+    }
+
+    private void reconcilePreparedReserve(
+            ExamCreationOperation operation,
+            BillingClientException originalFailure
+    ) {
+        BillingReservationClient.ReservationSnapshot status;
+        try {
+            status = billingClient.status(operation.getUserId(), operation.getOperationId());
+        } catch (BillingClientException statusFailure) {
+            if (statusFailure.category() == BillingClientException.Category.OPERATION_NOT_FOUND) {
+                throw publicFailure(originalFailure);
+            }
+            throw publicFailure(statusFailure);
+        } catch (RuntimeException contractFailure) {
+            throw new ExamsException(ErrorStatus._BILLING_TEMPORARILY_UNAVAILABLE, 1);
+        }
+
+        if (status.reservationStatus() == BillingReservationClient.ReservationStatus.RESERVED) {
+            try {
+                validateReserved(operation, status);
+            } catch (RuntimeException contractFailure) {
+                throw new ExamsException(ErrorStatus._BILLING_TEMPORARILY_UNAVAILABLE, 1);
+            }
+            if (originalFailure.category() == BillingClientException.Category.CONTRACT_ERROR) {
+                persistCancelPending(operation, status);
+            } else {
+                persistReserved(operation, status);
+            }
+            return;
+        }
+        if (status.reservationStatus() == BillingReservationClient.ReservationStatus.CANCELED
+                || status.reservationStatus() == BillingReservationClient.ReservationStatus.EXPIRED) {
+            markTerminalFailure(operation, "RESERVE_" + status.reservationStatus().name());
+            throw new ExamsException(ErrorStatus._BILLING_TEMPORARILY_UNAVAILABLE);
+        }
+        throw new ExamsException(ErrorStatus._BILLING_TEMPORARILY_UNAVAILABLE, 1);
+    }
+
+    private void reconcileReserveContractMismatch(ExamCreationOperation operation) {
+        BillingReservationClient.ReservationSnapshot status;
+        try {
+            status = billingClient.status(operation.getUserId(), operation.getOperationId());
+            if (status.reservationStatus()
+                    == BillingReservationClient.ReservationStatus.RESERVED) {
+                validateReserved(operation, status);
+                persistCancelPending(operation, status);
+            }
+        } catch (RuntimeException ignored) {
+            // The mismatched response is untrusted. Leave PREPARED unchanged unless status
+            // independently proves the exact reservation that is safe to cancel.
+        }
+    }
+
+    private void persistReserved(
+            ExamCreationOperation operation,
+            BillingReservationClient.ReservationSnapshot snapshot
+    ) {
+        try {
+            operation.markReserved(
+                    snapshot.reservationId(),
+                    snapshot.reservationKind(),
+                    snapshot.attemptGroupId(),
+                    snapshot.expiresAt(),
+                    now()
+            );
+            operationRepository.save(operation);
+        } catch (OptimisticLockingFailureException concurrent) {
+            // Another replay advanced the same operation. The caller loop reloads it.
+        } catch (RuntimeException persistenceFailure) {
+            throw new ExamsException(ErrorStatus._BILLING_TEMPORARILY_UNAVAILABLE, 1);
+        }
+    }
+
+    private void persistCancelPending(
+            ExamCreationOperation operation,
+            BillingReservationClient.ReservationSnapshot snapshot
+    ) {
+        try {
+            operation.markCancelPendingFromPrepared(
+                    snapshot.reservationId(),
+                    snapshot.reservationKind(),
+                    snapshot.attemptGroupId(),
+                    snapshot.expiresAt(),
+                    now()
+            );
+            operationRepository.save(operation);
+        } catch (OptimisticLockingFailureException concurrent) {
+            // Another replay recorded the authoritative status first.
         } catch (RuntimeException persistenceFailure) {
             throw new ExamsException(ErrorStatus._BILLING_TEMPORARILY_UNAVAILABLE, 1);
         }
@@ -345,6 +510,13 @@ public class BillingExamCreationSaga {
         if (!Objects.equals(session.getExamId(), operation.getSessionId())
                 || !Objects.equals(session.getUserId(), operation.getUserId())
                 || !Objects.equals(session.getMockExamId(), operation.getMockExamId())
+                || !Objects.equals(
+                        session.getCreationOperationId(), operation.getOperationId())
+                || !Objects.equals(
+                        session.getBillingReservationId(), operation.getReservationId())
+                || !Objects.equals(
+                        session.getBillingReservationKind(), operation.getReservationKind())
+                || !Objects.equals(session.getAttemptGroupId(), operation.getAttemptGroupId())
                 || session.getEntitlementState()
                 != web.tosunsaeng.domain.exams.domain.enums.ExamEntitlementState.CONFIRMED) {
             throw new ExamsException(ErrorStatus._BILLING_TEMPORARILY_UNAVAILABLE);
@@ -373,13 +545,35 @@ public class BillingExamCreationSaga {
         boolean replacementExpected = !isBlank(operation.getReplacementSourceSessionId())
                 && !isBlank(operation.getExpectedAttemptGroupId())
                 && !isBlank(operation.getExpectedMockExamId());
-        if (snapshot.reservationKind() == BillingReservationKind.INITIAL && replacementExpected) {
-            throw new IllegalStateException("Billing returned INITIAL for an existing group");
+        if (operation.isPhoneContinuation()) {
+            if (replacementExpected
+                    || !isBlank(operation.getReplacementSourceSessionId())
+                    || snapshot.reservationKind() != BillingReservationKind.REPLACEMENT
+                    || snapshot.continuationReason() != BillingContinuationReason.PHONE_REJOIN
+                    || !Objects.equals(snapshot.continuationId(), operation.getContinuationId())
+                    || !Objects.equals(
+                            snapshot.attemptGroupId(), operation.getExpectedAttemptGroupId())
+                    || !Objects.equals(
+                            operation.getMockExamId(), operation.getExpectedMockExamId())) {
+                throw new IllegalStateException("Billing phone continuation does not match");
+            }
+            return;
         }
-        if (snapshot.reservationKind() == BillingReservationKind.REPLACEMENT
-                && (!replacementExpected
+        if (operation.getContinuationReason() != null
+                || operation.getContinuationId() != null
+                || snapshot.continuationReason() != null
+                || snapshot.continuationId() != null) {
+            throw new IllegalStateException("Unexpected Billing continuation context");
+        }
+        if (snapshot.reservationKind() == BillingReservationKind.INITIAL) {
+            if (replacementExpected) {
+                throw new IllegalStateException("Billing returned INITIAL for an existing group");
+            }
+            return;
+        }
+        if (!replacementExpected
                 || !Objects.equals(operation.getExpectedAttemptGroupId(), snapshot.attemptGroupId())
-                || !Objects.equals(operation.getExpectedMockExamId(), operation.getMockExamId()))) {
+                || !Objects.equals(operation.getExpectedMockExamId(), operation.getMockExamId())) {
             throw new IllegalStateException("Billing replacement group does not match local state");
         }
     }
@@ -431,6 +625,7 @@ public class BillingExamCreationSaga {
                 && snapshot.terminalAt() == null)) {
             throw new IllegalStateException("Billing status response is invalid");
         }
+        validateContinuationContext(operation, snapshot);
     }
 
     private void validateCanceled(
@@ -457,6 +652,22 @@ public class BillingExamCreationSaga {
         }
     }
 
+    private void validateContinuationContext(
+            ExamCreationOperation operation,
+            BillingReservationClient.ReservationSnapshot snapshot
+    ) {
+        if (operation.isPhoneContinuation()) {
+            if (snapshot.continuationReason() != BillingContinuationReason.PHONE_REJOIN
+                    || !Objects.equals(snapshot.continuationId(), operation.getContinuationId())) {
+                throw new IllegalStateException("Billing status continuation does not match");
+            }
+            return;
+        }
+        if (snapshot.continuationReason() != null || snapshot.continuationId() != null) {
+            throw new IllegalStateException("Unexpected Billing status continuation");
+        }
+    }
+
     private void markTerminalFailure(ExamCreationOperation operation, String category) {
         try {
             transactionService.markFailedTerminal(
@@ -464,8 +675,8 @@ public class BillingExamCreationSaga {
         } catch (RuntimeException persistenceFailure) {
             log.warn(
                     "시험 생성 terminal 상태 저장 실패 event=exam.creation.saga "
-                            + "outcome=failed reason=terminal_persistence examId={} errorType={}",
-                    operation.getSessionId(), persistenceFailure.getClass().getName()
+                            + "outcome=failed reason=terminal_persistence errorType={}",
+                    persistenceFailure.getClass().getName()
             );
         }
     }
@@ -565,6 +776,14 @@ public class BillingExamCreationSaga {
         } catch (IllegalArgumentException invalid) {
             return false;
         }
+    }
+
+    private static boolean isOpaqueText(String value) {
+        return value != null
+                && !value.isBlank()
+                && value.equals(value.trim())
+                && value.length() <= 128
+                && value.chars().noneMatch(Character::isISOControl);
     }
 
     private enum CommitObservation {

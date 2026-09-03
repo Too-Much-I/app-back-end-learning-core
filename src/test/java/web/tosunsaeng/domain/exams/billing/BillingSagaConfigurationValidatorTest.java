@@ -19,6 +19,19 @@ class BillingSagaConfigurationValidatorTest {
     }
 
     @Test
+    void phoneContinuationCannotBeEnabledWithoutCreationSaga() {
+        BillingSagaProperties properties = new BillingSagaProperties();
+        properties.setPhoneContinuationEnabled(true);
+
+        assertThrows(
+                IllegalStateException.class,
+                () -> new BillingSagaConfigurationValidator(
+                        properties, new MockEnvironment()
+                ).run(new DefaultApplicationArguments())
+        );
+    }
+
+    @Test
     void enabledStagingRequiresHttpsAndApprovedRegion() {
         BillingSagaProperties properties = enabledProperties("http://billing.internal");
         MockEnvironment environment = new MockEnvironment();
