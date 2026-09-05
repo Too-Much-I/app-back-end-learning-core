@@ -40,12 +40,16 @@ jobs:
           java-version: "21"
           cache: gradle
 
-      - name: Run tests
+      - name: Run unit and migration tests
         env:
           SENTRY_RELEASE: app-back-end-learning-core@test
         run: |
           chmod +x gradlew
           ./gradlew clean test --no-daemon
+          node --test scripts/mongodb/user-merged-prepare.test.js
+
+      - name: Run Mongo replica-set integration tests
+        run: ./gradlew mongoIntegrationTest --no-daemon
 
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4

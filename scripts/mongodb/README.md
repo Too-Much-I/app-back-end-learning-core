@@ -22,6 +22,15 @@ dry-run blocker 0을 확인한다. `exam_results.userId`, `exam_summaries.userId
 canonical owner의 ACTIVE guard를 idempotent하게 생성하며 기존 MERGED guard나 충돌 데이터는
 자동 변경하지 않는다.
 
+Dry-run은 다음 관계 오류도 건수만 출력하고 한 건이라도 있으면 apply를 차단한다.
+
+- Session이 없는 orphan `ExamResult`와 `ExamSummary`
+- Result/Summary의 `userId`와 참조 `ExamSession.userId` 불일치
+
+실제 userId, examId와 문서 ID는 출력하지 않는다. 관계 오류는 올바른 소유자를 자동으로
+판단할 수 없으므로 script가 삭제하거나 owner를 덮어쓰지 않는다. read-only inventory와 운영
+승인을 거친 별도 보정 계획으로 해결한 뒤 dry-run을 다시 실행한다.
+
 ```bash
 node --test scripts/mongodb/user-merged-prepare.test.js
 ```

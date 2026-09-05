@@ -83,7 +83,12 @@ public class UserOwnedTransactionExecutor {
                 throw guardFailure;
             } catch (RuntimeException failure) {
                 lastFailure = failure;
-                if (attempt == MAX_ATTEMPTS || !retryable(failure)) {
+                TransactionFailureKind failureKind = classify(failure);
+                if (failureKind == TransactionFailureKind.UNKNOWN_COMMIT) {
+                    throw new UserOwnedCommitOutcomeUnknownException(failure);
+                }
+                if (attempt == MAX_ATTEMPTS
+                        || failureKind != TransactionFailureKind.TRANSIENT_RETRYABLE) {
                     throw failure;
                 }
             }
@@ -93,19 +98,20 @@ public class UserOwnedTransactionExecutor {
                 : lastFailure;
     }
 
-    private static boolean retryable(RuntimeException failure) {
+    private static TransactionFailureKind classify(RuntimeException failure) {
+        boolean retryable = false;
         Throwable current = failure;
         for (int depth = 0; current != null && depth < 16; depth++) {
             if (current instanceof DuplicateKeyException
                     || current instanceof OptimisticLockingFailureException) {
-                return true;
+                retryable = true;
             }
             if (current instanceof MongoException mongoException) {
                 if (mongoException.hasErrorLabel(MongoException.UNKNOWN_TRANSACTION_COMMIT_RESULT_LABEL)) {
-                    return false;
+                    return TransactionFailureKind.UNKNOWN_COMMIT;
                 }
                 if (mongoException.hasErrorLabel(MongoException.TRANSIENT_TRANSACTION_ERROR_LABEL)) {
-                    return true;
+                    retryable = true;
                 }
             }
             if (current.getCause() == current) {
@@ -113,6 +119,14 @@ public class UserOwnedTransactionExecutor {
             }
             current = current.getCause();
         }
-        return false;
+        return retryable
+                ? TransactionFailureKind.TRANSIENT_RETRYABLE
+                : TransactionFailureKind.NON_RETRYABLE;
+    }
+
+    private enum TransactionFailureKind {
+        TRANSIENT_RETRYABLE,
+        UNKNOWN_COMMIT,
+        NON_RETRYABLE
     }
 }

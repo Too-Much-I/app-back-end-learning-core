@@ -8628,3 +8628,132 @@
 - 기존 Billing 계약서에는 현행 우선 공지를 추가하고, 1차 범위·영향 분석·프론트 비로그인 가이드·현재 상태의 상충 표현을 현행 정책에 맞게 수정했다.
 - 관련 기반 Jira는 Billing `TMI-110`, `TMI-112`, `TMI-113`, `TMI-115`, `TMI-117`, `TMI-120`, Learning Core `TMI-116`, `TMI-118`, `TMI-122`, `TMI-125`다. 유료 기간제 이용권 구현 전용 Jira는 아직 없으며 Jira를 조회하거나 변경하지 않았다.
 - 애플리케이션 코드·공개 API·스토어 설정·AWS·DB·Git 이력은 변경하지 않았다. Secret·Token·receipt·결제 credential을 기록하지 않았다.
+
+## 2026-09-05 — TMI-125 Jira 완료 처리
+
+<!-- codex-turn:01a0707d-d8dd-7261-ac67-a92e16f83aef -->
+
+- 날짜·브랜치·Jira: 2026-09-05, Learning Core `develop`, `TMI-125` `[Learning Core] UserMerged consumer 및 ownership migration 구현`.
+- 사용자 요청: 구현과 병합이 끝난 TMI-125 Jira를 닫는다.
+- 사전 확인: Jira는 `해야 할 일`, Resolution 없음이었고 workflow의 `완료` transition을 사용할 수 있었다.
+- 처리 결과: TMI-125를 `완료`로 전환했다. 재조회 결과 status category는 `done`, Resolution은 `완료`, 갱신 시각은 2026-09-05로 확인됐다.
+- Git 확인: PR #28 merge commit `8c8208b`가 현재 `develop`과 `origin/develop`의 HEAD이며 TMI-125 구현 commit `60742be`를 포함한다. Jira 처리 전 작업 트리는 clean이었다.
+- 운영 경계: Jira 완료는 코드 구현·병합 완료를 의미하며 production UserMerged flag 활성화 승인은 아니다. Docker replica-set `mongoIntegrationTest`, Mongo migration·writer drain/backfill, workload issuer/JWKS와 staging E2E·성능 gate는 계속 남아 있다.
+- 변경 파일: Jira 완료 결과 기록을 위해 `docs/codex/CURRENT_STATE.md`와 `docs/codex/WORKLOG.md`만 변경했다. 애플리케이션·계약·테스트 코드는 변경하지 않았다.
+- 테스트: 애플리케이션 코드 변경이 없어 Gradle 테스트를 재실행하지 않았고 문서 갱신 후 `git diff --check`를 수행한다.
+- Git·보안: commit, push, 배포, AWS·Mongo 운영 변경은 수행하지 않았고 Secret·Token을 기록하지 않았다.
+
+## 2026-09-05 — Challenge 제외 1차 잔여 기능 재점검
+
+<!-- codex-turn:01a0708b-40be-78c2-bd10-b67e9d899a7d -->
+
+- 날짜·브랜치: 2026-09-05, Learning Core `develop@8c8208b`, Identity `develop@fa9843e`, Billing `develop@7138810`.
+- 사용자 요청: 10초 챌린지를 제외해도 추가 기능 개발이 필요한지 최신 구현·병합 기록과 1차 확정 범위 기준으로 재점검한다.
+- 핵심 판정: 필요하다. 새로 확정한 1·3·7·14·30일 비자동갱신 무제한 이용권은 전용 Jira와 runtime이 없어 Billing 상품·Apple/Google server 검증·payment/transaction/entitlement 원장·공개 구매/상태/현재 이용권/복원 API·notification/refund/reconciliation, Learning Core evaluator와 모바일 StoreKit 2·Google Play 구매/복원 전체가 신규 기능으로 남는다.
+- 기존 범위 판정: Identity `TMI-123` fan-out과 Learning Core `TMI-125` UserMerged까지 병합돼 SNS lifecycle, 검증 phone당 무료시험, Reservation·AttemptGroup, phone continuation과 owner migration의 큰 서버 기능은 구현됐다. 무료시험만 범위로 보면 남은 중심은 신규 대형 도메인보다 통합·rollout이다.
+- 후속 코드 3건: Learning Core staging workflow에 `mongoIntegrationTest` required gate 추가, UserMerged Mongo 준비 script에 orphan Result/Summary와 Session-owner 불일치 preflight 추가, phone continuation discovery의 `attemptGroupId` lowercase UUID v4 strict decode와 회귀 테스트가 필요하다.
+- 운영·검증: Learning Core와 Billing의 Docker replica-set 미실행 테스트, Mongo migration dry-run/apply, 실제 Lattice/IAM/SG·workload issuer/JWKS, multi-instance·response-loss·rollback·stale event와 모바일 SNS/phone/무료시험 staging E2E, canary·feature flag 순차 활성화가 남는다.
+- 문서 변경: `docs/codex/FIRST_UPDATE_PROGRESS_CHECKLIST.md`, `docs/codex/CURRENT_STATE.md`, `docs/codex/WORKLOG.md`만 갱신했다. 애플리케이션·공개 API·계약·Jira·AWS·DB는 변경하지 않았다.
+- 테스트·Git·보안: 분석 문서만 변경해 Gradle 테스트는 재실행하지 않는다. `git diff --check`, WORKLOG EOF와 marker 단일 포함을 확인하며 commit·push·배포를 수행하지 않고 Secret·Token을 기록하지 않는다.
+
+## 2026-09-05 — TMI-125 후속 결함 4건 검토
+
+<!-- codex-turn:01a0709b-ce26-75d1-8ea7-7bbd9b8850c0 -->
+
+- 날짜·브랜치·Jira: 2026-09-05, Learning Core `develop`; 완료 상태인 `TMI-125` `[Learning Core] UserMerged consumer 및 ownership migration 구현`의 후속 리뷰다.
+- 사용자 요청: attemptGroupId 검증, Mongo 사전검사, unknown commit 수렴과 replica-set 통합 테스트 누락 지적이 실제 결함인지 현재 코드에 대조한다.
+- 결론: 네 항목 모두 수정 또는 검증 보강이 필요하며 production UserMerged 활성화를 막는 유효한 finding이다. 단, 1번은 모든 reserve 경로가 아니라 phone continuation discovery에 남은 경계 누락으로 범위를 정정한다.
+- finding 1: `BillingExamCreationSaga.validateReserved()`는 reserve snapshot의 `reservationId`와 `attemptGroupId`를 lowercase UUID v4로 검사한 뒤에만 `markReserved()`를 호출하므로 일반 reserve 저장은 보호된다. 반면 `PhoneContinuationResponse`와 `validatePhoneContinuation()`은 `attemptGroupId`를 opaque text로만 검사하고, 실제 test도 `group-existing`을 성공값으로 허용한다. 이 discovery snapshot은 `ExamCreationOperation.expectedAttemptGroupId`에 저장되므로 client decode와 Saga pre-persist 양쪽에서 UUID v4를 검사해야 한다.
+- finding 2: migration inventory는 owner UUID, 활성 Session 중복, 기존 MERGED guard와 index만 검사한다. `exam_results`/`exam_summaries.examId`가 가리키는 Session 부재와 양쪽 `userId` 불일치를 검사하지 않아 오염된 데이터를 그대로 guard backfill·migration 대상으로 만들 수 있다. `$lookup` 기반 count-only 검사로 apply를 차단하고 원시 user/exam 식별자는 출력하지 않아야 한다.
+- finding 3: `UserOwnedTransactionExecutor`는 unknown commit label을 non-retry로 분류해 blind mutation 재실행은 막지만, `UserMergedConsumerService`는 DuplicateKey만 inbox 재조회하고 unknown commit은 재조회하지 않는다. internal advice도 `DataAccessException`만 503으로 매핑하므로 Spring이 `TransactionSystemException` 등으로 감싸면 500 가능성이 있다. eventId/digest inbox bounded recheck로 204 duplicate/409 conflict/503 unknown에 수렴하고 wrapper 계층과 HTTP 매핑을 테스트해야 한다.
+- finding 4: 현재 replica-set 통합 테스트 4개는 정상 원자 이전·withdrawal 선검사·양쪽 active target 우선·merged target 충돌을 검증한다. non-terminal operation은 mock 단위 테스트만 있고 HTTP 503/Transaction 통합 증명은 없으며, sequential duplicate 외 동시 duplicate, mutation 중간/후반 failure rollback, source/target writer·네 Callback 경합과 unknown commit은 없다. 계획의 완료 gate 대비 실제 통합 테스트가 부족하다.
+- 우선순위: 1·3은 잘못된 durable state와 불명확 응답을 막는 P1, 2는 migration apply P1 gate, 4는 위 동시성 불변식의 release P1 검증 gate로 본다. TMI-125를 다시 열거나 별도 후속 Bug를 만들어 한 묶음으로 수정한 뒤 Jira 완료를 재판정하는 것이 적절하다.
+- 변경 파일·테스트: 리뷰 기록을 위해 `docs/codex/CURRENT_STATE.md`와 `docs/codex/WORKLOG.md`만 변경했다. 애플리케이션·migration·test 코드는 수정하지 않았고 코드 변경이 없어 Gradle 테스트는 실행하지 않았다. `git diff --check`만 확인한다.
+- 계약·Git·보안: 기존 공개 API·AI·S3·Redis와 Billing wire 계약을 변경하지 않았고 commit, push, 배포, DB/AWS와 Jira 상태를 변경하지 않았다. Secret·Token과 raw 식별자를 기록하지 않았다.
+
+## 2026-09-05 — TMI-125 후속 수정 위해 재개
+
+- 날짜·브랜치·Jira: 2026-09-05, Learning Core `develop`, `TMI-125` `[Learning Core] UserMerged consumer 및 ownership migration 구현`.
+- 사용자 결정: 후속 리뷰에서 확인된 네 가지 production blocker를 기존 Jira에서 수정하기 위해 TMI-125를 다시 연다.
+- Jira 처리: workflow transition `진행 중`을 적용해 기존 `완료` 상태를 재개했다. Jira 댓글에 attemptGroupId strict 검증, migration 사전 정합성, unknown commit 수렴과 replica-set 경합 테스트 보강 범위를 기록했다.
+- 완료 재판정 조건: 네 항목 구현, 비-Docker 전체 테스트와 migration Node test, Docker replica-set 통합 테스트, 공개 API·Billing·AI·S3·Redis 계약 불변 확인 후 다시 완료로 전환한다.
+- 운영 경계: 수정과 검증 전 production UserMerged writer/consumer/source deny flag는 OFF로 유지한다.
+- 변경 파일: Jira 재개 결과 기록을 위해 `docs/codex/CURRENT_STATE.md`와 `docs/codex/WORKLOG.md`만 변경했다. 애플리케이션·migration·test 코드는 아직 수정하지 않았다.
+- 테스트·Git·보안: 코드 변경이 없어 Gradle 테스트를 실행하지 않았고 문서 형식만 확인한다. commit, push, 배포, AWS·Mongo 운영 변경은 수행하지 않았고 Secret·Token을 기록하지 않았다.
+
+## 2026-09-05 — TMI-125 재개 종료 훅 동기화
+
+<!-- codex-turn:01a070a0-e037-7a51-826a-0ffd7013797a -->
+
+- 날짜·브랜치·Jira: 2026-09-05, Learning Core `develop`, `TMI-125` `[Learning Core] UserMerged consumer 및 ownership migration 구현`.
+- 현재 상태: 후속 리뷰에서 확인된 production blocker 4건을 수정하기 위해 Jira가 `진행 중`으로 재개됐고 수정 범위와 완료 조건이 Jira 댓글에 기록돼 있다.
+- 남은 구현: phone continuation `attemptGroupId` UUID v4 strict 검증, migration orphan/owner mismatch preflight, unknown commit inbox 수렴·503 매핑, replica-set rollback·duplicate·writer/Callback 경합 테스트 보강이다.
+- 운영 경계: 수정과 전체 검증 전 production UserMerged writer/consumer/source deny flag는 OFF로 유지한다.
+- 변경 파일: 종료 훅 동기화를 위해 `docs/codex/CURRENT_STATE.md`와 `docs/codex/WORKLOG.md`만 변경했다. 애플리케이션·migration·test 코드는 수정하지 않았다.
+- 테스트·외부 작업: 코드 변경이 없어 Gradle 테스트를 실행하지 않았고 `git diff --check`만 확인한다. Jira·AWS·Mongo·배포 상태를 추가로 변경하지 않았다.
+- Git·보안: commit과 push는 수행하지 않았고 Secret·Token을 기록하지 않았다.
+
+## 2026-09-05 — TMI-125 후속 production safety 수정 계획 작성
+
+<!-- codex-turn:01a070a2-d6fe-7e01-a2ea-8e8fddbbded1 -->
+
+- 날짜·브랜치·Jira: 2026-09-05, Learning Core `develop`, 진행 중인 `TMI-125` `[Learning Core] UserMerged consumer 및 ownership migration 구현`.
+- 사용자 요청: 재검토에서 확인한 `attemptGroupId` 검증, Mongo 데이터 사전검사, unknown commit 수렴과 replica-set 통합 테스트 부족을 수정하기 위한 구현 계획서를 작성한다.
+- 작성 결과: `docs/codex/TMI-125_FOLLOWUP_PRODUCTION_SAFETY_FIX_PLAN.md`를 신규 작성했다. 5줄 결론, 필독 사항, 확정 결정, 위험, 단계별 구현, 테스트 매트릭스, rollout·rollback과 파일별 변경 지도를 포함한다.
+- strict 검증: 일반 reserve는 기존 Saga 검증이 있음을 반영해 실제 누락을 phone continuation discovery로 좁혔다. Billing 성공 응답 decode와 Saga의 durable operation 저장 직전에서 `attemptGroupId` lowercase UUID v4를 이중 검증하며 invalid 값은 저장·후속 Billing 호출 전에 fail-closed한다.
+- migration: orphan `ExamResult`/`ExamSummary`와 참조 Session owner 불일치를 `$lookup` count-only로 검사하고 한 건이라도 있으면 dry-run/apply를 모두 막는다. 원시 식별자를 출력하거나 데이터를 자동 보정·삭제하지 않는다.
+- unknown commit: owner migration을 blind retry하지 않고 `eventId + canonical digest` inbox를 bounded recheck하여 같은 digest는 `204`, 다른 digest는 `409`, 미확정 또는 조회 실패는 `503 + Retry-After: 1`로 수렴한다. Spring Transaction wrapper의 500 누출도 UserMerged 전용 advice에서 차단한다.
+- 검증 gate: 실제 replica-set에서 후반 rollback, non-terminal operation, 동시 duplicate/conflict, source/target writer와 Callback 경합, unknown commit을 검증하고 unit·Node migration·`mongoIntegrationTest`·`git diff --check`를 PR 및 staging deploy 필수 gate로 두는 계획이다.
+- 결정·운영 경계: 구현 전 추가 제품·wire 결정은 없다. 기존 공개 API·Billing field·AI `user_id=examId`·S3/Redis key는 유지하고 production UserMerged flag는 수정·검증·운영 gate 완료 전 OFF로 둔다.
+- 변경·테스트·Git: 계획서와 상태 기록 문서만 변경했다. 애플리케이션·migration·test 코드는 수정하지 않아 Gradle/Node 테스트는 실행하지 않고 문서 형식과 `git diff --check`만 확인한다. commit, push, 배포, Jira 추가 변경, AWS·Mongo 운영 변경은 수행하지 않았고 Secret·Token을 기록하지 않았다.
+
+## 2026-09-05 — TMI-125 후속 수정 계획 Jira 반영
+
+<!-- codex-turn:01a070a6-0860-7e62-b9c2-f37aad69e5cd -->
+
+- 날짜·브랜치·Jira: 2026-09-05, Learning Core `develop`, `TMI-125` `[Learning Core] UserMerged consumer 및 ownership migration 구현`.
+- 사용자 요청: 작성한 후속 production safety 수정 계획을 Jira에 반영한다.
+- 사전 확인: TMI-125는 `진행 중`이었고 기존 댓글에는 결함 네 건의 개요만 기록돼 있었다. 기존 설명과 댓글 이력을 보존하기 위해 설명 전체를 덮어쓰지 않고 상세 계획 댓글을 추가했다.
+- Jira 처리: 댓글 ID `10047`로 phone continuation 및 Billing 성공 응답의 `attemptGroupId` lowercase UUID v4 이중 검증, migration orphan Result/Summary·Session owner mismatch count-only blocker, unknown commit의 eventId+digest inbox 204/409/503 수렴과 Transaction wrapper 503 mapping을 기록했다.
+- 검증·완료 조건: 실제 replica-set의 rollback·non-terminal operation·동시 duplicate/conflict·source/target writer 및 Callback 경합·unknown commit 테스트, unit·Node migration·`mongoIntegrationTest`·`git diff --check`의 PR/staging 필수 gate를 Jira 댓글에 포함했다.
+- 계약·운영 경계: 공개 API·Billing field·AI `user_id=examId`·retryCount·S3/Redis key 불변, orphan 자동 보정 금지, production UserMerged flag OFF 유지와 추가 제품·wire 결정 없음도 기록했다.
+- 상태: Jira 상태는 `진행 중`으로 유지했다. 이 작업에서 애플리케이션·migration·test 코드, Jira 설명·workflow 상태, AWS·Mongo 운영 리소스와 배포는 변경하지 않았다.
+- 테스트·Git·보안: 외부 Jira 기록과 문서 동기화만 수행해 Gradle/Node 테스트는 실행하지 않는다. `git diff --check`와 turn marker 단일 포함을 확인하고 commit·push는 수행하지 않으며 Secret·Token을 기록하지 않는다.
+
+## 2026-09-05 — TMI-125 Jira 계획 반영 종료 훅 동기화
+
+<!-- codex-turn:01a070a6-dbc5-7e61-a4b3-078576ace4b4 -->
+
+- 날짜·브랜치·Jira: 2026-09-05, Learning Core `develop`, `TMI-125` `[Learning Core] UserMerged consumer 및 ownership migration 구현`.
+- 현재 상태: TMI-125는 `진행 중`이고 후속 production safety 계획이 상세 댓글 `10047`로 반영돼 있다.
+- 반영 범위: `attemptGroupId` UUID v4 strict 검증, migration orphan/owner mismatch 차단, unknown commit inbox 수렴, replica-set 경합 테스트와 CI gate다.
+- 운영 경계: 구현과 전체 검증 전 production UserMerged writer/consumer/source-deny flag는 OFF로 유지한다.
+- 변경 범위: 종료 훅 동기화를 위해 `docs/codex/CURRENT_STATE.md`와 `docs/codex/WORKLOG.md`만 추가 갱신했다. Jira·애플리케이션·AWS·Mongo·배포 상태는 추가 변경하지 않았다.
+- 테스트·Git·보안: 코드 변경이 없어 Gradle/Node 테스트는 실행하지 않고 `git diff --check`만 확인한다. commit·push를 수행하지 않았고 Secret·Token을 기록하지 않았다.
+
+## 2026-09-05 — TMI-125 후속 production safety 구현
+
+<!-- codex-turn:01a070a7-853f-7f81-8550-0ad3928d6fd0 -->
+
+- 날짜·브랜치·Jira: 2026-09-05, Learning Core `feat/TMI-125-user-merged-ownership-migration`, 진행 중인 `TMI-125` `[Learning Core] UserMerged consumer 및 ownership migration 구현`.
+- 사용자 요청: 확정하고 Jira에 반영한 후속 production safety 계획의 네 결함을 구현한다.
+- Billing 경계: PhoneContinuation/Reserve/Confirm/Status 성공 응답 decode와 Saga의 discovery·PREPARED operation 저장 직전에 `attemptGroupId` lowercase canonical UUID v4를 검증한다. invalid discovery는 Session 준비·operation insert·reserve 전에 차단하며 기존 invalid operation replay도 Billing 호출 없이 fail-closed한다.
+- migration: `user-merged-prepare.js`가 `exam_results`·`exam_summaries`와 `exam_sessions._id`를 `$lookup`해 orphan 및 owner mismatch 네 건수를 계산한다. 하나라도 있으면 dry-run/apply를 모두 막고 실제 식별자는 출력하지 않으며 자동 수정·삭제하지 않는다.
+- unknown commit: `UserOwnedTransactionExecutor`가 cause chain의 unknown commit label을 transient보다 우선 분류해 mutation replay 없이 전용 예외로 전달한다. consumer는 eventId+digest inbox를 250ms bounded recheck하여 같은 digest는 duplicate `204`, 다른 digest는 `409`, 미확정은 `503 + Retry-After: 1`에 수렴한다. UserMerged 전용 advice는 Spring `TransactionException`도 빈 503으로 매핑한다.
+- 통합 검증: replica-set 테스트를 기존 4개에서 11개로 늘려 마지막 inbox 실패 전체 rollback, non-terminal operation 무변경 재시도, concurrent duplicate, committed-response-loss inbox 수렴, merge 후 source writer 차단과 Feedback/Summary/Azure/SpeechAce Callback의 merge 전·후 owner 수렴을 추가했다.
+- CI: 신규 `.github/workflows/verify.yml`이 develop/main PR에서 unit·Node migration·Mongo replica-set·diff 검사를 실행하고, staging deploy도 image build 전에 Node와 `mongoIntegrationTest`를 통과해야 한다.
+- 테스트 결과: `./gradlew clean test --no-daemon` Java 496개 failures/errors 0, `node --test scripts/mongodb/user-merged-prepare.test.js` 7개 성공, `compileMongoIntegrationTestJava` 성공, workflow YAML parse와 `git diff --check` 성공이다. 실제 `./gradlew mongoIntegrationTest --no-daemon`은 로컬 Docker daemon 부재로 Testcontainers initialization error가 발생했으며 코드 실패로 완료 처리하지 않고 CI Docker 환경의 필수 gate로 남긴다.
+- Jira 반영: 구현 범위와 테스트 결과, Docker CI 잔여 gate를 TMI-125 댓글 `10048`에 기록했고 이슈 상태는 `진행 중`으로 유지했다.
+- 계약·운영 경계: 공개 API·DTO·`BaseResponse`, Billing wire field, AI `user_id=examId`, retryCount, S3/Redis key를 변경하지 않았다. production UserMerged writer/consumer/source-deny flag는 CI·migration·workload·staging 성능 gate 전 OFF로 유지한다.
+- Git·외부 작업·보안: commit, push, PR, merge, 배포와 AWS·Mongo 운영 변경은 수행하지 않았다. 기존 사용자 변경 `docs/codex/FIRST_UPDATE_PROGRESS_CHECKLIST.md`는 수정하지 않았고 Secret·Token을 기록하지 않았다.
+
+## 2026-09-05 — TMI-125 후속 구현 종료 훅 동기화
+
+<!-- codex-turn:01a070a9-adeb-7ad0-85ec-cbaa8fe988fd -->
+
+- 날짜·브랜치·Jira: 2026-09-05, Learning Core `feat/TMI-125-user-merged-ownership-migration`, `TMI-125` `[Learning Core] UserMerged consumer 및 ownership migration 구현`.
+- 구현 상태: `attemptGroupId` UUID v4 strict 검증, migration orphan/owner mismatch 차단, unknown commit inbox 수렴·Transaction wrapper 503 mapping, replica-set/Callback 테스트와 CI gate 보강을 완료했다.
+- 검증 상태: Java 496개와 Node 7개가 성공했고 integration test source compile, workflow YAML parse와 `git diff --check`도 성공했다. 실제 `mongoIntegrationTest`는 로컬 Docker daemon 부재로 Testcontainers initialization 단계에서 중단돼 CI Docker gate로 남아 있다.
+- Jira 상태: 구현·검증 결과와 잔여 Docker gate를 댓글 `10048`에 기록했고 TMI-125는 `진행 중`으로 유지했다.
+- 운영 경계: CI replica-set, migration, workload와 staging 성능 검증 전 production UserMerged writer/consumer/source-deny flag는 OFF로 유지한다.
+- 외부 작업·Git·보안: commit, push, PR, merge, 배포와 AWS·Mongo 운영 변경은 수행하지 않았고 Secret·Token을 기록하지 않았다.

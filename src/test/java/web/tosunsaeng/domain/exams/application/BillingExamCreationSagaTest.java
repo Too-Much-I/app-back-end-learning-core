@@ -149,6 +149,61 @@ class BillingExamCreationSagaTest {
     }
 
     @Test
+    void invalidPhoneContinuationGroupIsRejectedBeforePreparedOperationInsert() {
+        properties.setPhoneContinuationEnabled(true);
+        when(operationRepository.findByUserIdAndOperationId(USER_ID, OPERATION_ID))
+                .thenReturn(Optional.empty());
+        when(sessionRepository.findByUserIdAndCreationOperationId(USER_ID, OPERATION_ID))
+                .thenReturn(Optional.empty());
+        when(operationRepository.findByUserIdAndActiveGuardTrue(USER_ID))
+                .thenReturn(Optional.empty());
+        when(sessionRepository.existsByUserId(USER_ID)).thenReturn(false);
+        when(billingClient.findPhoneContinuation(USER_ID)).thenReturn(Optional.of(
+                new BillingReservationClient.PhoneContinuationSnapshot(
+                        BillingContinuationReason.PHONE_REJOIN,
+                        "018f6f36-2f42-4bf5-8c17-0be35de4872f",
+                        "group-existing",
+                        MOCK_EXAM_ID
+                )
+        ));
+
+        ExamsException failure = assertThrows(
+                ExamsException.class,
+                () -> saga.start(USER_ID, OPERATION_ID)
+        );
+
+        assertEquals(ErrorStatus._BILLING_TEMPORARILY_UNAVAILABLE, failure.getCode());
+        verify(sessionManager, never()).preparePhoneReplacement(any(), any());
+        verify(operationRepository, never()).insert(any(ExamCreationOperation.class));
+        verify(billingClient, never()).reservePhoneContinuation(
+                any(), any(), any(), any(), any(), any(), any());
+    }
+
+    @Test
+    void invalidPersistedExpectedGroupIsRejectedBeforeBillingReserve() {
+        ExamCreationOperation operation = ExamCreationOperation.prepared(
+                USER_ID, OPERATION_ID, SESSION_ID, MOCK_EXAM_ID, 1,
+                null, "group-existing", MOCK_EXAM_ID,
+                BillingContinuationReason.PHONE_REJOIN,
+                "018f6f36-2f42-4bf5-8c17-0be35de4872f",
+                NOW
+        );
+        when(operationRepository.findByUserIdAndOperationId(USER_ID, OPERATION_ID))
+                .thenReturn(Optional.of(operation));
+        when(operationRepository.findById(operation.getCommandId()))
+                .thenReturn(Optional.of(operation));
+
+        ExamsException failure = assertThrows(
+                ExamsException.class,
+                () -> saga.start(USER_ID, OPERATION_ID)
+        );
+
+        assertEquals(ErrorStatus._BILLING_TEMPORARILY_UNAVAILABLE, failure.getCode());
+        verifyNoInteractions(billingClient);
+        verify(operationRepository, never()).save(any());
+    }
+
+    @Test
     void phoneDiscoveryIsSkippedWhenTargetAlreadyHasAnySession() {
         properties.setPhoneContinuationEnabled(true);
         ExamCreationOperation operation = stubPreparedOperation();

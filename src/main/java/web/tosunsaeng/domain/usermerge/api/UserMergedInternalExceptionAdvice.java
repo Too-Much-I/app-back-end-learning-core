@@ -7,6 +7,7 @@ import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.converter.HttpMessageNotReadableException;
+import org.springframework.transaction.TransactionException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import web.tosunsaeng.domain.usermerge.application.UserMergedEventException;
@@ -37,6 +38,13 @@ public class UserMergedInternalExceptionAdvice {
 
     @ExceptionHandler(DataAccessException.class)
     public ResponseEntity<Void> databaseFailure() {
+        return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE)
+                .header(HttpHeaders.RETRY_AFTER, "1")
+                .build();
+    }
+
+    @ExceptionHandler(TransactionException.class)
+    public ResponseEntity<Void> transactionFailure() {
         return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE)
                 .header(HttpHeaders.RETRY_AFTER, "1")
                 .build();

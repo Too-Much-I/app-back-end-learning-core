@@ -1,7 +1,7 @@
 # Learning Core `UserMerged` 계약 결정 가이드
 
 - 작성일: 2026-08-20
-- 최종 갱신일: 2026-09-04
+- 최종 갱신일: 2026-09-05
 - 입력 문서: Identity `UserMerged` schema v1 구현 인계서, Learning Core 구현 사전 검토
 - 상태: 권장 기본 패키지 확정, 운영값·측정 gate 이행 전
 - Jira: `TMI-125` `[Learning Core] UserMerged consumer 및 ownership migration 구현`
@@ -17,6 +17,7 @@
 ### 사용자가 반드시 읽어야 하는 내용
 
 - 이번 승인은 구현 방향 승인이지 production flag 활성화 승인이 아니다.
+- 2026-09-05 후속 수정은 wire 계약 변경이 아니라 기존 UUID v4·204/409/503·Mongo 원자성 계약의 누락된 집행과 검증 보강이다. unknown commit은 같은 mutation을 즉시 재실행하지 않고 eventId·digest inbox 확인으로 수렴하며, 실제 replica-set CI가 성공하기 전 production 활성화 승인은 없다.
 - direct 성능 gate 실패 시 timeout을 늘리거나 hybrid로 우회하지 않고 async 계약을 새로 승인받는다.
 
 ### 사용자가 결정해야 하는 사항

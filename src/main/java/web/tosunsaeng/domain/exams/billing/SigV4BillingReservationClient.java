@@ -564,7 +564,7 @@ public class SigV4BillingReservationClient implements BillingReservationClient {
                 throw new IllegalArgumentException("Billing continuation reason is invalid");
             }
             requireCanonicalUuidV4(continuationId, "continuationId");
-            requireOpaqueText(attemptGroupId, "attemptGroupId");
+            requireCanonicalUuidV4(attemptGroupId, "attemptGroupId");
             requireOpaqueText(mockExamId, "mockExamId");
         }
 
@@ -592,7 +592,7 @@ public class SigV4BillingReservationClient implements BillingReservationClient {
             requireText(reservationId, "reservationId");
             requireValue(reservationKind, "reservationKind");
             requireValue(reservationStatus, "reservationStatus");
-            requireText(attemptGroupId, "attemptGroupId");
+            requireCanonicalUuidV4(attemptGroupId, "attemptGroupId");
             requireText(sessionId, "sessionId");
             requireText(mockExamId, "mockExamId");
             requireContinuationPair(continuationReason, continuationId);
@@ -621,7 +621,7 @@ public class SigV4BillingReservationClient implements BillingReservationClient {
             requireText(operationId, "operationId");
             requireText(reservationId, "reservationId");
             requireValue(reservationStatus, "reservationStatus");
-            requireText(attemptGroupId, "attemptGroupId");
+            requireCanonicalUuidV4(attemptGroupId, "attemptGroupId");
             requireValue(attemptGroupStatus, "attemptGroupStatus");
             requireText(sessionId, "sessionId");
             requireValue(confirmedAt, "confirmedAt");
@@ -676,7 +676,7 @@ public class SigV4BillingReservationClient implements BillingReservationClient {
             requireText(reservationId, "reservationId");
             requireValue(reservationKind, "reservationKind");
             requireValue(reservationStatus, "reservationStatus");
-            requireText(attemptGroupId, "attemptGroupId");
+            requireCanonicalUuidV4(attemptGroupId, "attemptGroupId");
             requireText(sessionId, "sessionId");
             requireText(mockExamId, "mockExamId");
             requireContinuationPair(continuationReason, continuationId);

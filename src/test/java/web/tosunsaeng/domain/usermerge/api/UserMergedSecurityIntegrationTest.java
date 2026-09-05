@@ -7,6 +7,7 @@ import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
 import org.springframework.boot.test.context.TestConfiguration;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Import;
+import org.springframework.http.HttpHeaders;
 import org.springframework.security.oauth2.jwt.BadJwtException;
 import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.security.oauth2.jwt.JwtDecoder;
@@ -15,6 +16,7 @@ import org.springframework.test.context.ContextConfiguration;
 import org.springframework.test.context.TestPropertySource;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.transaction.TransactionSystemException;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RestController;
 import web.tosunsaeng.domain.usermerge.application.UserMergedConsumerService;
@@ -40,6 +42,7 @@ import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -121,6 +124,21 @@ class UserMergedSecurityIntegrationTest {
 
         verify(consumerService).consume(any(UserMergedEventRequest.class));
         verify(guardRepository, never()).findById(any());
+    }
+
+    @Test
+    void transactionWrapperIsMappedToRetryableEmptyServiceUnavailable() throws Exception {
+        when(consumerService.consume(any())).thenThrow(
+                new TransactionSystemException("commit outcome unavailable")
+        );
+
+        mockMvc.perform(post("/internal/v1/events/user-merged")
+                        .header("Authorization", "Bearer workload-token")
+                        .contentType("application/json")
+                        .content(validPayload()))
+                .andExpect(status().isServiceUnavailable())
+                .andExpect(header().string(HttpHeaders.RETRY_AFTER, "1"))
+                .andExpect(content().string(""));
     }
 
     @Test

@@ -51,7 +51,9 @@ public class UserMergedConsumerService {
             try {
                 result = transactionService.consume(event);
             } catch (DuplicateKeyException race) {
-                result = resolveConcurrentWinner(event, race);
+                result = resolveInboxOutcome(event, race);
+            } catch (UserOwnedCommitOutcomeUnknownException unknownCommit) {
+                result = resolveInboxOutcome(event, unknownCommit);
             }
             outcome = result.name();
             return result;
@@ -73,7 +75,7 @@ public class UserMergedConsumerService {
         }
     }
 
-    private UserMergedConsumeResult resolveConcurrentWinner(
+    private UserMergedConsumeResult resolveInboxOutcome(
             NormalizedUserMergedEvent event,
             RuntimeException original
     ) {
