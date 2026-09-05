@@ -19,6 +19,16 @@ public enum ErrorStatus implements BaseErrorCode {
             "WITHDRAWAL_DENY_GATE_UNAVAILABLE",
             "탈퇴 계정 확인을 일시적으로 수행할 수 없습니다."
     ),
+    _ACCOUNT_MERGED_TOKEN_REJECTED(
+            HttpStatus.FORBIDDEN,
+            "ACCOUNT_MERGED_TOKEN_REJECTED",
+            "다른 계정으로 병합된 계정입니다."
+    ),
+    _USER_MERGED_DENY_GATE_UNAVAILABLE(
+            HttpStatus.SERVICE_UNAVAILABLE,
+            "USER_MERGED_DENY_GATE_UNAVAILABLE",
+            "병합 계정 확인을 일시적으로 수행할 수 없습니다."
+    ),
 
     // Member
     _MEMBER_NOT_FOUND(HttpStatus.FORBIDDEN, "MEMBER_4000", "없는 유저 입니다."),

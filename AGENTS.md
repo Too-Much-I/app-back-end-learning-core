@@ -332,6 +332,53 @@ AI Callback에서는 examId로 ExamSession을 조회하여 실제 userId를 찾�
 - Billing 배포·Lattice exact route·staging E2E 전에 production flag를 활성화하지 않는다.
 - 새 continuation 유형, owner rebind lifecycle 또는 Billing 권리 정책을 추가할 때는 별도 계약과 명시적 승인이 필요하다.
 
+# UserMerged consumer와 시험 ownership migration 구현 허용 규칙
+
+사용자 결정에 따라 Learning Core의 Guest `UserMerged` consumer, source deny와 시험 ownership migration은 신규 구현 범위에 포함한다. 이 허용은 특정 Jira 한 건에만 묶지 않으며, 동일한 계약 경계 안의 후속 버그 수정·테스트·운영 안정화에도 적용한다.
+
+- Jira `TMI-125`는 최초 구현 이력이며 허용 범위의 유효기간을 제한하지 않는다.
+- 구현 계획: `docs/codex/USER_MERGED_CONSUMER_IMPLEMENTATION_PLAN.md`
+- 계약 결정: `docs/codex/USER_MERGED_CONTRACT_DECISIONS.md`
+- Identity producer: Identity `TMI-123`의 schema v1 `UserMerged` fan-out 계약을 따른다.
+- Phone continuation과 AttemptGroup 절에서 UserMerged를 제외한 문구는 해당 기능의 범위 확장을 금지한 것이며, 이 전용 절의 허용을 취소하지 않는다.
+
+## UserMerged 허용 범위
+
+- exact internal endpoint `POST /internal/v1/events/user-merged`와 최대 4 KiB schema v1 body, 빈 `204`, 계약·인증·경합별 승인된 HTTP status를 추가할 수 있다.
+- RS256, 환경별 workload issuer/JWKS, 고정 `aud=learning-core-user-merged`, `sub=identity-service`, `iat=nbf`, 최대 TTL `PT2M`, UUID `jti`, `typ=JWT`, `kid` 계약을 검증하는 전용 workload security를 추가할 수 있다.
+- UserMerged exact chain은 `@Order(0)`, 기존 UserWithdrawn exact chain은 `@Order(1)`, 사용자 JWT 또는 local/test Legacy catch-all은 `@Order(2)`로 유지할 수 있다.
+- `user_ownership_guards`와 `user_merged_inbox_events`, payload normalization·semantic digest·영구 멱등성과 source token deny gate를 추가할 수 있다.
+- source와 target ownership guard를 결정적 순서로 같은 Mongo Transaction에서 touch하고 `exam_sessions`, `exam_results`, `exam_summaries`의 직접 `userId`를 target으로 이전할 수 있다.
+- target 활성 시험을 우선하고 source와 target이 모두 활성인 경우 source 활성 시험을 abandon하며, source만 활성인 경우 같은 `examId`를 target에 이전하고 완료·폐기 이력은 합집합으로 보존할 수 있다.
+- 모든 user-owned writer, Billing 시험 생성 Transaction, Question/Summary 상태 전이, Callback과 AttemptGroup coordinator·summary completion·reconciler·backfill·outbox 생성이 current owner guard와 같은 Transaction 경계를 사용하도록 수정할 수 있다.
+- 서로 다른 feature의 `TransactionTemplate`을 중첩하지 않고 기존 Transaction body에 guard touch가 참여하도록 command 경계를 재구성할 수 있다.
+- source 또는 target에 non-terminal `ExamCreationOperation`이 있으면 operation owner를 rewrite하거나 부분 migration하지 않고 `503`과 `Retry-After: 5`로 재시도하게 할 수 있다. terminal operation은 기존 coordination snapshot과 purge 정책을 유지하고 migration을 차단하지 않는다.
+- merge 전에 생성된 `attempt_group_event_outbox`의 userId·canonical payload·digest는 수정하지 않고 Billing의 승인된 legacy-source fence로 전달하며, merge 이후 신규 event부터 target owner를 사용하도록 할 수 있다.
+- source 또는 target에 기존 `withdrawn_user_access_denies` 충돌이 있으면 mutation 없이 `409`로 fail-closed하고 경보하며, commit winner가 미확정인 일시적 Transaction 경합만 `503`으로 재시도할 수 있다. Learning Core가 withdrawal marker를 삭제하거나 해제하지 않는다.
+- direct Transaction을 우선 구현하되 Identity read timeout `PT3S` 아래 초기 gate인 Transaction P99 1초 이하·전체 HTTP 2초 미만을 production 유사 staging에서 검증할 수 있다. 실패하면 timeout 연장이나 hybrid가 아니라 durable inbox + worker 계약을 별도로 개정한다.
+- default-off feature flag, startup validator, migration/index dry-run·apply, 구조화 로그·저카디널리티 metric, 전용 `mongoIntegrationTest` replica-set task와 관련 unit·contract·integration·staging E2E를 추가할 수 있다.
+
+## UserMerged 금지 범위
+
+- 기존 공개 API URL, HTTP Method, Parameter, Request/Response DTO와 `BaseResponse`를 변경하지 않는다.
+- 실제 userId, merge event, guard, inbox, reservationId와 attemptGroupId를 공개 Request/Response에 추가하지 않는다.
+- source JWT를 target actor로 alias하거나 source token으로 target 데이터를 조회하지 않는다.
+- `examId`, retryCount, Redis Key, S3 Object Key, Presigned URL 발급·submit·Polling과 Python AI request/Callback의 `user_id=examId` 계약을 변경하지 않는다.
+- merge 전에 발급된 Presigned PUT URL을 취소하기 위한 새 nonce·generation·Object Key 체계를 이 범위에 추가하지 않는다. v1은 승인된 최대 5분 잔여 capability를 수용한다.
+- non-terminal 또는 terminal `ExamCreationOperation`의 userId·reservation snapshot을 target으로 rewrite하지 않는다.
+- 기존 AttemptGroup outbox event의 userId·canonical payload·digest·eventId를 rewrite하거나 재생성하지 않는다.
+- Billing consumer, owner rebind·Reservation·AttemptGroup 상태 머신과 Billing 저장소 코드를 Learning Core 작업 범위로 수정하지 않는다.
+- Identity merge 상태·UserMerged producer를 Learning Core에서 재구현하거나 withdrawal marker를 임의로 해제하지 않는다.
+- 새 owner event, phone proof 기반 과거 데이터 이전, TrialOwnerRebindApproved consumer, 결제·subscription·coupon과 Challenge 기능을 이 허용 범위에 포함하지 않는다.
+- 실제 AWS Lattice/IAM/SG/ECS 리소스 생성·배포 또는 static AWS credential 추가를 수행하지 않는다.
+
+## UserMerged rollout과 테스트
+
+- consumer와 source deny feature flag는 기본 off다.
+- writer guard 전환과 구버전 instance drain, ACTIVE guard backfill·index 검증, Mongo replica-set Transaction, workload security, Identity retry와 staging 성능 gate를 완료하기 전에는 publisher와 merge 기능을 production에서 활성화하지 않는다.
+- direct gate 실패 시 publisher timeout만 늘리거나 direct 처리 중 timeout 뒤 background로 넘기는 hybrid를 사용하지 않는다. durable async 모델의 ack·source deny 시점·SLA·DLQ를 별도 계약으로 확정한다.
+- `./gradlew clean test`, `./gradlew mongoIntegrationTest`, migration Node test와 `git diff --check`를 완료한다.
+
 # AttemptGroup 상태 outbox/publisher 구현 허용 규칙
 
 사용자 결정에 따라 Learning Core의 AttemptGroup 상태 판정, durable outbox와 Billing publisher는 신규 구현 범위에 포함한다. 이 허용은 특정 Jira 한 건에만 묶지 않으며, 후속 버그 수정·테스트·운영 안정화에도 동일한 경계를 적용한다.

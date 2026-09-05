@@ -45,6 +45,10 @@ app:
   user-withdrawn:
     consumer-enabled: false
     deny-gate-enabled: false
+  user-merged:
+    writer-enabled: false
+    consumer-enabled: false
+    source-deny-enabled: false
 
 sentry:
   dsn: ""

@@ -14,6 +14,7 @@ import web.tosunsaeng.domain.exams.attemptgroup.domain.AttemptGroupProjectionSta
 import web.tosunsaeng.domain.exams.attemptgroup.infrastructure.AttemptGroupEventProperties;
 import web.tosunsaeng.domain.exams.domain.repository.ExamCreationOperationRepository;
 import web.tosunsaeng.domain.exams.domain.repository.ExamSessionRepository;
+import web.tosunsaeng.domain.usermerge.application.UserOwnedTransactionExecutor;
 
 import java.time.Duration;
 import java.time.Instant;
@@ -32,6 +33,9 @@ public class BillingExamCreationTransactionService {
     private final ExamSessionManager sessionManager;
     private final ObjectProvider<TransactionOperations> transactionOperationsProvider;
     private final AttemptGroupEventProperties attemptGroupProperties;
+
+    @Autowired(required = false)
+    private UserOwnedTransactionExecutor userOwnedTransactionExecutor;
 
     @Autowired
     public BillingExamCreationTransactionService(
@@ -66,6 +70,7 @@ public class BillingExamCreationTransactionService {
     public ExamCreationOperation commitReservedSession(String commandId, Instant committedAt, ZoneId zone) {
         return inTransaction(() -> {
             ExamCreationOperation operation = required(commandId);
+            touchOwner(operation.getUserId());
             if (operation.getState() == ExamCreationState.SESSION_COMMITTED
                     || operation.getState() == ExamCreationState.SUCCEEDED) {
                 return operation;
@@ -108,6 +113,7 @@ public class BillingExamCreationTransactionService {
     public ExamCreationOperation finalizeConfirmed(String commandId, Instant confirmedAt) {
         return inTransaction(() -> {
             ExamCreationOperation operation = required(commandId);
+            touchOwner(operation.getUserId());
             if (operation.getState() == ExamCreationState.SUCCEEDED) {
                 return operation;
             }
@@ -133,6 +139,7 @@ public class BillingExamCreationTransactionService {
     public ExamCreationOperation markCancelPending(String commandId, Instant now) {
         return inTransaction(() -> {
             ExamCreationOperation operation = required(commandId);
+            touchOwner(operation.getUserId());
             if (operation.getState() == ExamCreationState.CANCEL_PENDING) {
                 return operation;
             }
@@ -144,6 +151,7 @@ public class BillingExamCreationTransactionService {
     public ExamCreationOperation markCanceled(String commandId, Instant terminalAt) {
         return inTransaction(() -> {
             ExamCreationOperation operation = required(commandId);
+            touchOwner(operation.getUserId());
             if (operation.getState() == ExamCreationState.CANCELED) {
                 return operation;
             }
@@ -158,6 +166,7 @@ public class BillingExamCreationTransactionService {
     public ExamCreationOperation markExpired(String commandId, Instant terminalAt) {
         return inTransaction(() -> {
             ExamCreationOperation operation = required(commandId);
+            touchOwner(operation.getUserId());
             if (operation.getState() == ExamCreationState.EXPIRED) {
                 return operation;
             }
@@ -176,6 +185,7 @@ public class BillingExamCreationTransactionService {
     ) {
         return inTransaction(() -> {
             ExamCreationOperation operation = required(commandId);
+            touchOwner(operation.getUserId());
             if (operation.getState() == ExamCreationState.FAILED_TERMINAL) {
                 return operation;
             }
@@ -189,6 +199,30 @@ public class BillingExamCreationTransactionService {
             );
             return operationRepository.save(operation);
         });
+    }
+
+    public ExamCreationOperation insertPrepared(ExamCreationOperation operation) {
+        return inTransaction(() -> {
+            touchOwner(operation.getUserId());
+            return operationRepository.insert(operation);
+        });
+    }
+
+    public ExamCreationOperation saveOperation(ExamCreationOperation operation) {
+        return inTransaction(() -> {
+            touchOwner(operation.getUserId());
+            return operationRepository.save(operation);
+        });
+    }
+
+    public boolean userMergedWriterEnabled() {
+        return userOwnedTransactionExecutor != null && userOwnedTransactionExecutor.enabled();
+    }
+
+    private void touchOwner(String userId) {
+        if (userOwnedTransactionExecutor != null) {
+            userOwnedTransactionExecutor.touchWithinExistingTransaction(userId);
+        }
     }
 
     private ExamCreationOperation required(String commandId) {

@@ -2,6 +2,7 @@ package web.tosunsaeng.domain.exams.application;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.dao.DuplicateKeyException;
 import org.springframework.dao.OptimisticLockingFailureException;
@@ -27,6 +28,8 @@ import web.tosunsaeng.domain.exams.dto.ExamResponseDTO;
 import web.tosunsaeng.domain.exams.exception.ExamsException;
 import web.tosunsaeng.global.config.GradingProperties;
 import web.tosunsaeng.global.error.code.status.ErrorStatus;
+import web.tosunsaeng.domain.usermerge.application.UserOwnedTransactionExecutor;
+import web.tosunsaeng.domain.usermerge.application.UserOwnershipGuardException;
 
 import java.time.Clock;
 import java.time.Duration;
@@ -40,6 +43,7 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Function;
+import java.util.function.Supplier;
 import java.util.stream.Collectors;
 
 @Slf4j
@@ -67,10 +71,78 @@ public class ExamGradingService {
     private final GradingProperties properties;
     private final Clock clock;
 
+    @Autowired(required = false)
+    private UserOwnedTransactionExecutor userOwnedTransactionExecutor;
+
     @Value("${spring.cloud.aws.s3.bucket}")
     private String bucketName;
 
     public ExamStatus submitQuestion(String examId, Integer questionNumber, Integer retryCount) {
+        if (userOwnedTransactionExecutor == null || !userOwnedTransactionExecutor.enabled()) {
+            return submitQuestionWithoutGuard(examId, questionNumber, retryCount);
+        }
+        int canonicalRetryCount = GradingKeys.canonicalRetryCount(retryCount);
+        SubmitPreparation preparation = inCurrentOwnerTransaction(
+                examId,
+                () -> prepareQuestionDispatch(examId, questionNumber, canonicalRetryCount)
+        );
+        if (preparation.claim() == null) {
+            calculateAndCacheOverallStatus(examId);
+            return preparation.status();
+        }
+        QuestionDispatchClaim claim = preparation.claim();
+        if (!canProcessSession(examId)) {
+            failQuestionClaim(claim, EXAM_ABANDONED);
+            throw new ExamsException(ErrorStatus._EXAM_ABANDONED);
+        }
+        if (!dispatchQuestion(claim)) {
+            calculateAndCacheOverallStatus(examId);
+            throw new ExamsException(ErrorStatus._AI_SERVER_CONNECTION_ERROR);
+        }
+        calculateAndCacheOverallStatus(examId);
+        return ExamStatus.PROCESSING;
+    }
+
+    private SubmitPreparation prepareQuestionDispatch(
+            String examId,
+            Integer questionNumber,
+            int retryCount
+    ) {
+        requireNotAbandonedSession(examId);
+        String jobId = GradingKeys.questionJobId(examId, questionNumber, retryCount);
+        if (hasQuestionResult(examId, questionNumber, retryCount)) {
+            completeQuestionWithoutGuard(examId, questionNumber, retryCount);
+            return new SubmitPreparation(ExamStatus.COMPLETED, null);
+        }
+        QuestionGradingJob current = questionJobRepository.findById(jobId).orElse(null);
+        if (current != null) {
+            return new SubmitPreparation(toExamStatus(current.getStatus()), null);
+        }
+        Instant now = clock.instant();
+        QuestionGradingJob pending = QuestionGradingJob.pending(
+                jobId,
+                examId,
+                questionNumber,
+                retryCount,
+                GradingKeys.questionFileKey(examId, questionNumber, retryCount),
+                resolveMockExamId(examId),
+                now
+        );
+        QuestionGradingJob inserted = questionJobRepository.insert(pending);
+        if (hasQuestionResult(examId, questionNumber, retryCount)) {
+            completeQuestionWithoutGuard(examId, questionNumber, retryCount);
+            return new SubmitPreparation(ExamStatus.COMPLETED, null);
+        }
+        inserted.startProcessing(now);
+        QuestionGradingJob claimed = questionJobRepository.save(inserted);
+        return new SubmitPreparation(ExamStatus.PROCESSING, QuestionDispatchClaim.from(claimed));
+    }
+
+    private ExamStatus submitQuestionWithoutGuard(
+            String examId,
+            Integer questionNumber,
+            Integer retryCount
+    ) {
         requireNotAbandonedSession(examId);
         int canonicalRetryCount = GradingKeys.canonicalRetryCount(retryCount);
         String mockExamId = resolveMockExamId(examId);
@@ -151,6 +223,10 @@ public class ExamGradingService {
     }
 
     public ExamResponseDTO.GradingRetryResult retryExam(String examId) {
+        return retryExamWithoutGuard(examId);
+    }
+
+    private ExamResponseDTO.GradingRetryResult retryExamWithoutGuard(String examId) {
         requireInProgressSession(examId);
         List<Integer> questionNumbers = expectedQuestionNumbers(examId);
         List<Integer> retried = new ArrayList<>();
@@ -201,6 +277,17 @@ public class ExamGradingService {
     }
 
     public void completeQuestion(String examId, Integer questionNumber, Integer retryCount) {
+        inCurrentOwnerTransaction(examId, () -> {
+            completeQuestionWithoutGuard(examId, questionNumber, retryCount);
+            return Boolean.TRUE;
+        });
+    }
+
+    private void completeQuestionWithoutGuard(
+            String examId,
+            Integer questionNumber,
+            Integer retryCount
+    ) {
         if (!canProcessSession(examId)) {
             return;
         }
@@ -237,6 +324,12 @@ public class ExamGradingService {
                     );
                     return;
                 } catch (DuplicateKeyException concurrentInsert) {
+                    if (userOwnedTransactionExecutor != null
+                            && userOwnedTransactionExecutor.enabled()
+                            && org.springframework.transaction.support.TransactionSynchronizationManager
+                            .isActualTransactionActive()) {
+                        throw concurrentInsert;
+                    }
                     continue;
                 }
             }
@@ -266,6 +359,12 @@ public class ExamGradingService {
                 );
                 return;
             } catch (OptimisticLockingFailureException concurrentUpdate) {
+                if (userOwnedTransactionExecutor != null
+                        && userOwnedTransactionExecutor.enabled()
+                        && org.springframework.transaction.support.TransactionSynchronizationManager
+                        .isActualTransactionActive()) {
+                    throw concurrentUpdate;
+                }
                 // Re-read and converge on COMPLETED without overwriting a newer document version.
             }
         }
@@ -278,6 +377,13 @@ public class ExamGradingService {
     }
 
     public void completeSummary(String examId) {
+        inCurrentOwnerTransaction(examId, () -> {
+            completeSummaryWithoutGuard(examId);
+            return Boolean.TRUE;
+        });
+    }
+
+    private void completeSummaryWithoutGuard(String examId) {
         if (!canProcessSession(examId)) {
             return;
         }
@@ -285,7 +391,7 @@ public class ExamGradingService {
         String mockExamId = resolveMockExamId(examId);
         Optional<SummaryGradingJob> existing = summaryJobRepository.findById(jobId);
         if (existing.isPresent()) {
-            completeSummary(examId, existing.get().effectiveGenerationAttempt());
+            completeSummaryWithoutGuard(examId, existing.get().effectiveGenerationAttempt());
             return;
         }
 
@@ -306,6 +412,12 @@ public class ExamGradingService {
                     jobId, examId, -1L
             );
         } catch (DuplicateKeyException concurrentInsert) {
+            if (userOwnedTransactionExecutor != null
+                    && userOwnedTransactionExecutor.enabled()
+                    && org.springframework.transaction.support.TransactionSynchronizationManager
+                    .isActualTransactionActive()) {
+                throw concurrentInsert;
+            }
             summaryJobRepository.findById(jobId)
                     .ifPresent(job -> completeSummary(examId, job.effectiveGenerationAttempt()));
         }
@@ -321,6 +433,13 @@ public class ExamGradingService {
     }
 
     public boolean claimSummaryCompletion(String examId, int generationAttempt) {
+        return inCurrentOwnerTransaction(
+                examId,
+                () -> claimSummaryCompletionWithoutGuard(examId, generationAttempt)
+        );
+    }
+
+    private boolean claimSummaryCompletionWithoutGuard(String examId, int generationAttempt) {
         if (!canProcessSession(examId)) {
             return false;
         }
@@ -354,8 +473,19 @@ public class ExamGradingService {
             String examId,
             int generationAttempt,
             String failureReason) {
+        return inCurrentOwnerTransaction(
+                examId,
+                () -> failSummaryGenerationWithoutGuard(examId, generationAttempt, failureReason)
+        );
+    }
+
+    private boolean failSummaryGenerationWithoutGuard(
+            String examId,
+            int generationAttempt,
+            String failureReason
+    ) {
         if (hasSummaryResult(examId)) {
-            completeSummary(examId, generationAttempt);
+            completeSummaryWithoutGuard(examId, generationAttempt);
             return false;
         }
         String jobId = GradingKeys.summaryJobId(examId);
@@ -383,6 +513,13 @@ public class ExamGradingService {
     }
 
     public boolean completeSummary(String examId, int generationAttempt) {
+        return inCurrentOwnerTransaction(
+                examId,
+                () -> completeSummaryWithoutGuard(examId, generationAttempt)
+        );
+    }
+
+    private boolean completeSummaryWithoutGuard(String examId, int generationAttempt) {
         if (!canProcessSession(examId)) {
             return false;
         }
@@ -399,7 +536,7 @@ public class ExamGradingService {
         int dispatchAttempt = current.get().getDispatchAttempt();
         Instant processingStartedAt = current.get().getProcessingStartedAt();
         if (!current.get().isCompletionClaimedFor(generationAttempt)
-                && !claimSummaryCompletion(examId, generationAttempt)) {
+                && !claimSummaryCompletionWithoutGuard(examId, generationAttempt)) {
             return false;
         }
 
@@ -445,6 +582,10 @@ public class ExamGradingService {
     }
 
     public void ensureSummaryStartedIfReady(String examId) {
+        ensureSummaryStartedIfReadyWithoutGuard(examId);
+    }
+
+    private void ensureSummaryStartedIfReadyWithoutGuard(String examId) {
         if (!canProcessSession(examId)) {
             log.debug(
                     "처리할 수 없는 시험 세션의 요약 채점 시작 무시 "
@@ -493,8 +634,16 @@ public class ExamGradingService {
                     clock.instant()
             );
             try {
-                summaryJob = summaryJobRepository.insert(pending);
-                created = true;
+                if (userOwnedTransactionExecutor != null && userOwnedTransactionExecutor.enabled()) {
+                    summaryJob = inCurrentOwnerTransaction(examId, () -> {
+                        SummaryGradingJob concurrent = summaryJobRepository.findById(jobId).orElse(null);
+                        return concurrent == null ? summaryJobRepository.insert(pending) : concurrent;
+                    });
+                    created = summaryJob != null && summaryJob.getVersion() == null;
+                } else {
+                    summaryJob = summaryJobRepository.insert(pending);
+                    created = true;
+                }
             } catch (DuplicateKeyException concurrentInsert) {
                 summaryJob = summaryJobRepository.findById(jobId).orElse(null);
             }
@@ -585,7 +734,16 @@ public class ExamGradingService {
                 clock.instant()
         );
         try {
-            QuestionGradingJob inserted = questionJobRepository.insert(pending);
+            QuestionGradingJob inserted = inCurrentOwnerTransaction(examId, () -> {
+                if (questionJobRepository.existsById(pending.getJobId())) {
+                    return null;
+                }
+                return questionJobRepository.insert(pending);
+            });
+            if (inserted == null) {
+                waiting.add(questionNumber);
+                return;
+            }
             DispatchOutcome outcome = claimAndDispatchQuestion(inserted, true);
             recordOutcome(questionNumber, outcome, retried, waiting);
         } catch (DuplicateKeyException concurrentInsert) {
@@ -631,11 +789,12 @@ public class ExamGradingService {
             List<Integer> retried,
             List<Integer> waiting) {
         int currentRecoveryCycle = job.effectiveRecoveryCycle();
-        long reopened = questionJobRepository.reopenCompletedMissingResult(
-                job.getJobId(),
-                currentRecoveryCycle,
-                clock.instant()
-        );
+        long reopened = inCurrentOwnerTransaction(job.getExamId(), () ->
+                questionJobRepository.reopenCompletedMissingResult(
+                        job.getJobId(),
+                        currentRecoveryCycle,
+                        clock.instant()
+                ));
         if (reopened == 0) {
             waiting.add(job.getQuestionNumber());
             return;
@@ -673,10 +832,25 @@ public class ExamGradingService {
         }
 
         QuestionGradingJob claimed;
-        try {
-            job.startProcessing(clock.instant());
-            claimed = questionJobRepository.save(job);
-        } catch (OptimisticLockingFailureException lostClaim) {
+        if (userOwnedTransactionExecutor == null || !userOwnedTransactionExecutor.enabled()) {
+            try {
+                job.startProcessing(clock.instant());
+                claimed = questionJobRepository.save(job);
+            } catch (OptimisticLockingFailureException lostClaim) {
+                return DispatchOutcome.CLAIM_LOST;
+            }
+        } else {
+            claimed = inCurrentOwnerTransaction(job.getExamId(), () -> {
+            QuestionGradingJob current = questionJobRepository.findById(job.getJobId()).orElse(null);
+            if (current == null || current.getStatus() == GradingJobStatus.COMPLETED
+                    || current.getStatus() == GradingJobStatus.PROCESSING) {
+                return null;
+            }
+            current.startProcessing(clock.instant());
+            return questionJobRepository.save(current);
+            });
+        }
+        if (claimed == null) {
             return DispatchOutcome.CLAIM_LOST;
         }
 
@@ -761,13 +935,14 @@ public class ExamGradingService {
     }
 
     private boolean failQuestionClaim(QuestionDispatchClaim claim, String reason) {
-        long updated = questionJobRepository.failClaimedAttempt(
-                claim.jobId(),
-                claim.dispatchAttempt(),
-                claim.recoveryCycle(),
-                clock.instant(),
-                reason
-        );
+        long updated = inCurrentOwnerTransaction(claim.examId(), () ->
+                questionJobRepository.failClaimedAttempt(
+                        claim.jobId(),
+                        claim.dispatchAttempt(),
+                        claim.recoveryCycle(),
+                        clock.instant(),
+                        reason
+                ));
         return updated == 1;
     }
 
@@ -777,9 +952,16 @@ public class ExamGradingService {
             return;
         }
         GradingJobStatus fromStatus = job.getStatus();
-        job.fail(clock.instant(), MAX_DISPATCH_ATTEMPTS);
         try {
-            questionJobRepository.save(job);
+            inCurrentOwnerTransaction(job.getExamId(), () -> {
+                QuestionGradingJob current = questionJobRepository.findById(job.getJobId())
+                        .orElse(null);
+                if (current == null) {
+                    return null;
+                }
+                current.fail(clock.instant(), MAX_DISPATCH_ATTEMPTS);
+                return questionJobRepository.save(current);
+            });
             log.warn(
                     "문항 채점 최대 전송 시도 도달 event=grading.question.job "
                             + "outcome=max_attempts reason={} jobId={} examId={} "
@@ -803,6 +985,38 @@ public class ExamGradingService {
             throw new ExamsException(ErrorStatus._EXAM_ALREADY_COMPLETED);
         }
         return session;
+    }
+
+    private <T> T inCurrentOwnerTransaction(String examId, Supplier<T> command) {
+        if (userOwnedTransactionExecutor == null || !userOwnedTransactionExecutor.enabled()) {
+            return command.get();
+        }
+        RuntimeException lastFailure = null;
+        for (int attempt = 0; attempt < 3; attempt++) {
+            ExamSession observed = examSessionRepository.findById(examId)
+                    .orElseThrow(() -> new ExamsException(ErrorStatus._EXAM_NOT_FOUND));
+            try {
+                return userOwnedTransactionExecutor.execute(observed.getUserId(), () -> {
+                    ExamSession current = examSessionRepository.findById(examId)
+                            .orElseThrow(() -> new ExamsException(ErrorStatus._EXAM_NOT_FOUND));
+                    if (!java.util.Objects.equals(current.getUserId(), observed.getUserId())) {
+                        throw new SessionOwnerChangedException();
+                    }
+                    return command.get();
+                });
+            } catch (UserOwnershipGuardException | SessionOwnerChangedException race) {
+                lastFailure = race;
+            }
+        }
+        throw lastFailure == null
+                ? new IllegalStateException("Grading owner convergence failed")
+                : lastFailure;
+    }
+
+    private static final class SessionOwnerChangedException extends RuntimeException {
+    }
+
+    private record SubmitPreparation(ExamStatus status, QuestionDispatchClaim claim) {
     }
 
     private ExamSession requireNotAbandonedSession(String examId) {
@@ -833,14 +1047,20 @@ public class ExamGradingService {
         Optional<SummaryGradingJob> existing = summaryJobRepository.findById(jobId);
         if (existing.isEmpty()) {
             try {
-                SummaryGradingJob inserted = summaryJobRepository.insert(
-                        SummaryGradingJob.pending(
-                                jobId,
-                                examId,
-                                resolveMockExamId(examId),
-                                clock.instant()
-                        )
-                );
+                SummaryGradingJob inserted = inCurrentOwnerTransaction(examId, () -> {
+                    if (summaryJobRepository.existsById(jobId)) {
+                        return null;
+                    }
+                    return summaryJobRepository.insert(SummaryGradingJob.pending(
+                            jobId,
+                            examId,
+                            resolveMockExamId(examId),
+                            clock.instant()
+                    ));
+                });
+                if (inserted == null) {
+                    return SummaryAction.WAITING;
+                }
                 return summaryDispatchScheduler.schedulePending(
                         inserted.getJobId(),
                         inserted.effectiveGenerationAttempt()
@@ -860,13 +1080,14 @@ public class ExamGradingService {
                 && FEEDBACK_GENERATION_FAILED.equals(job.getFailureReason())) {
             int currentGenerationAttempt = job.effectiveGenerationAttempt();
             int nextGenerationAttempt = currentGenerationAttempt + 1;
-            long rearmed = summaryJobRepository.rearmFeedbackGeneration(
-                    job.getJobId(),
-                    currentGenerationAttempt,
-                    nextGenerationAttempt,
-                    FEEDBACK_GENERATION_FAILED,
-                    clock.instant()
-            );
+            long rearmed = inCurrentOwnerTransaction(examId, () ->
+                    summaryJobRepository.rearmFeedbackGeneration(
+                            job.getJobId(),
+                            currentGenerationAttempt,
+                            nextGenerationAttempt,
+                            FEEDBACK_GENERATION_FAILED,
+                            clock.instant()
+                    ));
             if (rearmed == 0) {
                 return SummaryAction.WAITING;
             }
@@ -925,9 +1146,17 @@ public class ExamGradingService {
             return;
         }
         GradingJobStatus fromStatus = job.getStatus();
-        job.fail(clock.instant(), MAX_DISPATCH_ATTEMPTS);
         try {
-            summaryJobRepository.save(job);
+            inCurrentOwnerTransaction(job.getExamId(), () -> {
+                SummaryGradingJob current = summaryJobRepository.findById(job.getJobId())
+                        .orElse(null);
+                if (current == null
+                        || current.isCompletionClaimedFor(current.effectiveGenerationAttempt())) {
+                    return null;
+                }
+                current.fail(clock.instant(), MAX_DISPATCH_ATTEMPTS);
+                return summaryJobRepository.save(current);
+            });
             log.warn(
                     "요약 채점 최대 전송 시도 도달 event=grading.summary.job "
                             + "outcome=max_attempts reason={} jobId={} examId={} "

@@ -68,6 +68,7 @@ public class AttemptGroupBackfillService {
                 if (session == null || session.getAttemptGroupProjectionStatus() != null) {
                     return false;
                 }
+                coordinator.touchCurrentOwnerWithinTransaction(examId);
                 session.enableAttemptGroupProjectionForBackfill();
                 sessionRepository.save(session);
                 return true;

@@ -2,6 +2,7 @@ package web.tosunsaeng.domain.exams.application;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.dao.DuplicateKeyException;
 import org.springframework.stereotype.Service;
 import web.tosunsaeng.domain.exams.domain.entity.ExamSession;
@@ -9,6 +10,10 @@ import web.tosunsaeng.domain.exams.domain.entity.MockExam;
 import web.tosunsaeng.domain.exams.domain.enums.ExamSessionStatus;
 import web.tosunsaeng.domain.exams.domain.repository.ExamSessionCompletionQuery;
 import web.tosunsaeng.domain.exams.domain.repository.ExamSessionRepository;
+import web.tosunsaeng.domain.exams.exception.ExamsException;
+import web.tosunsaeng.domain.usermerge.application.UserOwnedTransactionExecutor;
+import web.tosunsaeng.domain.usermerge.application.UserOwnershipGuardException;
+import web.tosunsaeng.global.error.code.status.ErrorStatus;
 
 import java.time.Clock;
 import java.time.LocalDateTime;
@@ -19,6 +24,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import java.util.function.Supplier;
 
 @Slf4j
 @Service
@@ -34,11 +40,18 @@ public class ExamSessionManager {
     private final MockExamCatalogService mockExamCatalogService;
     private final Clock clock;
 
+    @Autowired(required = false)
+    private UserOwnedTransactionExecutor userOwnedTransactionExecutor;
+
     public Assignment startNew(String userId) {
-        return startNew(userId, 1);
+        return inUserOwnedTransaction(userId, () -> startNewAttempt(userId, 1));
     }
 
     public PreparedAssignment prepareForBilling(String userId) {
+        return inUserOwnedTransaction(userId, () -> prepareForBillingInTransaction(userId));
+    }
+
+    private PreparedAssignment prepareForBillingInTransaction(String userId) {
         List<ExamSession> activeSessions = findInProgressSessions(userId);
         ExamSession replacement = activeSessions.stream()
                 .filter(candidate -> candidate.getAttemptGroupId() != null
@@ -88,7 +101,7 @@ public class ExamSessionManager {
         );
     }
 
-    private Assignment startNew(String userId, int attempt) {
+    private Assignment startNewAttempt(String userId, int attempt) {
         List<String> abandonedExamIds = abandonInProgressSessions(userId);
 
         SelectedExam selected = selectExam(userId);
@@ -126,14 +139,29 @@ public class ExamSessionManager {
                     attempt,
                     attempt < CREATE_ATTEMPTS ? attempt + 1 : null
             );
+            if (userOwnedTransactionExecutor != null && userOwnedTransactionExecutor.enabled()) {
+                throw concurrentCreation;
+            }
             if (attempt < CREATE_ATTEMPTS) {
-                return startNew(userId, attempt + 1);
+                return startNewAttempt(userId, attempt + 1);
             }
             throw concurrentCreation;
         }
     }
 
     public boolean completeIfIncomplete(String examId) {
+        if (userOwnedTransactionExecutor == null || !userOwnedTransactionExecutor.enabled()) {
+            return completeIfIncompleteInTransaction(examId);
+        }
+        ExamSession session = examSessionRepository.findById(examId)
+                .orElseThrow(() -> new ExamsException(ErrorStatus._EXAM_NOT_FOUND));
+        return inUserOwnedTransaction(
+                session.getUserId(),
+                () -> completeIfIncompleteInTransaction(examId)
+        );
+    }
+
+    private boolean completeIfIncompleteInTransaction(String examId) {
         LocalDateTime completedAt = LocalDateTime.ofInstant(clock.instant(), clock.getZone());
         boolean completed = examSessionRepository.completeIfIncomplete(examId, completedAt) == 1;
         if (completed) {
@@ -147,6 +175,17 @@ public class ExamSessionManager {
             log.debug("시험 세션 완료 전환 생략 event=exam.session.completed outcome=noop examId={}", examId);
         }
         return completed;
+    }
+
+    private <T> T inUserOwnedTransaction(String userId, Supplier<T> command) {
+        if (userOwnedTransactionExecutor == null) {
+            return command.get();
+        }
+        try {
+            return userOwnedTransactionExecutor.execute(userId, command);
+        } catch (UserOwnershipGuardException merged) {
+            throw new ExamsException(ErrorStatus._ACCOUNT_MERGED_TOKEN_REJECTED);
+        }
     }
 
     private List<String> abandonInProgressSessions(String userId) {

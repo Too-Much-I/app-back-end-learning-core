@@ -24,6 +24,8 @@ import web.tosunsaeng.domain.exams.attemptgroup.application.AttemptGroupStateCoo
 import web.tosunsaeng.domain.exams.attemptgroup.application.AttemptGroupSummaryCompletionService;
 import web.tosunsaeng.global.auth.CurrentUserProvider;
 import web.tosunsaeng.global.error.code.status.ErrorStatus;
+import web.tosunsaeng.domain.usermerge.application.UserOwnedTransactionExecutor;
+import web.tosunsaeng.domain.usermerge.application.UserOwnershipGuardException;
 
 import java.time.Duration;
 import java.util.Arrays;
@@ -35,6 +37,7 @@ import java.util.Optional;
 import java.util.TreeMap;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
+import java.util.function.Supplier;
 
 @Slf4j
 @Service
@@ -61,6 +64,9 @@ public class ExamServiceImpl implements ExamService {
     private final SpeechAceResultRepository speechAceResultRepository;
     private final AzureResultRepository azureResultRepository;
     private final CurrentUserProvider currentUserProvider;
+
+    @Autowired(required = false)
+    private UserOwnedTransactionExecutor userOwnedTransactionExecutor;
 
     @Value("${spring.cloud.aws.s3.bucket}")
     private String bucketName;
@@ -237,7 +243,6 @@ public class ExamServiceImpl implements ExamService {
     }
 
     @Override
-    @Transactional(readOnly = true)
     public ExamResponseDTO.QuestionDTO getQuestionPrompt(String examId, Integer questionNumber) {
         ExamSession examSession = requireOwnedSession(examId);
         String mockExamId = GradingKeys.effectiveMockExamId(examSession.getMockExamId());
@@ -278,6 +283,19 @@ public class ExamServiceImpl implements ExamService {
     // 사용자가 가상으로 녹음 오디오 파일을 업로드할 수 있는 임시 S3 PutObject용 Presigned URL을 발급합니다.
     @Override
     public ExamResponseDTO.UploadUrlResult getPresignedUrl(String examId, Integer questionNumber, Integer retryCount) {
+        if (userOwnedTransactionExecutor == null || !userOwnedTransactionExecutor.enabled()) {
+            return getPresignedUrlInTransaction(examId, questionNumber, retryCount);
+        }
+        String userId = currentUserProvider.getCurrentUserId();
+        return executeUserOwned(userId,
+                () -> getPresignedUrlInTransaction(examId, questionNumber, retryCount));
+    }
+
+    private ExamResponseDTO.UploadUrlResult getPresignedUrlInTransaction(
+            String examId,
+            Integer questionNumber,
+            Integer retryCount
+    ) {
         long startedAt = System.nanoTime();
         requireOwnedNotAbandonedSession(examId);
 
@@ -342,6 +360,129 @@ public class ExamServiceImpl implements ExamService {
     // AI 서버 연산 완료 후 백엔드 웹훅 콜백을 통해 인입된 분석 스코어와 텍스트 피드백 데이터를 처리합니다.
     @Override
     public void updateExamResult(ExamRequestDTO.AiResultReq req) {
+        if (userOwnedTransactionExecutor == null || !userOwnedTransactionExecutor.enabled()) {
+            updateExamResultWithoutGuard(req);
+            return;
+        }
+        String examId = req.getExamId();
+        boolean summaryCallback = req.getGenerationAttempt() != null || req.getTotalScore() != null;
+        if (!summaryCallback) {
+            updateFeedbackResultWithGuard(req);
+            return;
+        }
+        if (summaryCallback && attemptGroupSummaryCompletionService != null
+                && attemptGroupSummaryCompletionService.supports(examId)) {
+            updateExamResultWithoutGuard(req);
+            return;
+        }
+        updateSummaryResultWithGuard(req);
+    }
+
+    private void updateFeedbackResultWithGuard(ExamRequestDTO.AiResultReq req) {
+        String examId = req.getExamId();
+        int retryCount = GradingKeys.canonicalRetryCount(req.getRetryCount());
+        String jobId = GradingKeys.questionJobId(examId, req.getQuestionNumber(), retryCount);
+        executeCallbackForCurrentOwner(examId, () -> {
+            ExamSession session = resolveCallbackSession("feedback", examId, jobId);
+            if (ignoreAbandonedCallback(session, req.getQuestionNumber(), retryCount, jobId)) {
+                return;
+            }
+            boolean alreadyStored = examResultRepository
+                    .existsByExamIdAndQuestionNumberAndRetryCountIn(
+                            examId,
+                            req.getQuestionNumber(),
+                            compatibleRetryCounts(retryCount)
+                    );
+            if (!alreadyStored) {
+                examResultRepository.insert(ExamConverter.toExamResult(
+                        req,
+                        session.getUserId(),
+                        GradingKeys.feedbackResultId(examId, req.getQuestionNumber(), retryCount),
+                        GradingKeys.effectiveMockExamId(session.getMockExamId())
+                ));
+            }
+            gradingService.completeQuestion(examId, req.getQuestionNumber(), retryCount);
+        });
+
+        gradingService.ensureSummaryStartedIfReady(examId);
+        if (retryCount == 0) {
+            reconcileAttemptGroup(examId);
+        }
+    }
+
+    private void updateSummaryResultWithGuard(ExamRequestDTO.AiResultReq req) {
+        String examId = req.getExamId();
+        String jobId = GradingKeys.summaryJobId(examId);
+        SummaryCallbackOutcome outcome = executeCallbackForCurrentOwner(examId, () -> {
+            ExamSession session = resolveCallbackSession("summary", examId, jobId);
+            if (ignoreAbandonedCallback(
+                    session,
+                    req.getQuestionNumber(),
+                    GradingKeys.canonicalRetryCount(req.getRetryCount()),
+                    jobId
+            )) {
+                return SummaryCallbackOutcome.NO_OP;
+            }
+
+            Integer generationAttempt = req.getGenerationAttempt();
+            if (!gradingService.isCurrentSummaryGeneration(examId, generationAttempt)) {
+                log.debug(
+                        "이전 요약 채점 콜백 무시 event=grading.callback "
+                                + "outcome=stale_ignored reason={} callbackType=summary "
+                                + "examId={} jobId={} generationAttempt={}",
+                        generationAttempt == null ? "missing_generation" : "generation_mismatch",
+                        examId,
+                        jobId,
+                        generationAttempt
+                );
+                return SummaryCallbackOutcome.NO_OP;
+            }
+
+            boolean alreadyStored = examSummaryRepository.existsById(jobId)
+                    || examSummaryRepository.existsByExamId(examId)
+                    || examResultRepository.findFirstByExamIdAndTotalScoreIsNotNullOrderByIdDesc(examId)
+                    .isPresent();
+            if (alreadyStored) {
+                completeSummaryCallbackDatabase(examId, generationAttempt);
+                return SummaryCallbackOutcome.COMPLETED;
+            }
+
+            if (req.getPartFeedback() == null || req.getPartFeedback().isEmpty()) {
+                gradingService.failSummaryGeneration(
+                        examId,
+                        generationAttempt,
+                        ExamGradingService.FEEDBACK_GENERATION_FAILED
+                );
+                return SummaryCallbackOutcome.FAILED;
+            }
+
+            if (!gradingService.claimSummaryCompletion(examId, generationAttempt)) {
+                return SummaryCallbackOutcome.NO_OP;
+            }
+
+            examSummaryRepository.insert(ExamConverter.toExamSummary(
+                    req,
+                    session.getUserId(),
+                    jobId,
+                    GradingKeys.effectiveMockExamId(session.getMockExamId())
+            ));
+            completeSummaryCallbackDatabase(examId, generationAttempt);
+            log.info(
+                    "요약 채점 콜백 저장 완료 event=grading.callback "
+                            + "outcome=stored callbackType=summary "
+                            + "examId={} jobId={} generationAttempt={}",
+                    examId, jobId, generationAttempt
+            );
+            return SummaryCallbackOutcome.COMPLETED;
+        });
+
+        if (outcome != SummaryCallbackOutcome.NO_OP) {
+            reconcileAttemptGroup(examId);
+            gradingService.calculateAndCacheOverallStatus(examId);
+        }
+    }
+
+    private void updateExamResultWithoutGuard(ExamRequestDTO.AiResultReq req) {
         String examId = req.getExamId();
         int retryCount = GradingKeys.canonicalRetryCount(req.getRetryCount());
         boolean summaryCallback = req.getGenerationAttempt() != null || req.getTotalScore() != null;
@@ -445,6 +586,12 @@ public class ExamServiceImpl implements ExamService {
                         examId, callbackJobId, generationAttempt
                 );
             } catch (DuplicateKeyException duplicateCallback) {
+                if (userOwnedTransactionExecutor != null
+                        && userOwnedTransactionExecutor.enabled()
+                        && org.springframework.transaction.support.TransactionSynchronizationManager
+                        .isActualTransactionActive()) {
+                    throw duplicateCallback;
+                }
                 log.debug(
                         "중복 요약 채점 콜백 무시 event=grading.callback "
                                 + "outcome=duplicate callbackType=summary "
@@ -501,13 +648,20 @@ public class ExamServiceImpl implements ExamService {
     }
 
     private void completeSummaryCallback(String examId, int generationAttempt) {
-        if (gradingService.completeSummary(examId, generationAttempt)) {
+        if (completeSummaryCallbackDatabase(examId, generationAttempt)) {
             reconcileAttemptGroup(examId);
-            if (attemptGroupStateCoordinator == null || !attemptGroupStateCoordinator.manages(examId)) {
-                examSessionManager.completeIfIncomplete(examId);
-            }
             gradingService.calculateAndCacheOverallStatus(examId);
         }
+    }
+
+    private boolean completeSummaryCallbackDatabase(String examId, int generationAttempt) {
+        if (!gradingService.completeSummary(examId, generationAttempt)) {
+            return false;
+        }
+        if (attemptGroupStateCoordinator == null || !attemptGroupStateCoordinator.manages(examId)) {
+            examSessionManager.completeIfIncomplete(examId);
+        }
+        return true;
     }
 
     private void reconcileAttemptGroup(String examId) {
@@ -708,6 +862,17 @@ public class ExamServiceImpl implements ExamService {
     // 별도의 3rd 파티 발음 평가 데이터인 SpeechAce 분석의 원본 수록 JSON을 전용 가공 컬렉션에 영구 보존합니다.
     @Override
     public void saveSpeechAceResult(ExamRequestDTO.SpeechAceReq req) {
+        if (userOwnedTransactionExecutor == null || !userOwnedTransactionExecutor.enabled()) {
+            saveSpeechAceResultWithoutGuard(req);
+            return;
+        }
+        executeCallbackForCurrentOwner(
+                req.getExamId(),
+                () -> saveSpeechAceResultWithoutGuard(req)
+        );
+    }
+
+    private void saveSpeechAceResultWithoutGuard(ExamRequestDTO.SpeechAceReq req) {
         int retryCount = GradingKeys.canonicalRetryCount(req.getRetryCount());
         String jobId = GradingKeys.questionJobId(
                 req.getExamId(), req.getQuestionNumber(), retryCount);
@@ -746,6 +911,12 @@ public class ExamServiceImpl implements ExamService {
                     req.getExamId(), jobId, req.getQuestionNumber(), retryCount
             );
         } catch (DuplicateKeyException duplicateCallback) {
+            if (userOwnedTransactionExecutor != null
+                    && userOwnedTransactionExecutor.enabled()
+                    && org.springframework.transaction.support.TransactionSynchronizationManager
+                    .isActualTransactionActive()) {
+                throw duplicateCallback;
+            }
             log.debug(
                     "중복 SpeechAce 콜백 무시 event=grading.callback "
                             + "outcome=duplicate callbackType=speechace "
@@ -757,8 +928,19 @@ public class ExamServiceImpl implements ExamService {
 
     // 외부 Azure 전용 음성 분석 모델로부터 수신한 대용량 JSON 페이로드를 매핑 변환 없이 물리 구조 그대로 누적 보존합니다.
     @Override
-    @Transactional
     public void processAzureCallback(Map<String, Object> rawPayload) {
+        String examId = azureExamId(rawPayload);
+        if (userOwnedTransactionExecutor == null || !userOwnedTransactionExecutor.enabled()) {
+            processAzureCallbackWithoutGuard(rawPayload);
+            return;
+        }
+        executeCallbackForCurrentOwner(
+                examId,
+                () -> processAzureCallbackWithoutGuard(rawPayload)
+        );
+    }
+
+    private void processAzureCallbackWithoutGuard(Map<String, Object> rawPayload) {
         String examId;
         Integer questionNumber;
         Integer retryCount;
@@ -813,6 +995,12 @@ public class ExamServiceImpl implements ExamService {
                     examId, jobId, questionNumber, retryCount
             );
         } catch (DuplicateKeyException duplicateCallback) {
+            if (userOwnedTransactionExecutor != null
+                    && userOwnedTransactionExecutor.enabled()
+                    && org.springframework.transaction.support.TransactionSynchronizationManager
+                    .isActualTransactionActive()) {
+                throw duplicateCallback;
+            }
             log.debug(
                     "중복 Azure 콜백 무시 event=grading.callback "
                             + "outcome=duplicate callbackType=azure "
@@ -824,7 +1012,6 @@ public class ExamServiceImpl implements ExamService {
 
     // 프론트엔드가 개별 문항 녹음본을 제출한 후, 해당 단건 채점 분석 결과가 MongoDB에 도착했는지 추적하기 위한 폴링 엔드포인트용 조회 메서드입니다.
     @Override
-    @Transactional(readOnly = true)
     public ExamResponseDTO.QuestionPollResult getQuestionProcessingStatus(String examId, Integer questionNumber, Integer retryCount) {
         requireOwnedSession(examId);
 
@@ -836,6 +1023,63 @@ public class ExamServiceImpl implements ExamService {
                 .retryCount(retryCount)
                 .status(questionStatus)
                 .build();
+    }
+
+    @SuppressWarnings("unchecked")
+    private static String azureExamId(Map<String, Object> rawPayload) {
+        try {
+            return (String) ((Map<String, Object>) rawPayload.get("metadata")).get("user_id");
+        } catch (RuntimeException invalidMetadata) {
+            throw invalidMetadata;
+        }
+    }
+
+    private <T> T executeUserOwned(String userId, Supplier<T> command) {
+        if (userOwnedTransactionExecutor == null) {
+            return command.get();
+        }
+        try {
+            return userOwnedTransactionExecutor.execute(userId, command);
+        } catch (UserOwnershipGuardException merged) {
+            throw new ExamsException(ErrorStatus._ACCOUNT_MERGED_TOKEN_REJECTED);
+        }
+    }
+
+    private void executeCallbackForCurrentOwner(String examId, Runnable callbackCommand) {
+        executeCallbackForCurrentOwner(examId, () -> {
+            callbackCommand.run();
+            return Boolean.TRUE;
+        });
+    }
+
+    private <T> T executeCallbackForCurrentOwner(String examId, Supplier<T> callbackCommand) {
+        RuntimeException lastFailure = null;
+        for (int attempt = 0; attempt < 3; attempt++) {
+            ExamSession observed = resolveSession(examId);
+            try {
+                return userOwnedTransactionExecutor.execute(observed.getUserId(), () -> {
+                    ExamSession current = resolveSession(examId);
+                    if (!Objects.equals(current.getUserId(), observed.getUserId())) {
+                        throw new CallbackOwnerChangedException();
+                    }
+                    return callbackCommand.get();
+                });
+            } catch (UserOwnershipGuardException | CallbackOwnerChangedException race) {
+                lastFailure = race;
+            }
+        }
+        throw lastFailure == null
+                ? new IllegalStateException("Callback owner convergence failed")
+                : lastFailure;
+    }
+
+    private enum SummaryCallbackOutcome {
+        NO_OP,
+        FAILED,
+        COMPLETED
+    }
+
+    private static final class CallbackOwnerChangedException extends RuntimeException {
     }
 
     private static List<Integer> compatibleRetryCounts(int retryCount) {

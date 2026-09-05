@@ -1,9 +1,9 @@
 # 1차 업데이트 진행 체크리스트
 
-- 기준일: 2026-08-31
+- 기준일: 2026-09-03
 - 기준 범위: SNS 로그인, 검증된 전화번호당 무료 모의고사 1회, 10초 챌린지
 - 판정 근거: Identity·Billing·Learning Core 현재 코드, 저장소 CURRENT_STATE/WORKLOG, 병합·테스트 기록
-- Jira 주의: 이번 점검은 세 저장소의 현재 `develop`, 코드와 최근 Jira 재조회 기록을 기준으로 한다. Challenge `TMI-102`·`TMI-106`은 별도 실시간 재조회 없이 저장소의 최근 상태 기록을 사용한다.
+- Jira 주의: 이번 점검은 세 저장소의 현재 `develop`, 작업 트리와 최근 Jira 재조회 기록을 기준으로 한다. Challenge `TMI-102`·`TMI-106`은 별도 실시간 재조회 없이 저장소의 최근 상태 기록을 사용한다.
 
 표시 기준:
 
@@ -14,13 +14,13 @@
 
 ## 0. 전체 판정
 
-현재 1차 업데이트는 **Identity와 무료시험 핵심 서버 코드는 대부분 구현됐지만, 실제 workload 경로와 상태 event·모바일 종단 흐름이 아직 완성되지 않은 상태**다. production 출시 가능 단계는 아니다.
+현재 1차 업데이트는 **Identity lifecycle과 무료시험의 생성·채점 상태·phone 재가입 continuation까지 핵심 서버 코드가 구현됐지만, Identity Stage 7 fan-out과 실제 workload·모바일 종단 검증이 남은 상태**다. production 출시 가능 단계는 아니다.
 
 | 영역 | 현재 판정 | 핵심 잔여 작업 |
 | --- | --- | --- |
-| Identity·SNS | ✅ 서버 lifecycle 완료 / 🟡 통합 전 | 모바일·SigV4 workload·replica set staging E2E, feature flag rollout |
-| 무료 모의고사 1회 | ✅ 원장·Reservation·시험 생성 saga / 🟡 상태 연동 전 | Learning Core AttemptGroup publisher, owner rebind, 실제 Lattice·E2E |
-| Learning Core 기존 시험 | ✅ 시험·Billing saga 구현 / 🟡 feature off | migration·Lattice·failure-injection E2E, UserMerged 연동 |
+| Identity·SNS | ✅ 기존 lifecycle 완료 / 🟡 Stage 7 진행 | `TMI-123` SigV4·owner event fan-out, 모바일·replica set staging E2E |
+| 무료 모의고사 1회 | ✅ 생성·상태·phone continuation 코드 / 🟡 통합 전 | Identity fan-out, Learning Core UserMerged, 실제 Lattice·E2E |
+| Learning Core 기존 시험 | ✅ Billing saga·AttemptGroup publisher·continuation / 🟡 feature off | migration·Lattice·failure-injection E2E |
 | 10초 챌린지 | 🟡 v1 계약·콘텐츠 준비 | Learning Core backend와 양방향 AI 구현 |
 | 배포·통합 | 🚫 미완료 | 환경 격리, response-loss·multi-instance·rollback E2E, canary |
 
@@ -51,13 +51,18 @@
   - 전체 113 suite·600개 테스트 성공 기록
   - Jira 상태·Resolution 완료
   - worker는 production 기본 비활성으로 staging 검증 전 활성화 금지
+- 🟡 Billing SigV4와 owner event durable fan-out — `TMI-123`
+  - Identity Stage 7의 7-A·7-C 구현 Jira 생성, 상태 `해야 할 일`
+  - phone eligibility SigV4 전송, `UserMerged` consumer별 delivery와 `TrialOwnerRebindApproved` Billing-only delivery 범위
+  - 현재 Identity 작업 트리에 구현 파일과 변경이 있으나 테스트 완료·commit·`develop` 병합 기록은 아직 없음
+  - capture·publisher flag는 production 기본 비활성 유지
 - ⬜ Learning Core `UserMerged` consumer와 source actor deny 처리
 - 🚫 실제 모바일 Google·Apple·Phone 로그인/link 및 staging E2E
 - 🚫 Kakao를 1차에 포함한다면 Identity Platform/OIDC·deep-link staging PoC
 - 🚫 실제 Mongo replica set·multi-instance worker·workload JWT key overlap 검증
 - 🚫 withdrawal publisher/backfill과 Guest merge production feature flag 활성화 검증
 
-판정: Identity 서버의 SNS·탈퇴·가입 중단 cleanup lifecycle 코드는 구현됐다. 현재 병목은 신규 domain 코드보다 **실제 Firebase/mobile, Identity→Billing SigV4 transport, replica set staging E2E와 안전한 feature flag rollout**이다.
+판정: Identity 서버의 SNS·탈퇴·가입 중단 cleanup lifecycle 코드는 구현됐다. 현재 핵심 개발 병목은 **`TMI-123` Identity→Billing SigV4와 owner event durable fan-out**, 이후 실제 Firebase/mobile·replica set staging E2E와 안전한 feature flag rollout이다.
 
 ## 2. 검증된 전화번호당 무료 모의고사 1회
 
@@ -90,13 +95,29 @@
   - active Session fencing, 단방향 상태 전이, inbox·Transaction·CAS와 204/409/422/503 계약 구현
   - 전체 137개 테스트 성공 기록
   - Jira 상태·Resolution 완료
+- ✅ Learning Core AttemptGroup durable outbox/publisher — `TMI-118`
+  - PR #25와 Summary Transaction hotfix PR #26이 Learning Core `develop`에 병합됨
+  - GRADING·COMPLETED·RETAKE_AVAILABLE 판정, Session+outbox Transaction, lease/retry/dead-letter/auth circuit 구현
+  - Summary Transaction 전체 단위 재시도 보완 후 전체 444개 테스트 성공 기록
+  - Jira 상태 완료
+- 🟡 Billing retained trial owner rebind·phone continuation — `TMI-120`
+  - owner rebind와 continuation 보완 PR #6·#7·#8이 Billing `develop`에 병합됨
+  - OPEN·RETAKE_AVAILABLE owner CAS, GRADING pending, COMPLETED NOOP와 phone continuation discovery 구현
+  - 비-Docker 테스트와 집중 테스트는 통과했지만 Docker daemon 미가동으로 replica-set Testcontainers 4개는 아직 실행 증거가 없음
+  - Jira는 최근 기록 기준 `해야 할 일`, production flag 기본 off
+- ✅ Learning Core phone 재가입 시험 continuation — `TMI-122`
+  - PR #27이 Learning Core `develop`에 병합됨
+  - target Session 0건일 때 Billing discovery 204/200, PHONE_REJOIN REPLACEMENT와 same group/mock 연결 구현
+  - source Session·답안·결과는 이전하지 않고 target의 새 examId로 처음부터 재시작
+  - 전체 457개 테스트 성공 기록, feature flag 기본 off
 - 🟡 Reservation expiry worker
   - 구현은 완료됐지만 기본 비활성
   - production schedule·metric·alert·운영값 검증 필요
 - 🟡 AttemptGroup과 R3 무료 replacement
-  - Billing consumer와 AttemptGroup·AttemptSession 상태 전이는 구현됨
-  - Learning Core의 durable outbox/publisher가 없어 실제 `GRADING → COMPLETED/RETAKE_AVAILABLE` event는 아직 전달되지 않음
-- ⬜ Billing 탈퇴·재가입 owner rebind
+  - Learning Core publisher와 Billing consumer 양쪽 코드가 구현됨
+  - feature flag·실제 Lattice·multi-instance·failure-injection staging E2E는 미완료
+- 🟡 Billing 탈퇴·재가입 owner rebind
+  - `TMI-120` 코드는 병합됐지만 Identity `TMI-123` producer와 replica-set/staging 검증이 남음
 - ⬜ Billing 자동 repair/reconciliation과 운영 route
 - 🟡 실제 VPC Lattice·SigV4·IAM/SG 연결
   - Learning Core SigV4 client 코드는 구현됐지만 실제 route·role·policy·SG 검증은 미완료
@@ -111,7 +132,7 @@
   - 장기 background reconciliation과 실제 failure injection은 후속
 - 🚫 같은 전화번호·다른 계정, 동시 시험 시작, Session commit 실패, confirm 응답 유실 cross-service E2E
 
-판정: Billing의 **TrialClaim·무료 grant·Reservation·AttemptGroup consumer와 Learning Core 시험 생성 saga까지 핵심 코드가 구현됐다.** 다만 기능은 기본 off이고 실제 Lattice·migration·staging E2E와 Learning Core 상태 publisher가 없어 production 종단 흐름은 아직 닫히지 않았다.
+판정: Billing의 **TrialClaim·무료 grant·Reservation·AttemptGroup consumer·owner rebind와 Learning Core 시험 생성·상태 publisher·phone continuation까지 핵심 코드가 구현됐다.** 다만 관련 flag가 기본 off이고 Identity `TMI-123`, 실제 Lattice·migration·replica-set 및 staging E2E가 남아 production 종단 흐름은 아직 닫히지 않았다.
 
 ## 3. Learning Core 기존 시험 기반
 
@@ -125,13 +146,16 @@
 - ⬜ `UserMerged` 학습 데이터 consumer
 - ✅ Billing Reservation client와 시험 생성 saga — `TMI-116`
 - ✅ feature flag on의 필수 `Idempotency-Key`와 동일 operation replay — `TMI-116`
-- ⬜ AttemptGroup 상태 durable outbox/publisher
-- 🟡 R3 replacement 연결
-  - Billing 수신 상태 전이는 구현됐지만 Learning Core event 발행이 없어 종단 미완성
+- ✅ AttemptGroup 상태 durable outbox/publisher — `TMI-118`
+- ✅ R3 replacement 코드 연결 — `TMI-118`
+  - 최초 응시에서 1회만 차감하고 완료할 때까지 같은 consumption·group·mock으로 새 Session을 처음부터 시작
+  - `GRADING`은 기존 복구를 우선하고 최종 실패의 `RETAKE_AVAILABLE`에서 replacement 허용
+- ✅ phone 재가입 continuation — `TMI-122`
+  - Billing `TMI-120` discovery와 exact context를 사용해 target 새 Session을 기존 미완료 group에 연결
 - ⬜ Billing 장애 reconciliation
 - ⬜ Challenge domain·API·AI Job
 
-판정: 기존 모의고사와 Billing Reservation 시험 생성 경계는 코드상 연결됐다. 이제 **feature flag 활성화 전 Mongo migration·실제 Lattice와 failure-injection E2E**, 그리고 채점 결과를 Billing AttemptGroup으로 보내는 publisher가 필요하다.
+판정: 기존 모의고사, Billing Reservation 시험 생성, 채점 상태 publisher와 phone continuation까지 코드상 연결됐다. 이제 **feature flag 활성화 전 Mongo migration·실제 Lattice·replica-set과 failure-injection E2E**, 그리고 별도 `UserMerged` consumer가 필요하다.
 
 ## 4. 10초 챌린지
 
@@ -175,13 +199,20 @@
   - 실제 workload credential·HTTPS route·key rotation·backfill staging E2E는 미완료
 - 🟡 Identity → Billing eligibility event
   - publisher와 consumer 코드는 구현
-  - Identity publisher의 실제 SigV4/Lattice transport 보정과 route·role 검증은 미완료
+  - Identity SigV4 transport 보정은 `TMI-123` 작업 트리에서 진행 중이며 테스트·병합 전
+  - 실제 route·role·negative E2E는 미완료
 - 🟡 Learning Core → Billing Reservation 호출 — `TMI-116`
   - SigV4 client와 saga 코드는 구현·병합
   - 실제 Lattice/IAM/SG·Mongo migration·staging E2E와 feature flag 활성화는 미완료
-- 🟡 Learning Core → Billing AttemptGroup 상태 event — `TMI-117` 후속
-  - Billing consumer는 구현·병합·Jira 완료
-  - Learning Core outbox/publisher PLAN·Jira·구현은 없음
+- 🟡 Learning Core → Billing AttemptGroup 상태 event — `TMI-117`, `TMI-118`
+  - Billing consumer와 Learning Core outbox/publisher 모두 구현·병합
+  - 실제 Lattice, consumer/publisher flag 순차 활성화와 상태·오류 E2E는 미완료
+- 🟡 Identity → Billing owner rebind event — `TMI-120`, `TMI-123`
+  - Billing consumer는 구현·병합
+  - Identity durable fan-out은 `TMI-123` 구현·테스트·병합 전
+- 🟡 Billing ↔ Learning Core phone continuation — `TMI-120`, `TMI-122`
+  - 양쪽 코드가 `develop`에 병합됨
+  - Billing replica-set Testcontainers 4개와 Lattice exact route·stale epoch·응답 유실 staging E2E가 남음
 - ⬜ 무료시험 전체 흐름 E2E
 - ⬜ Challenge 전체 흐름 E2E
 - ⬜ staging 환경별 Mongo·Redis·S3·Firebase·credential 분리 확인
@@ -196,24 +227,24 @@
 
 - 🚫 모바일 SNS 로그인·phone link와 Identity staging E2E
 - 🚫 Learning Core Billing saga의 실제 Lattice·migration·무료시험 cross-service E2E
-- 🚫 Learning Core AttemptGroup outbox/publisher와 Billing owner rebind 구현
+- 🚫 Identity `TMI-123` SigV4·owner event fan-out과 Learning Core `UserMerged` consumer 완료
+- 🚫 Billing `TMI-120` replica-set 테스트와 owner rebind·phone continuation cross-service E2E
 - 🚫 Challenge backend·AI 양방향 구현과 모바일 E2E
 - 🚫 workload 인증, 환경 격리, 실제 replica set·multi-instance 검증
 - 🚫 response loss·rollback·dead-letter/replay runbook과 canary 검증
 
 ## 7. 가장 우선적인 다음 순서
 
-1. Learning Core AttemptGroup durable outbox/publisher의 PLAN·신규 Jira·명시적 범위를 확정하고 구현한다.
-2. Billing 탈퇴·재가입 retained subject owner rebind를 계획·구현한다.
-3. Identity→Billing eligibility publisher를 SigV4/Lattice transport로 정렬하고 `TMI-110` staging E2E를 수행한다.
-4. `TMI-116` Mongo migration, Lattice/IAM/SG와 reserve/commit/confirm failure-injection E2E를 통과한다.
-5. Learning Core `UserMerged` consumer를 구현한다.
-6. Challenge backend Jira를 만들고 catalog/attempt/API/AI Job을 구현한다.
-7. 모바일 SNS·무료시험·Challenge 종단 E2E와 multi-instance·response-loss·rollback을 통과한다.
-8. canary 후 consumer → publisher → 사용자 feature 순서로 production flag를 활성화한다.
+1. Identity `TMI-123` SigV4·owner event durable fan-out 구현을 테스트하고 feature branch·`develop`에 병합한다.
+2. Billing `TMI-120`의 replica-set Testcontainers 4개를 Docker 환경에서 통과시키고 Jira 상태를 정리한다.
+3. Learning Core `UserMerged` consumer와 source actor deny 처리를 별도 계획·Jira로 구현한다.
+4. `TMI-116`·`TMI-118`·`TMI-120`·`TMI-122`의 Mongo migration, Lattice/IAM/SG와 failure-injection staging E2E를 통과한다.
+5. Challenge backend Jira를 만들고 catalog/attempt/API/AI Job을 구현한다.
+6. 모바일 SNS·무료시험·Challenge 종단 E2E와 multi-instance·response-loss·rollback을 통과한다.
+7. canary 후 consumer → publisher → 사용자 feature 순서로 production flag를 활성화한다.
 
 ## 한 줄 요약
 
-현재는 **Identity lifecycle, Billing 무료권·Reservation·AttemptGroup consumer, Learning Core 시험 생성 saga까지 핵심 코드가 구현됐고, Learning Core 상태 publisher·owner rebind·Challenge backend·실제 Lattice/mobile/staging 종단 검증이 남은 상태**다.
+현재는 **무료시험 생성·채점 상태·실패 재시작·phone 재가입 continuation의 양쪽 서버 코드가 대부분 구현됐고, Identity `TMI-123`, Learning Core `UserMerged`, Challenge backend와 실제 Lattice/mobile/staging 종단 검증이 남은 상태**다.
 
 프론트 API 상세는 [`docs/contracts/FRONTEND_API_HANDOFF.md`](../contracts/FRONTEND_API_HANDOFF.md), Challenge API v1은 [`docs/contracts/ten-second-challenge-frontend-api.md`](../contracts/ten-second-challenge-frontend-api.md)를 따른다.

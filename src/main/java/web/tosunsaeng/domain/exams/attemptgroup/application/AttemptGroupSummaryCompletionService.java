@@ -68,7 +68,8 @@ public class AttemptGroupSummaryCompletionService {
             int generationAttempt,
             TransactionStatus status
     ) {
-        persistSummaryIfAbsent(summary);
+        String currentOwner = coordinator.touchCurrentOwnerWithinTransaction(examId);
+        persistSummaryIfAbsent(withCurrentOwner(summary, currentOwner));
         if (!gradingService.completeSummary(examId, generationAttempt)) {
             status.setRollbackOnly();
             return false;
@@ -89,6 +90,26 @@ public class AttemptGroupSummaryCompletionService {
                 || !Objects.equals(existing.getMockExamId(), summary.getMockExamId())) {
             throw new IllegalStateException("Deterministic summary identity conflict");
         }
+    }
+
+    private ExamSummary withCurrentOwner(ExamSummary summary, String currentOwner) {
+        if (currentOwner == null || Objects.equals(currentOwner, summary.getUserId())) {
+            return summary;
+        }
+        return ExamSummary.builder()
+                .id(summary.getId())
+                .examId(summary.getExamId())
+                .userId(currentOwner)
+                .mockExamId(summary.getMockExamId())
+                .totalScore(summary.getTotalScore())
+                .levelEstimate(summary.getLevelEstimate())
+                .summary(summary.getSummary())
+                .overallFeedback(summary.getOverallFeedback())
+                .partFeedback(summary.getPartFeedback())
+                .strengths(summary.getStrengths())
+                .weaknesses(summary.getWeaknesses())
+                .recommendedPractice(summary.getRecommendedPractice())
+                .build();
     }
 
     private boolean retryableTransactionFailure(RuntimeException failure) {

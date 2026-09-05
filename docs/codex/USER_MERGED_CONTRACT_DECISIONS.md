@@ -1,11 +1,34 @@
 # Learning Core `UserMerged` 계약 결정 가이드
 
 - 작성일: 2026-08-20
+- 최종 갱신일: 2026-09-04
 - 입력 문서: Identity `UserMerged` schema v1 구현 인계서, Learning Core 구현 사전 검토
 - 상태: 권장 기본 패키지 확정, 운영값·측정 gate 이행 전
-- Jira: 별도 이슈 키 미제공
+- Jira: `TMI-125` `[Learning Core] UserMerged consumer 및 ownership migration 구현`
 
-## 확정 결과 — 2026-08-20
+## 0. 5줄 결론
+
+1. C1~C11의 기존 정책과 2026-09-04 추가 C12~C18 권장안은 모두 사용자 승인으로 구현 기준이 됐다.
+2. 진행 중 Billing creation operation은 `503`과 `Retry-After: 5`로 미루고 terminal operation snapshot은 rewrite하지 않는다.
+3. 기존 AttemptGroup outbox는 불변 유지하고 security는 UserMerged/UserWithdrawn/일반 chain Order 0/1/2로 분리한다.
+4. withdrawal marker는 `409` fail-closed하며 direct Transaction은 P99 1초·전체 HTTP 2초 미만 gate를 적용한다.
+5. 전용 replica-set `mongoIntegrationTest`와 제한형 영구 허용을 사용하되 production 활성화는 외부 운영 gate 뒤에 별도로 승인한다.
+
+### 사용자가 반드시 읽어야 하는 내용
+
+- 이번 승인은 구현 방향 승인이지 production flag 활성화 승인이 아니다.
+- direct 성능 gate 실패 시 timeout을 늘리거나 hybrid로 우회하지 않고 async 계약을 새로 승인받는다.
+
+### 사용자가 결정해야 하는 사항
+
+- 현재 구현 착수 전에 남은 제품 선택은 없다. C16 staging gate 실패 시에만 C2-B 계약을 다시 결정한다.
+
+### 주요 위험과 미확인 사항
+
+- 환경별 workload issuer/JWKS·key rotation, Mongo topology/index와 TLS/network allowlist 증빙이 남아 있다.
+- durable withdrawal 충돌과 producer 계약 위반 `409`는 자동 복구되지 않으므로 경보·수동 대응 runbook이 필요하다.
+
+## 확정 결과 — 2026-08-20, C12~C18 추가 승인 2026-09-04
 
 사용자 승인에 따라 아래 조합을 Learning Core의 구현 기준으로 확정한다.
 
@@ -21,16 +44,23 @@ C8-A  producer 최종 target 불변식 + consumer fail-closed
 C9    권장 HTTP status 표와 204 빈 body
 C10-A 인프라 TLS/network 제한 + 앱 workload 검증
 C11-A publisher OFF 상태의 단계적 guard 전환
+C12-A non-terminal ExamCreationOperation 동안 503 재시도, operation snapshot 불변
+C13-A 기존 AttemptGroup outbox 불변 + Billing legacy-source fence
+C14-A UserMerged/UserWithdrawn/일반 chain Order 0/1/2 분리
+C15-A withdrawal marker 409 fail-closed, 일시 경합만 503
+C16-A direct Transaction P99 1초·전체 HTTP 2초 초기 gate
+C17-A 전용 mongoIntegrationTest replica-set CI gate
+C18-A 계약 경계 제한형 UserMerged 영구 구현 허용
 ```
 
-이번 확정은 **구현 방향과 위험 수용 정책의 확정**이다. 아직 존재하지 않는 issuer, JWKS URI, audience, principal, TTL 같은 운영값을 임의로 확정했다는 의미는 아니며 production 활성화 승인도 아니다.
+이번 확정은 **구현 방향과 위험 수용 정책의 확정**이다. Identity `TMI-123` 구현에 따라 RS256, `aud=learning-core-user-merged`, `sub=identity-service`, `iat=nbf`, TTL `PT2M`, UUID `jti`, `typ=JWT`, `kid`는 고정됐다. 환경별 issuer·JWKS URI와 key rotation/overlap, 실제 Mongo·network 증빙은 production 활성화 gate이며 production 활성화 자체를 승인한 것은 아니다.
 
 남은 외부·측정 gate는 다음과 같다.
 
-1. Identity·인프라와 C1의 실제 credential profile 및 rotation 절차를 채운다.
+1. Identity·인프라와 환경별 workload issuer·JWKS URI 및 rotation 절차를 채운다.
 2. Identity가 C8 producer 불변식과 C9 status/retry 표를 인계서 개정본에 반영한다.
 3. staging/prod Mongo transaction 지원과 retry 조건을 확인한다.
-4. production 유사 이력에서 C2 direct Transaction 성능을 측정한다. 합의한 기준에 실패하면 자동으로 timeout을 늘리지 않고 C2-B 계약 개정 절차로 전환한다.
+4. production 유사 이력에서 C2 direct Transaction P99 1초 이하·전체 HTTP 2초 미만 초기 gate를 측정한다. 실패하면 timeout을 늘리지 않고 C2-B 계약 개정 절차로 전환한다.
 5. C10의 TLS 종료점, network allowlist와 trusted proxy 책임을 배포 문서에 확정한다.
 6. C11의 구버전 writer drain, guard backfill과 staging E2E를 완료하기 전에는 publisher와 merge feature를 활성화하지 않는다.
 
@@ -64,6 +94,13 @@ C11-A publisher OFF 상태의 단계적 guard 전환
 | C9 | HTTP status | 공동 계약 | 명확한 단일 status 표로 고정, 일시적 처리 경합은 `503` | Identity publisher 확인 | 방향 확정 |
 | C10 | TLS/network 책임 | 인프라 계약 | 인프라에서 HTTPS·접근 제한, 앱에서 workload credential 검증 | TLS·network 실제 구성 | 방향 확정 |
 | C11 | guard 전환 배포 | 배포 계약 | publisher OFF 상태로 writer 전환·구버전 drain·backfill 완료 후 consumer 활성화 | runbook·E2E 완료 | 확정 |
+| C12 | 진행 중 시험 생성 saga | 동시성 불변식 | source/target non-terminal operation이면 mutation 없이 `503`, terminal 이후 재시도 | saga/merge 경합 통합 테스트 | 확정 |
+| C13 | 기존 AttemptGroup outbox | 멱등성 불변식 | eventId·userId·canonical payload·digest 불변, Billing legacy-source fence 사용 | Billing 계약·전달 E2E | 확정 |
+| C14 | SecurityFilterChain | 보안 정책 | UserMerged 0, UserWithdrawn 1, 사용자 JWT/Legacy catch-all 2 | 401/403·Legacy 우회 테스트 | 확정 |
+| C15 | withdrawal/merge 충돌 | lifecycle 정책 | active marker는 `409` fail-closed, 미확정 Transaction 경합만 `503` | 동시 event E2E·경보 | 확정 |
+| C16 | direct 성능 예산 | 측정 gate | Transaction P99 1초 이하, 전체 HTTP 2초 미만 | production 유사 staging 측정 | 조건부 확정 |
+| C17 | Mongo 통합 테스트 | 품질 gate | Testcontainers replica-set 전용 `mongoIntegrationTest`를 CI 필수 실행 | CI Docker 실행 환경 | 확정 |
+| C18 | 저장소 구현 허용 | 거버넌스 | Jira 단건 예외가 아닌 계약 경계 제한형 영구 허용 | `AGENTS.md` 경계 유지 | 확정 |
 
 ## 3. 선택지와 장단점
 
@@ -71,11 +108,12 @@ C11-A publisher OFF 상태의 단계적 guard 전환
 
 #### A. 별도 비대칭 서명 workload JWT와 JWKS — 권장
 
-사용자 Access JWT와 다른 issuer 또는 명시적으로 분리된 credential profile, 전용 audience, Identity workload principal을 사용한다.
+사용자 Access JWT와 논리적으로 분리된 workload issuer, 전용 audience와 Identity workload principal을 사용한다. Identity의 기존 RSA signing/JWKS infrastructure를 재사용하되 사용자 Token과 issuer·audience·subject 검증으로 상호 사용을 차단한다.
 
 - 장점: 사용자 토큰과 권한 경계가 명확하고, private key를 consumer에 배포하지 않으며, `kid` 기반 rotation/overlap이 가능하다.
 - 단점: issuer/JWKS 가용성, cache, rotation 운영이 필요하다.
-- 확정해야 할 값: credential type, issuer, JWKS URI, 허용 algorithm, audience, principal claim/value, TTL, clock skew, rotation/overlap.
+- 고정값: RS256, `aud=learning-core-user-merged`, `sub=identity-service`, `iat=nbf`, `exp-iat<=PT2M`, 요청별 UUID `jti`, `typ=JWT`, `kid`; `service` claim은 사용하지 않는다.
+- 운영값: 환경별 workload issuer·JWKS URI, clock skew 기본 `PT30S`, rotation/overlap.
 
 #### B. shared HMAC secret JWT
 
@@ -96,10 +134,10 @@ C11-A publisher OFF 상태의 단계적 guard 전환
 #### A. 요청 안에서 migration commit 후 `204` — 조건부 권장
 
 - 장점: `204`의 의미가 “소유권 이전과 source 차단 완료”로 단순하며, 별도 worker 상태와 지연 구간이 없다.
-- 단점: 사용자 이력이 많으면 Mongo transaction과 Identity의 5초 read timeout이 충돌한다. timeout 후 duplicate 처리 경합도 커진다.
+- 단점: 사용자 이력이 많으면 Mongo transaction과 Identity의 `PT3S` read timeout이 충돌한다. timeout 후 duplicate 처리 경합도 커진다.
 - 채택 조건: production 유사 데이터 상한에서 transaction P99와 최대치가 합의한 예산 안에 들어오고, replica set/sharded transaction 및 retry가 검증돼야 한다.
 
-5초 전체를 DB에 사용하지 않는다. 예시 승인 기준은 **P99 2초 이하**로 두어 네트워크·인증·재시도에 여유를 남기는 것이다. 실제 기준은 양 팀이 staging 수치로 확정한다.
+3초 전체를 DB에 사용하지 않는다. 사용자 승인 초기 gate는 **Transaction P99 1초 이하, 전체 HTTP 2초 미만**으로 두어 네트워크·인증·재시도에 여유를 남긴다. max·retry율·timeout 0건 조건은 양 팀이 staging 수치로 추가 확정한다.
 
 #### B. durable inbox commit 후 worker 처리
 
@@ -318,6 +356,124 @@ Learning Core는 다음을 적용한다.
 
 publisher가 켜진 상태에서 구버전 writer와 신버전 writer를 혼용하는 방식은 허용하지 않는다.
 
+### C12. non-terminal ExamCreationOperation과 merge
+
+#### A. operation 종료까지 `503` 재시도 — 확정
+
+- 장점: Billing reservation/confirm/cancel과 Learning Core owner가 중간에 갈라지지 않으며 partial migration을 막는다.
+- 단점: 진행 중 saga가 끝날 때까지 merge 반영이 지연될 수 있다.
+- 세부 계약: source 또는 target의 `activeGuard=true` operation이 있으면 mutation 없이 `503`과 `Retry-After: 5`; terminal 뒤 동일 event를 재처리한다. 5초는 Identity owner-event publisher의 기본 초기 backoff `PT5S`와 맞춘다. operation snapshot은 rewrite하지 않는다.
+
+#### B. operation owner를 target으로 중간 변경
+
+- 장점: merge를 즉시 진행할 수 있다.
+- 단점: Billing이 알고 있는 reservation owner, immutable continuation snapshot과 status 복구가 불일치할 수 있어 채택하지 않는다.
+
+#### C. 완료된 aggregate만 먼저 이전
+
+- 장점: 구현 표면이 작아 보인다.
+- 단점: source/target에 소유권이 분리되어 원자적 merge 의미를 깨므로 채택하지 않는다.
+
+### C13. merge 전에 생성된 AttemptGroup outbox
+
+#### A. immutable snapshot 유지 — 확정
+
+- 장점: 같은 eventId의 canonical payload·digest와 at-least-once 멱등성을 유지한다.
+- 단점: merge 전에 만들어진 event에는 source owner가 남으며 Billing legacy-source fence에 의존한다.
+- 세부 계약: 기존 event는 Billing `TMI-120` fence로 전달하고 merge 이후 신규 event부터 target owner를 사용한다.
+
+#### B. 기존 event를 target owner로 rewrite
+
+- 장점: 모든 미전송 event가 최신 owner를 가진다.
+- 단점: payload와 digest가 바뀌어 동일 eventId conflict를 만들므로 채택하지 않는다.
+
+#### C. outbox drain까지 merge 차단
+
+- 장점: owner 변경 전 event 전달 순서를 단순화한다.
+- 단점: Billing 장애나 auth circuit으로 merge가 무기한 정체될 수 있어 채택하지 않는다.
+
+### C14. internal SecurityFilterChain 구성
+
+#### A. exact chain 세 개와 Order 0/1/2 — 확정
+
+- 장점: UserMerged, UserWithdrawn과 사용자 Token의 목적·decoder·401/403 경계가 명확하다.
+- 단점: chain별 설정과 회귀 테스트가 필요하다.
+
+#### B. 하나의 internal chain과 path별 resolver
+
+- 장점: top-level chain 수를 줄일 수 있다.
+- 단점: 내부에서 path별 decoder/audience authorization을 다시 구현해야 하며 현재 endpoint 두 개에는 복잡도가 더 크다.
+
+#### C. 모든 internal endpoint에 같은 generic Token
+
+- 장점: 설정이 가장 단순하다.
+- 단점: 한 credential로 merge와 withdrawal을 모두 실행할 수 있어 최소 권한을 깨므로 채택하지 않는다.
+
+### C15. withdrawal marker와 merge 충돌
+
+#### A. durable marker는 `409`, 일시 경합만 `503` — 확정
+
+- 장점: 탈퇴 owner로 데이터를 이전하거나 Learning Core가 Identity lifecycle을 되살리는 일을 막는다.
+- 단점: 영구 충돌은 자동 복구하지 않고 계약 경보·운영 확인이 필요하다.
+
+#### B. merge가 withdrawal보다 우선
+
+- 장점: merge가 자동 진행된다.
+- 단점: 탈퇴 접근 차단을 우회할 수 있어 채택하지 않는다.
+
+#### C. 모든 충돌을 `503`으로 재시도
+
+- 장점: 일시적인 event ordering은 수렴할 수 있다.
+- 단점: 영구 lifecycle 위반도 무한 재시도될 수 있어 채택하지 않는다.
+
+### C16. Identity `PT3S` timeout 아래 direct 성능 gate
+
+#### A. Transaction P99 1초·전체 HTTP 2초 미만 — 조건부 확정
+
+- 장점: 인증·network·retry 여유를 남기면서 `204=완료` 의미를 유지한다.
+- 단점: 큰 history가 기준을 넘으면 direct 모델을 사용할 수 없다.
+
+#### B. 처음부터 durable inbox + worker
+
+- 장점: 큰 이력과 timeout에 강하다.
+- 단점: source deny 시점, migration 중 가시성, SLA와 DLQ 계약이 추가된다. A가 staging gate에 실패할 때 C2-B로 개정한다.
+
+#### C. direct timeout 뒤 자동 background 전환
+
+- 장점: 짧은 이력은 빠르게 처리된다.
+- 단점: direct와 worker 이중 실행·응답 의미 모호성이 있어 채택하지 않는다.
+
+### C17. Mongo Transaction 통합 테스트
+
+#### A. 전용 `mongoIntegrationTest` + Testcontainers replica set — 확정
+
+- 장점: 실제 commit/rollback·unknown commit·경합을 일반 단위 테스트와 분리해 재현하고 CI gate로 고정할 수 있다.
+- 단점: CI Docker 자원과 실행 시간이 추가된다.
+
+#### B. 전부 `clean test`에 포함
+
+- 장점: 명령이 하나다.
+- 단점: Docker가 없는 모든 로컬 실행을 깨고 빠른 단위 테스트 피드백을 늦춘다.
+
+#### C. 공유 staging Mongo 사용
+
+- 장점: 운영과 유사한 topology를 사용할 수 있다.
+- 단점: 데이터 충돌·비결정성·운영 접근 위험이 있어 자동 테스트 대상으로 사용하지 않는다.
+
+### C18. `AGENTS.md` 구현 허용 범위
+
+#### A. 계약 경계 제한형 영구 허용 — 확정
+
+- 장점: TMI-125 뒤의 버그 수정·테스트·운영 안정화에도 같은 안전 경계를 재사용한다.
+- 단점: 허용·금지 범위를 상세히 유지해야 한다.
+
+#### B. TMI-125 단건 예외
+
+- 장점: 가장 보수적이다.
+- 단점: 후속 안정화마다 새 예외가 필요해 채택하지 않는다.
+
+Billing 저장소 수정, 새 owner event, 공개 API 변경, withdrawal marker 해제와 Challenge는 영구 허용에 포함하지 않는다.
+
 ## 4. 권장 기본 패키지
 
 별도 요구가 없다면 다음 조합을 공동 검토안으로 사용한다.
@@ -334,15 +490,22 @@ C8-A  producer 최종 target 불변식 + consumer fail-closed
 C9    권장 status 표와 204 빈 body
 C10-A 인프라 TLS/network 제한 + 앱 workload 검증
 C11-A publisher OFF 상태의 단계적 guard 전환
+C12-A non-terminal creation operation 동안 503 재시도
+C13-A 기존 AttemptGroup outbox 불변
+C14-A exact SecurityFilterChain Order 0/1/2
+C15-A withdrawal marker 409, 일시 경합 503
+C16-A direct Transaction P99 1초·전체 HTTP 2초 gate
+C17-A 전용 mongoIntegrationTest replica-set CI gate
+C18-A 계약 경계 제한형 UserMerged 영구 허용
 ```
 
-이 패키지에서 제품·보안이 반드시 직접 승인해야 하는 핵심은 `C4-A + C6-A`다. “merge 후 source에서 비롯된 S3 write 가능성도 0이어야 한다”면 `C4-B + C6-B`를 선택하거나, 별도 범위로 `C6-C`를 설계해야 한다.
+`C4-A + C6-A`와 C12~C18은 2026-09-04 사용자 승인으로 구현 기준이 됐다. “merge 후 source에서 비롯된 S3 write 가능성도 0이어야 한다”는 정책으로 바뀌면 `C4-B + C6-B`를 선택하거나 별도 범위로 `C6-C`를 재설계해야 하며, 현재 구현 중 임의로 변경하지 않는다.
 
 ## 5. 실제 확정 절차
 
 ### 1차: 문서 결정 회의
 
-- 제품: C4, C5, C6 승인
+- 제품: C4, C5, C6과 C12~C18의 사용자 승인 기록 확인
 - Identity/보안: C1, C8 승인
 - Learning Core: C3, C7, C9 승인
 - 인프라/DBA: C10과 Mongo transaction 지원 여부 승인
@@ -354,7 +517,7 @@ C11-A publisher OFF 상태의 단계적 guard 전환
 - production 유사 user history 문서 수의 P50/P95/P99/max 확보
 - direct transaction 처리시간 P50/P95/P99/max와 retry/timeout 측정
 - Mongo transaction 지원, write concern, transient retry 검증
-- Identity 5초 timeout과 네트워크 예산을 포함한 E2E 측정
+- Identity connect `PT1S`·read `PT3S` timeout과 네트워크 예산을 포함한 E2E 측정
 
 수치가 승인 기준을 통과해야 C2-A를 확정한다. 실패하면 C2-B로 문서를 개정한다.
 

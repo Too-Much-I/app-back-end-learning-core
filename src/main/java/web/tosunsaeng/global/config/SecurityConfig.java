@@ -30,6 +30,7 @@ import web.tosunsaeng.global.config.security.JwtAudienceValidator;
 import web.tosunsaeng.global.config.security.JwtSubjectValidator;
 import web.tosunsaeng.global.config.security.SecurityErrorResponseHandler;
 import web.tosunsaeng.domain.withdrawal.security.UserWithdrawnAccessGateFilter;
+import web.tosunsaeng.domain.usermerge.security.MergedUserAccessGateFilter;
 
 import java.util.List;
 
@@ -67,7 +68,8 @@ public class SecurityConfig {
             HttpSecurity http,
             JwtDecoder jwtDecoder,
             SecurityErrorResponseHandler errorHandler,
-            ObjectProvider<UserWithdrawnAccessGateFilter> denyGateFilterProvider) throws Exception {
+            ObjectProvider<UserWithdrawnAccessGateFilter> denyGateFilterProvider,
+            ObjectProvider<MergedUserAccessGateFilter> mergedGateFilterProvider) throws Exception {
         configureCommonSecurity(http);
         http
                 .authorizeHttpRequests(auth -> auth
@@ -82,6 +84,8 @@ public class SecurityConfig {
                         .jwt(jwt -> jwt.decoder(jwtDecoder)));
 
         denyGateFilterProvider.ifAvailable(filter ->
+                http.addFilterAfter(filter, BearerTokenAuthenticationFilter.class));
+        mergedGateFilterProvider.ifAvailable(filter ->
                 http.addFilterAfter(filter, BearerTokenAuthenticationFilter.class));
 
         return http.build();

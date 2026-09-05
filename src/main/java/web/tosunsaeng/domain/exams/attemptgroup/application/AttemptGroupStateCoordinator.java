@@ -3,6 +3,7 @@ package web.tosunsaeng.domain.exams.attemptgroup.application;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.beans.factory.annotation.Qualifier;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.dao.DuplicateKeyException;
 import org.springframework.dao.OptimisticLockingFailureException;
 import org.springframework.stereotype.Service;
@@ -18,6 +19,7 @@ import web.tosunsaeng.domain.exams.attemptgroup.infrastructure.AttemptGroupOutbo
 import web.tosunsaeng.domain.exams.domain.entity.ExamSession;
 import web.tosunsaeng.domain.exams.domain.enums.ExamEntitlementState;
 import web.tosunsaeng.domain.exams.domain.repository.ExamSessionRepository;
+import web.tosunsaeng.domain.usermerge.application.UserOwnedTransactionExecutor;
 
 import java.time.Clock;
 import java.time.Instant;
@@ -36,6 +38,9 @@ public class AttemptGroupStateCoordinator {
     private final AttemptGroupEventMetrics metrics;
     private final ObjectProvider<TransactionOperations> transactionProvider;
     private final Clock clock;
+
+    @Autowired(required = false)
+    private UserOwnedTransactionExecutor userOwnedTransactionExecutor;
 
     public AttemptGroupStateCoordinator(
             AttemptGroupEventProperties properties,
@@ -83,6 +88,14 @@ public class AttemptGroupStateCoordinator {
         reconcileInTransaction(examId);
     }
 
+    String touchCurrentOwnerWithinTransaction(String examId) {
+        ExamSession session = sessionRepository.findById(examId).orElse(null);
+        if (session != null && userOwnedTransactionExecutor != null) {
+            userOwnedTransactionExecutor.touchWithinExistingTransaction(session.getUserId());
+        }
+        return session == null ? null : session.getUserId();
+    }
+
     public boolean manages(String examId) {
         if (!properties.writerEnabled()) {
             return false;
@@ -92,6 +105,9 @@ public class AttemptGroupStateCoordinator {
 
     private void reconcileInTransaction(String examId) {
         ExamSession session = sessionRepository.findById(examId).orElse(null);
+        if (session != null && userOwnedTransactionExecutor != null) {
+            userOwnedTransactionExecutor.touchWithinExistingTransaction(session.getUserId());
+        }
         if (!eligible(session) || session.getTerminalEventId() != null) {
             return;
         }

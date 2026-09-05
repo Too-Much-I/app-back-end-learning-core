@@ -16,6 +16,7 @@ import web.tosunsaeng.domain.exams.domain.enums.ExamCreationState;
 import web.tosunsaeng.domain.exams.domain.repository.ExamCreationOperationRepository;
 import web.tosunsaeng.domain.exams.domain.repository.ExamSessionRepository;
 import web.tosunsaeng.domain.exams.exception.ExamsException;
+import web.tosunsaeng.domain.usermerge.application.UserOwnershipGuardException;
 import web.tosunsaeng.global.error.code.status.ErrorStatus;
 
 import java.time.Clock;
@@ -138,7 +139,7 @@ public class BillingExamCreationSaga {
                 now
         );
         try {
-            return operationRepository.insert(operation);
+            return insertPrepared(operation);
         } catch (DuplicateKeyException concurrent) {
             return operationRepository.findByUserIdAndOperationId(userId, operationId)
                     .orElseThrow(() -> new ExamsException(
@@ -200,7 +201,7 @@ public class BillingExamCreationSaga {
                     snapshot.expiresAt(),
                     now()
             );
-            operationRepository.save(operation);
+            saveOperation(operation);
         } catch (OptimisticLockingFailureException concurrent) {
             // Another replay advanced the same operation. The caller loop reloads it.
         } catch (RuntimeException persistenceFailure) {
@@ -305,7 +306,7 @@ public class BillingExamCreationSaga {
                     snapshot.expiresAt(),
                     now()
             );
-            operationRepository.save(operation);
+            saveOperation(operation);
         } catch (OptimisticLockingFailureException concurrent) {
             // Another replay advanced the same operation. The caller loop reloads it.
         } catch (RuntimeException persistenceFailure) {
@@ -325,7 +326,7 @@ public class BillingExamCreationSaga {
                     snapshot.expiresAt(),
                     now()
             );
-            operationRepository.save(operation);
+            saveOperation(operation);
         } catch (OptimisticLockingFailureException concurrent) {
             // Another replay recorded the authoritative status first.
         } catch (RuntimeException persistenceFailure) {
@@ -723,6 +724,28 @@ public class BillingExamCreationSaga {
         return category == BillingClientException.Category.TEMPORARILY_UNAVAILABLE
                 || category == BillingClientException.Category.OPERATION_NOT_FOUND
                 || category == BillingClientException.Category.RESERVATION_CONFLICT;
+    }
+
+    private ExamCreationOperation insertPrepared(ExamCreationOperation operation) {
+        try {
+            if (transactionService.userMergedWriterEnabled()) {
+                return transactionService.insertPrepared(operation);
+            }
+            return operationRepository.insert(operation);
+        } catch (UserOwnershipGuardException merged) {
+            throw new ExamsException(ErrorStatus._ACCOUNT_MERGED_TOKEN_REJECTED);
+        }
+    }
+
+    private ExamCreationOperation saveOperation(ExamCreationOperation operation) {
+        try {
+            if (transactionService.userMergedWriterEnabled()) {
+                return transactionService.saveOperation(operation);
+            }
+            return operationRepository.save(operation);
+        } catch (UserOwnershipGuardException merged) {
+            throw new ExamsException(ErrorStatus._ACCOUNT_MERGED_TOKEN_REJECTED);
+        }
     }
 
     private ExamCreationOperation reload(String commandId) {
