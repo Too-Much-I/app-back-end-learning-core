@@ -42,14 +42,39 @@ test("same-name incompatible index blocks apply", () => {
 });
 
 test("inventory blockers never depend on raw owner identifiers", () => {
-    assert.deepEqual(blockers({
+    const rawIdentifier = "73a18ed4-1d56-4c4f-afd6-b39175b82a86";
+    const result = blockers({
         indexes: {errors: []},
         invalidOwnerCount: 1,
         activeDuplicateGroups: 1,
-        existingMergedGuards: 1
-    }), [
+        existingMergedGuards: 1,
+        orphanResultCount: 1,
+        orphanSummaryCount: 1,
+        resultOwnerMismatchCount: 1,
+        summaryOwnerMismatchCount: 1,
+        rawIdentifier
+    });
+    assert.deepEqual(result, [
         "non-canonical owner UUIDs exist",
         "duplicate active Session owner groups exist",
-        "pre-existing MERGED guards require manual review"
+        "pre-existing MERGED guards require manual review",
+        "orphan ExamResult documents exist",
+        "orphan ExamSummary documents exist",
+        "ExamResult owner does not match Session owner",
+        "ExamSummary owner does not match Session owner"
     ]);
+    assert.equal(result.join("\n").includes(rawIdentifier), false);
+});
+
+test("clean relational integrity report does not block apply", () => {
+    assert.deepEqual(blockers({
+        indexes: {errors: []},
+        invalidOwnerCount: 0,
+        activeDuplicateGroups: 0,
+        existingMergedGuards: 0,
+        orphanResultCount: 0,
+        orphanSummaryCount: 0,
+        resultOwnerMismatchCount: 0,
+        summaryOwnerMismatchCount: 0
+    }), []);
 });

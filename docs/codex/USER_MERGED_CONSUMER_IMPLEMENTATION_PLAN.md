@@ -1,13 +1,13 @@
 # Learning Core `UserMerged` consumer 최종 구현 계획
 
 - 작성일: 2026-08-20
-- 최종 갱신일: 2026-09-04
+- 최종 갱신일: 2026-09-05
 - 대상 저장소: `Too-Much-I/app-back-end-learning-core`
 - 기준 브랜치: `develop`
 - 기준 계약: Identity `UserMerged` schema version 1
 - 결정 근거: `docs/codex/USER_MERGED_CONTRACT_DECISIONS.md`
 - 사전 검토: `docs/codex/USER_MERGED_CONSUMER_REVIEW.md`
-- 상태: 사용자 권장안 승인·구현 기준 갱신 완료, 운영값·Mongo 성능 gate 이행 필요
+- 상태: runtime 및 production safety 후속 보강 구현 완료, Docker CI·운영값·Mongo 성능 gate 이행 필요
 - Jira: `TMI-125` `[Learning Core] UserMerged consumer 및 ownership migration 구현`
 
 ## 0. 5줄 결론
@@ -36,6 +36,14 @@
 - writer 전환 중 구버전 instance가 남아 있으면 guard를 우회할 수 있으므로 drain/backfill 전 publisher를 켜면 안 된다.
 
 ## 1. 목적과 완료 상태의 정의
+
+### 2026-09-05 후속 안전성 보강
+
+- phone continuation을 포함한 Billing 성공 응답의 `attemptGroupId`는 lowercase canonical UUID v4가 아니면 durable operation 저장 전에 거절한다.
+- migration dry-run은 orphan Result/Summary와 참조 Session owner mismatch를 count-only로 검사하고 한 건이라도 있으면 apply를 차단한다.
+- `UnknownTransactionCommitResult`는 mutation을 blind replay하지 않고 eventId·digest inbox를 bounded recheck하여 `204`/`409`/`503`으로 수렴한다.
+- 전용 PR workflow와 staging deploy workflow가 unit·Node migration·replica-set `mongoIntegrationTest`를 필수 실행한다.
+- 로컬 Java 496개와 Node 7개는 통과했고 replica-set test source compile도 성공했다. 로컬 Docker daemon 부재로 실제 `mongoIntegrationTest` 실행은 미완료이며 CI 성공 전에는 이 계획의 Mongo 검증 완료 체크를 하지 않는다.
 
 Identity가 ACTIVE GUEST를 최종 ACTIVE MEMBER로 merge한 뒤 at-least-once로 전달하는 `UserMerged` event를 Learning Core가 안전하게 소비한다.
 

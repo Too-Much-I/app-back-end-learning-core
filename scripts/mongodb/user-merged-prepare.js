@@ -150,12 +150,47 @@ async function activeDuplicateCount(database) {
     return rows[0]?.groups ?? 0;
 }
 
+async function childOwnerIntegrity(database, collectionName) {
+    const rows = await database.getCollection(collectionName).aggregate([
+        {$lookup: {
+            from: "exam_sessions",
+            localField: "examId",
+            foreignField: "_id",
+            as: "referencedSessions"
+        }},
+        {$facet: {
+            orphan: [
+                {$match: {"referencedSessions.0": {$exists: false}}},
+                {$count: "count"}
+            ],
+            ownerMismatch: [
+                {$match: {"referencedSessions.0": {$exists: true}}},
+                {$match: {$expr: {$ne: [
+                    "$userId",
+                    {$arrayElemAt: ["$referencedSessions.userId", 0]}
+                ]}}},
+                {$count: "count"}
+            ]
+        }}
+    ]).toArray();
+    return {
+        orphanCount: rows[0]?.orphan[0]?.count ?? 0,
+        ownerMismatchCount: rows[0]?.ownerMismatch[0]?.count ?? 0
+    };
+}
+
 async function inventory(database) {
     const ownerInventory = await distinctOwners(database);
     const indexes = inspectIndexes(await readIndexes(database));
+    const resultIntegrity = await childOwnerIntegrity(database, "exam_results");
+    const summaryIntegrity = await childOwnerIntegrity(database, "exam_summaries");
     return {
         ...ownerInventory,
         activeDuplicateGroups: await activeDuplicateCount(database),
+        orphanResultCount: resultIntegrity.orphanCount,
+        orphanSummaryCount: summaryIntegrity.orphanCount,
+        resultOwnerMismatchCount: resultIntegrity.ownerMismatchCount,
+        summaryOwnerMismatchCount: summaryIntegrity.ownerMismatchCount,
         existingMergedGuards: await database.getCollection("user_ownership_guards")
             .countDocuments({state: "MERGED"}),
         activeWithdrawalMarkers: await database.getCollection("withdrawn_user_access_denies")
@@ -177,6 +212,18 @@ function blockers(report) {
     if (report.existingMergedGuards > 0) {
         values.push("pre-existing MERGED guards require manual review");
     }
+    if (report.orphanResultCount > 0) {
+        values.push("orphan ExamResult documents exist");
+    }
+    if (report.orphanSummaryCount > 0) {
+        values.push("orphan ExamSummary documents exist");
+    }
+    if (report.resultOwnerMismatchCount > 0) {
+        values.push("ExamResult owner does not match Session owner");
+    }
+    if (report.summaryOwnerMismatchCount > 0) {
+        values.push("ExamSummary owner does not match Session owner");
+    }
     return values;
 }
 
@@ -186,6 +233,10 @@ function printReport(databaseName, applyChanges, report) {
     output(`Canonical owner count: ${report.owners.length}`);
     output(`Invalid owner count: ${report.invalidOwnerCount}`);
     output(`Duplicate active owner groups: ${report.activeDuplicateGroups}`);
+    output(`Orphan ExamResult count: ${report.orphanResultCount}`);
+    output(`Orphan ExamSummary count: ${report.orphanSummaryCount}`);
+    output(`ExamResult owner mismatch count: ${report.resultOwnerMismatchCount}`);
+    output(`ExamSummary owner mismatch count: ${report.summaryOwnerMismatchCount}`);
     output(`Existing MERGED guard count: ${report.existingMergedGuards}`);
     output(`Active withdrawal marker count: ${report.activeWithdrawalMarkers}`);
     output(`Non-terminal creation operation count: ${report.nonTerminalOperations}`);

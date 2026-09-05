@@ -214,7 +214,7 @@ public class BillingExamCreationSaga {
     ) {
         if (continuation.continuationReason() != BillingContinuationReason.PHONE_REJOIN
                 || !isLowercaseUuidV4(continuation.continuationId())
-                || !isOpaqueText(continuation.attemptGroupId())
+                || !isLowercaseUuidV4(continuation.attemptGroupId())
                 || !isOpaqueText(continuation.mockExamId())) {
             throw new ExamsException(ErrorStatus._BILLING_TEMPORARILY_UNAVAILABLE);
         }
@@ -224,6 +224,9 @@ public class BillingExamCreationSaga {
         boolean sourcePresent = !isBlank(operation.getReplacementSourceSessionId());
         boolean groupPresent = !isBlank(operation.getExpectedAttemptGroupId());
         boolean mockPresent = !isBlank(operation.getExpectedMockExamId());
+        if (groupPresent && !isLowercaseUuidV4(operation.getExpectedAttemptGroupId())) {
+            throw new ExamsException(ErrorStatus._BILLING_TEMPORARILY_UNAVAILABLE);
+        }
         if (operation.isPhoneContinuation()) {
             if (sourcePresent
                     || !groupPresent

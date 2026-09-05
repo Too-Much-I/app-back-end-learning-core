@@ -259,12 +259,13 @@ class SigV4BillingReservationClientTest {
     @Test
     void phoneContinuationStrictlyDecodesBillingSnapshot() throws Exception {
         String continuationId = "018f6f36-2f42-4bf5-8c17-0be35de4872f";
+        String attemptGroupId = "018f6f36-2f42-4bf5-8c17-0be35de4872e";
         BillingReservationClient client = clientReturning(
                 "/internal/v1/reservations/continuations/phone",
                 "{"
                         + "\"continuationReason\":\"PHONE_REJOIN\","
                         + "\"continuationId\":\"" + continuationId + "\","
-                        + "\"attemptGroupId\":\"group-existing\","
+                        + "\"attemptGroupId\":\"" + attemptGroupId + "\","
                         + "\"mockExamId\":\"mock_exam_003\""
                         + "}"
         );
@@ -275,8 +276,115 @@ class SigV4BillingReservationClientTest {
 
         assertEquals(BillingContinuationReason.PHONE_REJOIN, result.continuationReason());
         assertEquals(continuationId, result.continuationId());
-        assertEquals("group-existing", result.attemptGroupId());
+        assertEquals(attemptGroupId, result.attemptGroupId());
         assertEquals("mock_exam_003", result.mockExamId());
+    }
+
+    @Test
+    void phoneContinuationRejectsNonCanonicalAttemptGroupId() throws Exception {
+        BillingReservationClient client = clientReturning(
+                "/internal/v1/reservations/continuations/phone",
+                "{"
+                        + "\"continuationReason\":\"PHONE_REJOIN\","
+                        + "\"continuationId\":\"018f6f36-2f42-4bf5-8c17-0be35de4872f\","
+                        + "\"attemptGroupId\":\"group-existing\","
+                        + "\"mockExamId\":\"mock_exam_003\""
+                        + "}"
+        );
+
+        BillingClientException failure = assertThrows(
+                BillingClientException.class,
+                () -> client.findPhoneContinuation(
+                        "00000000-0000-4000-8000-000000000001")
+        );
+
+        assertEquals(BillingClientException.Category.CONTRACT_ERROR, failure.category());
+    }
+
+    @Test
+    void reserveRejectsUppercaseAttemptGroupUuid() throws Exception {
+        BillingReservationClient client = clientReturning(
+                "/internal/v1/reservations",
+                "{"
+                        + "\"operationId\":\"018f6f36-2f42-4bf5-8c17-0be35de4872c\","
+                        + "\"reservationId\":\"018f6f36-2f42-4bf5-8c17-0be35de4872d\","
+                        + "\"reservationKind\":\"INITIAL\","
+                        + "\"reservationStatus\":\"RESERVED\","
+                        + "\"attemptGroupId\":\"018F6F36-2F42-4BF5-8C17-0BE35DE4872E\","
+                        + "\"sessionId\":\"ex_contract\","
+                        + "\"mockExamId\":\"mock_exam_003\","
+                        + "\"expiresAt\":\"2026-08-28T03:05:00Z\""
+                        + "}"
+        );
+
+        BillingClientException failure = assertThrows(
+                BillingClientException.class,
+                () -> client.reserve(
+                        "018f6f36-2f42-4bf5-8c17-0be35de4872c",
+                        "00000000-0000-4000-8000-000000000001",
+                        "ex_contract",
+                        "mock_exam_003"
+                )
+        );
+
+        assertEquals(BillingClientException.Category.CONTRACT_ERROR, failure.category());
+    }
+
+    @Test
+    void confirmRejectsNonVersionFourAttemptGroupUuid() throws Exception {
+        String reservationId = "018f6f36-2f42-4bf5-8c17-0be35de4872d";
+        BillingReservationClient client = clientReturning(
+                "/internal/v1/reservations/" + reservationId + "/confirm",
+                "{"
+                        + "\"operationId\":\"018f6f36-2f42-4bf5-8c17-0be35de4872c\","
+                        + "\"reservationId\":\"" + reservationId + "\","
+                        + "\"reservationStatus\":\"CONFIRMED\","
+                        + "\"attemptGroupId\":\"018f6f36-2f42-1bf5-8c17-0be35de4872e\","
+                        + "\"attemptGroupStatus\":\"OPEN\","
+                        + "\"sessionId\":\"ex_contract\","
+                        + "\"confirmedAt\":\"2026-08-28T03:00:02Z\""
+                        + "}"
+        );
+
+        BillingClientException failure = assertThrows(
+                BillingClientException.class,
+                () -> client.confirm(
+                        "018f6f36-2f42-4bf5-8c17-0be35de4872c",
+                        reservationId,
+                        "00000000-0000-4000-8000-000000000001",
+                        "ex_contract",
+                        Instant.parse("2026-08-28T03:00:01Z")
+                )
+        );
+
+        assertEquals(BillingClientException.Category.CONTRACT_ERROR, failure.category());
+    }
+
+    @Test
+    void statusRejectsNonUuidAttemptGroupId() throws Exception {
+        BillingReservationClient client = clientReturning(
+                "/internal/v1/reservations/status",
+                "{"
+                        + "\"operationId\":\"018f6f36-2f42-4bf5-8c17-0be35de4872c\","
+                        + "\"reservationId\":\"018f6f36-2f42-4bf5-8c17-0be35de4872d\","
+                        + "\"reservationKind\":\"INITIAL\","
+                        + "\"reservationStatus\":\"RESERVED\","
+                        + "\"attemptGroupId\":\"not-a-uuid\","
+                        + "\"sessionId\":\"ex_contract\","
+                        + "\"mockExamId\":\"mock_exam_003\","
+                        + "\"expiresAt\":\"2026-08-28T03:05:00Z\""
+                        + "}"
+        );
+
+        BillingClientException failure = assertThrows(
+                BillingClientException.class,
+                () -> client.status(
+                        "00000000-0000-4000-8000-000000000001",
+                        "018f6f36-2f42-4bf5-8c17-0be35de4872c"
+                )
+        );
+
+        assertEquals(BillingClientException.Category.CONTRACT_ERROR, failure.category());
     }
 
     @Test
