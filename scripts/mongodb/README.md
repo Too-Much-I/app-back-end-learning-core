@@ -1,5 +1,31 @@
 # MongoDB maintenance scripts
 
+## TMI-125 UserMerged guard preparation
+
+`user-merged-prepare.js`는 UserMerged consumer를 켜기 전에 기존 Session·Result·Summary
+소유자를 읽기 전용으로 점검하고 ACTIVE ownership guard와 owner migration index를 준비한다.
+기본은 dry-run이며 URI, credential과 실제 userId를 출력하지 않는다. Apply는 모든 구버전
+writer가 drain됐음을 명시적으로 확인한 경우에만 허용한다.
+
+```bash
+MONGODB_URI=<secret> MONGODB_DATABASE=<learning-core-db> \
+node scripts/mongodb/user-merged-prepare.js
+
+MONGODB_URI=<secret> MONGODB_DATABASE=<learning-core-db> \
+USER_MERGED_LEGACY_WRITERS_DRAINED=true \
+USER_MERGED_PREPARE_APPLY=true \
+node scripts/mongodb/user-merged-prepare.js
+```
+
+Apply 전에는 Learning Core 구버전 instance drain, Identity UserMerged publisher OFF, DB backup과
+dry-run blocker 0을 확인한다. `exam_results.userId`, `exam_summaries.userId` index와 모든 기존
+canonical owner의 ACTIVE guard를 idempotent하게 생성하며 기존 MERGED guard나 충돌 데이터는
+자동 변경하지 않는다.
+
+```bash
+node --test scripts/mongodb/user-merged-prepare.test.js
+```
+
 ## TMI-116 Billing 시험 생성 saga indexes
 
 `tmi-116-migrate-billing-exam-saga.js`는 Billing saga feature flag를 켜기 전에

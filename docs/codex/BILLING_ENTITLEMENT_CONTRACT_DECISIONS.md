@@ -1,5 +1,9 @@
 # Billing/Entitlement 상품·사용권 계약 결정서
 
+> **2026-09-05 현행 상품 계약 우선 적용 공지**
+>
+> 이 문서의 기존 B2 credit catalog, `모의고사 1회 = 10 credits`, credit grant·balance·reservation·consumption·reward ledger 및 첫 구매 2배 계약은 모두 폐기되어 더 이상 유효하지 않다. 현행 목표 제품에는 credit 잔액·지급·소비·충전 API가 없으며, 유료 권리는 `UNLIMITED_1D`, `UNLIMITED_3D`, `UNLIMITED_7D`, `UNLIMITED_14D`, `UNLIMITED_30D`의 비자동갱신 기간제 무제한 이용권만 사용한다. 첫 구매 2배는 후속 후보가 아니라 완전히 제거한다. 출석 연장·연속 로그인·추천인·coupon은 이후 범위로 미루며, 다시 도입하려면 credit 전제를 재사용하지 않고 별도 계약을 새로 확정해야 한다. 검증 phone당 무료 1회인 `FREE_EXAM_ONCE`는 유료 이용권과 별개의 권리로 유지한다. 아래의 상충하는 credit 관련 내용은 역사적 초안일 뿐 구현 근거로 사용할 수 없다.
+
 - 작성일: 2026-08-20
 - 상태: B1·B2 기본 상품·결제 채널·P1·P2·P4·B9 확정, B3~B8 일부 운영 정책 승인 필요
 - 관련 Identity Jira: `TMI-95`, `TMI-98`

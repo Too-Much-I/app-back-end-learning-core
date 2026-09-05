@@ -7224,3 +7224,1407 @@
 - 남은 위험·배포 전 확인: Billing `7138810` 포함 이미지 배포, Lattice exact phone route IAM, Mongo index·Transaction 환경과 204/200/응답 유실/stale/trace staging E2E 전에는 phone flag를 켜지 않는다. reader-first 배포 후 caller flag를 canary로 활성화해야 한다.
 - 예상 밖 변경: 기존 사용자 소유 미추적 draw.io 파일 3개를 수정·삭제하지 않았다. 이번 기능 밖의 애플리케이션 리팩터링과 Billing 저장소 변경은 없다.
 - Git·배포: commit·push·PR·merge·배포, Jira 상태 변경과 AWS 리소스 변경을 수행하지 않았고 Secret·Token을 기록하지 않았다.
+
+## 2026-09-01 — 시스템 구성도 표현 도구 선택
+
+<!-- codex-turn:01a05bcd-56e8-76c0-9114-249362fbacc0 -->
+
+- 날짜: 2026-09-01
+- 브랜치: `codex/fix-tmi-118-summary-transaction`
+- Jira: 현재 브랜치는 `TMI-118` 문맥이지만 이번 시스템 구성도 도구 선택은 별도 Jira 작업이 아니며 Jira를 조회하거나 변경하지 않았다.
+- 5줄 결론: 토선생처럼 서비스·외부 시스템·데이터 저장소·신뢰 경계를 한눈에 설명하고 직접 편집해야 하는 시스템 구성도는 draw.io를 원본으로 사용한다. Mermaid는 sequence·state·간단한 코드 인접 흐름에 사용하며, 생성 이미지는 발표 표지나 개념적 삽화에만 사용하고 정확한 시스템 원본으로 사용하지 않는다.
+- 결정 근거: draw.io는 자유 배치, grouping, 색상 범례, 서비스 경계와 수동 편집에 유리하다. Mermaid는 Git diff와 Markdown 동기화는 좋지만 큰 시스템 지도에서 배치 제어가 약하다. 생성 이미지는 편집·버전 관리·정확한 label 유지가 어렵다.
+- 권장 운영: 같은 도식을 세 형식으로 중복 유지하지 않고, 통합 시스템 구성도는 draw.io 하나를 source of truth로 두며 별개의 sequence/state 도식만 Mermaid로 작성한다.
+- 변경 파일: `docs/codex/WORKLOG.md`, `docs/codex/CURRENT_STATE.md`. draw.io, Mermaid 또는 이미지 파일은 새로 만들지 않았다.
+- 유지한 계약: 애플리케이션 코드, 공개 API, `BaseResponse`, AI·S3·Redis·Billing 계약을 변경하지 않았다.
+- 테스트·검증: 설명과 기록 문서만 변경했으므로 Gradle 테스트는 실행하지 않고 `git diff --check`로 검증한다.
+- 위험·배포 전 확인: draw.io와 Mermaid로 동일한 관계를 중복 작성하면 drift가 생길 수 있으므로 도식별 원본을 하나만 정해야 한다. 배포 사항은 없고 이번 작업과 무관한 기존 dirty worktree는 수정하지 않았다.
+- Git commit·push는 수행하지 않았고 Secret과 Token을 기록하지 않았다.
+
+## 2026-09-01 — 토선생 앱 시스템 구성도 draw.io 작성
+
+<!-- codex-turn:01a05bd6-9b87-7a42-bf18-10b2e61d38b8 -->
+
+- 날짜: 2026-09-01
+- 브랜치: `codex/fix-tmi-118-summary-transaction`
+- Jira: 현재 브랜치는 `TMI-118` 문맥이지만 이번 시스템 구성도 작성은 별도 Jira 작업이 아니며 Jira를 조회하거나 변경하지 않았다.
+- 5줄 결론: 웹 POC를 제외한 토선생 앱 시스템을 한 페이지 draw.io로 작성했다. 앱, Identity, Learning Core, Billing, Python AI, 서비스별 MongoDB, Redis와 S3를 배치했다. 공개 HTTPS, JWKS, SigV4·VPC Lattice, Presigned PUT, AI 요청·Callback을 연결했다. 구현·조건부·외부 연동과 데이터 소유권을 색상·선 스타일로 구분했다. 기존 멘토링용 8페이지 draw.io는 수정하지 않았다.
+- 변경 파일: `docs/architecture/tosunsaeng-app-system-configuration.drawio`, `docs/codex/WORKLOG.md`, `docs/codex/CURRENT_STATE.md`.
+- 구현 내용: 앱이 Identity와 Learning Core만 직접 호출하고 Billing은 내부 전용임을 표현했다. `examId→userId`, `AI user_id=examId`, 실제 userId 비전송, 서비스별 DB 소유권과 Billing rollout gate를 도식에 명시했다.
+- 유지한 계약: 애플리케이션 코드, 공개 API, `BaseResponse`, 사용자 식별, AI request/Callback, S3·Redis와 Billing wire 계약을 변경하지 않았다.
+- 테스트·검증: `xmllint --noout` 성공, diagram 1개, vertex 29개, edge 14개, 누락 source/target 0개를 확인했다. 애플리케이션 코드 변경이 없어 Gradle 테스트는 실행하지 않았으며 최종 `git diff --check`를 수행한다.
+- 위험·미확인: draw.io CLI가 없어 diagrams.net 실제 렌더링 화면 export는 수행하지 못했다. 사용자가 diagrams.net에서 열어 label 겹침과 선 배치를 확인한 뒤 필요하면 위치를 미세 조정할 수 있다.
+- 배포 전 확인: 문서 산출물이므로 애플리케이션 배포 사항은 없다.
+- 예상 밖 diff: 이번 작업은 신규 draw.io와 두 기록 문서만 변경했다. 그 밖의 애플리케이션·설정 파일 변경은 없다.
+- Git commit·push는 수행하지 않았고 Secret과 Token을 기록하지 않았다.
+
+## 2026-09-01 — 시스템 구성도 연결선 라우팅 개선
+
+- 날짜: 2026-09-01
+- 브랜치: `codex/fix-tmi-118-summary-transaction`
+- Jira: 현재 브랜치는 `TMI-118` 문맥이지만 이번 draw.io 가독성 개선은 별도 Jira 작업이 아니며 Jira를 조회하거나 변경하지 않았다.
+- 사용자 PNG 확인 결과 기본 자동 라우팅이 앱→Learning Core, Identity→Billing과 Learning Core↔Python AI 연결선을 서비스 내부 도형 위로 통과시키고 긴 label을 겹치게 하는 문제를 확인했다.
+- `tosunsaeng-app-system-configuration.drawio`의 주요 연결선 9개에 entry/exit 지점과 고정 경유점을 지정했다. 상단 공개·eligibility 통로, 서비스 하단 Billing 통로, 데이터 저장소 사이 AI 요청 통로, 우측 외곽 Callback 통로로 분리했다.
+- 긴 edge label을 짧게 줄이고 offset을 지정했으며 앱→Identity와 인증 Provider→Identity는 서비스 사이의 짧은 전용 통로만 사용하게 했다.
+- XML 검증, edge 14개, 수동 routing edge 9개, 누락 source/target 0개와 `git diff --check` 성공을 확인했다. 애플리케이션 코드 변경이 없어 Gradle 테스트는 실행하지 않았다.
+- 공개 API·`BaseResponse`·사용자 식별·AI·S3·Redis·Billing 계약과 시스템 의미는 변경하지 않았다. diagrams.net 최종 화면에서 label 미세 위치는 사용자가 확인할 수 있다.
+- 이번 작업은 draw.io와 기록 문서만 변경했으며 애플리케이션·설정 파일의 예상 밖 변경은 없다. 배포 사항과 Git commit·push는 없고 Secret·Token을 기록하지 않았다.
+
+## 2026-09-01 — 시스템 구성도 연결선 개선 종료 기록
+
+<!-- codex-turn:01a05bdb-4bf7-7e83-b7ce-45d895c810c4 -->
+
+- 날짜: 2026-09-01
+- 브랜치: `codex/fix-tmi-118-summary-transaction`
+- Jira: 현재 브랜치는 `TMI-118` 문맥이지만 이번 draw.io 연결선 개선은 별도 Jira 작업이 아니며 Jira를 조회하거나 변경하지 않았다.
+- 변경 파일은 `docs/architecture/tosunsaeng-app-system-configuration.drawio`, `docs/codex/WORKLOG.md`, `docs/codex/CURRENT_STATE.md`다.
+- 주요 연결선을 상단·서비스 하단·데이터 저장소 사이·우측 외곽 통로로 분리하고 label을 축약·offset 처리했다. 시스템 구성의 의미와 외부 계약은 변경하지 않았다.
+- `xmllint --noout`, edge 14개·수동 route 9개·누락 source/target 0개와 `git diff --check` 성공을 확인했다. 문서 변경이라 Gradle 테스트는 실행하지 않았다.
+- diagrams.net 실제 화면에서의 최종 미세 배치는 사용자가 다시 연 파일로 확인할 수 있다. 배포·Git commit·push는 수행하지 않았고 Secret과 Token을 기록하지 않았다.
+
+## 2026-09-01 — 시스템 구성도의 백엔드 편향 검토
+
+<!-- codex-turn:01a05be3-191e-7291-8986-3060546fa60c -->
+
+- 날짜: 2026-09-01
+- 브랜치: `codex/fix-tmi-118-summary-transaction`
+- Jira: 현재 브랜치는 `TMI-118` 문맥이지만 이번 도식 관점 검토는 별도 Jira 작업이 아니며 Jira를 조회하거나 변경하지 않았다.
+- 5줄 결론: 현재 draw.io는 정확하지만 일반적인 전체 시스템 구성도보다 앱 백엔드 기술 구성도에 가깝다. 백엔드 개발자·멘토 대상에는 적절하다. 제품·비개발 이해관계자 대상에는 내부 aggregate·Job·원장 명칭이 과하다. 기존 그림은 백엔드 상세로 보존하는 것이 좋다. 사용자→앱 기능→서비스→외부 연동만 보이는 상위 시스템 구성도를 첫 페이지로 추가하는 방식을 권고한다.
+- 반드시 읽을 내용: 하나의 도식으로 모든 독자를 만족시키기보다 1페이지 제품·시스템 관점과 2페이지 백엔드 기술 관점을 분리한다. 상위 페이지에는 로그인, 시험 시작, 녹음, AI 채점, 결과 확인의 사용자 흐름과 Identity·Learning Core·Billing의 역할만 표시한다.
+- 사용자 결정 사항: 현재 파일의 기존 페이지를 `백엔드 기술 구성도`로 이름 변경하고, 별도 첫 페이지 `전체 시스템 구성도`를 추가할지 결정하면 된다. 권고는 두 페이지 유지다.
+- 위험·미확인: 상위 도식에 실제로 존재하지 않는 프론트 인프라, API Gateway, CDN 등을 추정해 넣지 않아야 한다. 대상 독자와 발표 목적이 확정되면 정보 밀도를 조정해야 한다.
+- 변경·검증: 이번 턴은 관점 분석과 기록 문서 갱신만 수행했고 draw.io·애플리케이션·설정·외부 계약을 변경하지 않았다. 코드 변경이 없어 Gradle 테스트를 실행하지 않고 `git diff --check`로 검증한다.
+- 배포·예상 밖 diff: 배포 사항은 없으며 기존 draw.io와 기록 문서 외 예상 밖 파일은 수정하지 않았다. Git commit·push를 수행하지 않았고 Secret과 Token을 기록하지 않았다.
+
+## 2026-09-01 — 전체 시스템·AWS 구성도 첫 페이지 추가
+
+<!-- codex-turn:01a05be6-7b2e-76a2-a981-17a5f2fe903e -->
+
+- 날짜: 2026-09-01
+- 브랜치: `codex/fix-tmi-118-summary-transaction`
+- Jira: 현재 브랜치는 `TMI-118` 문맥이지만 이번 AWS 구성도 개선은 별도 Jira 작업이 아니며 Jira를 조회하거나 변경하지 않았다.
+- 5줄 결론: `tosunsaeng-app-system-configuration.drawio`를 2페이지로 확장했다. 첫 페이지는 사용자·앱과 AWS runtime/deployment 구조를 함께 보여준다. 둘째 페이지는 기존 백엔드 기술 구성도를 보존했다. 확인된 현재 리소스와 승인된 목표 리소스를 선·색으로 구분했다. 실제 inventory가 없는 AWS 경로는 추정하지 않고 미확인으로 표시했다.
+- 반드시 읽을 내용: 현재 Identity·Learning Core는 ALB와 `tosunsaeng-staging-cluster` ECS Service를 사용하고 GitHub Actions OIDC→ECR→ECS Task Definition revision 배포를 수행한다. Billing/VPC Lattice는 승인 목표지만 아직 미배포이며 Billing은 private Fargate·no ALB/public IP·Lattice AWS_IAM 경계다.
+- 근거: Learning Core·Identity `.github/workflows/deploy-staging.yml`, Billing `docs/adr/ADR-002-vpc-lattice-ecs-sigv4-and-environment-migration.md`의 현재 사실·목표 topology·IAM/SG 계약을 사용했다.
+- 변경 파일: `docs/architecture/tosunsaeng-app-system-configuration.drawio`, `docs/codex/WORKLOG.md`, `docs/codex/CURRENT_STATE.md`.
+- 구현 내용: AWS Cloud·VPC·ALB ingress·ECS Fargate·ECR·S3·IAM/Secret reference·관측 영역, 외부 앱/인증/AI/데이터 의존성을 배치했다. production/staging 분리 목표와 현재 staging 명칭 cluster가 실제 트래픽을 처리하는 상태를 명시했다.
+- 유지한 계약: 공개 API·`BaseResponse`·사용자 식별·AI·S3·Redis·Billing wire와 배포 workflow를 변경하지 않았다.
+- 테스트·검증: draw.io XML, 페이지 2개, AWS 페이지 vertex 25개·edge 16개, 누락 source/target 0개와 `git diff --check` 성공을 확인했다. 애플리케이션 코드 변경이 없어 Gradle 테스트는 실행하지 않았다.
+- 위험·미확인: 실제 ALB listener/target/DNS, VPC/subnet/SG/role ARN, MongoDB Atlas·Redis·NAT 경로와 Secret 서비스는 AWS read-only inventory 전까지 확정하지 않았다. draw.io CLI가 없어 실제 렌더 export는 수행하지 못했다.
+- 배포·예상 밖 diff: 문서 변경이므로 배포 사항은 없다. 사용자가 별도로 만든 것으로 보이는 untracked `docs/architecture/제목 없는 다이어그램.drawio`는 수정하지 않았다.
+- Git commit·push는 수행하지 않았고 Secret과 Token을 기록하지 않았다.
+- 종료 전 라우팅 보완: Identity→Lattice는 서비스 상단과 cluster 사이 통로, Learning Core↔AI는 ECS 영역 우측과 VPC 하단 통로, 앱→S3는 managed resource 하단, 데이터 의존성은 ECS/Lattice 하단 통로로 우회시켰다. AWS 페이지 16개 edge 중 14개에 고정 경유점을 지정해 다른 핵심 도형을 관통하지 않도록 했다.
+
+## 2026-09-01 — 1차 업데이트 완료 기준 시스템·AWS 구성도
+
+<!-- codex-turn:01a05bed-0554-7680-a519-b62c5618369d -->
+
+- 날짜: 2026-09-01
+- 브랜치: `codex/fix-tmi-118-summary-transaction`
+- Jira: 현재 브랜치는 `TMI-118` 문맥이지만 이번 구성도 시점 변경은 별도 Jira 작업이 아니며 Jira를 조회하거나 변경하지 않았다.
+- 5줄 결론: 첫 페이지를 현재와 목표의 비교가 아니라 `1차 업데이트 완료 시점`의 단일 운영 스냅샷으로 변경했다. SNS/Phone 로그인, 무료 모의고사, 기존 시험·AI 채점, Billing Reservation·AttemptGroup lifecycle, 10초 챌린지를 완료 기능으로 표현했다. Production ECS Fargate, public ALB, private Billing과 VPC Lattice AWS_IAM 경계를 완료 구조로 표시했다. Identity·Learning Core·Billing별 MongoDB, Redis, S3와 기존 시험·Challenge AI 연동을 포함했다. 기존 둘째 페이지 백엔드 기술 구성도와 고정 연결선 routing은 보존했다.
+- 완료 기준 근거: `docs/codex/FIRST_UPDATE_PROGRESS_CHECKLIST.md`의 출시 차단 조건, Learning Core·Identity staging workflow의 GitHub Actions OIDC→ECR→ECS 배포 방식, Billing `docs/adr/ADR-002-vpc-lattice-ecs-sigv4-and-environment-migration.md`의 production topology를 반영했다.
+- 변경 파일: `docs/architecture/tosunsaeng-app-system-configuration.drawio`, `docs/codex/WORKLOG.md`, `docs/codex/CURRENT_STATE.md`.
+- 유지한 계약: 애플리케이션 코드, 공개 API·`BaseResponse`, 사용자 식별, AI request/Callback, S3·Redis·Billing wire와 배포 workflow를 변경하지 않았다.
+- 테스트·검증: `xmllint --noout` 성공, 페이지 2개, 첫 페이지 vertex 25개·edge 16개, 누락 source/target 0개, 과도기 표기 미검출과 `git diff --check` 성공을 확인했다. 문서 변경이라 Gradle 테스트는 실행하지 않았다.
+- 위험·미확인: 이 그림은 1차 업데이트의 release gate와 production canary까지 완료됐다는 전제의 논리 구성도다. 실제 ALB listener/target/DNS, subnet·SG·ARN 같은 물리 resource ID는 AWS inventory 없이 추정하지 않았다. diagrams.net에서 실제 렌더링한 뒤 label의 미세 위치를 확인할 수 있다.
+- 배포 전 확인: 이 문서 자체의 배포 사항은 없다. 실제 1차 업데이트 배포 시에는 production/staging 격리, Mongo replica-set, Lattice/IAM/SG, 장애 복구 E2E, canary와 rollback 검증이 완료 조건이다.
+- 예상 밖 diff: 사용자가 별도로 만든 untracked `docs/architecture/제목 없는 다이어그램.drawio`는 수정하지 않았다. 애플리케이션·설정 파일의 예상 밖 변경은 없다.
+- Git commit·push는 수행하지 않았고 Secret과 Token을 기록하지 않았다.
+
+## 2026-09-01 — 앱 프론트·AI 근거 기반 전체 제품 구성도 개편
+
+<!-- codex-turn:01a05bf3-4e4a-7c11-ac0b-097a1b4a180f -->
+
+- 날짜: 2026-09-01
+- 브랜치: `codex/fix-tmi-118-summary-transaction`
+- Jira: 현재 브랜치는 `TMI-118` 문맥이지만 이번 구성도 개편은 별도 Jira 작업이 아니며 Jira를 조회하거나 변경하지 않았다.
+- 5줄 결론: `app-front-end`와 `web-ai`를 직접 조사해 구성도를 백엔드 중심 2페이지에서 제품 중심 3페이지로 개편했다. 첫 페이지는 학습자가 앱에서 로그인·시험·챌린지·피드백·재답변을 경험하는 전체 흐름을 보여준다. 둘째 페이지는 앱과 네 서비스의 AWS 배포·데이터 구조를 보여준다. 셋째 페이지는 기존 백엔드 기술 상세를 보존한다. AI를 AWS 외부 시스템이 아니라 ECS의 FastAPI API·Redis queue·4개 worker 서비스로 바로잡았다.
+- 조사 근거: `Too-Much-I/app-front-end` commit `4e6c5957f72a92025ac0eb6d9bd7beff51eb1783`의 navigation, auth, exam/challenge API·hook, WebView native bridge, CI/EAS·관측 설정과 `Too-Much-I/web-ai` commit `ee9db665ddadd9b830c3d39988157ed535ccaa04`의 FastAPI route, scoring pipeline, Redis worker, Callback, Docker Compose와 app ECS workflow를 읽었다.
+- 확인된 구현 사실: 앱은 Expo 57 React Native이며 홈·모의고사·피드백 탭, 마이크/사운드 점검, 11문항 녹음·S3 upload·Polling, 피드백 WebView/native data bridge, 재답변과 10초 챌린지 화면/API 경계를 가진다. AI는 현재 시험 `/evaluations`, Q1 Azure, Q2~Q11 STT+Azure+LLM/VLM, 결정론 checklist score, 한국어 feedback/summary Callback과 ECS API+worker 배포를 구현한다.
+- 완료 시점 전제: 조사한 프론트 개발 모드의 Challenge mock은 제거되고 실제 Learning Core API를 사용하며, 조사한 AI 저장소에는 아직 없는 Challenge 전용 평가 endpoint·양방향 credential/Callback이 1차 업데이트 완료 조건에 따라 구현·E2E 검증된 상태로 표현했다. SNS/Phone 로그인도 같은 완료 조건으로 표시했다.
+- 변경 파일: `docs/architecture/tosunsaeng-app-system-configuration.drawio`, `docs/codex/WORKLOG.md`, `docs/codex/CURRENT_STATE.md`.
+- 변경한 동작: draw.io 페이지를 `1. 제품·사용자 흐름 구성도`, `2. AWS·배포 구성도`, `3. 백엔드 기술 구성도`로 재구성했다. 첫 페이지에 사용자 가치, 앱의 여섯 기능 영역, Identity/Learning/Billing/AI, WebView 콘텐츠, S3, AI provider, 서비스별 데이터, 관측과 앱·서버 배포를 연결했다.
+- 유지한 외부 계약: 애플리케이션 코드, 공개 API·`BaseResponse`, userId 식별, `AI user_id=examId`, Callback JSON, retryCount, S3·Redis·Billing 계약과 배포 workflow를 변경하지 않았다.
+- 테스트·결과: `xmllint --noout` 성공, 페이지 3개, 페이지별 `24/17`, `25/17`, `29/14` vertex/edge, 전체 누락 source/target 0개와 `git diff --check` 성공을 확인했다. 문서만 변경해 Gradle·프론트·AI 테스트는 실행하지 않았다.
+- 주요 위험·미확인: draw.io CLI가 없어 실제 PNG 렌더 export는 수행하지 못했다. 정확한 production ALB/target/subnet/SG/ARN과 AI Redis·runtime의 실제 AWS resource topology는 read-only inventory 없이 추정하지 않았다. 피드백 Web 콘텐츠 저장소는 이번에 제공되지 않아 앱의 WebView·bridge 사용 사실까지만 표현했다.
+- 배포 전 확인: Challenge mock 제거, Challenge AI contract/E2E, SNS/Phone mobile E2E, AI ECS queue/runtime 공유 방식, production/staging 격리, canary/rollback을 실제 환경에서 다시 확인해야 한다.
+- 예상 밖 diff: 사용자가 별도로 만든 untracked `docs/architecture/제목 없는 다이어그램.drawio`는 수정하지 않았다. 애플리케이션·설정 파일의 예상 밖 변경은 없다.
+- Git commit·push·배포는 수행하지 않았고 Secret과 Token을 읽거나 기록하지 않았다.
+
+## 2026-09-01 — 전체 제품·AWS 구성도 화살표 정리
+
+<!-- codex-turn:01a05bff-985b-7ca2-82a5-61264ce40cd7 -->
+
+- 날짜: 2026-09-01
+- 브랜치: `codex/fix-tmi-118-summary-transaction`
+- Jira: 현재 브랜치는 `TMI-118` 문맥이지만 이번 구성도 가독성 개선은 별도 Jira 작업이 아니며 Jira를 조회하거나 변경하지 않았다.
+- 변경 파일: `docs/architecture/tosunsaeng-app-system-configuration.drawio`, `docs/codex/WORKLOG.md`, `docs/codex/CURRENT_STATE.md`.
+- 변경한 동작: 제품 페이지의 연결선을 17개에서 14개로 줄였다. AI 평가 요청과 문항·요약 Callback을 양방향 한 줄로 합치고, 긴 결과 회귀선과 의미가 박스 본문에 이미 있는 데이터 소유권 선을 제거했다. 앱 음성 Presigned PUT은 Identity/Learning 사이의 빈 세로 통로와 하단 전용 통로를 거쳐 S3에 연결했다.
+- AWS 페이지: Learning Core↔AI 평가 요청/Callback 두 줄을 양방향 한 줄로 합쳐 17개에서 16개로 줄였다. 기존 ingress, Lattice, S3, 배포와 데이터선의 고정 routing은 보존했다.
+- 유지한 외부 계약: 도식의 기능·서비스·AWS 내용과 애플리케이션 코드, 공개 API·`BaseResponse`, userId, AI request/Callback, S3·Redis·Billing 계약을 변경하지 않았다.
+- 테스트·결과: `xmllint --noout` 성공, 페이지별 vertex/edge/routed가 `24/14/8`, `25/16/13`, `29/14/9`, 전체 누락 source/target 0개이며 `git diff --check`가 통과했다. 문서만 변경해 Gradle·프론트·AI 테스트는 실행하지 않았다.
+- 위험·미확인: draw.io CLI가 없어 PNG 렌더링 기반 육안 검증은 수행하지 못했다. diagrams.net에서 열었을 때 label의 미세 offset은 추가 조정할 수 있다.
+- 배포 전 확인: 문서 변경이라 배포 사항은 없다. 구성도 사용 전 첫 페이지와 둘째 페이지를 100% zoom에서 열어 label 겹침 여부만 확인하면 된다.
+- 예상 밖 diff: 사용자가 만든 untracked `docs/architecture/제목 없는 다이어그램.drawio`는 수정하지 않았다. 애플리케이션·설정 파일의 예상 밖 변경은 없다.
+- Git commit·push·배포는 수행하지 않았고 Secret과 Token을 기록하지 않았다.
+
+## 2026-09-01 — 구성도 화살표를 도형 뒤 레이어로 이동
+
+<!-- codex-turn:01a05c03-d993-7102-9367-82eed9c99fb0 -->
+
+- 날짜: 2026-09-01
+- 브랜치: `codex/fix-tmi-118-summary-transaction`
+- Jira: 현재 브랜치는 `TMI-118` 문맥이지만 이번 draw.io 레이어 조정은 별도 Jira 작업이 아니며 Jira를 조회하거나 변경하지 않았다.
+- 변경 파일: `docs/architecture/tosunsaeng-app-system-configuration.drawio`, `docs/codex/WORKLOG.md`, `docs/codex/CURRENT_STATE.md`.
+- 변경한 동작: 세 페이지의 mxCell 저장 순서를 `큰 영역 배경 → edge → 실제 도형·텍스트`로 재배치했다. 연결선은 AWS/VPC/서비스 영역 배경 위에는 보이지만 기능 카드·서비스 박스·글자보다 뒤에서 렌더링된다.
+- 유지한 내용: 연결선 수, source/target, 고정 경유점, 기능·서비스·AWS 설명과 페이지 구조는 변경하지 않았다.
+- 유지한 외부 계약: 애플리케이션 코드, 공개 API·`BaseResponse`, 사용자 식별, AI request/Callback, S3·Redis·Billing 계약을 변경하지 않았다.
+- 테스트·결과: `xmllint --noout` 성공, 3페이지와 페이지별 vertex/edge `24/14`, `25/16`, `29/14`를 유지했다. foreground 도형보다 앞에 남은 edge 0개, edge보다 뒤에 잘못 배치된 영역 배경 0개, 누락 source/target 각각 0개와 `git diff --check` 성공을 확인했다. 문서만 변경해 Gradle·프론트·AI 테스트는 실행하지 않았다.
+- 위험·미확인: draw.io CLI가 없어 실제 PNG export 기반 육안 검증은 수행하지 못했다. diagrams.net renderer가 mxCell z-order를 따르는 일반 동작을 기준으로 적용했다.
+- 배포 전 확인: 문서 변경이라 배포 사항은 없다. diagrams.net에서 첫 페이지를 열어 선이 카드 뒤로 가려지는지만 확인하면 된다.
+- 예상 밖 diff: 임시 layer 변환 stylesheet는 작업 후 삭제했다. 사용자가 만든 untracked `docs/architecture/제목 없는 다이어그램.drawio`는 수정하지 않았고 애플리케이션·설정 파일의 예상 밖 변경은 없다.
+- Git commit·push·배포는 수행하지 않았고 Secret과 Token을 기록하지 않았다.
+
+## 2026-09-01 — draw.io 실제 레이어 분리와 렌더링 재검증
+
+<!-- codex-turn:01a05c07-5d0e-74f1-ac32-847056a0d2ae -->
+
+- 날짜: 2026-09-01
+- 브랜치: `codex/fix-tmi-118-summary-transaction`
+- Jira: 현재 브랜치는 `TMI-118` 문맥이지만 이번 구성도 렌더링 수정은 별도 Jira 작업이 아니며 Jira를 조회하거나 변경하지 않았다.
+- 문제 원인: 동일 draw.io layer 안에서 mxCell XML 순서만 바꾸는 이전 방식은 diagrams.net renderer가 edge를 다시 위에 그릴 수 있어 실제 화면에서 도형 뒤 배치를 보장하지 못했다.
+- 복구 기록: 최초 실제 layer 변환의 임시 출력 검증이 실패했는데 shell이 후속 이동을 계속해 target이 일시적으로 빈 파일이 됐다. 빈 결과를 최종 산출물로 사용하지 않고 제품·AWS 페이지를 재생성했으며, 사용자가 별도로 보관한 `docs/architecture/제목 없는 다이어그램.drawio`를 읽기 전용 원본으로 사용해 백엔드 상세 페이지를 복원했다. 원본 파일은 수정하지 않았다.
+- 변경 파일: `docs/architecture/tosunsaeng-app-system-configuration.drawio`, `docs/codex/WORKLOG.md`, `docs/codex/CURRENT_STATE.md`.
+- 변경한 동작: 각 페이지에 draw.io top-level layer `배경`, `연결선`, `도형·텍스트`를 실제로 추가했다. 모든 edge의 parent는 `edge-layer`, 영역 배경은 `background-layer`, 실제 카드·텍스트는 `foreground-layer` 또는 그 하위 cell이다.
+- 실제 렌더 검증: Browser 스킬을 사용해 첫 페이지 mxGraphModel을 diagrams.net 편집기에 로드하고 스크린샷으로 확인했다. 기능 카드가 연결선보다 위에 렌더링되고, 선은 별도 하위 layer에 존재하는 것을 확인했다.
+- 유지한 내용: 제품 페이지의 사용자·앱·Identity/Learning/Billing/AI·S3·관측 흐름, AWS 페이지의 production 논리 구조와 백엔드 상세 페이지를 유지했다. 복원 과정에서 AWS 페이지 표현을 동일 의미의 간결한 14개 edge 구조로 수렴시켰다.
+- 유지한 외부 계약: 애플리케이션 코드, 공개 API·`BaseResponse`, 사용자 식별, AI request/Callback, S3·Redis·Billing 계약을 변경하지 않았다.
+- 테스트·결과: `xmllint --noout` 성공. 페이지별 `3 layers / 24 vertices / 14 edges`, `3 / 21 / 14`, `3 / 28 / 15`이며 모든 edge가 `edge-layer`에 있다. 잘못된 edge parent 0개, 누락 source/target 각각 0개와 `git diff --check` 성공을 확인했다. 문서만 변경해 Gradle·프론트·AI 테스트는 실행하지 않았다.
+- 위험·배포 전 확인: 문서 변경이라 배포 사항은 없다. 사용자가 로컬 diagrams.net에서 기존 열린 탭이 아니라 수정된 파일을 다시 열어 layer 효과를 확인해야 한다.
+- 예상 밖 diff: 임시 generator·stylesheet는 삭제했다. 사용자 원본과 애플리케이션·설정 파일의 예상 밖 변경은 없다.
+- Git commit·push·배포는 수행하지 않았고 Secret과 Token을 기록하지 않았다.
+
+## 2026-09-01 — 데일리 학습 콘텐츠 수행 방법 문구 작성
+
+<!-- codex-turn:01a05c24-a3d0-7231-b2cf-20eb9242f4f6 -->
+
+- 날짜: 2026-09-01
+- 브랜치: `codex/fix-tmi-118-summary-transaction`
+- Jira: 현재 브랜치는 `TMI-118` 문맥이지만 이번 문구 작성은 별도 Jira 작업이 아니며 Jira를 조회하거나 변경하지 않았다.
+- 작업 내용: 사용자가 작성 중인 수행 방법 표의 `개발 단계 > 데일리 학습 콘텐츠` 항목에 넣을 문구를 토선생의 10초 챌린지와 실제 구현 방향에 맞게 정리했다.
+- 권장 문구: TOEIC Speaking 유형과 학습자 취약 영역을 반영한 짧은 일일 말하기 문제를 자체 기획·제작하고, 앱에서 매일 새로운 문제 제공, 10초 음성 녹음, AI 발화 분석, 교정 문장·모범 답안·맞춤 피드백 확인까지 이어지는 반복 학습 기능을 구현한다. 초기 콘텐츠는 전문가 검수와 자체 제작으로 확보하고 이용·정답률·오류 유형 데이터를 분석해 난이도와 문항을 지속 개선한다.
+- 표현 원칙: 단순히 콘텐츠를 제공한다고 쓰지 않고 콘텐츠 확보 방법, 사용자 학습 절차, AI 피드백, 운영 개선 순서가 드러나게 했다. 구현된 사실과 향후 운영 계획을 과장하지 않도록 구분한다.
+- 변경 파일: `docs/codex/WORKLOG.md`, `docs/codex/CURRENT_STATE.md`.
+- 유지한 외부 계약: 애플리케이션 코드, 공개 API·AI·S3·Redis·Billing 계약과 draw.io를 변경하지 않았다.
+- 테스트·결과: 문구 작성과 기록 문서만 변경해 Gradle 테스트는 실행하지 않았으며 `git diff --check`로 문서 형식을 검증한다.
+- 위험·배포 전 확인: 제출처의 글자 수 제한과 10초 챌린지 명칭 공개 가능 여부가 확인되지 않았다. 제한이 있으면 축약형을 사용한다. 배포 사항은 없다.
+- 예상 밖 diff: 이번 작업에서 기록 문서 외 파일을 수정하지 않았다. 기존 untracked draw.io 파일은 건드리지 않았다.
+- Git commit·push·배포는 수행하지 않았고 Secret과 Token을 기록하지 않았다.
+
+## 2026-09-01 — 데일리 학습 콘텐츠 예상 문제점·결과물 문구
+
+- 날짜: 2026-09-01
+- 브랜치: `codex/fix-tmi-118-summary-transaction`
+- Jira: 현재 브랜치는 `TMI-118` 문맥이지만 이번 문구 작성은 별도 Jira 작업이 아니며 Jira를 조회하거나 변경하지 않았다.
+- 작업 내용: 수행 방법 표의 데일리 학습 콘텐츠에 대응하는 `예상 문제점-개발 측면`과 `결과물 형태` 문구를 작성했다.
+- 예상 문제점: 매일 제공할 문항의 지속적 확보와 난이도·품질 관리, 다양한 정답 표현에 대한 AI 판정 일관성, 모바일 음성 녹음·업로드 실패, 비동기 채점 지연과 중복 제출, AI 비용과 개인정보 보호를 핵심 개발 위험으로 정리했다.
+- 대응 방향: 콘텐츠 snapshot·전문가 검수, 정답 허용 범위와 평가 기준 표준화, 멱등 제출·Polling·재시도, 음성·Transcript 최소 보관과 민감정보 비기록, 사용 데이터 기반 개선을 제시한다.
+- 결과물 형태: 모바일 앱의 오늘 문제·10초 녹음·결과/이력 화면, 일일 문항 catalog DB, 음성 업로드·채점·결과 API, AI 교정·모범답안·피드백 결과, 테스트·운영 지표 문서로 구분한다.
+- 변경 파일: `docs/codex/WORKLOG.md`, `docs/codex/CURRENT_STATE.md`.
+- 유지한 외부 계약: 애플리케이션 코드, 공개 API·AI·S3·Redis·Billing 계약과 draw.io를 변경하지 않았다.
+- 테스트·결과: 문구와 기록 문서만 변경해 Gradle 테스트는 실행하지 않았으며 `git diff --check`로 문서 형식을 검증한다.
+- 위험·배포 전 확인: 제출 양식의 글자 수와 결과물 분류 기준이 확인되지 않았다. 제한이 있으면 축약형을 사용한다. 배포 사항은 없다.
+- 예상 밖 diff: 이번 작업에서 기록 문서 외 파일을 수정하지 않았다.
+- Git commit·push·배포는 수행하지 않았고 Secret과 Token을 기록하지 않았다.
+
+## 2026-09-01 — 데일리 학습 콘텐츠 문제점·결과물 문구 종료 기록
+
+<!-- codex-turn:01a05c26-be32-78e0-bc4a-8b4de8084d53 -->
+
+- 날짜: 2026-09-01
+- 브랜치: `codex/fix-tmi-118-summary-transaction`
+- Jira: 현재 브랜치는 `TMI-118` 문맥이지만 이번 문구 작성은 별도 Jira 작업이 아니며 Jira를 조회하거나 변경하지 않았다.
+- 완료 내용: 데일리 학습 콘텐츠의 개발 측면 예상 문제점을 콘텐츠 확보·품질과 난이도, AI 평가 일관성, 음성 업로드, 비동기 채점 지연·중복 제출, AI 비용·개인정보 보호로 정리했다.
+- 결과물 형태: 오늘 문제·10초 녹음·채점 대기·결과/이력 앱 화면, 문항 catalog DB, 음성 업로드·채점·결과 API, AI 교정 문장·모범 답안·맞춤 피드백과 운영·테스트 문서로 제시했다.
+- 사용자 전달: 표에 넣을 기본 문장과 공간이 좁을 때 사용할 축약형을 함께 제공했다.
+- 변경 파일: `docs/codex/WORKLOG.md`, `docs/codex/CURRENT_STATE.md`.
+- 외부 계약: 애플리케이션 코드, 공개 API·AI·S3·Redis·Billing 계약과 draw.io를 변경하지 않았다.
+- 테스트: 문구와 기록 문서만 변경해 Gradle 테스트는 실행하지 않았으며 `git diff --check`로 검증한다.
+- 위험·배포: 제출 양식의 글자 수 제한은 확인되지 않았으며 문서 작업이므로 배포 사항은 없다.
+- 예상 밖 변경: 기록 문서 외 이번 작업으로 변경한 파일은 없다.
+- Git commit·push·배포는 수행하지 않았고 Secret과 Token을 기록하지 않았다.
+
+## 2026-09-01 — 중간 발표용 개발 문제점 2개 선정
+
+- 날짜: 2026-09-01
+- 브랜치: `codex/fix-tmi-118-summary-transaction`
+- Jira: 현재 브랜치는 `TMI-118` 문맥이지만 이번 발표 문구 선정은 별도 Jira 작업이 아니며 Jira를 조회하거나 변경하지 않았다.
+- 선정 결과: 전체 개발 위험 중 중간 발표에는 토선생의 핵심 가치와 직접 연결되는 `AI 채점 품질·신뢰도`와 사업 지속 가능성을 보여주는 `외부 AI API 비용·의존성` 두 가지를 권장했다.
+- 해결 방향: 채점 sample 검수·품질 지표·이상 결과 조기 보정과 오픈소스/복수 모델 사전 검증·비용/성능 비교·유연한 모델 선택 구조를 각각 대응 방안으로 제시했다.
+- 변경 파일: `docs/codex/WORKLOG.md`, `docs/codex/CURRENT_STATE.md`.
+- 외부 계약: 애플리케이션 코드, 공개 API·AI·S3·Redis·Billing 계약과 draw.io를 변경하지 않았다.
+- 테스트: 문구와 기록 문서만 변경해 Gradle 테스트는 실행하지 않았으며 `git diff --check`로 검증한다.
+- 위험·배포: 발표 자료의 글자 수 제한은 확인되지 않았고 배포 사항은 없다.
+- 예상 밖 변경: 기록 문서 외 이번 작업으로 변경한 파일은 없다.
+- Git commit·push·배포는 수행하지 않았고 Secret과 Token을 기록하지 않았다.
+
+## 2026-09-01 — 전체 서비스 예상 문제점·해결 방안·결과물 문구 재정리
+
+- 날짜: 2026-09-01
+- 브랜치: `codex/fix-tmi-118-summary-transaction`
+- Jira: 현재 브랜치는 `TMI-118` 문맥이지만 이번 문구 작성은 별도 Jira 작업이 아니며 Jira를 조회하거나 변경하지 않았다.
+- 정정 내용: `예상 문제점-개발 측면`과 `결과물 형태`를 데일리 학습 콘텐츠 한 기능이 아니라 모의고사, 피드백, 학습 로드맵·챗봇, 데일리 학습 콘텐츠와 피드백 챗봇을 포함한 전체 토선생 서비스 기준으로 재작성했다.
+- 예상 문제점과 해결: 다기능 범위 확대는 MVP·단계별 roadmap과 acceptance criteria로 통제하고, 앱·Identity·Learning·Billing·AI 간 계약 불일치는 계약 문서·contract test·staging E2E로 방지한다. AI 품질 편차는 표준화 rubric·benchmark·전문가 검수·fallback으로, 음성·비동기 실패는 형식 표준화·멱등 처리·retry/Polling·복구 Job으로 대응한다.
+- 추가 해결: 개인정보는 최소 수집·보관 기간·암호화·로그 비식별화로 보호하고, AI 비용과 확장성은 사용량 metric·cache·worker scale-out·모델별 비용 기준으로 관리한다. 콘텐츠 품질은 catalog·snapshot·검수 workflow와 학습 데이터 분석으로 개선한다.
+- 결과물 형태: iOS/Android 앱, Identity·Learning Core·Billing 서버, AI 채점/피드백 서버, 모의고사·데일리 콘텐츠 catalog, 학습 로드맵·피드백 챗봇, API/데이터 계약 문서, 관리자·운영 지표, 테스트 결과와 배포·모니터링 체계를 전체 산출물로 정리했다.
+- 변경 파일: `docs/codex/WORKLOG.md`, `docs/codex/CURRENT_STATE.md`.
+- 외부 계약: 애플리케이션 코드, 공개 API·AI·S3·Redis·Billing 계약과 draw.io를 변경하지 않았다.
+- 테스트: 문구와 기록 문서만 변경해 Gradle 테스트는 실행하지 않았으며 `git diff --check`로 검증한다.
+- 위험·배포: 제출 양식의 글자 수 제한은 확인되지 않았으며 문서 작업이므로 배포 사항은 없다.
+- 예상 밖 변경: 기록 문서 외 이번 작업으로 변경한 파일은 없다.
+- Git commit·push·배포는 수행하지 않았고 Secret과 Token을 기록하지 않았다.
+
+## 2026-09-01 — 전체 서비스 문제점·해결 방안·결과물 문구 종료 기록
+
+<!-- codex-turn:01a05c28-6f95-7123-b3ed-db4f3386f883 -->
+
+- 날짜: 2026-09-01
+- 브랜치: `codex/fix-tmi-118-summary-transaction`
+- Jira: 현재 브랜치는 `TMI-118` 문맥이지만 이번 문구 작성은 별도 Jira 작업이 아니며 Jira를 조회하거나 변경하지 않았다.
+- 완료 내용: 개발 측면 예상 문제점과 결과물 형태의 범위를 데일리 콘텐츠 한 기능이 아닌 토선생 전체 서비스로 정정했다.
+- 문제점·해결 방안: 범위 확대, 서비스 간 계약 불일치, AI 평가 편차, 음성·비동기 실패, 콘텐츠 확보, 개인정보, 비용·확장성과 배포 복잡성을 식별하고 각각 단계별 MVP, 계약·E2E 테스트, 표준 평가·전문가 검수, 멱등·retry·복구, catalog 운영, 데이터 보호, 사용량 모니터링과 자동 배포·rollback으로 연결했다.
+- 결과물 형태: iOS·Android 앱, Identity·Learning Core·Billing·AI 서버, 모의고사·데일리 콘텐츠 DB, AI 피드백·학습 로드맵·챗봇, API·데이터 계약서, 테스트·분석·운영·배포 문서를 전체 산출물로 정리했다.
+- 사용자 전달: 제출용 상세 문단, 문제점/해결 방안 대응표와 글자 수가 짧을 때 사용할 축약형을 제공했다.
+- 변경 파일: `docs/codex/WORKLOG.md`, `docs/codex/CURRENT_STATE.md`.
+- 외부 계약: 애플리케이션 코드, 공개 API·AI·S3·Redis·Billing 계약과 draw.io를 변경하지 않았다.
+- 테스트: 문구와 기록 문서만 변경해 Gradle 테스트는 실행하지 않았으며 `git diff --check`로 검증한다.
+- 위험·배포: 제출 양식의 글자 수 제한은 확인되지 않았으며 문서 작업이므로 배포 사항은 없다.
+- 예상 밖 변경: 기록 문서 외 이번 작업으로 변경한 파일은 없다.
+- Git commit·push·배포는 수행하지 않았고 Secret과 Token을 기록하지 않았다.
+
+## 2026-09-01 — 전체 서비스 개발 측면 예상 문제점 문체 정리
+
+- 날짜: 2026-09-01
+- 브랜치: `codex/fix-tmi-118-summary-transaction`
+- Jira: 현재 브랜치는 `TMI-118` 문맥이지만 이번 문구 작성은 별도 Jira 작업이 아니며 Jira를 조회하거나 변경하지 않았다.
+- 작업 내용: 사용자가 제시한 `발생 가능성 → 모니터링·검증·대체 수단 구축` 문체에 맞춰 토선생 전체 서비스의 개발 측면 예상 문제점과 해결 방안을 대응 순서로 작성했다.
+- 문제 범위: AI 채점 품질, 외부 AI 비용, 앱·서버·AI 계약 불일치, 음성 업로드·비동기 채점 장애, 개인정보·보안과 이용량 증가에 따른 성능 저하를 포함한다.
+- 해결 방향: 품질 sample 검수·지표·benchmark, 대체 모델 검증·비용 routing, 계약 문서·자동 contract/E2E test, 멱등·retry·Polling·복구 처리, 최소 수집·암호화·비식별화와 scale-out·관측 체계를 각 문제에 연결한다.
+- 변경 파일: `docs/codex/WORKLOG.md`, `docs/codex/CURRENT_STATE.md`.
+- 외부 계약: 애플리케이션 코드, 공개 API·AI·S3·Redis·Billing 계약과 draw.io를 변경하지 않았다.
+- 테스트: 문구와 기록 문서만 변경해 Gradle 테스트는 실행하지 않았으며 `git diff --check`로 검증한다.
+- 위험·배포: 제출 양식의 글자 수 제한은 확인되지 않았고 배포 사항은 없다.
+- 예상 밖 변경: 기록 문서 외 이번 작업으로 변경한 파일은 없다.
+- Git commit·push·배포는 수행하지 않았고 Secret과 Token을 기록하지 않았다.
+
+## 2026-09-01 — 전체 서비스 개발 문제점·해결 방안 제출 문구 종료
+
+<!-- codex-turn:01a05c2c-0d6f-7bf2-914f-7d9e5b500501 -->
+
+- 날짜: 2026-09-01
+- 브랜치: `codex/fix-tmi-118-summary-transaction`
+- Jira: 현재 브랜치는 `TMI-118` 문맥이지만 이번 문구 작성은 별도 Jira 작업이 아니며 Jira를 조회하거나 변경하지 않았다.
+- 완료 내용: 전체 토선생 서비스의 개발 측면 예상 문제점 7개와 같은 순서로 대응하는 해결 방안 7개를 제출용 문체로 작성했다.
+- 문제점: AI 채점 품질·일관성, 외부 AI 비용, 다중 서비스 계약 불일치, 모바일 음성·비동기 Callback 장애, 트래픽 집중, 개인정보·학습 데이터 보호와 콘텐츠 버전·품질 불일치를 포함했다.
+- 해결 방안: sample 검수·품질 지표, 대체 모델 사전 검증, API 계약·자동 테스트, 멱등·retry·Polling·Callback 복구, 비동기 queue·scale-out, 최소 수집·암호화·비식별화와 콘텐츠 version·전문가 검수를 각 항목에 연결했다.
+- 사용자 전달: 사용자가 제시한 `발생할 가능성`과 `지속적으로 모니터링·구축` 문체를 유지하고 문제점 목록과 해결 방안 목록의 순서를 일치시켰다.
+- 변경 파일: `docs/codex/WORKLOG.md`, `docs/codex/CURRENT_STATE.md`.
+- 외부 계약: 애플리케이션 코드, 공개 API·AI·S3·Redis·Billing 계약과 draw.io를 변경하지 않았다.
+- 테스트: 문구와 기록 문서만 변경해 Gradle 테스트는 실행하지 않았으며 `git diff --check`로 검증한다.
+- 위험·배포: 제출 양식의 글자 수 제한은 확인되지 않았고 문서 작업이므로 배포 사항은 없다.
+- 예상 밖 변경: 기록 문서 외 이번 작업으로 변경한 파일은 없다.
+- Git commit·push·배포는 수행하지 않았고 Secret과 Token을 기록하지 않았다.
+
+## 2026-09-01 — 중간 발표용 개발 문제점 2개 최종 선정
+
+<!-- codex-turn:01a05c2d-d987-7791-b62f-57222333ac4e -->
+
+- 날짜: 2026-09-01
+- 브랜치: `codex/fix-tmi-118-summary-transaction`
+- Jira: 현재 브랜치는 `TMI-118` 문맥이지만 이번 발표 문구 선정은 별도 Jira 작업이 아니며 Jira를 조회하거나 변경하지 않았다.
+- 완료 내용: 중간 발표에 사용할 개발 측면 예상 문제점으로 `AI 채점 품질·신뢰도`와 `외부 AI API 비용·의존성` 두 가지를 최종 추천했다.
+- 해결 방안: 채점 결과 표본 검수·품질 지표 모니터링·이상 결과 조기 보정과 오픈소스·복수 모델 사전 검증·비용/성능 기반 선택 구조를 각각 연결했다.
+- 선정 근거: 두 항목이 토선생의 핵심 경쟁력인 채점 신뢰도와 서비스의 지속 가능한 운영을 가장 직접적으로 설명한다.
+- 변경 파일: `docs/codex/WORKLOG.md`, `docs/codex/CURRENT_STATE.md`.
+- 유지한 외부 계약: 애플리케이션 코드, 공개 API·AI·S3·Redis·Billing 계약과 draw.io를 변경하지 않았다.
+- 테스트·결과: 문서 기록만 변경하여 Gradle 테스트는 실행하지 않았고 `git diff --check`로 형식을 검증한다.
+- 위험·배포 전 확인: 발표 자료의 글자 수 제한은 확인되지 않았으며 코드 배포 사항은 없다.
+- 예상 밖 변경: 기존 미추적 draw.io 파일 2개는 이번 작업에서 수정하지 않았다.
+- 다음 작업 전 확인: 실제 발표 양식의 분량에 따라 문장을 축약할지 확인한다.
+- Git commit·push·배포는 수행하지 않았고 Secret과 Token을 기록하지 않았다.
+
+## 2026-09-02 — TMI-118 hotfix 이후 다음 작업 확정
+
+<!-- codex-turn:01a05fa8-6bd9-7521-a97f-cb3c26961017 -->
+
+- 날짜: 2026-09-02
+- 현재 브랜치: `develop`
+- Jira: `TMI-118` `[Learning Core] AttemptGroup durable outbox/publisher 구현`; 상태는 완료이며 이번 작업에서 변경하지 않았다.
+- Git 확인: hotfix commit `4781723`이 PR #26 merge commit `4f9e74c`로 병합됐고 현재 `HEAD`, 로컬 `develop`, `origin/develop`이 `4f9e74c`로 일치한다.
+- 다음 즉시 작업: AttemptGroup 실제 경계 통합 검증을 신규 후속 Jira로 분리한다. 격리된 replica-set Mongo에서 transaction commit/rollback, duplicate·unknown commit 수렴, COMPLETED/RETAKE terminal race와 multi-instance lease reclaim/stale token fencing을 검증한다.
+- 전송·관측 검증: fake signer와 local HTTP component test로 publish span traceparent 주입 후 SigV4가 마지막 변경인지 확인하고, payload·credential·사용자 식별자가 log/span/metric에 없는지 검사한다. 이후 Learning Core/Billing staging E2E에서 같은 traceId, 다른 spanId와 baggage 미전파를 확인한다.
+- 다음 제품 기능: 위 rollout gate 이후 Billing `UserMerged` retained subject owner rebind의 wire 계약·활성 Reservation 충돌 정책을 ADR과 계획서로 확정하고 전용 Jira를 생성한다.
+- 변경 파일: 분석 기록을 위해 `docs/codex/CURRENT_STATE.md`, `docs/codex/WORKLOG.md`만 갱신했다. 애플리케이션·테스트·설정과 외부 계약은 변경하지 않았다.
+- 테스트·검증: 코드 변경이 없어 Gradle 테스트를 재실행하지 않았다. hotfix PR 포함 관계와 Git ref를 읽기 전용으로 확인하고 문서는 `git diff --check`와 marker 1회 검사로 검증한다.
+- 예상 밖 변경: 기존 미추적 `docs/architecture` draw.io 파일 2개는 사용자 변경으로 보존했으며 수정하지 않았다.
+- 보안·범위: Secret·Token을 기록하지 않았고 Jira 생성·상태 전환, DB·AWS·Git commit·push·PR·merge·배포를 수행하지 않았다.
+
+## 2026-09-02 — 학습 로드맵·챗봇 무료/유료 설명 정리
+
+<!-- codex-turn:01a060e0-a105-72f3-a7ce-66fc65f476ec -->
+
+- 날짜: 2026-09-02
+- 현재 브랜치: `develop`
+- Jira: 별도 Jira 이슈가 없는 문구 작성 작업이다.
+- 완료 내용: 학습 로드맵·챗봇 기능을 무료형 `표준 로드맵 안내`와 유료형 `학습 데이터 기반 맞춤형 코칭`으로 구분해 제출용 문장으로 정리했다.
+- 무료 기능: 최초 목표 설정 시 입력받은 목표 등급과 시험 준비 기간을 기준으로, 사전에 분류·설계한 학습 로드맵 중 적합한 경로를 안내한다.
+- 유료 기능: 기존 로드맵을 기준으로 사용자의 학습 이력, 모의고사 결과와 피드백을 함께 분석하여 현재 수준과 취약점을 반영한 세부 학습 방법과 우선순위를 챗봇이 안내한다.
+- 변경 파일: `docs/codex/WORKLOG.md`, `docs/codex/CURRENT_STATE.md`.
+- 외부 계약·테스트: 애플리케이션 코드와 공개 API·AI·S3·Redis·Billing 계약은 변경하지 않았다. 문서 기록만 변경하여 Gradle 테스트는 실행하지 않고 `git diff --check`로 검증한다.
+- 위험·미확인: 유료 로드맵의 갱신 주기, 추천 범위, 사용자에게 보여줄 근거 수준과 무료/유료 전환 조건은 아직 확정되지 않았다.
+- 예상 밖 변경: 기존 미추적 draw.io 파일 2개는 이번 작업에서 수정하지 않았다.
+- 보안·범위: Secret과 Token을 기록하지 않았고 Git commit·push·배포를 수행하지 않았다.
+
+## 2026-09-02 — 학습 로드맵·챗봇 상세 설명 확장
+
+- 날짜: 2026-09-02
+- 현재 브랜치: `develop`
+- Jira: 별도 Jira 이슈가 없는 문구 작성 작업이다.
+- 완료 내용: 학습 로드맵·챗봇을 목표 설정, 무료 표준 경로 제공, 유료 학습 데이터 분석, 챗봇 코칭, 로드맵 재조정과 품질 통제의 전체 흐름으로 상세화했다.
+- 무료 기능: 목표 등급과 준비 기간을 입력받아 전문가가 사전 설계·분류한 로드맵을 규칙 기반으로 매칭하고, 기간별 학습 순서와 권장 학습량을 안내하는 구조로 설명했다.
+- 유료 기능: 학습 이력, 모의고사 점수, 파트·문항별 피드백과 반복 취약점을 표준 로드맵에 결합해 우선순위·실행 과제·복습 방향을 개인화하고 이후 성과에 따라 재조정하는 구조로 설명했다.
+- 품질 원칙: AI가 검증되지 않은 학습법을 새로 생성하지 않고 사전 설계된 로드맵 범위 안에서 근거 데이터를 바탕으로 안내하며, 데이터가 부족할 때는 표준 경로를 유지하도록 정리했다.
+- 변경 파일: `docs/codex/WORKLOG.md`, `docs/codex/CURRENT_STATE.md`.
+- 외부 계약·테스트: 애플리케이션 코드와 공개 API·AI·S3·Redis·Billing 계약은 변경하지 않았다. 문서 기록만 변경하여 Gradle 테스트는 실행하지 않고 `git diff --check`로 검증한다.
+- 위험·미확인: 목표 등급 체계, 준비 기간 구간, 로드맵 분류표, 개인화 갱신 시점과 챗봇이 제시할 세부 항목은 제품 정책으로 확정해야 한다.
+- 예상 밖 변경: 기존 미추적 draw.io 파일 2개는 이번 작업에서 수정하지 않았다.
+- 보안·범위: Secret과 Token을 기록하지 않았고 Git commit·push·배포를 수행하지 않았다.
+
+## 2026-09-02 — 학습 로드맵·챗봇 상세 설명 종료
+
+<!-- codex-turn:01a060e1-de6c-7fa3-8a5a-b013e5d1c568 -->
+
+- 날짜: 2026-09-02
+- 현재 브랜치: `develop`
+- Jira: 별도 Jira 이슈가 없는 문구 작성 작업이다.
+- 완료 내용: 모의고사 기능 설명과 유사한 상세도로 학습 로드맵·챗봇의 무료/유료 기능, 데이터 활용, 개인화 갱신과 품질 원칙을 최종 문안으로 작성했다.
+- 변경한 설명: 무료는 목표 등급·준비 기간에 따른 검증된 표준 로드맵 매칭으로, 유료는 학습·모의고사·AI 피드백을 근거로 우선순위와 다음 행동을 조정하는 개인 맞춤형 코칭으로 구분했다.
+- 유지한 원칙: 학습 데이터가 부족하면 표준 경로를 유지하고, 챗봇은 검증되지 않은 학습법을 임의 생성하지 않고 사전 설계된 로드맵 범위 안에서 안내한다.
+- 변경 파일: `docs/codex/WORKLOG.md`, `docs/codex/CURRENT_STATE.md`.
+- 외부 계약·테스트: 코드 및 공개 API·AI·S3·Redis·Billing 계약은 변경하지 않았다. 문서 기록만 변경하여 Gradle 테스트는 실행하지 않았고 `git diff --check`로 검증한다.
+- 남은 위험·결정: 로드맵 분류표, 갱신 시점, 추천의 세부 단위와 무료/유료 전환 정책은 후속 제품 결정이 필요하다.
+- 배포 전 확인: 문안 작업이므로 배포 사항은 없으며 발표·제출 양식의 분량만 확인하면 된다.
+- 예상 밖 변경: 기존 미추적 draw.io 파일 2개는 이번 작업에서 수정하지 않았다.
+- 보안·범위: Secret과 Token을 기록하지 않았고 Git commit·push·배포를 수행하지 않았다.
+
+## 2026-09-02 — 간결한 실제 AWS 시스템 구성도 사전 확인
+
+<!-- codex-turn:01a060e9-4db5-7aa0-a5bd-3e20cff8f82d -->
+
+- 날짜: 2026-09-02
+- 현재 브랜치: `develop`
+- Jira: 별도 Jira 이슈가 없는 구성도 사전 분석 작업이다.
+- 사용자 요청: 첨부 예시처럼 구성요소와 핵심 흐름만 남긴 간결한 draw.io를 만들되, 개념적 백엔드 구조보다 실제 AWS 배포 구조를 중심으로 표현한다.
+- 확인된 사실: Learning Core staging workflow에는 GitHub Actions OIDC, ECR과 ECS Fargate 배포가 있으며 코드·기존 문서에는 S3 Presigned 업로드, MongoDB와 Redis 연동이 존재한다.
+- 문서상 계획·미확정: 기존 구성도에는 Public DNS/ALB, VPC Lattice AWS_IAM, private Billing, AI ECS, CloudWatch와 환경별 data plane이 표현돼 있으나 실제 콘솔 배포 상태와 일치하는지는 확인이 필요하다.
+- 다음 입력 요청: 대상 환경·리전, AWS IAM Identity Center 계정/권한, ECS 서비스, 공개 ingress, VPC/subnet/NAT, Lattice 적용 상태, 데이터 저장소 공급자와 배포·관측 리소스를 사용자에게 확인한다.
+- 보안 안내: 로그인 비밀번호, MFA 코드, Access Key, Secret과 Token은 요청하거나 기록하지 않는다. 사용자가 로그인한 AWS 콘솔은 승인된 범위에서 읽기 전용으로 확인한다.
+- 변경 파일: `docs/codex/WORKLOG.md`, `docs/codex/CURRENT_STATE.md`.
+- 외부 계약·테스트: 구성도와 애플리케이션 코드, 공개 API·AI·S3·Redis·Billing 계약은 아직 변경하지 않았다. 문서 기록만 변경해 Gradle 테스트는 실행하지 않고 `git diff --check`로 검증한다.
+- 예상 밖 변경: 기존 미추적 draw.io 파일 2개는 이번 작업에서 수정하지 않았다.
+- Git commit·push·AWS 변경·배포는 수행하지 않았다.
+
+## 2026-09-02 — Production AWS 구성 확인 준비
+
+<!-- codex-turn:01a060ee-242d-78f1-bac2-e9477c411b86 -->
+
+- 날짜: 2026-09-02
+- 현재 브랜치: `develop`
+- Jira: 별도 Jira 이슈가 없는 구성도 확인 작업이다.
+- 사용자 확정: 구성도는 서울 리전 Production만 대상으로 하며, 현재 AWS에는 Billing을 제외한 Identity·Learning Core·AI가 배포되어 있다.
+- 사용자 확정: 가비아에서 관리하는 도메인이 공유 ALB로 진입하며 CloudFront·API Gateway·WAF는 사용하지 않는다. Cache는 Valkey이고 MongoDB Atlas는 클러스터로 분리돼 있다.
+- 콘솔 확인: 사용자가 실제 AWS 콘솔을 읽기 전용으로 확인하도록 승인했다. 별도 브라우저에서 AWS 로그인 페이지를 열고 인증 단계는 사용자에게 넘겼다.
+- 보안: 사용자가 전달한 AWS 계정 식별 정보와 federation 사용자 정보는 기록하지 않았으며, 비밀번호·MFA·Access Key·Secret·Token을 요청하거나 입력하지 않는다.
+- 다음 단계: 사용자가 로그인하면 ECS service/task, shared ALB listener/target group, VPC/subnet/NAT/public IP, S3, ECR, Valkey와 CloudWatch를 읽기 전용으로 확인하고 간결한 draw.io를 작성한다.
+- 변경 파일: `docs/codex/WORKLOG.md`, `docs/codex/CURRENT_STATE.md`.
+- 외부 계약·테스트: 애플리케이션 코드, 구성도와 공개 API·AI·S3·Redis·Billing 계약은 변경하지 않았다. 기록 문서만 변경하여 Gradle 테스트는 실행하지 않았고 `git diff --check`로 검증한다.
+- 예상 밖 변경: 기존 미추적 draw.io 파일 2개는 이번 작업에서 수정하지 않았다.
+- Git commit·push·AWS 설정 변경·배포는 수행하지 않았다.
+
+## 2026-09-02 — 실제 AWS 기반 간결 Production 구성도 작성
+
+- 날짜: 2026-09-02
+- 현재 브랜치: `develop`
+- Jira: 별도 Jira 이슈가 없는 구성도 작성 작업이다.
+- 결과물: `docs/architecture/tosunsaeng-production-aws-simple.drawio` 한 페이지를 새로 작성했다. 첨부 예시처럼 계층과 핵심 통신만 남기고 연결선은 별도 하위 레이어에 배치했다.
+- 콘솔 확인 사실: 서울 리전에 ECS Fargate cluster 1개, Identity·Learning Core·AI service와 실행 task 각 1개, Internet-facing ALB 1개, private task subnet 2개, public ALB subnet 2개와 NAT Gateway 1개가 있다.
+- 서비스 연결: ALB HTTPS 443은 Identity target `8081`과 Learning Core target `8080`으로 라우팅한다. Learning Core는 ECS Service Connect client로 private AI alias `8000`을 호출하며 AI에는 ALB와 VPC Lattice가 구성되지 않았다.
+- AI 구성: AI task 하나에 `ai-api`, `ai-worker-1`부터 `ai-worker-4`와 Service Connect sidecar가 함께 실행된다.
+- 데이터·배포: S3 앱 음성 bucket, 단일 node형 ElastiCache for Valkey, 서비스별 MongoDB Atlas cluster, CloudWatch Container Insights, GitHub Actions OIDC → ECR → ECS 흐름을 구성도에 반영했다.
+- 제외: 미배포 Billing, 미사용 CloudFront·API Gateway·WAF·VPC Lattice와 기존 웹 POC bucket은 구성도에서 제외했다.
+- 명칭 위험: 실제 AWS resource는 `staging` 접두어를 사용하고 별도 production-named cluster·ALB는 확인되지 않았다. 요청한 Production 대상 도식에는 이 사실을 주의 문구로 표시했다.
+- 보안 위험: Valkey는 단일 node·Multi-AZ 비활성 상태이고 전송 중 암호화가 비활성화된 것으로 확인됐다. 이번 작업에서는 AWS 설정을 변경하지 않았다.
+- 보안·개인정보: AWS 계정 ID, federation 사용자, resource ARN, IP와 세부 식별자는 결과물·기록에 넣지 않았으며 Secret과 Token을 조회하거나 기록하지 않았다.
+- 변경 파일: `docs/architecture/tosunsaeng-production-aws-simple.drawio`, `docs/codex/WORKLOG.md`, `docs/codex/CURRENT_STATE.md`.
+- 테스트·결과: `xmllint --noout` 성공, 1 page·23 vertex·13 edge, mxCell 중복 ID 없음과 `git diff --check` 통과를 확인했다. draw.io renderer CLI가 없어 PNG 렌더 기반 육안 검증은 수행하지 못했다.
+- 외부 계약·배포: 애플리케이션 코드와 공개 API·AI·S3·Redis·Billing 계약은 변경하지 않았고 Git commit·push·AWS 설정 변경·배포를 수행하지 않았다.
+- 예상 밖 변경: 기존 미추적 draw.io 파일 2개는 사용자 작업으로 보존했으며 수정하지 않았다.
+
+## 2026-09-02 — 실제 AWS 기반 간결 구성도 작업 종료
+
+<!-- codex-turn:01a060f0-1711-7692-a8c1-daf770598502 -->
+
+- 날짜: 2026-09-02
+- 현재 브랜치: `develop`
+- Jira: 별도 Jira 이슈가 없는 구성도 작성 작업이다.
+- 완료 결과: 로그인된 AWS 콘솔을 읽기 전용으로 확인하고 `docs/architecture/tosunsaeng-production-aws-simple.drawio` 한 페이지를 작성·검증했다.
+- 반영 범위: 가비아 DNS, Internet-facing 공유 ALB, private subnet의 Identity·Learning Core·AI ECS Fargate, Service Connect, S3, Valkey, MongoDB Atlas, ECR와 CloudWatch를 간결하게 표현했다.
+- 제외 범위: 미배포 Billing과 미사용 CloudFront·API Gateway·WAF·VPC Lattice는 제외했다.
+- 확인된 위험: 실제 AWS resource 이름은 `staging`이며 별도 production-named cluster·ALB가 없다. Valkey는 단일 node·Multi-AZ 비활성·전송 암호화 비활성 상태다.
+- 변경 파일: `docs/architecture/tosunsaeng-production-aws-simple.drawio`, `docs/codex/WORKLOG.md`, `docs/codex/CURRENT_STATE.md`.
+- 유지한 계약: 애플리케이션 코드와 공개 API·AI·S3·Redis·Billing 계약을 변경하지 않았다.
+- 테스트·결과: `xmllint --noout`, mxCell ID 중복 검사와 `git diff --check`가 통과했다. 1 page·23 vertex·13 edge이며 모든 edge는 도형보다 아래 레이어에 있다.
+- 미확인·배포 전 확인: draw.io renderer CLI가 없어 PNG 육안 검증을 하지 못했다. 발표 전 diagrams.net에서 열어 선·라벨 겹침과 `staging` 명칭 처리 방침을 확인해야 한다.
+- 예상 밖 변경: 기존 미추적 draw.io 파일 2개는 수정하지 않았다.
+- 보안·범위: 계정 ID·federation 사용자·ARN·IP·Secret·Token을 결과물과 기록에 넣지 않았고 AWS 설정 변경, Git commit·push와 배포를 수행하지 않았다.
+
+## 2026-09-02 — 1차 업데이트 목표 AWS 구성도 수정
+
+<!-- codex-turn:01a060fb-71ba-77a2-85c7-09bd996afe92 -->
+
+- 날짜: 2026-09-02
+- 현재 브랜치: `develop`
+- Jira: 별도 Jira 이슈가 없는 구성도 수정 작업이다.
+- 사용자 요청: 현재 실배포 구성이 아니라 1차 업데이트 완료 시점을 기준으로 앱 서버를 각각 하나씩 표현하고, AI는 Worker 없이 단일 서버로 표시한다.
+- 변경한 파일: `docs/architecture/tosunsaeng-production-aws-simple.drawio`, `docs/codex/WORKLOG.md`, `docs/codex/CURRENT_STATE.md`.
+- 변경한 동작·표현: Identity·Learning Core·Billing·AI를 같은 ECS Fargate 영역의 서비스별 태스크 1개로 통일했다. AI는 FastAPI 단일 서버와 `Worker 없음`으로, Billing은 Spring Boot 결제·이용권 서버로 추가했다.
+- 서비스 연결: 공개 ALB는 Identity와 Learning Core에만 연결했다. Learning Core↔AI는 ECS Service Connect, Learning Core→VPC Lattice↔Billing은 SigV4/AWS_IAM 기반 비공개 통신으로 표현했다.
+- 데이터·배포: Valkey에서 AI Job Queue를 제거하고 Learning 상태·Lock만 남겼다. MongoDB Atlas의 Identity·Learning·Billing 서비스별 Cluster와 ECR의 네 서비스 image를 반영했다.
+- 구현 사실·목표 구분: 현재 콘솔에는 staging 접두어 리소스, 미배포 Billing과 Worker 4개 포함 AI가 있다. 구성도 본문은 1차 업데이트 이후 Billing 태스크 1개와 Worker 없는 AI 태스크 1개라는 목표 구조이며 차이를 하단 주의 문구에 명시했다.
+- 유지한 외부 계약: 애플리케이션 코드와 공개 API·`BaseResponse`·AI Callback·S3·Redis·Billing 계약을 변경하지 않았다.
+- 테스트·결과: `xmllint --noout`, mxCell 중복 ID 검사와 레이어 검사를 통과했다. 1 page·25 vertex·15 edge이고 모든 edge의 parent는 도형보다 앞서 선언된 `edge-layer`다. `git diff --check`도 통과했다.
+- 남은 위험·배포 전 확인: draw.io renderer CLI가 없어 PNG 육안 검증은 수행하지 못했다. diagrams.net에서 파일을 열어 Lattice 라벨과 연결선 꺾임을 최종 확인해야 한다. 실제 production 배포 전에는 Billing ECS/Lattice/IAM 구성과 AI 단일 프로세스의 처리량·장애 복구 방식을 별도로 검증해야 한다.
+- 예상 밖 변경: 기존 미추적 draw.io 파일 2개를 포함한 사용자 파일은 수정하지 않았다. 이번 요청 범위 밖의 애플리케이션·인프라 변경은 없다.
+- 다음 작업 전 확인: 1차 업데이트의 AI 단일 서버가 동기 처리만 하는지, 내부 비동기 작업을 별도 프로세스 없이 같은 서버에서 처리하는지 운영 모델을 확정한다.
+- 보안·범위: 계정 ID·federation 사용자·ARN·IP·Secret·Token을 기록하지 않았고 Git commit·push, AWS 설정 변경과 배포를 수행하지 않았다.
+
+## 2026-09-02 — 간결 구성도 AWS Architecture 아이콘 적용
+
+- 날짜: 2026-09-02
+- 현재 브랜치: `develop`
+- Jira: 별도 Jira 이슈가 없는 draw.io 시각 표현 작업이다.
+- 사용자 요청: 첨부 예시와 같은 AWS Architecture 아이콘으로 현재 1차 업데이트 간결 구성도의 요소를 표현한다.
+- 변경한 파일: `docs/architecture/tosunsaeng-production-aws-simple.drawio`, `docs/codex/WORKLOG.md`, `docs/codex/CURRENT_STATE.md`.
+- 변경한 표현: ALB에 AWS Application Load Balancer 아이콘을, Identity·Learning Core·AI·Billing에 Fargate 아이콘을, S3와 ElastiCache for Valkey에 각 AWS 서비스 아이콘을 적용했다.
+- 비AWS 요소: 토선생 앱, MongoDB Atlas와 외부 AI Provider는 AWS 관리 리소스가 아니므로 일반 도형을 유지했다. 가비아 DNS는 ALB 라벨에 연결 출처로 표시했다.
+- 유지한 구조: 1 page·16 vertex·10 edge와 기존 서비스 간 연결을 유지했고 모든 edge는 도형보다 뒤의 `edge-layer`에 있다.
+- 유지한 외부 계약: 애플리케이션 코드와 공개 API·`BaseResponse`·AI Callback·S3·Redis·Billing 계약을 변경하지 않았다.
+- 테스트·결과: `xmllint --noout`, mxCell ID 중복과 layer 순서를 확인했고 AWS4 resource icon style이 7개 대상에 적용된 것을 정적으로 검증했다. `git diff --check`도 실행한다.
+- 남은 위험·배포 전 확인: 로컬 draw.io renderer CLI가 없어 실제 아이콘 렌더와 글자 간격은 diagrams.net에서 최종 육안 확인해야 한다. 사용 환경의 AWS4 stencil 지원 버전에 따라 매우 오래된 diagrams.net에서는 아이콘 fallback 여부를 확인한다.
+- 예상 밖 변경: 기존 미추적 draw.io 파일 2개는 수정하지 않았고 애플리케이션·AWS 설정 변경도 없다.
+- 다음 작업 전 확인: 가비아 DNS도 별도 일반 아이콘으로 분리할지, 현재처럼 ALB 설명에 통합해 간결함을 유지할지 발표 화면에서 판단한다.
+- 보안·범위: 계정·사용자 식별자, ARN, IP, Secret과 Token을 기록하지 않았고 Git commit·push, AWS 설정 변경과 배포를 수행하지 않았다.
+
+## 2026-09-02 — 1차 업데이트 구성도 발표용 단순화
+
+<!-- codex-turn:01a06104-c9f5-7cb2-bbb1-21f608eb8075 -->
+
+- 날짜: 2026-09-02
+- 현재 브랜치: `develop`
+- Jira: 별도 Jira 이슈가 없는 draw.io 단순화 작업이다.
+- 사용자 요청: 1차 업데이트 목표 시스템 구성도를 발표 화면에서 더 빠르게 이해할 수 있는 구조로 단순화한다.
+- 변경한 파일: `docs/architecture/tosunsaeng-production-aws-simple.drawio`, `docs/codex/WORKLOG.md`, `docs/codex/CURRENT_STATE.md`.
+- 변경한 표현: VPC, Public/Private Subnet, NAT Gateway, ECR, GitHub Actions와 운영·관측 도형을 제거했다. 앱→DNS·ALB→공개 앱 서버, 네 개 Fargate 서비스, 데이터 저장소와 외부 AI 연동만 남겼다.
+- 유지한 핵심 구조: Identity·Learning Core·AI·Billing은 각각 태스크 1개이며 AI에는 Worker가 없다. Learning Core↔AI의 Service Connect, Learning Core↔Billing의 VPC Lattice·SigV4, S3 Presigned 업로드, Valkey 상태·Lock과 서비스별 MongoDB Atlas Cluster는 유지했다.
+- 단순화 결과: 도형은 25개에서 16개로, 연결선은 15개에서 10개로 줄였다. 별도 VPC Lattice 도형은 제거하고 연결선 라벨로 통합했다.
+- 유지한 외부 계약: 애플리케이션 코드와 공개 API·`BaseResponse`·AI Callback·S3·Redis·Billing 계약을 변경하지 않았다.
+- 테스트·결과: `xmllint --noout`이 성공했고 1 page·16 vertex·10 edge, mxCell ID 중복 없음, layer 순서와 모든 edge의 `edge-layer` 소속을 확인했다. `git diff --check`도 실행한다.
+- 남은 위험·배포 전 확인: draw.io renderer CLI가 없어 PNG 렌더 기반 육안 검증은 하지 못했다. 발표 전에 diagrams.net에서 연결선과 라벨 간격만 확인해야 한다. 생략된 Subnet·NAT·배포·관측 구조는 운영 상세 설명용 별도 도식이 필요할 때만 다시 제공한다.
+- 예상 밖 변경: 기존 미추적 draw.io 파일 2개는 수정하지 않았다. 이번 작업 범위 밖의 애플리케이션·AWS·인프라 변경은 없다.
+- 다음 작업 전 확인: 발표 자료가 시스템의 개념적 흐름을 묻는지 AWS 네트워크 상세를 묻는지에 따라 현재 간결본과 이전 상세 수준 중 사용할 버전을 결정한다.
+- 보안·범위: 계정 ID·federation 사용자·ARN·IP·Secret·Token을 기록하지 않았고 Git commit·push, AWS 설정 변경과 배포를 수행하지 않았다.
+
+## 2026-09-02 — AWS 아이콘 적용 작업 종료 동기화
+
+- 날짜: 2026-09-02
+- Jira: 별도 Jira 이슈가 없다.
+- 완료 결과: `docs/architecture/tosunsaeng-production-aws-simple.drawio`의 ALB·Fargate 4개·S3·ElastiCache에 AWS4 Architecture 아이콘을 적용하고, 앱·Atlas·외부 Provider는 비AWS 일반 도형으로 유지했다.
+- 검증 결과: XML 파싱, 7개 AWS icon style, 중복 ID 없음, 16 vertex·10 edge와 후면 edge layer, `git diff --check`를 확인했다.
+- 외부 계약·변경 범위: 애플리케이션 코드·공개 API·AI·S3·Redis·Billing 계약과 실제 AWS 리소스는 변경하지 않았다. 기존 미추적 draw.io 파일 2개도 수정하지 않았다.
+- 잔여 확인: diagrams.net에서 실제 아이콘 렌더와 글자 간격을 육안 확인한다.
+- 보안·Git: Secret·Token·계정 식별 정보를 기록하지 않았고 commit·push·배포를 수행하지 않았다.
+
+## 2026-09-02 — AWS 아이콘 구성도 종료 훅 동기화
+
+<!-- codex-turn:01a06108-827d-7d02-98d6-9adbf949aab1 -->
+
+- 날짜: 2026-09-02
+- 현재 브랜치: `develop`
+- Jira: 별도 Jira 이슈가 없는 구성도 작업이다.
+- 완료 결과: 1차 업데이트 간결 구성도의 ALB·Fargate 4개·S3·ElastiCache에 AWS4 Architecture 아이콘을 적용한 상태를 종료 기록에 동기화했다.
+- 변경 파일: `docs/codex/WORKLOG.md`, `docs/codex/CURRENT_STATE.md`. 구성도 파일은 이번 종료 동기화에서 추가 수정하지 않았다.
+- 유지한 동작·계약: 16개 도형·10개 연결선, 후면 edge layer와 기존 서비스 연결을 유지했다. 애플리케이션 코드와 공개 API·AI Callback·S3·Redis·Billing 계약을 변경하지 않았다.
+- 검증: XML 파싱, AWS icon style 7개, 중복 ID와 layer 순서, `git diff --check`를 다시 확인한다. Gradle 대상 코드 변경이 없어 `./gradlew clean test`는 실행하지 않는다.
+- 위험·배포 전 확인: diagrams.net에서 실제 아이콘 렌더와 글자 간격을 육안 확인해야 한다. 실제 AWS 설정·배포 변경은 수행하지 않았다.
+- 예상 밖 변경: 기존 미추적 draw.io 파일 2개는 수정하지 않았고 이번 종료 동기화에 예상 밖 범위는 없다.
+- 다음 작업 전 확인: 발표 화면에서 가비아 DNS를 ALB 설명에 통합한 현재 표현을 유지할지 확인한다.
+- 보안·Git: Secret·Token·계정 식별 정보를 기록하지 않았고 commit·push·배포를 수행하지 않았다.
+
+## 2026-09-02 — 토선생 이미지와 라벨 연결 방식 적용
+
+<!-- codex-turn:01a0610d-9892-7ca2-86d4-82778ea64bb3 -->
+
+- 날짜: 2026-09-02
+- 현재 브랜치: `develop`
+- Jira: 별도 Jira 이슈가 없는 draw.io 시각 개선 작업이다.
+- 사용자 요청: 토선생은 제공한 토끼 PNG를 사용하고 다른 구성요소는 역할에 맞는 아이콘을 사용하며, 화살표 때문에 글자가 가려지지 않도록 화살표를 글자에 연결한다.
+- 변경한 파일: `docs/architecture/tosunsaeng-production-aws-simple.drawio`, `docs/codex/WORKLOG.md`, `docs/codex/CURRENT_STATE.md`.
+- 변경한 표현: 제공된 2048×2048 PNG를 256×256로 축소한 68,167 byte PNG로 만들어 draw.io의 토선생 앱 이미지에 base64 내장했다. 외부 Desktop 파일 경로에 의존하지 않는다.
+- 아이콘 체계: ALB·Fargate·S3·ElastiCache는 공식 AWS4 아이콘을 유지했다. MongoDB Atlas는 데이터베이스 실린더, 외부 AI Provider는 AWS 경계 밖의 별도 서비스 도형으로 유지해 공급자 소속을 혼동하지 않게 했다.
+- 화살표 개선: 앱·ALB·Identity·Learning Core·AI·Billing·S3·Valkey의 아이콘과 라벨을 별도 도형으로 분리했다. 주요 8개 연결선의 source와 target을 라벨 도형으로 바꾸고 라벨에는 불투명한 흰 배경과 테두리를 적용해 선이 글자를 가리지 않게 했다.
+- 유지한 구조: 1 page·10 edge와 후면 `edge-layer`, 앱→ALB→Identity/Learning, Learning↔AI·Billing·S3·Valkey, 앱→S3, ECS→Atlas 흐름을 유지했다. 라벨 분리로 vertex는 24개가 됐다.
+- 유지한 외부 계약: 애플리케이션 코드와 공개 API·`BaseResponse`·AI Callback·S3·Redis·Billing 계약을 변경하지 않았다.
+- 테스트·결과: `xmllint --noout`, 내장 base64의 PNG signature와 68,167 byte 복호화, 8개 label-to-label edge, ID 중복 없음, 모든 edge의 후면 layer 소속과 `git diff --check`를 확인했다. 코드 변경이 없어 Gradle 테스트는 실행하지 않았다.
+- 남은 위험·배포 전 확인: 로컬 draw.io renderer CLI가 없어 diagrams.net에서 토끼 이미지의 실제 크기·라벨 간격과 연결선 꺾임을 최종 육안 확인해야 한다. 제공 이미지 자체에 포함된 표식도 그대로 내장되어 있다.
+- 예상 밖 변경: 기존 미추적 draw.io 파일 2개는 수정하지 않았고 작업 범위 밖의 코드·AWS 설정 변경은 없다.
+- 다음 작업 전 확인: 발표 화면에서 토끼 이미지의 흰 여백과 원본에 포함된 표식을 그대로 사용할지 결정한다. 필요하면 사용자가 권리를 보유한 투명 배경 원본으로 교체한다.
+- 보안·Git: Secret·Token·계정·사용자 식별 정보를 기록하지 않았고 commit·push·배포를 수행하지 않았다.
+
+## 2026-09-03 — Learning Core phone 재가입 시험 승계 인계안 검토
+
+<!-- codex-turn:01a06571-ae0e-7530-bdb6-1d7a1034fb5e -->
+
+- 날짜: 2026-09-03
+- 현재 브랜치: `develop`
+- Jira: Learning Core 전용 이슈는 아직 없다. 상류 Billing owner rebind 구현은 `TMI-120`이다.
+- 사용자 요청: 첨부된 `Learning Core phone 재가입 시험 승계 구현 요청`을 현재 Learning Core 코드와 Billing 계약에 대조해 수정 방향을 검토한다.
+- 검토 결론: 과거 `ExamSession`·답안·결과를 이전하지 않고 Billing이 명시적으로 승인한 기존 `AttemptGroup`·`mockExamId`에 새 target `examId`를 연결하는 새 방향은 타당하다. continuation 204 시 기존 INITIAL, 200 시 `PHONE_REJOIN` REPLACEMENT, 세 continuation field exact echo, 응답·status strict 검증과 SigV4/Lattice 경계도 Billing 계약과 일치한다.
+- 필수 보완 1: phone 재가입은 Billing-only `TrialOwnerRebindApproved` lifecycle이며 ACTIVE GUEST→MEMBER의 `UserMerged` consumer와 다르다. 본 작업이 기존 `USER_MERGED_CONSUMER_IMPLEMENTATION_PLAN.md`의 Guest 학습 이력 migration을 대체하거나 폐기하지 않는다고 문서에 명시해야 한다.
+- 필수 보완 2: continuation 조회 조건을 단순한 `INITIAL 예상`이 아니라 `같은 operation의 최초 PREPARED 생성이고 target userId의 ExamSession이 전혀 없음`으로 고정해야 한다. 기존 operation·durable Session replay에서는 continuation을 재조회하지 않아야 한다.
+- 필수 보완 3: continuation 결과와 reserve exact payload은 존재하지 않는 별도 outbox가 아니라 `ExamCreationOperation`에 reserve 전 영속화한다. `continuationReason`, `continuationId`, `expectedAttemptGroupId`와 Billing이 반환한 `mockExamId`를 같은 operation의 불변 snapshot으로 두어 응답 유실·동시 요청에서도 같은 key·session·payload를 재사용해야 한다.
+- 필수 보완 4: 현재 `SigV4BillingReservationClient` 공통 success decoder는 empty body를 계약 오류로 처리하므로 continuation 204 전용 분기가 필요하다. phone caller에는 `app.billing.phone-continuation-enabled=false` 성격의 별도 flag·startup validation을 두고 creation saga OFF 시 기존 흐름을 유지해야 한다.
+- 필수 보완 5: reserve/status의 optional `continuationReason`·`continuationId`를 operation snapshot과 비교하고, phone 응답에서 누락·불일치나 예상 밖 kind를 거절해야 한다. 계약 불일치 시 응답의 untrusted `reservationId`를 바로 cancel하지 말고 `userId+operationId` status로 authoritative reservation을 재조회한 뒤 정합하는 경우만 cancel하도록 보상 규칙을 구체화해야 한다.
+- 필수 보완 6: 현재 시험 생성용 `SigV4BillingReservationClient`에는 W3C context injection이 없으므로 첨부 문서의 `traceparent 전파 유지` 표현은 실제 구현과 다르다. 이번 작업에서 허용된 trace metadata만 unsigned request에 inject한 뒤 SigV4를 마지막 논리적 변경 단계에서 수행하고, 서명 후 header·URI·body를 변경하지 않는 component test를 추가한다고 명시해야 한다.
+- 추가 테스트 권고: continuation 조회 응답 유실·시간 차로 204→200이 변해도 기존 operation snapshot이 바뀌지 않음, 같은 user의 다른 idempotency key 동시 요청, 204 empty-body strict handling, malformed 200, status optional field 누락·불일치, contract mismatch status-first cancel, flag OFF 회귀를 검증한다.
+- 변경 파일: 검토 기록을 위해 `docs/codex/CURRENT_STATE.md`, `docs/codex/WORKLOG.md`만 갱신했다. 애플리케이션·테스트·설정·Billing 저장소 파일은 수정하지 않았다.
+- 유지한 외부 계약: 공개 API·`BaseResponse`·AI `user_id=examId`·Callback·S3·Redis·`retryCount`는 변경하지 않았다.
+- 테스트·검증: 코드 변경이 없어 Gradle 테스트는 실행하지 않았다. 첨부 문서, Learning Core saga·operation·SigV4 client와 Billing ADR·계약·phone continuation 구현을 읽기 전용으로 대조했고 문서 diff는 `git diff --check`로 검증한다.
+- 남은 위험·배포 전 확인: Billing 참조 문서와 phone continuation 구현이 현재 Billing `develop` 작업 트리의 미커밋 변경이므로 Billing PR 병합 후 exact wire·error·IAM route를 다시 고정해야 한다. reader-first→Billing·Lattice→caller→Identity producer 순서와 staging E2E 전에 활성화하지 않는다.
+- 예상 밖 변경: 기존 사용자 소유 draw.io 미추적 파일 3개와 기존 기록 문서 변경을 보존했으며 수정·삭제하지 않았다.
+- 다음 작업 전 확인: 본 검토 보완을 반영한 Learning Core 전용 계획서와 신규 Jira를 먼저 확정한 뒤 구현한다.
+- Git·배포: commit·push·PR·merge·배포를 수행하지 않았고 Secret·Token을 기록하지 않았다.
+
+## 2026-09-03 — Billing phone continuation 병합 확인과 Learning Core 계획서 작성
+
+<!-- codex-turn:01a06579-062f-7e43-81ad-ff133940d876 -->
+
+- 날짜: 2026-09-03
+- 현재 브랜치: `develop`
+- Jira: 상류 Billing 구현은 `TMI-120`이며 Learning Core 전용 Jira는 아직 없다.
+- 병합 확인: Billing 저장소의 `HEAD`, 로컬 `develop`, `origin/develop`이 모두 PR #8 merge commit `7138810`을 가리키며 작업 트리가 clean임을 확인했다. 실제 phone continuation 구현 commit은 `b61ebb9`이다.
+- 상류 구현 확인: Billing에 `POST /internal/v1/reservations/continuations/phone`, `PHONE_REJOIN` discovery, reserve의 세 continuation field, reserve/status optional response field, payload hash와 security route 및 관련 테스트가 병합돼 있다.
+- 작성 파일: `docs/codex/PHONE_REJOIN_CONTINUATION_IMPLEMENTATION_PLAN.md`를 신규 작성하고 `docs/codex/CURRENT_STATE.md`, `docs/codex/WORKLOG.md`를 갱신했다.
+- 계획 핵심: target userId의 Session이 0건이고 같은 operation의 최초 준비일 때만 discovery를 실행한다. 204는 기존 INITIAL, 200은 Billing이 반환한 기존 AttemptGroup·mockExamId를 사용하는 새 target `examId`의 PHONE_REJOIN REPLACEMENT로 처리한다.
+- 멱등성 계획: `continuationReason`, `continuationId`, expected group/mock을 reserve 전에 `ExamCreationOperation`의 불변 snapshot으로 저장한다. duplicate operation insert loser는 winner snapshot을 reload하며 PREPARED 이후 discovery·sessionId·mock 선택을 다시 하지 않는다.
+- client·saga 계획: continuation의 정확한 204 empty-body 처리, strict 200 decoder, normal 3-field와 phone 6-field request 분리, reserve/status optional context 검증, reserve 응답 유실 status 복구와 contract mismatch의 untrusted reservationId 직접 cancel 금지를 포함했다.
+- 데이터 경계: phone 재가입은 Billing-only `TrialOwnerRebindApproved` lifecycle이며 Guest `UserMerged` consumer를 대체하지 않는다. source Session owner, 답안, 결과, Summary, grading Job과 audio를 이전하거나 복사하지 않고 새 target Session은 cycleNumber 1로 시작한다.
+- 보안·관측 계획: `app.billing.phone-continuation-enabled=false` 기본값과 creation saga 선행 조건, W3C 새 CLIENT span의 traceparent를 unsigned request에 넣은 뒤 SigV4를 마지막에 수행하는 순서, baggage·식별자·payload·credential 비로깅을 확정했다.
+- 유지한 외부 계약: 기존 `POST /api/v1/exams`, Request Body 없음, 성공 DTO·`BaseResponse`, 실제 userId 비노출, `retryCount`, S3·Redis·Polling과 AI `user_id=examId` 계약을 변경하지 않았다.
+- 테스트·검증: 문서 작업이므로 Gradle 테스트는 실행하지 않았다. Billing merge ref와 최종 계약·구현을 읽기 전용으로 확인했고 계획서의 wire·상태·오류·rollout 항목을 현재 Learning Core saga/client/operation과 대조했다. 문서 형식과 whitespace는 `git diff --check`로 검증한다.
+- 남은 위험·배포 전 확인: Learning Core 전용 Jira를 생성하고 해당 범위의 `AGENTS.md` 허용을 추가해야 한다. 구현·staging E2E 전에는 flag를 켜지 않으며 Billing `7138810` 포함 버전의 실제 환경 배포와 Lattice exact route를 별도로 확인해야 한다.
+- 예상 밖 변경: 기존 사용자 소유 미추적 draw.io 파일 3개와 이번 작업 이전부터 존재한 CURRENT_STATE·WORKLOG 변경을 보존했으며 수정·삭제하지 않았다. 애플리케이션·설정·테스트와 Billing 저장소는 변경하지 않았다.
+- 다음 작업 전 확인: 계획서를 사용자 승인한 뒤 Learning Core 전용 Jira를 만들고 `AGENTS.md` 범위를 확정한 다음 구현한다.
+- Git·배포: commit·push·PR·merge·배포, Jira 생성·상태 변경과 AWS 리소스 변경을 수행하지 않았고 Secret·Token을 기록하지 않았다.
+
+## 2026-09-03 — Jira TMI-122 생성
+
+<!-- codex-turn:01a06589-235a-7302-bbf5-8f91dbb9c563 -->
+
+- 날짜: 2026-09-03
+- 현재 브랜치: `develop`
+- Jira: `TMI-122` `[Learning Core] phone 재가입 시험 continuation 연동`
+- 생성 결과: TMI 프로젝트에 이슈 유형 `작업`, 상태 `해야 할 일`로 생성했고 assignee는 지정하지 않았다.
+- 중복 확인: 프로젝트 내 phone·재가입·continuation 관련 기존 이슈를 조회했으며 동일한 Learning Core 후속 이슈는 없었다.
+- Jira 본문: Billing `TMI-120`/PR #8을 배경으로 target Session 0건 discovery, 204 INITIAL, 200 PHONE_REJOIN REPLACEMENT, operation 불변 snapshot, strict client·reserve·status, 응답 유실 복구, status-first cancel, 데이터 격리, trace·SigV4·보안, 완료 조건, 필수 테스트와 rollout을 기록했다.
+- 이슈 연결: link type `Blocks`를 사용해 `TMI-122 is blocked by TMI-120` 관계를 만들고 `TMI-122` 조회에서 outward issue `TMI-120` 연결을 확인했다.
+- 상류 상태 주의: Billing 저장소에는 PR #8 merge commit `7138810`이 반영돼 있지만 Jira `TMI-120` 상태는 현재 `해야 할 일`이다. 사용자 요청 없이 `TMI-120` 상태를 변경하지 않았다.
+- 계획서 갱신: `docs/codex/PHONE_REJOIN_CONTINUATION_IMPLEMENTATION_PLAN.md`의 Learning Core Jira를 `TMI-122`로 기록하고 Phase 0의 Jira 생성·상류 연결을 완료 표시했다. `AGENTS.md` 허용 범위 추가는 구현 전 남은 단계로 유지했다.
+- 변경 파일: `docs/codex/PHONE_REJOIN_CONTINUATION_IMPLEMENTATION_PLAN.md`, `docs/codex/CURRENT_STATE.md`, `docs/codex/WORKLOG.md`.
+- 유지한 외부 계약: 애플리케이션 코드와 공개 API·`BaseResponse`·AI `user_id=examId`·Callback·S3·Redis·`retryCount`를 변경하지 않았다.
+- 테스트·검증: 코드 변경이 없어 Gradle 테스트를 실행하지 않았다. 생성된 Jira의 key·summary·type·status·description과 issue link를 재조회했고 문서는 `git diff --check`와 marker 1회 검사로 검증한다.
+- 남은 위험·배포 전 확인: 구현 전에 `TMI-122` 범위의 `AGENTS.md` 허용을 추가해야 한다. Billing `7138810` 포함 버전의 실제 환경 배포, Lattice exact route와 staging E2E 전에는 phone flag를 활성화하지 않는다.
+- 예상 밖 변경: 기존 사용자 소유 미추적 draw.io 파일 3개와 이번 작업 이전부터 존재한 기록 문서 변경을 보존했으며 수정·삭제하지 않았다. 애플리케이션·설정·테스트 파일은 변경하지 않았다.
+- 다음 작업 전 확인: 사용자가 구현 진행을 승인하면 먼저 `AGENTS.md`에 `TMI-122` 제한적 허용 범위를 반영한 뒤 계획서 순서로 구현한다.
+- Git·배포: commit·push·PR·merge·배포와 AWS 리소스 변경을 수행하지 않았고 Secret·Token을 기록하지 않았다.
+
+## 2026-09-03 — TMI-122 AGENTS 범위 의미 설명 및 구현 일시 중단
+
+<!-- codex-turn:01a0658e-fd29-76d3-93ff-ca1f8adc4b53 -->
+
+- 날짜: 2026-09-03
+- 현재 브랜치: `develop`
+- Jira: `TMI-122` `[Learning Core] phone 재가입 시험 continuation 연동`
+- 사용자 질문: 기존 `AGENTS.md`가 phone 재가입 owner continuation을 허용하지 않는다는 표현의 의미를 설명한다.
+- 설명 결과: 이는 제품 기능 자체를 금지한다는 뜻이 아니다. 기존 TMI-116 예외가 최초 Billing Reservation saga의 reserve·confirm·cancel·status와 당시 확정 범위에만 적용되고 다른 Jira에 자동 적용되지 않는다는 저장소 작업 거버넌스 의미다.
+- 기존 경계: TMI-116은 UserMerged·owner rebind와 후속 확장을 제외했고 AttemptGroup 영구 허용도 UserMerged·owner rebind 및 Billing saga 전체 reconciliation을 자동 허용하지 않는다. 따라서 Codex가 새 계약을 별도 승인 없이 구현하지 못하도록 막혀 있었다.
+- 현재 승인: 사용자가 phone continuation 계획을 승인하고 Jira `TMI-122` 생성과 구현을 명시적으로 요청했으므로 직전 중단된 구현 턴에서 `AGENTS.md`에 TMI-122 전용 제한적 예외를 추가했다.
+- TMI-122 예외가 허용하는 것: Billing continuation discovery, operation 내부 snapshot, phone 6-field reserve, reserve/status strict 검증·복구, 새 target Session의 기존 AttemptGroup 연결, default-off flag, traceparent와 SigV4 최종 서명 및 관련 테스트다.
+- 계속 금지하는 것: source Session·답안·결과 이전, TrialOwnerRebindApproved consumer, Guest UserMerged 변경, Billing 저장소 수정, 공개 API·AI·S3·Redis 계약 변경과 실제 AWS 리소스 변경이다.
+- 구현 상태: 사용자의 `잠깐` 요청에 따라 애플리케이션 구현을 진행하지 않았다. 현재 이번 구현 시도에서 바뀐 것은 `AGENTS.md`의 TMI-122 범위뿐이다.
+- 변경 파일: `AGENTS.md`, 기록용 `docs/codex/CURRENT_STATE.md`, `docs/codex/WORKLOG.md`. 이전 작업에서 생성된 계획서와 사용자 소유 draw.io 파일은 보존했다.
+- 유지한 외부 계약: 공개 API·`BaseResponse`·AI `user_id=examId`·Callback·S3·Redis·`retryCount`와 Billing wire를 변경하지 않았다.
+- 테스트·검증: 애플리케이션 코드 변경이 없어 Gradle 테스트는 실행하지 않았다. `AGENTS.md` diff와 TMI-116·TMI-122·AttemptGroup 범위를 대조하고 문서는 `git diff --check`와 marker 1회 검사로 검증한다.
+- 남은 위험·배포 전 확인: 구현은 아직 시작하지 않았으며 사용자가 계속 진행을 확인하면 TMI-122 계획서 순서로 재개한다. feature flag 활성화·AWS·배포 작업은 범위 밖이다.
+- 예상 밖 변경: 기존 사용자 소유 미추적 draw.io 파일 3개와 이전 CURRENT_STATE·WORKLOG·계획서 변경을 수정·삭제하지 않았다.
+- Git·배포: commit·push·PR·merge·배포, Jira 상태 변경과 AWS 리소스 변경을 수행하지 않았고 Secret·Token을 기록하지 않았다.
+
+## 2026-09-03 — phone continuation 영구 허용 범위 검토
+
+<!-- codex-turn:01a06590-a78f-7883-a3b3-acc628e25e24 -->
+
+- 날짜: 2026-09-03
+- 현재 브랜치: `develop`
+- Jira: `TMI-122` `[Learning Core] phone 재가입 시험 continuation 연동`
+- 사용자 질문: TMI-122를 Jira 단건 예외로 두지 않고 `AGENTS.md`에서 일반적으로 허용하는 방식이 나은지 검토한다.
+- 결론: 모든 Billing·owner rebind 변경을 포괄적으로 허용하는 것은 권장하지 않는다. 결제 권리, 과거 데이터 소유권, 서버 간 인증과 보상 로직까지 별도 승인 없이 확대될 수 있기 때문이다.
+- 권장안: phone 재가입 시험 continuation이라는 확정 capability 자체와 동일 경계 안의 후속 버그 수정·테스트·운영 안정화를 영구 허용한다. TMI-122는 최초 구현 이력과 기준 계획서로 기록하되 허용 효력은 특정 Jira에 종속시키지 않는다.
+- 유지할 허용 범위: Billing continuation discovery, operation snapshot, phone 6-field reserve, reserve/status 검증·복구, 새 target Session 연결, default-off flag, W3C trace와 SigV4 최종 서명이다.
+- 유지할 금지 범위: 전체 Billing 기능, 새로운 entitlement·결제 정책, source 시험 데이터 이전, TrialOwnerRebindApproved/UserMerged consumer, Billing 저장소 수정, 공개 API·AI·S3·Redis 계약 변경과 AWS 리소스 직접 변경이다.
+- 문서 권고: 현재 `## TMI-122 명시적 예외`를 `# Phone 재가입 시험 continuation 구현 허용 규칙`으로 바꾸고, TMI-122와 계획서를 최초 기준으로 연결하며 후속 작업도 동일 경계 안에서만 허용한다고 명시한다.
+- 변경 파일: 검토 기록을 위해 `docs/codex/CURRENT_STATE.md`, `docs/codex/WORKLOG.md`만 갱신했다. `AGENTS.md`의 직전 TMI-122 예외와 애플리케이션 코드는 이번 작업에서 추가 수정하지 않았다.
+- 테스트·검증: 코드 변경이 없어 Gradle 테스트는 실행하지 않았다. 기존 TMI-116·TMI-122·AttemptGroup 허용/금지 경계를 문서상 대조하고 `git diff --check`와 marker 1회 검사를 수행한다.
+- 외부 계약·보안: 공개 API·`BaseResponse`·AI `user_id=examId`·S3·Redis·`retryCount`와 Billing wire를 변경하지 않았고 Secret·Token을 기록하지 않았다.
+- 남은 확인: 사용자가 권장안을 승인하면 `AGENTS.md`의 TMI-122 단건 예외를 capability 기반 영구 허용 절로 교체한 뒤 구현을 재개한다.
+- 예상 밖 변경: 기존 사용자 소유 미추적 draw.io 파일 3개와 이전 계획·기록 변경을 보존했고 수정·삭제하지 않았다.
+- Git·배포: commit·push·PR·merge·배포, Jira·AWS 상태 변경을 수행하지 않았다.
+
+## 2026-09-03 — TMI-122 phone 재가입 시험 continuation 구현
+
+<!-- codex-turn:01a06592-36fc-7041-a4a9-0471c1762732 -->
+
+- 날짜: 2026-09-03
+- 현재 브랜치: `feat/TMI-122-phone-rejoin-continuation`
+- Jira: `TMI-122` `[Learning Core] phone 재가입 시험 continuation 연동`
+- 범위 규칙: `AGENTS.md`의 TMI-122 단건 예외를 `Phone 재가입 시험 continuation 구현 허용 규칙`으로 교체했다. 확정 capability와 동일 경계의 후속 버그 수정·테스트·운영 안정화는 영구 허용하지만 Billing 전체, source 데이터 이전, TrialOwnerRebindApproved/UserMerged consumer와 Billing 저장소 수정은 계속 제외한다.
+- discovery와 준비: `phone-continuation-enabled`가 켜지고 target user 소유 ExamSession이 0건일 때만 Billing `POST /internal/v1/reservations/continuations/phone`을 호출한다. body 없는 204는 기존 INITIAL 흐름, strict 200은 Billing 기존 group/mock을 쓰는 cycle 1 PHONE_REJOIN REPLACEMENT 준비로 연결한다.
+- operation 멱등성: `ExamCreationOperation`에 `continuationReason`, `continuationId`, expected group/mock snapshot을 reserve 전에 저장한다. 일반 INITIAL·local REPLACEMENT·PHONE_REJOIN 조합을 strict 검증하고 같은 key insert 경쟁에서는 기존 unique winner reload 흐름을 유지한다.
+- Billing wire: 일반 reserve는 기존 3필드, phone reserve는 continuation 세 필드를 더한 정확한 6필드로 분리했다. reserve·status response의 optional reason/id를 reader-first로 해석하고 200/204 discovery, unknown·duplicate·trailing·coercion, response size와 redirect 금지 규칙을 기존 strict mapper·HTTP 경계에 연결했다.
+- 복구와 보상: PREPARED reserve의 timeout·일시 실패·processing·contract error는 status를 먼저 조회한다. exact RESERVED만 operation을 전진시키고, 계약 불일치는 응답의 reservationId를 사용하지 않은 채 authoritative status가 증명한 ID로만 CANCEL_PENDING을 저장한다. phone stale context 409는 terminal failure로 수렴한다.
+- Session 격리: 새 target Session은 새 examId, target userId, cycle 1, Billing 기존 AttemptGroup·mockExamId와 REPLACEMENT kind를 저장한다. source Session owner, 답안, 결과, Summary, grading Job과 audio는 조회·복사·수정하지 않는다.
+- 보안·관측: Billing 호출마다 현재 server span의 child CLIENT span을 만들고 그 span의 `traceparent`만 unsigned request에 넣은 뒤 SigV4를 마지막 논리적 변경으로 수행한다. baggage를 전파하지 않고 user/session/group/continuation ID와 payload·credential 없는 고정 outcome 로그와 저카디널리티 counter/timer를 추가했다. 401/403은 body code보다 우선해 `AUTH_FAILURE`로 분류한다.
+- 설정: `BILLING_PHONE_CONTINUATION_ENABLED` 기본값은 false이며 creation saga가 꺼진 상태에서 phone flag만 켜면 startup validation이 실패한다. local/test도 false를 유지한다.
+- 변경 파일: `AGENTS.md`, phone 계획서·Billing saga 계획서, Billing client·properties·configuration·validator, `BillingExamCreationSaga`, `ExamCreationOperation`, `ExamSessionManager`, `ExamSessionRepository`, 신규 `BillingContinuationReason`, application 설정과 관련 테스트, CURRENT_STATE·WORKLOG.
+- 유지한 외부 계약: `POST /api/v1/exams` URL·Method·body 없는 요청·성공 DTO·BaseResponse·optional Idempotency-Key 규칙, 실제 userId 비노출, 시험 retryCount, S3·Redis·Polling과 Python AI `user_id=examId` 및 Callback 계약은 변경하지 않았다.
+- 테스트·검증: phone 204/200 discovery, exact 6필드 reserve, optional echo, target history gate, operation snapshot, reserve 응답 유실 status 복구, status continuation 누락 거절, untrusted reservationId 미사용, target Session group/mock 연결, flag 조합, client span traceparent의 SigV4 포함을 추가·검증했다. `./gradlew clean test` 전체 457개가 성공했고 `git diff --check`도 통과했다.
+- 남은 위험·배포 전 확인: Billing `7138810` 포함 이미지 배포, Lattice exact phone route IAM, Mongo index·Transaction 환경과 204/200/응답 유실/stale/trace staging E2E 전에는 phone flag를 켜지 않는다. reader-first 배포 후 caller flag를 canary로 활성화해야 한다.
+- 예상 밖 변경: 기존 사용자 소유 미추적 draw.io 파일 3개를 수정·삭제하지 않았다. 이번 기능 밖의 애플리케이션 리팩터링과 Billing 저장소 변경은 없다.
+- Git·배포: commit·push·PR·merge·배포, Jira 상태 변경과 AWS 리소스 변경을 수행하지 않았고 Secret·Token을 기록하지 않았다.
+
+## 2026-09-03 — 현재 앱 전체 사용자·서비스 흐름 정리
+
+<!-- codex-turn:01a065a5-a8cd-7bb0-ae41-cd833f345109 -->
+
+- 날짜: 2026-09-03
+- 브랜치: `develop`
+- Jira: 관련 구현 이력은 `TMI-116`, `TMI-118`, `TMI-122`이며 이번 분석에서 Jira를 조회하거나 상태를 변경하지 않았다.
+- 인증 흐름은 Identity의 LOCAL·Guest·Firebase SNS에서 Identity Access/Refresh Token을 발급하고 앱이 Access Token만 Learning Core Bearer로 전달하는 구조다. 실제 userId는 앱 Request/Response에 추가하지 않는다.
+- 시험 생성은 새 lowercase UUID v4 Idempotency-Key를 사용한다. Billing saga flag가 켜지면 reserve → ExamSession durable commit → confirm으로 권리를 확정하며 transport retry는 같은 key를 재사용한다. flag off이면 기존 session 생성 흐름이고 새 시험 시작 시 기존 진행 Session은 ABANDONED되어 이어풀기하지 않는다.
+- 문항 흐름은 prompt → Presigned URL → S3 raw audio PUT → submit → 문항/시험 polling → Summary·문항 결과·이력 조회다. Part 4 표는 비정형 tableContext JSON으로 앱에 전달하고 table image는 공개하지 않는다. AI는 examId를 user_id로 사용하며 비동기 Callback과 Job 멱등성을 유지한다.
+- Billing-linked 시험은 최초 retryCount=0의 제출·채점·Summary 증거로 AttemptGroup GRADING/COMPLETED/RETAKE_AVAILABLE을 판정하고 Transaction/CAS outbox를 통해 Billing에 전달한다. phone 재가입 target Session이 0건이면 별도 flag 아래 기존 AttemptGroup·mockExam에 새 examId만 연결하며 과거 답안·결과·audio는 복사하지 않는다.
+- Billing creation saga, phone continuation, AttemptGroup writer/publisher와 UserWithdrawn consumer 관련 flag는 기본 off다. 코드가 develop에 병합된 것과 production 사용자 흐름 활성화는 구분해야 하며 Lattice/IAM/Mongo migration·Billing consumer·staging failure E2E가 남아 있다.
+- 결제 상품·스토어 구매/복원, Guest UserMerged owner rebind와 10초 챌린지 공개 API는 아직 완성·활성화된 앱 흐름이 아니다. Challenge는 v1 계약과 콘텐츠만 준비된 상태다.
+- 분석과 기록만 수행했다. Java·테스트·공개 API·BaseResponse·AI/Callback·S3·Redis·AWS·DB·Git 이력을 변경하지 않았고 Secret·Token을 기록하지 않았다.
+- 코드 변경이 없어 Gradle 테스트는 실행하지 않았다. `git diff --check`와 marker 단일 포함을 검증한다.
+
+## 2026-09-03 — 앱 기능별 동작 로직 종합 정리
+
+<!-- codex-turn:01a065ac-25db-78d2-b608-6d726d513070 -->
+
+- 날짜: 2026-09-03
+- 브랜치: `develop`
+- Jira: 관련 구현 이력은 `TMI-116`, `TMI-118`, `TMI-122`이며 이번 정리에서 Jira를 조회하거나 상태를 변경하지 않았다.
+- 신규 `docs/codex/APP_FEATURE_LOGIC_OVERVIEW.md`에 5줄 결론, 필독 상태표, 사용자 결정, 위험, 기능별 사용자 동작·서버 로직·실패 처리와 서비스 책임·rollout 부록을 작성했다.
+- Identity LOCAL·Guest·Firebase SNS, 프로필·동의·탈퇴, Billing 무료 TrialClaim·Reservation, Learning Core 시험 생성·ABANDONED restart·문제·S3·AI·Summary·복구·AttemptGroup, phone continuation을 구현 사실과 기본 비활성 상태로 구분했다.
+- 인앱결제·구매 복원, Guest UserMerged owner 이전과 10초 Challenge는 구현 완료 기능이 아니라 후속 또는 계약 완료 상태로 명시했다.
+- 분석·문서 작업만 수행했다. Java·테스트·공개 API·BaseResponse·AI/Callback·S3·Redis·AWS·DB·Git 이력을 변경하지 않았고 Secret·Token을 기록하지 않았다.
+- 코드 변경이 없어 Gradle 테스트는 실행하지 않았다. `git diff --check`와 marker 단일 포함을 검증한다.
+
+## 2026-09-03 — Firebase 가입의 필수 휴대전화 인증 경계 정정
+
+<!-- codex-turn:01a065be-3a1a-7232-943a-525cdb081d05 -->
+
+- 날짜: 2026-09-03
+- 브랜치: `develop`
+- Jira: 신규 Jira 키는 없으며 Jira를 조회하거나 상태를 변경하지 않았다.
+- 사용자 지적에 따라 `APP_FEATURE_LOGIC_OVERVIEW.md`의 “필요하면 phone credential 연결” 표현을 “신규 MEMBER 가입 또는 Guest 승격 전에 동일 Firebase UID에 반드시 연결”로 정정했다.
+- Identity 실제 verifier는 enrollment evidence가 필요한 목적에서 linked PHONE, phoneVerified와 nonblank verifiedPhoneNumber를 모두 요구하고 하나라도 없으면 `FIREBASE_PHONE_VERIFICATION_REQUIRED`로 거절한다. signup과 Guest upgrade는 검증 번호를 정규화·fingerprint하여 PhoneIdentity와 eligibility candidate를 확정한다.
+- 필수 인증은 매 로그인마다 반복한다는 뜻이 아니다. 가입을 완료한 기존 MEMBER는 일반 exchange에서 기존 PhoneIdentity를 사용하며, phone 변경·재가입 등 새 proof가 필요한 흐름에서만 재인증한다. phone-only 로그인과 phone 기반 자동 merge는 계속 금지한다.
+- 분석·문서 정정만 수행했다. Java·테스트·공개 API·BaseResponse·AI/Callback·S3·Redis·AWS·DB·Git 이력을 변경하지 않았고 Secret·Token을 기록하지 않았다.
+- 코드 변경이 없어 Gradle 테스트는 실행하지 않았다. `git diff --check`와 marker 단일 포함을 검증한다.
+
+## 2026-09-03 — 미완료 시험의 무제한 무료 재시작 계약 정정
+
+<!-- codex-turn:01a065c7-8ab9-7af3-b50f-912a238eb6a7 -->
+
+- 날짜: 2026-09-03
+- 브랜치: `develop`
+- Jira: 관련 구현 이력은 `TMI-116`, `TMI-118`이며 이번 작업에서 Jira를 조회하거나 상태를 변경하지 않았다.
+- 사용자 지적에 따라 `APP_FEATURE_LOGIC_OVERVIEW.md`의 “단순 앱 종료는 무료 replacement의 충분조건이 아니다”라는 잘못된 설명을 확정 계약에 맞게 정정했다.
+- 앱 종료 자체는 즉시 Session을 폐기하지 않지만, 이후 사용자가 새 시험 시작을 요청했을 때 AttemptGroup이 `OPEN`이면 기존 Session을 `ABANDONED_RESTARTED` 처리하고 같은 consumption·attemptGroupId·mockExamId로 횟수·기간 제한 없는 무료 REPLACEMENT를 만든다.
+- 필수 제출을 모두 마친 `GRADING` 상태에서는 새 Session을 잠시 막고 기존 채점·Summary 복구를 우선한다. 복구가 최종 실패해 `RETAKE_AVAILABLE`이 되면 무료 REPLACEMENT를 허용하며, 필수 feedback·유효 점수와 조회 가능한 Summary가 모두 있는 `COMPLETED`에서만 다음 시험에 새 entitlement가 필요하다.
+- 재시작은 이어풀기가 아니므로 매번 새 examId·새 Idempotency-Key로 처음부터 시작하고 기존 답안·결과·업로드·Job·Summary·audio를 복사하지 않는다.
+- 변경 파일: `docs/codex/APP_FEATURE_LOGIC_OVERVIEW.md`, `docs/codex/CURRENT_STATE.md`, `docs/codex/WORKLOG.md`.
+- 애플리케이션 코드는 변경하지 않았고 공개 API·BaseResponse·AI `user_id=examId`·S3·Redis·Billing wire 계약도 변경하지 않았다.
+- 코드 변경이 없어 Gradle 테스트는 실행하지 않았다. `git diff --check`와 WORKLOG marker 단일 포함 및 항목의 EOF 위치를 검증한다.
+- commit·push·PR·merge·배포와 AWS·DB 상태 변경을 수행하지 않았고 Secret·Token을 기록하지 않았다.
+
+## 2026-09-03 — 미완료 시험 재시작의 사용자 표현 명확화
+
+<!-- codex-turn:01a065ca-3c6c-7587-832a-680c7b61ad9b -->
+
+- 날짜: 2026-09-03
+- 브랜치: `develop`
+- Jira: 관련 구현 이력은 `TMI-116`, `TMI-118`이며 Jira를 조회하거나 상태를 변경하지 않았다.
+- “무제한 무료 새 시험”이 별도의 무료 응시권을 반복 지급하는 의미로 오해될 수 있어 “최초 응시에서 1회만 차감하고, 완료할 때까지 추가 차감 없이 처음부터 재시작”으로 표현을 통일했다.
+- `OPEN`과 `RETAKE_AVAILABLE`에서는 동일 consumption·AttemptGroup·mockExamId를 유지하고 새 examId의 Session으로 교체한다. `GRADING`에서는 기존 채점·Summary 복구를 우선하며 `COMPLETED` 이후에만 다음 entitlement가 필요하다.
+- 애플리케이션 로직과 공개 API·BaseResponse·AI·S3·Redis·Billing wire 계약은 변경하지 않았다.
+- 변경 파일은 `docs/codex/APP_FEATURE_LOGIC_OVERVIEW.md`, `docs/codex/CURRENT_STATE.md`, `docs/codex/WORKLOG.md`이며 코드 변경이 없어 Gradle 테스트는 실행하지 않았다.
+- `git diff --check`, marker 단일 포함과 WORKLOG 항목의 EOF 위치를 검증한다.
+
+## 2026-09-03 — 미완료 시험 재시작 표현 정정 종료 훅 동기화
+
+<!-- codex-turn:01a065ca-6e51-7e61-b821-8720bbbe55f7 -->
+
+- 날짜: 2026-09-03
+- 브랜치: `develop`
+- Jira: 관련 구현 이력은 `TMI-116`, `TMI-118`이며 Jira를 조회하거나 상태를 변경하지 않았다.
+- 이번 턴에 확정한 사용자 표현은 “최초 응시에서 1회만 차감하고, 완료할 때까지 추가 차감 없이 처음부터 재시작”이다.
+- 새로운 무료 응시권을 반복 지급하는 의미가 아니며, `OPEN` 또는 `RETAKE_AVAILABLE`인 동일 consumption·AttemptGroup·mockExamId에 새 examId의 Session을 연결한다.
+- `GRADING`에서는 기존 채점·Summary 복구를 우선하고 `COMPLETED` 이후에만 다음 entitlement가 필요하다는 경계는 유지한다.
+- 종료 훅 기록 동기화만 수행했으며 애플리케이션 코드, 공개 API, BaseResponse, AI·S3·Redis·Billing wire 계약은 변경하지 않았다.
+- Secret·Token을 기록하지 않았고 commit·push·PR·merge·배포와 AWS·DB 상태 변경을 수행하지 않았다.
+
+## 2026-09-03 — 1차 업데이트 진행 체크리스트 최신화
+
+<!-- codex-turn:01a065ca-ef74-7e21-84d4-e6e250c5c756 -->
+
+- 날짜: 2026-09-03
+- 브랜치: Learning Core·Identity·Billing 모두 `develop`; Identity에는 `TMI-123` 관련 미커밋 구현 작업이 존재한다.
+- Jira: Identity `TMI-109`·`TMI-111`·`TMI-114`·`TMI-123`, Billing `TMI-110`·`TMI-112`·`TMI-113`·`TMI-115`·`TMI-117`·`TMI-120`, Learning Core `TMI-116`·`TMI-118`·`TMI-122`, Challenge `TMI-102`·`TMI-105`·`TMI-106`을 현재 상태 근거로 사용했다. Jira를 조회하거나 변경하지 않았다.
+- 작업 목표: 세 저장소의 최신 merge commit, 구현 파일, 작업 트리와 최근 Jira·테스트 기록을 대조해 `docs/codex/FIRST_UPDATE_PROGRESS_CHECKLIST.md`의 완료·진행·미착수·출시 차단 판정을 2026-09-03 기준으로 갱신한다.
+- 변경 파일: `docs/codex/FIRST_UPDATE_PROGRESS_CHECKLIST.md`, `docs/codex/CURRENT_STATE.md`, `docs/codex/WORKLOG.md`. 애플리케이션 코드, Identity·Billing 저장소, Jira, AWS와 DB는 이번 점검에서 변경하지 않았다.
+- 최신 완료 반영: Learning Core `TMI-118` outbox/publisher와 Summary Transaction hotfix는 PR #25·#26 및 444개 테스트·Jira 완료, Billing `TMI-120` owner rebind/continuation은 PR #6~#8 병합, Learning Core `TMI-122` phone continuation은 PR #27·457개 테스트와 `develop` 병합으로 반영했다.
+- 현재 판정: 무료시험의 reserve→Session commit→confirm, GRADING/COMPLETED/RETAKE_AVAILABLE 전달, 추가 차감 없는 실패 재시작과 phone 재가입 target Session 생성 코드는 양쪽 서버에 대부분 존재한다. Identity `TMI-123` fan-out/SigV4는 작업 트리 구현 진행 중이며 완료·병합 전이고 Learning Core `UserMerged`, 실제 Lattice·Mongo·staging 검증과 Challenge backend는 남아 있어 production 출시는 차단 상태다.
+- 유지한 외부 계약: 기존 공개 API URL·Method·Request/Response·`BaseResponse`, 실제 userId 비노출, 기존 시험 retryCount·S3·Redis와 Python AI request/Callback `user_id=examId` 계약을 변경하지 않았다. Secret과 Token을 기록하지 않았다.
+- 테스트·검증: 이번 작업은 문서 상태 점검이므로 Gradle 테스트를 실행하지 않았다. 세 저장소의 현재 branch·commit·구현 및 최근 테스트 기록을 읽기 전용으로 확인했고 종료 전에 링크·trailing whitespace·marker 단일 포함과 `git diff --check`를 검증한다.
+- 남은 위험·배포 전 확인: `TMI-123` 구현·테스트·병합, Billing `TMI-120` replica-set Testcontainers 4개, Learning Core `UserMerged`, 환경별 Mongo migration·Lattice/IAM/SG·multi-instance·response-loss E2E, 모바일 SNS와 Challenge 종단 검증 전에는 관련 feature flag를 활성화하지 않는다.
+- 예상 밖 diff: Learning Core에는 이번 작업 전부터 `docs/codex/APP_FEATURE_LOGIC_OVERVIEW.md` 미추적 파일과 기존 CURRENT_STATE/WORKLOG 변경이 있었고, Identity에는 `TMI-123` 애플리케이션·설정·테스트·신규 파일 작업이 진행 중이며, Billing에는 기존 기록·계약 작업이 있었다. 모두 보존하고 수정하지 않았다.
+- 다음 작업: Identity `TMI-123`을 먼저 완료·병합하고 Billing `TMI-120` replica-set 검증과 Jira 상태를 정리한 뒤 Learning Core `UserMerged`, cross-service staging E2E, Challenge backend 순으로 진행한다. Git commit과 push는 사용자가 수행한다.
+
+## 2026-09-03 — 미제출 시험의 AttemptGroup 상태 경로 명확화
+
+<!-- codex-turn:01a065ce-2e2f-79c3-9a9c-e246b49315de -->
+
+- 날짜: 2026-09-03
+- 브랜치: `develop`
+- Jira: 관련 구현 이력은 `TMI-116`, `TMI-118`이며 Jira를 조회하거나 상태를 변경하지 않았다.
+- 사용자 질문에 따라 AttemptGroup 상태표에 `OPEN`을 추가하고 미제출 중단과 채점 실패의 상태 전이를 구분했다.
+- 필수 retry 0 제출이 모두 접수되지 않은 시험은 `GRADING`에 진입하지 않고 `OPEN`에 남는다. 다시 시작하면 `OPEN → OPEN` Session 교체로 기존 Session을 `ABANDONED_RESTARTED` 처리하고 추가 차감 없이 새 examId로 처음부터 시작한다.
+- 모든 필수 제출과 durable Question Job이 확인된 뒤에만 `OPEN → GRADING`으로 전환한다. 그 뒤 채점 retry 소진, Summary 복구 불가 또는 deadline 초과 시 `RETAKE_AVAILABLE`로 전환한다.
+- 데이터 중복 등 자동 복구 불가능한 결과 정합성 위반은 잘못된 완료 결과를 노출하지 않기 위해 발견 시점과 무관하게 즉시 `RETAKE_AVAILABLE`로 종료할 수 있음을 함께 명시했다.
+- 변경 파일: `docs/codex/APP_FEATURE_LOGIC_OVERVIEW.md`, `docs/codex/CURRENT_STATE.md`, `docs/codex/WORKLOG.md`.
+- 애플리케이션 코드와 공개 API·BaseResponse·AI·S3·Redis·Billing wire 계약은 변경하지 않았고 코드 변경이 없어 Gradle 테스트는 실행하지 않았다.
+- Secret·Token을 기록하지 않았으며 commit·push·PR·merge·배포와 AWS·DB 상태 변경을 수행하지 않았다.
+
+## 2026-09-03 — Learning Core UserMerged consumer 역할 설명
+
+<!-- codex-turn:01a065d0-73d1-7082-be36-7086589870a3 -->
+
+- 날짜: 2026-09-03
+- 브랜치: `develop`
+- Jira: Learning Core 전용 이슈 키는 아직 없으며, 선행 Identity 발행·fan-out 작업은 `TMI-123`이다.
+- 사용자 요청: 앞으로 구현할 Learning Core `UserMerged` consumer가 필요한 이유와 동작 범위를 쉽게 설명한다.
+- 확인 결과: consumer는 Identity가 Guest source를 MEMBER target으로 최종 병합한 뒤 보내는 schema v1 event를 받아 source의 학습 데이터 소유권과 API actor 권한을 target으로 안전하게 수렴시키는 내부 기능이다.
+- 핵심 처리: 한 Mongo Transaction에서 source/target ownership guard를 함께 획득하고, 활성 시험 충돌 정책을 적용하며, `exam_sessions`, `exam_results`, `exam_summaries`의 직접 `userId`를 target으로 이전하고 source guard를 `MERGED`로 차단한 뒤 inbox event를 `PROCESSED`로 기록한다.
+- 유지 범위: `examId`는 변경하지 않으며 Question/Summary Job, Azure/SpeechAce 결과, Redis key와 S3 object는 `examId` 간접 귀속이므로 이동하지 않는다. 기존 공개 API·`BaseResponse`, `retryCount`, S3·Redis와 Python AI `user_id=examId` 계약도 유지한다.
+- 활성 시험 정책: target 활성 시험이 있으면 target을 우선하고 source 활성은 폐기 이력으로 이전한다. target 활성 없이 source만 활성이라면 같은 `examId`를 유지한 채 target 소유로 넘긴다. 완료·폐기 이력은 합집합으로 보존한다.
+- 동시성·멱등성: 모든 user-owned write와 Callback이 ownership guard를 같은 Transaction에서 touch해야 merge와 경합해도 source 또는 target 한쪽으로 일관되게 수렴한다. 같은 eventId·같은 payload 재전송은 `204` no-op, 상충 event는 `409`, 일시적 DB 경합은 `503`으로 처리하는 계획이다.
+- 보안: 사용자 Access Token과 분리된 workload JWT/JWKS로 internal endpoint를 보호하며, source 계정의 기존 사용자 Token은 merge commit 이후 Learning Core API에서 거절한다. merge 전에 발급된 S3 PUT URL은 v1 정책상 최대 5분 잔여 가능성을 수용한다.
+- 선행 조건: Identity `TMI-123` 발행·consumer별 fan-out 완료, workload issuer/JWKS/audience/principal 운영값 확정, Mongo Transaction 지원·성능 gate, guard backfill·구버전 writer drain과 staging E2E가 필요하다. 별도 Learning Core Jira를 만든 뒤 구현하는 것이 다음 단계다.
+- 변경 파일: 설명 기록을 위해 `docs/codex/CURRENT_STATE.md`, `docs/codex/WORKLOG.md`만 갱신했다. 애플리케이션 코드·설정·테스트, Jira, AWS와 DB는 변경하지 않았다.
+- 테스트·검증: 코드 변경이 없어 Gradle 테스트는 실행하지 않았으며 문서 diff와 marker 단일 포함을 검증한다. Secret·Token을 기록하지 않았고 git commit·push·PR·merge·배포를 수행하지 않았다.
+
+## 2026-09-03 — TMI-125 Learning Core UserMerged consumer Jira 생성
+
+<!-- codex-turn:01a065d6-1077-7d51-987a-e04c8676bc02 -->
+
+- 날짜: 2026-09-03
+- 브랜치: `develop`
+- Jira: `TMI-125` `[Learning Core] UserMerged consumer 및 ownership migration 구현`
+- 사용자 요청: 확정된 Learning Core `UserMerged` consumer 계획을 구현 작업으로 관리할 Jira를 생성한다.
+- 생성 결과: TMI 프로젝트에 `작업` 유형, `해야 할 일`, Medium 우선순위, 미할당 상태로 `TMI-125`를 생성했고 보드와 생성 성공 알림에서 이슈 키·제목·상태를 확인했다.
+- 이슈 범위: Identity `TMI-123`을 선행 작업으로 명시하고 internal endpoint, schema 검증, 4 KiB body 제한, inbox 멱등성, source/target ownership guard, Mongo Transaction owner migration, 활성 시험 충돌 정책, user-owned writer·Callback guard 전환과 workload JWT 보안을 기록했다.
+- 완료 기준: duplicate/conflict/status 계약, Transaction rollback·unknown commit 수렴, writer·Callback 경합, target 우선·source-only 이전·history 합집합, source actor 차단, 공개 API·AI·S3·Redis 계약 불변과 전체 Gradle 테스트를 포함했다.
+- 배포 gate: Identity publisher/fan-out과 workload 계약, Mongo Transaction·index, guard-aware writer 선배포, 구버전 drain·backfill, direct Transaction 성능과 staging E2E 전에는 consumer flag를 활성화하지 않도록 기록했다.
+- 제외 범위: Identity·Billing 서버 수정, phone continuation 변경, 공개 API·DTO·AI·S3·Redis 계약 변경, Presigned URL 즉시 취소, Kafka/SQS, AWS 배포와 Git commit·push를 포함하지 않았다.
+- 변경 파일: `docs/codex/USER_MERGED_CONSUMER_IMPLEMENTATION_PLAN.md`, `docs/codex/USER_MERGED_CONTRACT_DECISIONS.md`, `docs/codex/CURRENT_STATE.md`, `docs/codex/WORKLOG.md`. 애플리케이션 코드·설정·테스트는 변경하지 않았다.
+- 테스트·검증: 코드 변경이 없어 Gradle 테스트는 실행하지 않았다. Jira 생성 결과, 문서 Jira 키, `git diff --check`와 marker 단일 포함을 검증한다.
+- Git·배포: commit·push·PR·merge·배포와 AWS·DB 상태 변경을 수행하지 않았고 Secret·Token을 기록하지 않았다.
+
+## 2026-09-03 — TMI-125 선행 조건 상세 확인
+
+- 날짜: 2026-09-03
+- 브랜치: Learning Core `develop`; Identity `feat/TMI-123-owner-event-fanout-sigv4`
+- Jira: Learning Core `TMI-125`, 선행 Identity `TMI-123`
+- 사용자 질문: Identity 발행·fan-out, workload JWT 운영값과 Mongo Transaction 지원에서 구체적으로 무엇을 확인해야 하는지 설명한다.
+- TMI-123 현재 상태: Jira 보드에서는 `해야 할 일`이고 Identity 로컬 브랜치에는 owner event core/delivery/publisher와 관련 설정·테스트가 미커밋 상태로 존재한다. 따라서 구현 방향은 보이지만 전체 테스트·commit·PR merge·환경 배포가 확인될 때까지 선행 완료로 간주할 수 없다.
+- fan-out 확인 기준: `UserMerged` 한 core에서 BILLING과 LEARNING_CORE delivery가 각각 독립 생성되고 consumer별 lease·retry·dead-letter·성공 상태가 분리돼야 한다. `TrialOwnerRebindApproved`는 Billing에만 가야 하며 legacy와 신규 capture가 한 merge에서 중복 생성되면 안 된다.
+- wire 불일치: Identity 로컬 `LearningCoreOwnerEventDeliveryAdapter`는 exact path `/internal/v1/owners/merge/events`를 요구하지만 현재 TMI-125 계획은 `/internal/v1/events/user-merged`다. 구현 전에 한 경로로 계약과 양쪽 테스트를 고정해야 한다.
+- JWT 불일치: Identity의 기존 `JwtWorkloadIdentityCredentialProvider`는 `WorkloadJwtProperties`의 단일 audience `learning-core-user-withdrawn`만 발급하도록 고정돼 있다. UserMerged 전용 audience를 쓰려면 임의 audience가 아니라 명시적 다중 allowlist 또는 별도 credential profile로 확장해야 한다.
+- 권장 workload profile: RS256, 환경별 HTTPS workload issuer, 기존 Identity JWKS, UserMerged 전용 audience 예시 `learning-core-user-merged`, principal claim/value `sub=identity-service`, TTL `PT2M`, verifier skew `PT30S`, non-blank `kid`와 active/retiring key overlap을 양쪽에서 exact 검증한다. 실제 host와 credential은 문서에 기록하지 않는다.
+- Mongo 확인 기준: 실제 staging/prod Mongo가 standalone이 아니라 replica set 또는 transaction 가능한 sharded cluster인지 확인하고, startup rollback canary, 필수 guard/inbox/index migration, replica-set commit/rollback·duplicate·unknown commit·source/target writer 경합 테스트를 통과해야 한다.
+- 성능 기준: 현재 Identity TMI-123 owner event read timeout 기본값은 `PT3S`이므로 direct owner migration은 production 유사 이력에서 예시 P99 `2s` 이하 등 충분한 여유를 증명해야 한다. 실패하면 timeout만 늘리지 않고 durable inbox + worker 계약으로 재결정한다.
+- 기존 기반: Learning Core에는 Billing saga, AttemptGroup와 UserWithdrawn에서 `MongoTransactionManager`, `TransactionTemplate`과 staging/prod rollback capability probe를 사용하는 구현이 이미 있어 기술 기반은 존재한다. 다만 이것이 UserMerged 전체 migration의 실제 topology·성능 증명을 대신하지 않는다.
+- 변경 파일: 분석 기록을 위해 `docs/codex/CURRENT_STATE.md`, `docs/codex/WORKLOG.md`만 갱신했다. 애플리케이션 코드·설정·테스트, Identity 작업 트리, Jira, AWS와 DB는 변경하지 않았다.
+- 테스트·검증: 코드 변경이 없어 Gradle 테스트는 실행하지 않았다. 로컬 양 저장소의 branch·worktree·설정·publisher·JWT provider·Transaction probe를 읽기 전용으로 대조하고 문서 `git diff --check`를 수행한다. Secret·Token을 기록하지 않았다.
+
+## 2026-09-03 — TMI-125 선행 조건 검토 종료 훅 동기화
+
+<!-- codex-turn:01a065d8-7cd8-7012-9cfc-4e3c51c85c88 -->
+
+- 날짜: 2026-09-03
+- 브랜치: Learning Core `develop`; Identity `feat/TMI-123-owner-event-fanout-sigv4`
+- Jira: Learning Core `TMI-125`, 선행 Identity `TMI-123`
+- 종료 훅에 따라 이번 turn의 상세 검토 결과가 이미 기록됐음을 확인하고 current marker를 포함한 동기화 항목을 WORKLOG 끝에 추가했다.
+- 핵심 결론: Identity `TMI-123`은 아직 미커밋·미병합 상태이며, `/internal/v1/owners/merge/events`와 `/internal/v1/events/user-merged` 경로 불일치 및 단일 `learning-core-user-withdrawn` audience 발급 제한을 먼저 해결해야 한다.
+- Mongo gate: 실제 staging/prod replica set 또는 transaction 가능한 sharded topology, rollback canary, 필수 index, unknown commit·동시성 통합 테스트와 현재 Identity 3초 read timeout 대비 direct migration P99 증빙이 필요하다.
+- 변경 범위: 기록용 `docs/codex/CURRENT_STATE.md`, `docs/codex/WORKLOG.md`만 갱신했다. 애플리케이션 코드·설정·테스트, Identity 작업 트리, Jira, AWS와 DB는 변경하지 않았다.
+- 테스트: 코드 변경이 없어 Gradle 테스트는 실행하지 않았으며 `git diff --check`와 marker 단일 포함을 검증한다. Secret·Token을 기록하지 않았다.
+
+## 2026-09-03 — TMI-123 Identity 전달 내용 정리
+
+<!-- codex-turn:01a065de-3967-7893-81b8-1dc20d32ad23 -->
+
+- 날짜: 2026-09-03
+- 브랜치: Learning Core `develop`
+- Jira: Learning Core `TMI-125`, 선행 Identity `TMI-123`
+- 사용자 요청: Learning Core UserMerged consumer 구현 전에 Identity 팀에 전달해야 할 수정·확인사항을 복사 가능한 인계 문구로 정리한다.
+- 책임 분리: Identity에는 owner event fan-out, exact endpoint·wire, workload JWT 발급 profile과 publisher retry·flag를 요청한다. staging/prod Mongo topology·Transaction rollback·동시성·migration P99는 Learning Core·인프라 책임으로 Identity 요청에서 제외한다.
+- endpoint 요청: Identity 로컬 구현의 `/internal/v1/owners/merge/events`를 Learning Core 확정 경로 `/internal/v1/events/user-merged`로 통일하고 query·fragment·redirect 없는 HTTPS exact endpoint만 허용한다.
+- JWT 요청: UserMerged 전용 audience `learning-core-user-merged`를 도입하고 기존 단일 `learning-core-user-withdrawn` 제한을 목적별 별도 profile 또는 고정 allowlist로 확장한다. 호출자가 임의 audience를 선택하게 하지 않는다.
+- 공통 profile: RS256, 환경별 HTTPS workload issuer, Identity JWKS, `sub=identity-service`, TTL `PT2M`, verifier skew `PT30S`, `typ=JWT`, non-blank `kid`, 전달마다 새 `jti`와 multi-key rotation overlap을 유지한다. 실제 host·key·credential은 문서에 기록하지 않는다.
+- fan-out 요청: `UserMerged`는 BILLING·LEARNING_CORE 독립 delivery 두 건, `TrialOwnerRebindApproved`는 BILLING 한 건만 생성하고, consumer별 lease·retry·dead-letter·retention·circuit을 분리한다. legacy/new capture 이중 생성은 금지한다.
+- transport 경계: Billing owner event는 VPC Lattice SigV4, Learning Core UserMerged는 별도 변경 승인 전 Bearer workload JWT를 유지하고 사용자 Access Token을 재사용하지 않는다.
+- 완료 증빙: TMI-123 전체 테스트, exact payload/route/audience negative test, duplicate·응답 유실·consumer 한쪽 장애 테스트, feature flag 기본 off, develop merge commit과 staging 배포 가능 설정을 Identity에서 공유하도록 요청한다.
+- 변경 파일: 전달 내용 기록을 위해 `docs/codex/CURRENT_STATE.md`, `docs/codex/WORKLOG.md`만 갱신했다. 애플리케이션 코드·설정·테스트, Identity 저장소, Jira, AWS와 DB는 변경하지 않았다.
+- 테스트·검증: 코드 변경이 없어 Gradle 테스트는 실행하지 않았으며 `git diff --check`와 marker 단일 포함을 검증한다. Secret·Token을 기록하지 않았다.
+
+## 2026-09-03 — TMI-123 UserMerged 후속 구현 검토
+
+<!-- codex-turn:01a065f8-cfc7-7a90-b49f-ecb90e3a778a -->
+
+- 날짜: 2026-09-03
+- 브랜치: Learning Core `develop`; Identity 로컬 `feat/TMI-123-owner-event-fanout-sigv4`
+- Jira: 선행 Identity `TMI-123`, 관련 Learning Core `TMI-125`
+- 사용자 요청: Identity에 전달한 Learning Core UserMerged endpoint·workload audience·fan-out 후속 요구가 구현됐는지 확인한다.
+- Jira 확인: TMI-123 설명에는 TMI-125 후속 보완으로 exact `/internal/v1/events/user-merged`, typed purpose, `learning-core-user-merged`, HTTP 415, legacy drain과 추가 완료 테스트가 반영돼 있다. 상태는 `해야 할 일`이다.
+- 코드 확인: 신규 OwnerEvent와 legacy UserMerged adapter가 exact HTTPS endpoint와 `USER_MERGED` purpose를 사용한다. UserWithdrawn은 `USER_WITHDRAWN` purpose를 유지하고, 단일 provider가 enum의 고정 audience만 발급해 raw audience 환경변수와 임의 입력을 제거했다.
+- JWT 확인: RS256, environment workload issuer, `sub=identity-service`, `iat=nbf`, TTL `PT2M`, 요청별 UUID jti, JWT typ·kid와 민감 claim 부재 계약이 유지된다.
+- fan-out·오류: UserMerged의 BILLING·LEARNING_CORE 독립 delivery와 TrialOwnerRebindApproved BILLING-only shape가 유지된다. Billing 성공과 Learning Core 5xx는 독립 완료·retry로 수렴하며 415는 contract dead-letter에 추가됐다.
+- 테스트: Identity에서 `./gradlew clean test`를 실행해 총 630개가 실패·오류·건너뜀 없이 성공했다. `git diff --check`도 성공했다. 최초 sandbox cache lock 실패는 테스트 실행 전 발생했고 승인된 재실행은 성공했다.
+- 발견사항: `OwnerEventCoreTests.retrySerializationKeepsTheSameEventIdAndPayload`는 같은 event 객체를 두 번 직렬화해 비교할 뿐 첫 publish 실패→재예약→재claim→두 번째 전송을 실행하지 않는다. 기능 구현상 같은 core를 재조회해 deterministic mapper로 보내므로 즉시 확인된 결함은 없지만, Jira의 실제 재전송 완료 조건을 증명하는 publisher-level test로 보강해야 한다.
+- 병합 상태: 원 TMI-123은 Identity PR #37 merge commit `391b55f`로 develop에 병합됐다. 이번 TMI-125 연동 후속 변경은 로컬 feature branch에 미커밋·미추적 상태이고 연결된 원격 브랜치는 삭제돼 아직 develop에 반영되지 않았다.
+- 변경 파일: 이번 검토에서 애플리케이션·설정·테스트 코드는 수정하지 않았다. 기록용 Identity·Learning Core의 `docs/codex/CURRENT_STATE.md`, `docs/codex/WORKLOG.md`만 갱신했다.
+- 유지 계약: 공개 API, 사용자 JWT, UserMerged v1, Billing SigV4, TrialOwnerRebindApproved Billing-only, feature flag 기본 false와 Secret·Token 비기록을 유지했다.
+- 남은 작업: publisher-level 동일 eventId·payload retry test 보강, 사용자 주도 후속 commit·push·PR merge, workload 운영값·golden-token과 Learning Core TMI-125 Mongo/staging E2E 후 TMI-123 완료 상태를 검토한다.
+
+## 2026-09-03 — 중간 발표용 개발 예상 문제점 재작성
+
+<!-- codex-turn:01a06608-824d-7dd0-a969-c94714a0f04b -->
+
+- 날짜: 2026-09-03
+- 현재 브랜치: `develop`
+- Jira: 별도 Jira 이슈가 없는 발표 문안 작성 작업이다.
+- 사용자 요청: 개발 측면 예상 문제점을 `기능 범위 확대로 인한 일정 지연`과 `콘텐츠 품질`로 다시 작성한다.
+- 작성 결과: 기능 범위 확대는 개발·연동·검증 범위 증가로 일정이 지연될 가능성으로, 콘텐츠 품질은 AI 생성 문항·답안·피드백의 정확도와 난이도 편차로 학습 신뢰도가 낮아질 가능성으로 정리했다.
+- 해결 방향: 1차 출시 필수 기능 우선순위와 단계별 개발·범위 변경 관리를 적용하고, 콘텐츠 생성 기준·자동 유효성 검사·전문가/운영자 수동 검수·배포 후 품질 모니터링을 결합한다.
+- 변경 파일: `docs/codex/WORKLOG.md`, `docs/codex/CURRENT_STATE.md`.
+- 유지한 외부 계약: 애플리케이션 코드와 공개 API·AI Callback·S3·Redis·Billing 계약을 변경하지 않았다.
+- 테스트·결과: 코드 변경이 없는 문안 작업이라 Gradle 테스트는 실행하지 않고 `git diff --check`로 문서 형식을 확인한다.
+- 남은 위험·배포 전 확인: 발표 양식의 글자 수에 맞춰 문장 길이를 조정할 수 있으며 실제 일정 기준과 콘텐츠 검수 담당·승인 기준은 별도 확정이 필요하다.
+- 예상 밖 변경: 이번 작업 범위 밖의 파일과 기존 사용자 변경은 수정하지 않았다.
+- 다음 작업 전 확인: 발표 표에서 문제점과 해결 방안을 같은 행에 배치할지 각각 분리할지 확인한다.
+- 보안·Git: Secret·Token을 기록하지 않았고 commit·push·배포를 수행하지 않았다.
+
+## 2026-09-03 — 프론트엔드 로그인 연동 인계서 작성
+
+<!-- codex-turn:01a06614-601a-7ca0-b702-21850f4c0753 -->
+
+- 날짜: 2026-09-03
+- 브랜치: `develop`
+- Jira: Identity `TMI-109`, `TMI-111`, `TMI-114`, `TMI-123`, Learning Core `TMI-116`, `TMI-118`, `TMI-122`, Billing `TMI-120`을 구현 상태 근거로 사용했으며 Jira를 조회하거나 변경하지 않았다.
+- 작업 목표: 프론트가 로그인·회원가입·Guest 전환·Token lifecycle을 구현할 때 필요한 API 순서, 분기와 오류 처리를 현재 Identity 코드·계약 기준으로 정리한다.
+- 신규 `docs/codex/FRONTEND_LOGIN_INTEGRATION_GUIDE.md`에 Firebase ID Token과 Identity Token의 역할 분리, 앱 시작 세션 복원, Google·Apple exchange, 필수 phone link와 force refresh, Guest prepare/upgrade/merge, local login, reissue single-flight, logout과 오류별 UX를 기록했다.
+- Firebase와 provider flag 기본 off, legacy password/Firebase 동시 운영 주의, Guest merge의 downstream owner 이전·staging E2E 출시 gate를 구현 완료 사실과 구분했다.
+- 변경 파일: `docs/codex/FRONTEND_LOGIN_INTEGRATION_GUIDE.md`, `docs/codex/CURRENT_STATE.md`, `docs/codex/WORKLOG.md`.
+- 애플리케이션 코드와 공개 API·BaseResponse·JWT·AI·S3·Redis·Billing wire 계약은 변경하지 않았다.
+- 코드 변경이 없는 문서 작업이므로 Gradle 테스트는 실행하지 않았다. `git diff --check`, marker 단일 포함과 WORKLOG 항목 EOF 위치를 검증한다.
+- Secret·Token·비밀번호·개인정보를 기록하지 않았고 commit·push·PR·merge·배포와 AWS·DB 상태 변경을 수행하지 않았다.
+
+## 2026-09-03 — 로그인 제외 프론트 1차 업데이트 인계서 작성
+
+<!-- codex-turn:01a0664d-8b70-7e10-bfe8-e1a55305ce16 -->
+
+- 날짜: 2026-09-03
+- 브랜치: `develop`
+- Jira: Learning Core `TMI-116`, `TMI-118`, `TMI-122`와 Billing `TMI-120`을 구현 상태 근거로 사용했으며 Jira를 조회하거나 변경하지 않았다.
+- 작업 목표: 로그인 내용을 제외하고 시험 Session 생성 변경을 중심으로 프론트가 반영해야 할 1차 업데이트 계약과 상태·오류 처리를 정리한다.
+- 신규 `docs/codex/FRONTEND_NON_LOGIN_UPDATE_GUIDE.md`에 시험 시작별 lowercase UUID v4 `Idempotency-Key`, same-key transport retry, 생성 오류별 key 유지/폐기, 중복 시작 방지와 성공 응답 불변을 기록했다.
+- 최초 1회 권리 확정 뒤 `OPEN`·`GRADING`·`RETAKE_AVAILABLE`·`COMPLETED` 상태에 따른 추가 차감 없는 처음부터 재시작, grading retry·Summary 완료 gate, 폐기 Session 처리도 정리했다.
+- 기존 S3 raw audio PUT·submit·polling, Part 4 `tableContext`, phone 재가입 continuation, Billing 내부 API 금지와 결제·Challenge·Guest UserMerged의 미완료 출시 경계를 포함했다.
+- 변경 파일: `docs/codex/FRONTEND_NON_LOGIN_UPDATE_GUIDE.md`, `docs/codex/CURRENT_STATE.md`, `docs/codex/WORKLOG.md`.
+- 애플리케이션 코드와 기존 공개 API URL·Method·Request Body·성공 DTO·BaseResponse·AI·S3·Redis·Billing wire 계약은 변경하지 않았다.
+- 코드 변경이 없는 문서 작업이므로 Gradle 테스트는 실행하지 않았다. `git diff --check`, marker 단일 포함과 WORKLOG 항목 EOF 위치를 검증한다.
+- Secret·Token·비밀번호·개인정보를 기록하지 않았고 commit·push·PR·merge·배포와 AWS·DB 상태 변경을 수행하지 않았다.
+
+## 2026-09-04 — Identity TMI-123 병합·Jira 완료 확인 및 다음 작업 점검
+
+<!-- codex-turn:01a069f8-df1d-7a70-a88a-a769d36f7491 -->
+
+- 날짜: 2026-09-04
+- 브랜치: Learning Core `develop`; Identity `develop`.
+- Jira: 완료된 Identity `TMI-123`, 다음 작업 Learning Core `TMI-125`.
+- 작업 목표: 사용자가 병합·완료 처리한 TMI-123의 실제 저장소와 Jira 상태를 확인하고 다음 개발 작업을 확정한다.
+- 병합 확인: Identity의 `HEAD`, `develop`, `origin/develop`은 PR #38 merge commit `fa9843e`로 일치하며 후속 구현 commit `1110b8a`를 포함한다. 애플리케이션 변경은 병합됐고 Identity 작업 트리의 남은 변경은 기록 문서뿐이다.
+- 구현 확인: exact `POST /internal/v1/events/user-merged`, typed `USER_MERGED` purpose와 `learning-core-user-merged` audience, UserMerged Billing·Learning Core 독립 delivery, TrialOwnerRebindApproved Billing-only와 HTTP 415 contract dead-letter 분류가 최종 계약에 반영됐다.
+- Jira 확인: 브라우저 재조회에서 TMI-123 상태 `완료`, Resolution `완료`, 완료 댓글과 해결 시각을 확인했다. 이번 turn에서는 Jira를 변경하지 않았다.
+- 테스트 결과: 병합 전 Identity `./gradlew clean test` 결과 총 630개가 실패·오류·건너뜀 없이 통과한 증빙을 확인했다. 이번 상태 확인에서는 Gradle 테스트를 다시 실행하지 않았다.
+- 다음 작업: 현재 Jira `해야 할 일`인 TMI-125에서 Learning Core UserMerged consumer, source/target ownership guard, Session·Result·Summary owner migration, inbox 멱등성, workload JWT verifier와 Mongo Transaction 경합 수렴을 구현한다.
+- 유지한 외부 계약: 공개 API·DTO·`BaseResponse`, AI `user_id=examId`, 기존 S3·Redis key와 phone continuation·Billing 계약을 변경하지 않았다.
+- 남은 위험·배포 전 확인: Identity publisher의 실제 실패→재claim→재전송 동일 eventId·payload 테스트 보강, workload issuer/JWKS와 환경별 key 운영값, Mongo replica-set Transaction·index·P99 및 cross-service staging E2E가 필요하다. feature flag는 검증 전까지 기본 OFF를 유지한다.
+- 변경 파일: `docs/codex/CURRENT_STATE.md`, `docs/codex/WORKLOG.md`만 갱신했다. 기존 사용자 변경과 다른 문서는 수정하지 않았다.
+- 보안·Git: Secret·Token을 기록하지 않았고 commit·push·배포를 수행하지 않았다.
+
+## 2026-09-04 — TMI-125 UserMerged 구현 계획 최신 코드 재검토
+
+<!-- codex-turn:01a06a19-f55e-7c23-861b-94f191d8e946 -->
+
+- 날짜: 2026-09-04
+- 브랜치: Learning Core `develop`; 비교 대상 Identity `develop`과 Billing 로컬 계약 문서.
+- Jira: `TMI-125` `[Learning Core] UserMerged consumer 및 ownership migration 구현`; 선행 Identity `TMI-123`은 완료 상태다.
+- 작업 목표: 2026-08-20 작성된 UserMerged 구현 계획과 결정서를 이후 병합된 Identity·Billing·Learning Core 코드에 다시 대조해 구현 착수 가능 여부를 판정한다.
+- 결론: source/target ownership guard, direct Mongo Transaction, target 활성 우선, Session·Result·Summary owner migration, inbox 멱등성과 204/409/503 계약의 기본 방향은 유효하다. 다만 신규 Billing saga·AttemptGroup 코드와 최종 workload 계약이 반영되지 않아 현재 문서는 구현 기준으로 바로 사용할 수 없고 먼저 개정해야 한다.
+- 누락된 직접 userId: `exam_creation_operations`와 `attempt_group_event_outbox`가 현재 코드에 추가됐지만 계획의 세 컬렉션 inventory에는 없다. 전자는 active reserve/confirm/status saga와 결합되고 후자는 canonical payload·digest를 가진 immutable delivery snapshot이라 일반 owner rewrite에 포함하면 안 된다.
+- 권장 수렴: source 또는 target에 non-terminal `ExamCreationOperation`이 있으면 operation/userId를 rewrite하지 않고 merge consumer가 `503`과 bounded `Retry-After`로 재시도하게 해 saga가 terminal이 된 뒤 migration한다. 이미 생성된 AttemptGroup outbox는 userId·canonical payload·digest를 바꾸지 않고 Billing TMI-120의 exact legacy-source fence로 전송하며, migration 이후 새 event만 target owner로 생성한다. 이 정책은 계획서에 명시하고 경합 테스트로 고정해야 한다.
+- writer/Transaction gap: 계획의 writer 목록에는 `BillingExamCreationSaga`, `BillingExamCreationTransactionService`, `AttemptGroupStateCoordinator`, `AttemptGroupSummaryCompletionService`, reconciler/backfill/outbox store가 빠져 있다. guard touch가 각 기존 Mongo Transaction에 실제 참여하도록 설계하고 서로 다른 feature `TransactionTemplate`을 중첩하지 않는 규칙 및 billing+attempt-group+user-merged 동시 flag context test가 필요하다.
+- workload 최신값: Identity 구현은 RS256, 환경별 workload issuer, 기존 Identity signing/JWKS, `aud=learning-core-user-merged`, `sub=identity-service`, `iat=nbf`, `exp=iat+PT2M`, 요청별 UUID `jti`, `typ=JWT`, `kid`다. `service` claim은 의도적으로 없다. 따라서 Learning Core principal allowlist는 `sub=identity-service`로 고정하고 audience·algorithm·TTL을 자유 설정처럼 남기지 않아야 하며 실제 issuer/JWKS URL·환경별 key/rotation만 배포 gate로 남긴다.
+- timeout 최신값: 신규 owner-event publisher는 connect `PT1S`, read `PT3S`다. 계획·결정서의 5초 전제와 최대 HTTP 5초 기준은 낡았으므로 3초 안에 충분한 여유가 남도록 P99/hard-limit을 다시 합의해야 한다.
+- security gap: 현재 UserWithdrawn internal chain이 이미 `@Order(1)`, 사용자/Legacy chain이 `@Order(2)`다. 계획대로 UserMerged chain을 다시 `@Order(1)`로 추가하지 말고 명시적 우선순위 또는 통합 internal chain 전략을 확정해 두 endpoint·Legacy 우회·사용자 JWT·principal 401/403을 함께 검증해야 한다. 기존 withdrawal deny와 merged guard가 동시에 존재할 때 target/source withdrawal marker 충돌도 fail-closed 정책이 필요하다.
+- governance/test gap: 현재 `AGENTS.md`의 phone/AttemptGroup 허용 범위는 Guest UserMerged를 명시적으로 제외하므로 구현 전 별도 영구 허용 절이 필요하다. 계획의 `./gradlew <mongo-transaction-integration-task>` placeholder도 실제 Gradle task와 CI 필수 실행 방식으로 확정해야 한다. Challenge는 아직 runtime이 없으므로 TMI-125에서 구현하지 않되 향후 Challenge 활성화 전에 동일 guard/migration 계약을 적용한다는 rollout gate가 필요하다.
+- 문서 정합성: Identity 인계서의 workload 표에는 여전히 TBD가 남아 있지만 병합 코드와 테스트에서 위 고정 profile이 확정됐다. Learning Core 계획과 결정서를 먼저 최신화하고 Identity 인계서도 이후 같은 값으로 동기화하는 것이 좋다.
+- 변경 파일: 검토 기록을 위해 `docs/codex/CURRENT_STATE.md`, `docs/codex/WORKLOG.md`만 변경했다. 계획서·결정서·애플리케이션·설정·테스트·Jira·Billing·Identity 코드는 변경하지 않았다.
+- 유지한 계약: 공개 API·DTO·`BaseResponse`, AI `user_id=examId`, retryCount, 기존 S3·Redis key, phone continuation과 AttemptGroup wire를 변경하지 않았다.
+- 테스트와 결과: 코드 변경 없는 계획 검토라 Gradle 테스트는 실행하지 않았다. 기록 후 `git diff --check`, marker 단일 포함과 WORKLOG EOF 위치를 확인한다.
+- 남은 작업: 사용자 승인 후 `AGENTS.md`, UserMerged 계획서와 결정서를 위 정책으로 개정하고, active creation operation 처리와 3초 성능 예산을 확정한 뒤에만 구현을 시작한다.
+- 보안·Git: Secret·Token을 기록하지 않았고 commit·push·배포를 수행하지 않았다.
+
+## 2026-09-04 — TMI-125 SecurityFilterChain 순서 설명
+
+<!-- codex-turn:01a06aae-20a6-7a21-aa79-b51bab8f2184 -->
+
+- 날짜: 2026-09-04
+- 브랜치: Learning Core `develop`.
+- Jira: `TMI-125` `[Learning Core] UserMerged consumer 및 ownership migration 구현`.
+- 작업 목표: UserMerged와 UserWithdrawn workload endpoint에 별도 `SecurityFilterChain` 순서가 필요한 이유를 쉽게 설명한다.
+- 설명: Spring Security는 숫자가 작은 `@Order`의 chain부터 matcher를 검사하고, 한 요청에 처음 매칭된 chain 하나만 적용한다. 따라서 UserMerged 요청이 일반 사용자/Legacy catch-all chain보다 먼저 전용 workload chain에 도달하도록 해야 하며, UserWithdrawn과 UserMerged가 각자의 audience decoder를 사용하도록 경계를 고정해야 한다.
+- 현재 구조: UserWithdrawn exact endpoint chain은 `@Order(1)`, 사용자 JWT와 local/test Legacy catch-all chain은 `@Order(2)`다. 계획처럼 UserMerged를 다시 `@Order(1)`로 두면 당장 반드시 실패하는 것은 아니지만 같은 우선순위의 bean 정렬에 의존하는 취약한 구성이 된다.
+- 권장안: 기존 chain을 건드리지 않고 UserMerged exact endpoint chain을 `@Order(0)`으로 추가한다. 최종 순서는 UserMerged 0 → UserWithdrawn 1 → 사용자 JWT/Legacy 2이고, 각 internal chain은 정확한 POST path만 match한다.
+- 인증 의미: UserMerged는 audience `learning-core-user-merged`, UserWithdrawn은 `learning-core-user-withdrawn`을 검사한다. signature·issuer·audience·expiry가 잘못된 credential은 인증 실패 401이고, 그 검증은 성공했지만 허용 principal인 `sub=identity-service`가 아니면 권한 실패 403이다.
+- 필수 회귀: 두 internal path가 서로의 token을 거절하는지, 사용자 Access JWT가 internal path에 들어오지 못하는지, Legacy permit-all보다 internal chain이 먼저 선택되는지, 일반 사용자 API와 callback 범위가 유지되는지 테스트한다.
+- 변경 파일: 설명 기록을 위해 `docs/codex/CURRENT_STATE.md`, `docs/codex/WORKLOG.md`만 변경했다. 애플리케이션·계획서·설정·테스트·Jira는 변경하지 않았다.
+- 테스트와 결과: 코드 변경이 없어 Gradle 테스트는 실행하지 않았다. 기록 후 `git diff --check`, marker 단일 포함과 WORKLOG EOF 위치를 확인한다.
+- 보안·Git: Secret·Token을 기록하지 않았고 commit·push·배포를 수행하지 않았다.
+
+## 2026-09-04 — TMI-125 UserMerged chain을 Order 3으로 둘 수 있는지 설명
+
+<!-- codex-turn:01a06ab0-aaab-7f30-92a8-932a11ac74c3 -->
+
+- 날짜: 2026-09-04
+- 브랜치: Learning Core `develop`.
+- Jira: `TMI-125` `[Learning Core] UserMerged consumer 및 ownership migration 구현`.
+- 작업 목표: UserMerged 전용 `SecurityFilterChain`을 `@Order(0)`이 아니라 `@Order(3)`으로 둘 수 있는지 현재 코드 기준으로 설명한다.
+- 확인 결과: 현재 `@Order(2)`의 JWT와 Legacy chain에는 `securityMatcher`가 없으며 `anyRequest`를 처리하는 catch-all이다. Spring Security는 낮은 order부터 확인하여 처음 매칭된 chain 하나만 사용하므로, UserMerged가 `@Order(3)`이면 internal 요청도 먼저 `@Order(2)`에서 처리되어 UserMerged 전용 audience decoder가 선택되지 않는다.
+- 권장안: 현 구조의 최소 변경은 UserMerged `@Order(0)`, UserWithdrawn `@Order(1)`, 일반 JWT/Legacy catch-all `@Order(2)`다. UserMerged를 `@Order(3)`으로 두려면 `@Order(2)`가 해당 internal 경로에 매칭되지 않도록 matcher 제외를 추가하는 별도 보안 재구성이 필요하다.
+- 변경 파일: 분석 기록을 위해 `docs/codex/CURRENT_STATE.md`, `docs/codex/WORKLOG.md`만 변경했다. 애플리케이션·설정·계획서·테스트·Jira는 변경하지 않았다.
+- 테스트와 결과: 코드 변경이 없어 Gradle 테스트는 실행하지 않았다. 기록 후 `git diff --check`와 marker 단일 포함을 확인한다.
+- 보안·Git: Secret·Token을 기록하지 않았고 commit·push·배포를 수행하지 않았다.
+
+## 2026-09-04 — TMI-125 SecurityFilterChain order 선택 근거 확정
+
+<!-- codex-turn:01a06ab0-ec4e-7041-8011-155db0bb29d7 -->
+
+- 날짜: 2026-09-04
+- 브랜치: Learning Core `develop`.
+- Jira: `TMI-125` `[Learning Core] UserMerged consumer 및 ownership migration 구현`.
+- 작업 목표: UserMerged chain에 `@Order(0)`을 권장하고 `@Order(3)`을 현 구조에서 권장하지 않는 근거를 확정한다.
+- 결론: 0 자체가 특별한 값은 아니다. 현재 UserWithdrawn exact chain이 1이고 일반 JWT/Legacy catch-all이 2이므로, 2보다 먼저 평가되면서 1과 중복되지 않는 최소 변경 값이 0이다.
+- Order 3 영향: UserMerged 요청은 3에 도달하기 전에 `securityMatcher`가 없는 Order 2 catch-all에서 처리된다. JWT 모드에서는 잘못된 사용자 decoder가 적용되고 Legacy 모드에서는 internal endpoint가 permit-all로 열릴 수 있다.
+- 대안: Order 3을 사용하려면 Order 2 matcher에서 internal path를 확실히 제외하도록 전체 보안 경계를 함께 재구성해야 한다. 현재는 exact matcher를 가진 UserMerged 0 → UserWithdrawn 1 → catch-all 2가 더 단순하고 안전하다.
+- 변경 파일: `docs/codex/CURRENT_STATE.md`, `docs/codex/WORKLOG.md`만 갱신했다. 애플리케이션·보안 설정·테스트·Jira는 변경하지 않았다.
+- 유지한 계약: 공개 API·DTO·`BaseResponse`, AI, S3·Redis와 기존 internal endpoint 계약을 변경하지 않았다.
+- 테스트와 결과: 코드 변경이 없는 설명 작업이라 Gradle 테스트는 실행하지 않았다. `git diff --check`, marker 단일 포함과 WORKLOG EOF 위치를 확인한다.
+- 보안·Git: Secret·Token을 기록하지 않았고 commit·push·배포를 수행하지 않았다.
+
+## 2026-09-04 — TMI-125 `@Order` 동작 설명
+
+<!-- codex-turn:01a06ab4-8b03-7da1-883f-5d263d699a8b -->
+
+- 날짜: 2026-09-04
+- 브랜치: Learning Core `develop`.
+- Jira: `TMI-125` `[Learning Core] UserMerged consumer 및 ownership migration 구현`.
+- 작업 목표: Spring의 `@Order()`가 무엇이며 여러 `SecurityFilterChain`에서 어떻게 작동하는지 설명한다.
+- 설명: `@Order(n)`는 여러 후보 bean의 검사 우선순위를 나타내고 숫자가 작을수록 우선한다. SecurityFilterChain에서는 요청을 낮은 order부터 matcher와 대조하여 처음 맞는 chain 하나만 적용하고 나머지는 검사하지 않는다.
+- 현재 적용: UserMerged exact chain 0, UserWithdrawn exact chain 1, 일반 JWT/Legacy catch-all 2 순으로 구성하면 internal 요청은 각 전용 decoder를 사용하고 나머지 요청만 catch-all로 전달된다.
+- 주의: `@Order`는 API 실행 순서나 Controller 호출 순서를 정하는 값이 아니며, 같은 숫자를 여러 chain에 주면 상대 순서가 명확하지 않다.
+- 변경 파일: `docs/codex/CURRENT_STATE.md`, `docs/codex/WORKLOG.md`만 갱신했다. 애플리케이션·보안 설정·테스트·Jira는 변경하지 않았다.
+- 유지한 계약: 공개 API·DTO·`BaseResponse`, AI, S3·Redis와 기존 internal endpoint 계약을 변경하지 않았다.
+- 테스트와 결과: 코드 변경이 없는 설명 작업이라 Gradle 테스트는 실행하지 않았다. `git diff --check`, marker 단일 포함과 WORKLOG EOF 위치를 확인한다.
+- 보안·Git: Secret·Token을 기록하지 않았고 commit·push·배포를 수행하지 않았다.
+
+## 2026-09-04 — TMI-125 여러 SecurityFilterChain 구성 설명
+
+<!-- codex-turn:01a06ab5-989e-7ee3-acea-226505566ff7 -->
+
+- 날짜: 2026-09-04
+- 브랜치: Learning Core `develop`.
+- Jira: `TMI-125` `[Learning Core] UserMerged consumer 및 ownership migration 구현`.
+- 작업 목표: Spring에서 “같은 종류의 구성요소가 여러 개”라는 표현을 현재 보안 코드에 맞춰 쉽게 설명한다.
+- 설명: 현재 애플리케이션은 요청 전체에 보안 규칙 하나만 두는 대신 UserMerged, UserWithdrawn, 일반 사용자 API용 `SecurityFilterChain` bean을 각각 등록한다. 이들은 모두 같은 타입이지만 담당 경로와 JWT 검증 규칙이 서로 다른 보안 검사대다.
+- `@Order` 역할: Spring Security가 여러 검사대 중 경로가 맞는 하나를 찾을 때 확인할 순서를 정한다. UserMerged 0과 UserWithdrawn 1은 exact path만 받고, 일반 JWT/Legacy 2는 앞에서 선택되지 않은 나머지를 받는다.
+- 변경 파일: `docs/codex/CURRENT_STATE.md`, `docs/codex/WORKLOG.md`만 갱신했다. 애플리케이션·보안 설정·테스트·Jira는 변경하지 않았다.
+- 유지한 계약: 공개 API·DTO·`BaseResponse`, AI, S3·Redis와 기존 internal endpoint 계약을 변경하지 않았다.
+- 테스트와 결과: 코드 변경이 없는 설명 작업이라 Gradle 테스트는 실행하지 않았다. `git diff --check`, marker 단일 포함과 WORKLOG EOF 위치를 확인한다.
+- 보안·Git: Secret·Token을 기록하지 않았고 commit·push·배포를 수행하지 않았다.
+
+## 2026-09-04 — TMI-125 SecurityFilterChain 검사 범위 설명
+
+- 날짜: 2026-09-04
+- 브랜치: Learning Core `develop`.
+- Jira: `TMI-125` `[Learning Core] UserMerged consumer 및 ownership migration 구현`.
+- 작업 목표: `SecurityFilterChain`이 HTTP 요청에서 무엇을 검사하고 무엇을 검사하지 않는지 설명한다.
+- 설명: chain은 먼저 요청 경로와 HTTP method가 자신의 담당 범위인지 판단하고, 선택되면 인증 정보 존재 여부, JWT signature·expiry·issuer·audience 등 유효성, 인증 필요 여부와 principal 권한을 Controller 전에 검사한다.
+- 경계: chain은 UserMerged payload의 source/target owner migration 같은 업무 규칙을 처리하지 않는다. 인증·인가를 통과한 뒤 Controller와 Service가 요청 body 검증, 멱등성, ownership migration과 Transaction을 처리한다.
+- 변경 파일: `docs/codex/CURRENT_STATE.md`, `docs/codex/WORKLOG.md`만 갱신했다. 애플리케이션·보안 설정·테스트·Jira는 변경하지 않았다.
+- 유지한 계약: 공개 API·DTO·`BaseResponse`, AI, S3·Redis와 기존 internal endpoint 계약을 변경하지 않았다.
+- 테스트와 결과: 코드 변경이 없는 설명 작업이라 Gradle 테스트는 실행하지 않았고 `git diff --check`로 문서 형식을 확인한다.
+- 보안·Git: Secret·Token을 기록하지 않았고 commit·push·배포를 수행하지 않았다.
+
+## 2026-09-04 — TMI-125 SecurityFilterChain 인증 경계 설명 완료
+
+<!-- codex-turn:01a06ab7-60a1-7a83-8591-c53dd2022b37 -->
+
+- 날짜: 2026-09-04
+- 브랜치: Learning Core `develop`.
+- Jira: `TMI-125` `[Learning Core] UserMerged consumer 및 ownership migration 구현`.
+- 작업 목표: `SecurityFilterChain`이 검사하는 보안 범위와 Controller·Service가 처리하는 업무 범위를 구분하여 설명한다.
+- 결론: chain은 요청 path·method 선택, Bearer credential 존재, JWT signature·expiry·issuer·audience와 호출 권한을 Controller 전에 검사한다. 통과한 요청만 업무 계층으로 전달된다.
+- 업무 경계: UserMerged payload, event 멱등성, source/target ownership migration과 Mongo Transaction은 chain이 아니라 Controller·Service에서 처리한다.
+- 변경 파일: `docs/codex/CURRENT_STATE.md`, `docs/codex/WORKLOG.md`만 갱신했다. 애플리케이션·보안 설정·테스트·Jira는 변경하지 않았다.
+- 유지한 계약: 공개 API·DTO·`BaseResponse`, AI, S3·Redis와 기존 internal endpoint 계약을 변경하지 않았다.
+- 테스트와 결과: 코드 변경이 없는 설명 작업이라 Gradle 테스트는 실행하지 않았다. `git diff --check`, marker 단일 포함과 WORKLOG EOF 위치를 확인한다.
+- 보안·Git: Secret·Token을 기록하지 않았고 commit·push·배포를 수행하지 않았다.
+
+## 2026-09-04 — TMI-125 UserMerged workload 검사 분리 이유 설명
+
+<!-- codex-turn:01a06aba-1fcd-71e2-bbd7-a86ed3539575 -->
+
+- 날짜: 2026-09-04
+- 브랜치: Learning Core `develop`.
+- Jira: `TMI-125` `[Learning Core] UserMerged consumer 및 ownership migration 구현`.
+- 작업 목표: 앱→Identity→Learning Core UserMerged 흐름에서 Learning Core가 workload JWT를 검사하는 이유와 보안 chain을 나누는 이유를 설명한다.
+- 확인한 흐름: 앱의 사용자 요청은 Identity가 인증·정책 검증 후 merge를 확정한다. 이후 Identity가 별도의 workload JWT로 Learning Core internal endpoint를 호출하며, 앱의 사용자 Access Token을 그대로 전달하지 않는다.
+- 검사 목적: Learning Core는 호출자가 Identity인지, Token이 자신에게 발급됐는지, UserMerged 목적의 Token인지, 서명·issuer·expiry가 유효한지를 확인하여 앱 사용자나 다른 서비스·다른 목적 Token의 직접 호출을 막는다.
+- 분리 경계: 일반 사용자 Token, UserMerged workload Token과 UserWithdrawn workload Token은 권한 목적이 다르다. merge Token은 merge endpoint에만, withdrawal Token은 withdrawal endpoint에만 사용할 수 있어야 한다.
+- 대안 판단: 하나의 internal `SecurityFilterChain`으로 합치는 것은 가능하지만 그 안에서 요청 path별 decoder/audience/authorization 선택을 다시 구현해야 한다. 모든 internal endpoint에 동일 Token·audience를 허용하는 방식은 한 credential의 유출·오용 범위를 넓히고 목적 제한을 없애므로 채택하지 않는다.
+- 변경 파일: `docs/codex/CURRENT_STATE.md`, `docs/codex/WORKLOG.md`만 갱신했다. 애플리케이션·보안 설정·테스트·Jira는 변경하지 않았다.
+- 유지한 계약: 공개 API·DTO·`BaseResponse`, AI, S3·Redis와 기존 internal endpoint 계약을 변경하지 않았다.
+- 테스트와 결과: 코드 변경이 없는 설명 작업이라 Gradle 테스트는 실행하지 않았다. `git diff --check`, marker 단일 포함과 WORKLOG EOF 위치를 확인한다.
+- 보안·Git: Secret·Token을 기록하지 않았고 commit·push·배포를 수행하지 않았다.
+
+## 2026-09-04 — TMI-125 구현 전 잔여 선택지 재정리
+
+<!-- codex-turn:01a06abc-f34f-7d13-9809-359cf076d3ba -->
+
+- 날짜: 2026-09-04
+- 브랜치: Learning Core `develop`.
+- Jira: `TMI-125` `[Learning Core] UserMerged consumer 및 ownership migration 구현`.
+- 작업 목표: 2026-08-20에 이미 확정된 C1~C11을 다시 열지 않고, 이후 추가된 Billing creation saga·AttemptGroup·UserWithdrawn·Identity TMI-123 구현 때문에 새로 확정할 선택지와 장단점을 정리한다.
+- 이미 확정된 범위: RS256 workload JWT와 UserMerged 전용 audience·Identity subject, source/target 양쪽 guard, target 활성 시험 우선, source/target history 합집합, 기존 PUT URL 최대 5분 위험 수용, Callback 전체 Transaction, fail-closed event 멱등성, 204/409/503 status 방향과 단계적 rollout은 유지한다.
+- 신규 권장 1: source 또는 target에 non-terminal `ExamCreationOperation`이 있으면 owner를 중간에 rewrite하거나 일부 문서만 옮기지 않고 `503 + bounded Retry-After`로 Identity가 재시도하게 한다. terminal 이후 전체 migration하여 Billing reservation/confirm과 owner가 갈라지는 것을 막는다.
+- 신규 권장 2: merge 전에 생성된 `attempt_group_event_outbox`의 userId·canonical payload·digest는 수정하지 않고 Billing TMI-120 legacy-source fence로 기존 event를 전달한다. 재작성은 같은 eventId의 불변 payload·digest 계약을 깨므로 제외한다.
+- 신규 권장 3: UserMerged exact chain `@Order(0)`, UserWithdrawn exact chain `@Order(1)`, 사용자 JWT/Legacy catch-all `@Order(2)`를 사용한다. 하나의 internal chain도 path별 decoder/audience resolver를 두면 가능하지만 복잡도가 높고, 모든 internal API에 같은 generic Token을 허용하지 않는다.
+- 신규 권장 4: source 또는 target의 durable withdrawal marker가 merge event와 충돌하면 mutation 없이 `409` fail-closed와 경보로 격리한다. 아직 commit winner가 불명확한 일시 Transaction 경합만 `503`으로 재시도한다. Learning Core가 withdrawal marker를 임의로 해제하거나 merge 우선으로 덮지 않는다.
+- 신규 권장 5: Identity publisher read timeout `PT3S`에 맞춰 direct Transaction 초기 gate를 P99 1초 이하, 전체 HTTP 2초 미만으로 제안한다. production 유사 staging에서 실패하면 timeout 연장이나 direct/async 혼합 대신 durable inbox + worker 계약으로 개정한다.
+- 신규 권장 6: 실제 replica-set Mongo를 사용하는 전용 Gradle `mongoIntegrationTest` task를 두고 CI 필수 gate로 실행한다. 단위 `clean test`에 모두 섞거나 공유 staging DB에 의존하는 방식보다 실행 목적·장애 격리가 명확하다.
+- 거버넌스 권장: `AGENTS.md`에 TMI-125 단건 예외가 아니라 확정 UserMerged 계약 범위와 후속 버그 수정·테스트·운영 안정화만 허용하는 영구 절을 추가한다. Billing 저장소 수정, 새 owner event, 공개 API 변경과 Challenge는 계속 금지한다.
+- 운영값: 실제 issuer/JWKS URI, 환경별 key rotation, Mongo topology·index와 Lattice/TLS/network 증빙은 선택지가 아니라 production 활성화 전 외부 gate다.
+- 변경 파일: 분석 기록을 위해 `docs/codex/CURRENT_STATE.md`, `docs/codex/WORKLOG.md`만 변경했다. `AGENTS.md`, 계획서·결정서, 애플리케이션·설정·테스트·Jira는 아직 변경하지 않았다.
+- 유지한 계약: 공개 API·DTO·`BaseResponse`, AI `user_id=examId`, retryCount, S3·Redis key, Billing·Identity wire 계약을 변경하지 않았다.
+- 테스트와 결과: 코드 변경 없는 계획 분석이라 Gradle 테스트는 실행하지 않았다. `git diff --check`, marker 단일 포함과 WORKLOG EOF 위치를 확인한다.
+- 보안·Git: Secret·Token을 기록하지 않았고 commit·push·배포를 수행하지 않았다.
+
+## 2026-09-04 — TMI-125 승인 권장안 기반 구현 계획 갱신
+
+- 날짜: 2026-09-04
+- 브랜치: Learning Core `develop`.
+- Jira: `TMI-125` `[Learning Core] UserMerged consumer 및 ownership migration 구현`; 선행 Identity `TMI-123`, Billing legacy-source fence `TMI-120` 계약을 근거로 사용했다.
+- 사용자 승인: 기존 C1~C11과 신규 C12~C18 권장 조합을 구현 기준으로 확정했다. 이번 승인은 문서와 구현 착수 범위 승인이고 production publisher·merge flag 활성화 승인은 아니다.
+- 계획 핵심: source/target non-terminal `ExamCreationOperation`은 partial migration과 owner rewrite 없이 `503 + Retry-After: 5`로 미루고 terminal 뒤 동일 event를 재처리한다. terminal operation은 기존 owner·reservation snapshot과 purge 정책을 유지한다.
+- outbox 핵심: merge 전에 생성된 AttemptGroup outbox의 eventId·userId·canonical payload·digest는 불변 유지해 Billing TMI-120 legacy-source fence로 전달하고, merge 이후 새 event만 target owner를 snapshot한다.
+- security/lifecycle: UserMerged `@Order(0)`, UserWithdrawn `@Order(1)`, 사용자 JWT/Legacy catch-all `@Order(2)`로 고정했다. source/target active withdrawal marker는 mutation 없는 `409`, commit winner가 미확정인 일시 Transaction 경합만 `503`이다.
+- Transaction/writer: Billing creation saga·Transaction, AttemptGroup coordinator·summary completion·reconciler·backfill·outbox store를 guard inventory에 추가하고 서로 다른 feature `TransactionTemplate` 중첩을 금지했다. Session·Result·Summary만 직접 owner migration하며 operation/outbox/withdrawal marker는 rewrite하지 않는다.
+- 인증/성능: workload profile은 RS256, `aud=learning-core-user-merged`, `sub=identity-service`, `iat=nbf`, TTL `PT2M`, UUID `jti`, `typ=JWT`, `kid`로 고정하고 environment별 issuer/JWKS·rotation만 운영값으로 남겼다. Identity connect/read `PT1S/PT3S` 아래 direct Transaction P99 1초·전체 HTTP 2초 미만 초기 gate를 확정했다.
+- 테스트/거버넌스: Testcontainers replica-set 전용 Gradle `mongoIntegrationTest` task를 CI 필수 gate로 확정했다. `AGENTS.md`에는 TMI-125 단건 예외 대신 동일 계약의 후속 버그 수정·테스트·운영 안정화까지 허용하는 제한형 영구 절과 금지 범위를 추가했다.
+- 변경 파일: `AGENTS.md`, `docs/codex/USER_MERGED_CONSUMER_IMPLEMENTATION_PLAN.md`, `docs/codex/USER_MERGED_CONTRACT_DECISIONS.md`, `docs/codex/USER_MERGED_CONSUMER_REVIEW.md`, `docs/codex/CURRENT_STATE.md`, `docs/codex/WORKLOG.md`.
+- 변경한 동작: 애플리케이션 동작은 변경하지 않았다. 사전 검토 문서는 원문을 유지하면서 2026-09-04 최신 계획이 구현 기준임을 상단에 표시했다.
+- 유지한 외부 계약: 공개 API·DTO·`BaseResponse`, retryCount, AI `user_id=examId`, S3 Object Key·Presigned 흐름, Redis Key/TTL과 Identity/Billing wire schema를 변경하지 않았다.
+- 실행한 검증과 결과: 코드 변경이 없어 Gradle 테스트는 실행하지 않았다. stale 5초/P99 2초/Order 1/Gradle placeholder 검색 결과가 없고 `git diff --check`가 성공했다.
+- 남은 위험·배포 전 확인: environment별 issuer/JWKS·rotation, Mongo replica-set/sharded transaction과 필수 index, 실제 `mongoIntegrationTest` 구현, TLS/network allowlist, writer drain/backfill, Identity retry와 cross-service staging E2E, P99/HTTP 성능 gate가 남아 있다. 이 조건 전 production publisher와 merge flag는 OFF다.
+- 예상 밖 diff: 이번 범위 밖의 기존 수정 `docs/codex/FIRST_UPDATE_PROGRESS_CHECKLIST.md`와 기존 미추적 `APP_FEATURE_LOGIC_OVERVIEW.md`, `FRONTEND_LOGIN_INTEGRATION_GUIDE.md`, `FRONTEND_NON_LOGIN_UPDATE_GUIDE.md`는 수정하지 않았다.
+- 보안·Git: Secret·Token을 기록하지 않았고 commit·push·배포를 수행하지 않았다.
+
+## 2026-09-04 — TMI-125 승인 계획 문서 종료 기록 동기화
+
+<!-- codex-turn:01a06ad0-4f1d-7082-969f-ed042c35655d -->
+
+- 날짜: 2026-09-04
+- 브랜치: Learning Core `develop`.
+- Jira: `TMI-125` `[Learning Core] UserMerged consumer 및 ownership migration 구현`; Identity `TMI-123`과 Billing `TMI-120` 계약을 선행 근거로 사용했다.
+- 완료 결과: 사용자가 승인한 C12~C18 권장안을 `AGENTS.md`, UserMerged 구현 계획서와 계약 결정서에 반영했고 사전 검토 문서는 역사적 snapshot으로 표시했다.
+- 확정 핵심: non-terminal creation operation은 `503 + Retry-After: 5`, 기존 operation/outbox snapshot 불변, SecurityFilterChain Order 0/1/2, withdrawal marker `409`, direct P99 1초·HTTP 2초 gate, 전용 `mongoIntegrationTest`, 제한형 영구 구현 허용이다.
+- 변경한 동작: 애플리케이션 동작은 변경하지 않았고 구현도 시작하지 않았다.
+- 유지한 계약: 공개 API·DTO·`BaseResponse`, retryCount, AI `user_id=examId`, S3·Redis와 Identity/Billing wire를 유지했다.
+- 검증: stale timeout/order/Gradle placeholder 검색 결과가 없고 `git diff --check`가 성공했다. 문서 전용 작업이라 Gradle 테스트는 실행하지 않았다.
+- 남은 위험·배포 전 확인: issuer/JWKS·rotation, Mongo topology/index와 실제 통합 task 구현, TLS/network, writer drain/backfill, staging E2E와 성능 gate가 남아 있으며 그전에는 production flag를 활성화하지 않는다.
+- 예상 밖 diff: 기존 범위 밖 수정·미추적 문서는 보존했고 이번 종료 동기화에서 수정하지 않았다.
+- 보안·Git: Secret·Token을 기록하지 않았고 commit·push·배포를 수행하지 않았다.
+
+## 2026-09-04 — TMI-125 구현 승인과 production 활성화 승인 차이 설명
+
+<!-- codex-turn:01a06af4-f343-77a1-b304-992ae69405c9 -->
+
+- 날짜: 2026-09-04
+- 브랜치: Learning Core `develop`.
+- Jira: `TMI-125` `[Learning Core] UserMerged consumer 및 ownership migration 구현`.
+- 작업 목표: “구현 착수 기준을 확정했지만 production publisher·merge 기능 활성화 승인은 아니다”라는 계획 문구의 의미를 설명한다.
+- 설명: 사용자 승인은 C1~C18 설계대로 애플리케이션 코드, 테스트, migration과 설정을 만드는 권한을 확정한 것이다. 추가 제품 설계 결정을 요구한다는 뜻은 아니다.
+- production 경계: 실제 운영 Identity publisher와 merge feature flag를 켜 사용자 event를 보내고 Learning Core가 처리하게 하는 go-live는 코드 병합·배포, Mongo Transaction/index, workload issuer/JWKS·rotation, staging E2E·성능 gate, 관측·rollback 준비를 통과한 뒤 별도로 수행한다.
+- 현재 상태: 계획 문서만 갱신됐고 애플리케이션 구현, Gradle 테스트, migration 실행, 배포와 운영 flag 활성화는 아직 수행하지 않았다.
+- 변경 파일: 설명 기록을 위해 `docs/codex/CURRENT_STATE.md`, `docs/codex/WORKLOG.md`만 변경했다. 계획서 본문·애플리케이션·설정·테스트·Jira는 변경하지 않았다.
+- 유지한 계약: 공개 API·DTO·`BaseResponse`, retryCount, AI `user_id=examId`, S3·Redis와 Identity/Billing wire를 변경하지 않았다.
+- 검증: 코드 변경 없는 설명 작업이라 Gradle 테스트는 실행하지 않았고 `git diff --check`로 문서 형식을 확인한다.
+- 보안·Git: Secret·Token을 기록하지 않았고 commit·push·배포·운영 flag 변경을 수행하지 않았다.
+
+## 2026-09-04 — TMI-125 ownership guard와 Transaction 중첩 금지 설명
+
+<!-- codex-turn:01a06b03-27c4-7ab1-a712-71e96d4c46b6 -->
+
+- 날짜: 2026-09-04
+- 브랜치: Learning Core `develop`.
+- Jira: `TMI-125` `[Learning Core] UserMerged consumer 및 ownership migration 구현`.
+- 작업 목표: 순수 조회의 merged marker 확인 시점, 쓰기의 guard revision touch와 기존 command Transaction에 참여시키는 이유를 쉽게 설명한다.
+- 조회 경계: 순수 조회는 guard 상태만 읽고 revision을 증가시키지 않는다. guard를 읽은 시점을 선형화 기준으로 삼아 merge commit 전에 `ACTIVE`를 확인한 in-flight 조회는 완료할 수 있고, merge commit 뒤 시작한 guard 확인은 `MERGED` source를 거절한다.
+- 쓰기 경계: 모든 사용자 소유 쓰기는 업무 데이터와 같은 Mongo Transaction에서 guard를 실제 update한다. merge도 같은 guard를 수정하므로 동시 실행 시 write conflict가 발생하고, 쓰기 선행이면 merge가 재시도해 새 데이터까지 이전하며 merge 선행이면 source 쓰기가 재시도 후 거절된다.
+- Transaction 경계: Billing saga, Summary completion과 AttemptGroup coordinator처럼 이미 Transaction이 있는 command는 별도 feature `TransactionTemplate`을 중첩하지 않는다. 기존 Transaction body에 guard touch를 추가해 guard와 업무 변경을 함께 commit 또는 rollback한다. 기존 Transaction이 없는 command만 공통 executor가 Transaction을 한 번 연다.
+- 변경 파일: 설명 기록을 위해 `docs/codex/CURRENT_STATE.md`, `docs/codex/WORKLOG.md`만 변경했다. 애플리케이션·계획서·설정·테스트·Jira는 변경하지 않았다.
+- 유지한 계약: 공개 API·DTO·`BaseResponse`, retryCount, AI `user_id=examId`, S3·Redis와 Identity/Billing wire 계약을 변경하지 않았다.
+- 테스트와 결과: 코드 변경 없는 설명 작업이라 Gradle 테스트는 실행하지 않았다. `git diff --check`, marker 단일 포함과 WORKLOG EOF 위치를 확인한다.
+- 보안·Git: Secret·Token을 기록하지 않았고 commit·push·배포를 수행하지 않았다.
+
+## 2026-09-04 — TMI-125 ownership guard와 revision 개념 설명
+
+<!-- codex-turn:01a06b1b-88fa-7c52-9914-849b69edbede -->
+
+- 날짜: 2026-09-04
+- 브랜치: Learning Core `develop`.
+- Jira: `TMI-125` `[Learning Core] UserMerged consumer 및 ownership migration 구현`.
+- 작업 목표: UserMerged 설계에서 guard가 담당하는 접근 제어와 revision이 담당하는 동시성 충돌 감지를 쉽게 설명한다.
+- guard: 사용자별로 `ACTIVE` 또는 `MERGED` 상태와 revision을 보관하는 작은 Mongo 문서다. `ACTIVE`이면 정상 접근할 수 있고 source가 `MERGED`이면 새 요청을 거절하거나 비동기 처리를 target으로 수렴시킨다.
+- revision: guard가 실제로 수정될 때 증가하는 버전 번호다. 값 자체의 업무 의미보다, 사용자 쓰기와 merge가 같은 guard를 동시에 update하게 만들어 Mongo write conflict를 발생시키는 역할이 중요하다.
+- 적용: 순수 조회는 guard 상태만 읽고 revision을 올리지 않는다. 데이터 쓰기는 업무 데이터와 같은 Transaction에서 revision을 touch하고, merge도 같은 guard를 수정해 둘이 동시에 누락 없이 성공하지 못하도록 한다.
+- 변경 파일: 설명 기록을 위해 `docs/codex/CURRENT_STATE.md`, `docs/codex/WORKLOG.md`만 변경했다. 애플리케이션·계획서·설정·테스트·Jira는 변경하지 않았다.
+- 유지한 계약: 공개 API·DTO·`BaseResponse`, retryCount, AI `user_id=examId`, S3·Redis와 Identity/Billing wire 계약을 변경하지 않았다.
+- 테스트와 결과: 코드 변경 없는 설명 작업이라 Gradle 테스트는 실행하지 않았다. `git diff --check`, marker 단일 포함과 WORKLOG EOF 위치를 확인한다.
+- 보안·Git: Secret·Token을 기록하지 않았고 commit·push·배포를 수행하지 않았다.
+
+## 2026-09-04 — TMI-125 UserMerged Transaction 처리 순서 설명
+
+<!-- codex-turn:01a06b23-1c3f-7a90-8cc8-ace42d97ffef -->
+
+- 날짜: 2026-09-04
+- 브랜치: Learning Core `develop`.
+- Jira: `TMI-125` `[Learning Core] UserMerged consumer 및 ownership migration 구현`.
+- 작업 목표: inbox 판정부터 guard 잠금, active Session 정책, owner migration, source deny와 inbox 완료 기록까지의 실행 순서와 이유를 설명한다.
+- 사전 판정: eventId와 digest로 duplicate/conflict를 먼저 판정하고, source/target withdrawal marker는 durable `409`, non-terminal ExamCreationOperation은 retryable `503`으로 mutation 전에 종료한다.
+- 동시성 경계: 두 UUID를 canonical 순서로 정렬한 뒤 source/target guard를 같은 순서로 insert/touch하여 교차 merge의 lock 순서를 통일하고 write conflict로 동시 writer를 직렬화한다.
+- migration 경계: target active Session 우선 정책을 적용한 후 Result, Summary와 Session owner를 target으로 이전하고, 마지막에 source guard를 `MERGED`로 전환한다. operation과 기존 AttemptGroup outbox snapshot은 수정하지 않는다.
+- 멱등성과 원자성: inbox `PROCESSED` 기록을 업무 변경과 같은 Mongo Transaction에 넣어 둘이 함께 commit/rollback되게 한다. commit 실패 시 동일 event가 안전하게 재처리되고, unique eventId 경합도 재조회하여 duplicate/conflict로 수렴한다.
+- 변경 파일: 설명 기록을 위해 `docs/codex/CURRENT_STATE.md`, `docs/codex/WORKLOG.md`만 변경했다. 애플리케이션·계획서·설정·테스트·Jira는 변경하지 않았다.
+- 유지한 계약: 공개 API·DTO·`BaseResponse`, retryCount, AI `user_id=examId`, S3·Redis와 Identity/Billing wire 계약을 변경하지 않았다.
+- 테스트와 결과: 코드 변경 없는 설명 작업이라 Gradle 테스트는 실행하지 않았다. `git diff --check`, marker 단일 포함과 WORKLOG EOF 위치를 확인한다.
+- 보안·Git: Secret·Token을 기록하지 않았고 commit·push·배포를 수행하지 않았다.
+
+## 2026-09-04 — TMI-125 구현 착수 전 Jira·잔여 조건 확인
+
+<!-- codex-turn:01a06b2f-9eb0-7652-a39c-991939020594 -->
+
+- 날짜: 2026-09-04
+- 브랜치: Learning Core `develop`.
+- Jira: 기존 `TMI-125` `[Learning Core] UserMerged consumer 및 ownership migration 구현`을 사용하며 중복 이슈를 생성하지 않는다.
+- 확인 결과: `USER_MERGED_CONSUMER_IMPLEMENTATION_PLAN.md`와 `USER_MERGED_CONTRACT_DECISIONS.md`에 `TMI-125`가 이미 연결돼 있고 C12~C18 승인 이후 구현 전 추가 제품 선택은 없다고 명시돼 있다.
+- 다음 단계: 새 Jira 생성이 아니라 기존 TMI-125에서 승인 계획대로 구현을 시작한다. 구현 범위에는 코드·단위/계약 테스트, guard writer 전환, Mongo replica-set 통합 테스트 task와 feature flag/startup validation이 포함된다.
+- 남은 gate: 환경별 issuer/JWKS·rotation, Mongo topology/index, production 유사 staging P99·전체 HTTP latency, Identity 재시도, writer drain/backfill, Lattice/TLS와 cross-service E2E는 구현 및 production 활성화 전에 단계별로 확인한다. 이는 현재 코드 착수를 막는 추가 제품 결정은 아니다.
+- 변경 파일: 상태 기록을 위해 `docs/codex/CURRENT_STATE.md`, `docs/codex/WORKLOG.md`만 변경했다. 애플리케이션·계획서·설정·테스트·Jira는 변경하지 않았다.
+- 유지한 계약: 공개 API·DTO·`BaseResponse`, retryCount, AI `user_id=examId`, S3·Redis와 Identity/Billing wire 계약을 변경하지 않았다.
+- 테스트와 결과: 문서 확인 작업이라 Gradle 테스트는 실행하지 않았다. `git diff --check`, marker 단일 포함과 WORKLOG EOF 위치를 확인한다.
+- 보안·Git: Secret·Token을 기록하지 않았고 commit·push·배포를 수행하지 않았다.
+
+## 2026-09-04 — TMI-125 UserMerged consumer·ownership migration 구현
+
+<!-- codex-turn:01a06b32-274f-79e3-adc9-dcc6ccd84c31 -->
+
+- 날짜·브랜치·Jira: 2026-09-04, Learning Core `develop`, `TMI-125` `[Learning Core] UserMerged consumer 및 ownership migration 구현`.
+- 구현 결과: exact `POST /internal/v1/events/user-merged` internal endpoint, schema v1 normalization·semantic digest·영구 inbox 멱등성, source/target ownership guard와 source token deny gate를 추가했다. source/target withdrawal marker는 mutation 없는 `409`, non-terminal `ExamCreationOperation`은 `503 + Retry-After: 5`, 신규·동일 duplicate는 빈 `204`로 처리한다.
+- 보안: UserMerged/UserWithdrawn/사용자 catch-all chain을 `@Order(0/1/2)`로 분리했다. UserMerged workload는 RS256, 환경별 issuer/JWKS, `aud=learning-core-user-merged`, `sub=identity-service`, `iat=nbf`, 최대 TTL `PT2M`, canonical UUID `jti`, `typ=JWT`, nonblank `kid`를 검증한다. 인증·principal authorization 뒤에만 4096-byte body filter가 실행되고 사용자 JWT·다른 principal·Legacy permit-all 우회를 거절한다.
+- Transaction과 migration: source/target guard를 canonical UUID 순서로 touch한 뒤 target 활성 시험 우선 정책, `exam_results`, `exam_summaries`, `exam_sessions`의 owner 이전, source guard `MERGED`, inbox `PROCESSED`를 하나의 Mongo Transaction으로 commit한다. operation과 기존 AttemptGroup outbox payload·digest·owner snapshot은 rewrite하지 않는다.
+- writer 전환: ExamSession 생성·완료·legacy 보정, Billing creation operation/Session commit, Question·Summary Job claim·완료·복구, Feedback·Summary·SpeechAce·Azure Callback, AttemptGroup coordinator·summary completion·backfill을 current Session owner guard와 같은 Transaction 경계에 연결했다. 기존 Transaction이 있는 command에는 guard touch만 참여시키고 새 중첩 Transaction을 열지 않았다. AI·S3 network와 Redis projection은 Mongo commit 밖에서 실행하도록 유지·분리했다.
+- 운영 준비: 기본 OFF `writer-enabled`, `consumer-enabled`, `source-deny-enabled` 설정, issuer/JWKS/skew 설정 검증, Mongo rollback capability probe와 필수 index fail-closed validator를 추가했다. `user-merged-prepare.js`는 기본 dry-run이며 명시적 writer drain·apply 확인 뒤 ACTIVE guard backfill, 전용 collection과 Result/Summary owner index를 만들고 최종 검증한다.
+- 테스트: workload chain 상호 격리, wrong principal 403, source merged 403, deny store fail-closed, auth-before-body, 정확히 4096/4097 bytes, Legacy 우회 차단, JWT header/lifetime/jti, guard 상태, digest/duplicate/conflict/precondition과 저카디널리티 metric을 추가했다. Testcontainers Mongo replica-set에는 원자 owner 이전, withdrawal rollback, 양쪽 활성 target 우선, merged target rollback 4개를 추가했다.
+- 실행 결과: `./gradlew clean test` Java 482개가 failures/errors/skipped 0으로 성공했다. 이후 body-filter order targeted security test도 성공했다. `node --test scripts/mongodb/user-merged-prepare.test.js` 6개와 `git diff --check`가 성공했다. 현재 host에서 `./gradlew mongoIntegrationTest`는 Docker daemon 부재로 initialization 단계에서 실패했으며, 테스트를 skip하지 않도록 CI 필수 gate로 유지했다.
+- 유지한 외부 계약: 기존 공개 API URL·method·parameter·DTO·`BaseResponse`, 실제 userId 비노출, retryCount, S3 Object Key·Presigned/submit/Polling, Redis Key/TTL과 Python AI request/Callback `user_id=examId`를 변경하지 않았다. 신규 internal 성공 응답만 계약대로 빈 `204`다.
+- 남은 위험·배포 전 확인: Docker/CI에서 replica-set 통합 테스트 실행, staging/prod Mongo topology와 index migration, 환경별 workload issuer/JWKS·rotation, 구버전 writer drain과 ACTIVE guard backfill, Identity 동일 event 재시도·UserWithdrawn 교차 E2E, TLS/network allowlist, direct Transaction P99 1초·전체 HTTP 2초 미만 측정이 남아 있다. 그전에는 production publisher·consumer·source deny flag를 켜지 않는다.
+- 예상 밖 diff: 작업 시작 전부터 수정돼 있던 `docs/codex/FIRST_UPDATE_PROGRESS_CHECKLIST.md`와 미추적 `docs/codex/APP_FEATURE_LOGIC_OVERVIEW.md`, `docs/codex/FRONTEND_LOGIN_INTEGRATION_GUIDE.md`, `docs/codex/FRONTEND_NON_LOGIN_UPDATE_GUIDE.md`는 이번 구현에서 수정하지 않았다.
+- Git·외부 작업: commit, push, 배포, AWS·Mongo 운영 변경과 Jira 상태 변경을 수행하지 않았고 Secret·Token을 기록하지 않았다.
+
+## 2026-09-04 — TMI-125 구현 최종 재검증
+
+<!-- codex-turn:01a06b32-274f-79e3-adc9-dcc6ccd84c31-final-verification -->
+
+- 날짜·브랜치·Jira: 2026-09-04, Learning Core `develop`, `TMI-125` `[Learning Core] UserMerged consumer 및 ownership migration 구현`.
+- 재검증 결과: 마지막 security filter-order 변경까지 포함한 `./gradlew clean test`가 Java 483개, failures/errors/skipped 0으로 성공했다.
+- migration 검증: `node --test scripts/mongodb/user-merged-prepare.test.js` 6개가 모두 성공했고 `git diff --check`도 성공했다.
+- 통합 테스트 경계: 현재 host에는 Docker daemon이 없어 Testcontainers replica-set `mongoIntegrationTest` 4개를 실행할 수 없다. 자동 skip으로 숨기지 않았으며 Docker가 있는 CI/환경에서 필수 gate로 실행해야 한다.
+- 외부 계약·운영 상태: 공개 API·AI·S3·Redis 계약은 유지했고 feature flag는 기본 OFF다. commit, push, Jira 변경, 배포와 운영 migration/flag 활성화는 수행하지 않았다.
+- 예상 밖 diff: 작업 시작 전부터 수정돼 있던 `docs/codex/FIRST_UPDATE_PROGRESS_CHECKLIST.md`와 기존 미추적 문서 3개는 수정하지 않고 보존했다.
+
+## 2026-09-04 — TMI-125 구현 결과 설명
+
+<!-- codex-turn:01a06b61-d4a7-74a3-bdee-72b67f41c467 -->
+
+- 날짜·브랜치·Jira: 2026-09-04, Learning Core `develop`, `TMI-125` `[Learning Core] UserMerged consumer 및 ownership migration 구현`.
+- 작업 목표: 구현된 UserMerged consumer가 실제로 무엇을 보호하고 어떤 순서로 소유권을 이전하는지 사용자 요청 흐름 기준으로 재확인해 설명한다.
+- 확인 결과: Identity 전용 workload JWT 인증 뒤 schema v1 event를 정규화하고 eventId/digest로 duplicate와 conflict를 판정한다. withdrawal marker는 `409`, non-terminal ExamCreationOperation은 `503 + Retry-After: 5`로 mutation 전에 종료한다.
+- Transaction 결과: source/target guard를 canonical UUID 순서로 touch하고 target active Session 우선 정책을 적용한 뒤 `exam_results`, `exam_summaries`, `exam_sessions` owner를 target으로 이전한다. source guard `MERGED`와 inbox `PROCESSED`까지 같은 Mongo Transaction에 포함돼 전부 함께 commit 또는 rollback된다.
+- 동시성 결과: 기존 Session·Billing saga·채점 Job·AI Callback·AttemptGroup writer가 업무 write와 같은 Transaction에서 current owner guard를 touch한다. merge와 동시 실행되면 Mongo write conflict와 제한된 retry로 한쪽 순서에 수렴하고, merge 완료 뒤 source JWT의 공개 API 접근은 deny gate가 거절한다.
+- 운영 경계: feature flag는 기본 OFF다. Mongo migration·writer drain/backfill, Docker replica-set 통합 테스트, 환경별 workload issuer/JWKS·rotation, Identity 재시도와 staging E2E·성능 gate 전에는 production consumer와 source deny를 활성화하지 않는다.
+- 변경·검증: 이번 작업은 구현 설명과 상태 문서 갱신만 수행했고 애플리케이션 코드는 변경하지 않았다. 직전 최종 검증인 Java 483개와 Node 6개 성공 결과를 유지하며 추가 Gradle 테스트는 실행하지 않았다.
+- 계약·Git: 기존 공개 API·DTO·`BaseResponse`, retryCount, S3·Redis와 AI `user_id=examId` 계약을 유지했다. commit, push, 배포, 운영 DB·AWS·Jira 상태 변경을 수행하지 않았고 Secret·Token을 기록하지 않았다.
+
+## 2026-09-04 — TMI-125 이후 다음 작업 판정
+
+<!-- codex-turn:01a06b65-0577-7540-9310-450843b526a9 -->
+
+- 날짜·브랜치·Jira: 2026-09-04, Learning Core `develop`; 현재 구현 Jira는 `TMI-125`, 다음 Challenge 전용 Jira는 아직 없다.
+- 사용자 요청: UserMerged consumer 구현 다음에 진행할 작업을 최신 코드와 로드맵 기준으로 설명한다.
+- 확인 결과: 2026-09-03 체크리스트의 Identity `TMI-123` 진행 중과 Learning Core UserMerged 미구현 표시는 현재보다 오래됐다. 최신 기록상 Identity `TMI-123`은 병합·완료됐고 Learning Core `TMI-125`는 로컬 구현과 비-Docker 테스트가 완료됐다.
+- 즉시 마무리: 사용자가 TMI-125 변경을 commit/push하고 PR을 `develop`에 병합한 뒤 Docker CI에서 `./gradlew mongoIntegrationTest` 4개를 통과시켜야 한다. 이 검증 전 production UserMerged flag는 활성화하지 않는다.
+- 다음 신규 개발: Learning Core 10초 챌린지 runtime은 현재 `src/main`에 구현 파일이 없다. 승인된 프론트·AI v1 계약을 기준으로 Challenge backend 계획과 Jira를 만들고 구현하는 것이 다음 기능 우선순위다.
+- 권장 첫 단위: `challenge_10s_questions` validator, 최초 활성 KST 날짜 baseDate singleton, 비순환 day resolver, MEMBER/ownership 경계, ChallengeAttempt snapshot·1시간 deadline·고정 S3 key, today/question/attempt/upload-url/answer의 내구성 있는 제출 foundation을 먼저 만든다.
+- 후속 단위: Challenge AI multipart dispatch와 전용 service credential/Callback, 결정적 job·최대 3 generation·120초 deadline, stale/duplicate fencing, no-speech 결과, history/results API와 expiry·index·staging E2E를 연결한다.
+- 별도 운영 작업: Billing 장애 reconciliation과 TMI-116/118/120/122·TMI-125의 Lattice/Mongo migration/failure-injection E2E는 Challenge 기능과 섞지 않고 release 안정화 트랙으로 유지한다.
+- 변경·검증: 이번 작업은 분석과 상태 문서 갱신만 수행했고 애플리케이션·계약·Jira·AWS·DB를 변경하지 않았다. 코드 변경이 없어 Gradle 테스트는 재실행하지 않았고 `git diff --check`만 확인한다.
+- Git·보안: commit, push, 배포와 Jira 상태 변경을 수행하지 않았고 Secret·Token을 기록하지 않았다.
+
+## 2026-09-05 — 1차 업데이트 유료 인앱결제 포함 범위 분석
+
+<!-- codex-turn:01a0705c-9c5e-7c32-99b2-894428aa0e81 -->
+
+- 날짜·브랜치: 2026-09-05, `feat/TMI-125-user-merged-ownership-migration`.
+- Jira: Billing `TMI-110`, `TMI-112`, `TMI-113`, `TMI-115`, `TMI-117`, `TMI-120`, Learning Core `TMI-116`, `TMI-118`, `TMI-122`, `TMI-125`를 현재 기반 구현 이력으로 사용했으며 Jira를 조회하거나 변경하지 않았다.
+- 작업 목표: 유료 인앱결제를 1차 업데이트에 포함할 때 기존 무료시험·Reservation 범위 대비 추가되는 개발·검증·운영 범위를 추정한다.
+- 확인 결과: Billing에는 무료 entitlement·Reservation·AttemptGroup·owner rebind 기반은 있지만 Apple/Google server verification adapter, notification inbox, payment/order/refund 원장과 앱용 구매·복원 API는 없다.
+- 범위 추정: credit 중심 최소 결제 MVP는 현재 남은 출시 작업 대비 약 40~70%, 1 backend+1 mobile 병렬 기준 약 3~5주가 추가될 수 있다. 3일 pass·첫 구매 2배·출석·추천·coupon까지 전부 포함하면 약 80~150%, 6~10주 이상으로 커질 수 있다. 이는 스토어 계정·상품 준비 완료를 가정한 거친 추정이다.
+- 권장 결정: 결제를 반드시 1차에 넣는다면 credit 상품, server 검증, notification, 구매 복원과 미사용 전액 환불의 최소 폐쇄 루프만 포함하고 pass·보상·추천·coupon은 후속으로 분리한다.
+- 신규 문서: `docs/codex/FIRST_RELEASE_PAYMENT_SCOPE_IMPACT.md`에 현재 상태, 선택지 A/B/C, 작업 목록, 일정 추정, 줄이면 안 되는 안전 항목, 결정사항과 출시 gate를 기록했다.
+- 변경 파일: `docs/codex/FIRST_RELEASE_PAYMENT_SCOPE_IMPACT.md`, `docs/codex/CURRENT_STATE.md`, `docs/codex/WORKLOG.md`. 애플리케이션 코드·공개 API·AI·S3·Redis·Billing wire는 변경하지 않았다.
+- 검증: 코드 변경이 없는 분석 문서 작업이므로 Gradle 테스트는 실행하지 않았고 `git diff --check`, marker 단일 포함과 WORKLOG EOF 위치를 확인한다.
+- 보안·Git: Secret·Token·결제 credential을 기록하지 않았고 commit·push·PR·merge·배포와 AWS·DB 상태 변경을 수행하지 않았다.
+
+## 2026-09-05 — credit 대신 5종 기간형 이용권으로 범위 재산정
+
+<!-- codex-turn:01a0705f-1d15-7a3f-9325-088a00b4ebd2 -->
+
+- 날짜·브랜치: 2026-09-05, `feat/TMI-125-user-merged-ownership-migration`.
+- Jira: Billing `TMI-110`, `TMI-112`, `TMI-113`, `TMI-115`, `TMI-117`, `TMI-120`, Learning Core `TMI-116`, `TMI-118`, `TMI-122`, `TMI-125`를 기반 이력으로 기록했으며 Jira를 조회하거나 변경하지 않았다.
+- 사용자 결정: 유료 상품은 credit 충전이 아니라 1일·3일·7일·14일·30일 동안 모의고사를 무제한 이용하는 기간형 상품으로 변경한다.
+- 핵심 미확정: 각 상품이 구매한 기간만 사용하는 기간제 이용권인지 만료 때 반복 결제되는 자동 갱신 구독인지 최종 확정이 필요하다. 현재 기간 조합에는 기간제 이용권을 권장한다.
+- 계약 영향: credit 잔액·10-credit 차감 UI 대신 plan, activatedAt, expiresAt, status 기반 `SubscriptionEntitlement` authorization이 필요하다. 무료시험은 별도 `FREE_EXAM_ONCE`로 유지할 수 있다.
+- 시험 정책: 이용권 유효 중 새 AttemptGroup을 횟수 차감 없이 열고, 만료 전에 시작한 AttemptGroup은 완료될 때까지 추가 결제 없이 처음부터 재시작할 수 있도록 기존 정책을 유지한다.
+- 범위 추정: 5종 기간제 이용권은 약 4~6주/+50~80%, 모두 자동 갱신이면 renewal·cancel·grace·billing retry까지 포함해 약 6~10주 이상/+80~140%의 거친 추가 범위로 재산정했다.
+- 변경 파일: `docs/codex/FIRST_RELEASE_PAYMENT_SCOPE_IMPACT.md`, `docs/codex/CURRENT_STATE.md`, `docs/codex/WORKLOG.md`. 애플리케이션·공개 API·스토어 설정·Jira·AWS·DB는 변경하지 않았다.
+- 검증: 코드 변경이 없는 계약·범위 문서 작업이므로 Gradle 테스트는 실행하지 않았고 `git diff --check`, marker 단일 포함과 WORKLOG EOF 위치를 확인한다.
+- 보안·Git: Secret·Token·결제 credential을 기록하지 않았고 commit·push·PR·merge·배포를 수행하지 않았다.
+
+## 2026-09-05 — 5종 기간형 이용권 결정 종료 훅 동기화
+
+<!-- codex-turn:01a0705f-1d15-76c3-95cb-a7fc395a4099 -->
+
+- 날짜·브랜치: 2026-09-05, `feat/TMI-125-user-merged-ownership-migration`.
+- Jira: Billing `TMI-110`, `TMI-112`, `TMI-113`, `TMI-115`, `TMI-117`, `TMI-120`, Learning Core `TMI-116`, `TMI-118`, `TMI-122`, `TMI-125`를 기반 이력으로 기록했으며 Jira를 조회하거나 변경하지 않았다.
+- 사용자 결정은 credit 충전 대신 1일·3일·7일·14일·30일 동안 무제한 응시하는 기간형 상품을 사용한다는 것이다.
+- 기간형 상품을 한 번 구매 후 만료되는 이용권으로 할지 자동 결제되는 갱신 구독으로 할지는 미확정이며, 현재 상품 구성에는 전자를 권장한다.
+- 무료시험 1회는 별도 `FREE_EXAM_ONCE` entitlement로 유지하고, 이용권 유효 중 새 시험을 횟수 차감 없이 시작하며 만료 전에 연 AttemptGroup은 완료 전 재시작을 보장하는 정책을 유지한다.
+- 종료 훅 기록 동기화만 추가했으며 애플리케이션·공개 API·스토어 설정·Jira·AWS·DB는 변경하지 않았다.
+- Secret·Token·결제 credential을 기록하지 않았고 commit·push·PR·merge·배포를 수행하지 않았다.
+
+## 2026-09-05 — 1차 업데이트 5종 기간제 이용권 범위 확정
+
+<!-- codex-turn:01a07063-f1fb-7f50-a976-5a5a0b50e7d1 -->
+
+- 날짜·브랜치: 2026-09-05, `feat/TMI-125-user-merged-ownership-migration`.
+- Jira: 관련 기반 이력은 Billing `TMI-110`, `TMI-112`, `TMI-113`, `TMI-115`, `TMI-117`, `TMI-120`, Learning Core `TMI-116`, `TMI-118`, `TMI-122`, `TMI-125`다. 기간제 결제 전용 신규 Jira는 아직 없고 Jira를 조회하거나 변경하지 않았다.
+- 사용자 결정: 1차 유료 상품은 credit이나 자동 갱신 구독이 아니라 결제한 기간만 사용하는 1일·3일·7일·14일·30일 무제한 이용권이다.
+- 기간 계약: Billing server가 거래를 검증해 `CAPTURED`로 확정한 시점부터 24·72·168·336·720시간을 계산하고 만료 시 자동 결제 없이 종료한다. client clock은 권한 근거로 사용하지 않는다.
+- 시험 계약: 활성 이용권 중 새 AttemptGroup을 횟수 차감 없이 열고 usage audit만 남긴다. 만료 전에 시작한 AttemptGroup은 `OPEN/GRADING/RETAKE_AVAILABLE` 정책에 따라 완료 전 추가 결제 없는 처음부터 재시작을 보장한다.
+- 1차 포함: 5종 상품 catalog, Apple/Google 구매·server 검증·notification, order/payment/transaction/entitlement 원장, 구매 상태·현재 이용권·복원 API, refund/revoke, Learning Core evaluator, iOS/Android UI와 staging E2E다.
+- 1차 제외: credit, 자동 갱신, grace/billing retry, 활성 이용권 추가 구매·합산, 출석 연장, 첫 구매 배수, 추천, coupon, plan 변경, 웹 PG다.
+- 신규 `docs/codex/FIRST_RELEASE_FIXED_TERM_PASS_SCOPE.md`에 서비스별 범위, 상태, 오류 UX, 구현 순서, 완료 조건, 약 4~6주 일정 추정과 남은 최종 결정을 기록했고 기존 영향 분석도 확정 내용에 맞게 갱신했다.
+- 변경 파일: `docs/codex/FIRST_RELEASE_FIXED_TERM_PASS_SCOPE.md`, `docs/codex/FIRST_RELEASE_PAYMENT_SCOPE_IMPACT.md`, `docs/codex/CURRENT_STATE.md`, `docs/codex/WORKLOG.md`. 애플리케이션·공개 API·스토어·Jira·AWS·DB는 변경하지 않았다.
+- 검증: 코드 변경이 없는 범위 문서 작업이므로 Gradle 테스트는 실행하지 않았고 `git diff --check`, marker 단일 포함과 WORKLOG EOF 위치를 확인한다.
+- 보안·Git: Secret·Token·결제 credential을 기록하지 않았고 commit·push·PR·merge·배포를 수행하지 않았다.
+
+## 2026-09-05 — 1차 기간제 이용권 범위 종료 훅 동기화
+
+<!-- codex-turn:01a07063-f1fb-76e1-a46e-ab6a1e4100bd -->
+
+- 날짜·브랜치: 2026-09-05, `feat/TMI-125-user-merged-ownership-migration`.
+- Jira: Billing `TMI-110`, `TMI-112`, `TMI-113`, `TMI-115`, `TMI-117`, `TMI-120`, Learning Core `TMI-116`, `TMI-118`, `TMI-122`, `TMI-125`를 기반 이력으로 기록했다. 결제 전용 신규 Jira는 없으며 Jira를 조회하거나 변경하지 않았다.
+- 확정 상품은 Billing server 검증 시점부터 1·3·7·14·30일간 무제한 사용하는 비자동갱신 기간제 이용권이다.
+- 1차 범위는 Identity/SNS·필수 phone, 무료시험 1회, Apple/Google 구매와 검증·notification·복원·환불, 기간 entitlement, 시험 생성 saga·완료 전 재시작, owner lifecycle와 production 통합 gate다.
+- credit·자동 갱신·출석 연장·첫 구매 배수·추천·coupon·plan 변경·웹 PG는 1차에서 제외한다.
+- 10초 Challenge는 기존 진행표상 1차지만 runtime이 없어 같은 배포에 포함하면 별도 개발 일정이 추가되며 1.1 분리 여부가 남은 제품 결정이다.
+- 종료 훅 기록 동기화만 추가했고 애플리케이션·공개 API·스토어 설정·Jira·AWS·DB는 변경하지 않았다.
+- Secret·Token·결제 credential을 기록하지 않았고 commit·push·PR·merge·배포를 수행하지 않았다.
+
+## 2026-09-05 — credit 및 첫 구매 2배 영구 제거 계약 확정
+
+<!-- codex-turn:01a0706c-78cb-7193-8006-4f70081a9823 -->
+
+- 날짜·브랜치: 2026-09-05, `feat/TMI-125-user-merged-ownership-migration`.
+- 사용자 결정에 따라 credit 상품·잔액·grant·ledger·reservation·consumption·충전 API/UI를 목표 제품에서 완전히 제거하고, 첫 구매 2배도 후속 범위가 아니라 완전히 제거했다.
+- 유료 권리는 Billing 검증 `CAPTURED` 시점부터 1·3·7·14·30일간 무제한 사용하는 비자동갱신 기간제 이용권 5종만 유지한다. 검증 phone당 무료시험 `FREE_EXAM_ONCE`는 별도 권리로 유지한다.
+- 출석 연장·연속 로그인·추천인·coupon은 이후로 미뤘으며 다시 도입할 때는 폐기된 credit 계약을 재사용하지 않고 별도 계약을 확정해야 한다.
+- 기존 Billing 계약서에는 현행 우선 공지를 추가하고, 1차 범위·영향 분석·프론트 비로그인 가이드·현재 상태의 상충 표현을 현행 정책에 맞게 수정했다.
+- 관련 기반 Jira는 Billing `TMI-110`, `TMI-112`, `TMI-113`, `TMI-115`, `TMI-117`, `TMI-120`, Learning Core `TMI-116`, `TMI-118`, `TMI-122`, `TMI-125`다. 유료 기간제 이용권 구현 전용 Jira는 아직 없으며 Jira를 조회하거나 변경하지 않았다.
+- 애플리케이션 코드·공개 API·스토어 설정·AWS·DB·Git 이력은 변경하지 않았다. Secret·Token·receipt·결제 credential을 기록하지 않았다.

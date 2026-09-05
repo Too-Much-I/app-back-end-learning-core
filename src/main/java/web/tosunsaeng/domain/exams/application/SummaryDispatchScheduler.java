@@ -2,9 +2,9 @@ package web.tosunsaeng.domain.exams.application;
 
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Qualifier;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.core.task.TaskExecutor;
 import org.springframework.core.task.TaskRejectedException;
-import org.springframework.dao.OptimisticLockingFailureException;
 import org.springframework.stereotype.Component;
 import web.tosunsaeng.domain.exams.domain.entity.ExamSession;
 import web.tosunsaeng.domain.exams.domain.entity.SummaryGradingJob;
@@ -12,6 +12,8 @@ import web.tosunsaeng.domain.exams.domain.enums.GradingJobStatus;
 import web.tosunsaeng.domain.exams.domain.repository.ExamSessionRepository;
 import web.tosunsaeng.domain.exams.domain.repository.SummaryGradingJobRepository;
 import web.tosunsaeng.global.config.GradingProperties;
+import web.tosunsaeng.domain.usermerge.application.UserOwnedTransactionExecutor;
+import web.tosunsaeng.domain.usermerge.application.UserOwnershipGuardException;
 
 import java.time.Clock;
 import java.time.Duration;
@@ -31,6 +33,9 @@ public class SummaryDispatchScheduler {
     private final GradingDispatchService dispatchService;
     private final GradingProperties properties;
     private final Clock clock;
+
+    @Autowired(required = false)
+    private UserOwnedTransactionExecutor userOwnedTransactionExecutor;
 
     public SummaryDispatchScheduler(
             @Qualifier("summaryDispatchExecutor") TaskExecutor taskExecutor,
@@ -71,47 +76,12 @@ public class SummaryDispatchScheduler {
     }
 
     private void claimAndDispatch(String jobId, int generationAttempt, DispatchMode mode) {
-        Optional<SummaryGradingJob> existing = summaryJobRepository.findById(jobId);
-        if (existing.isEmpty()) {
+        SummaryDispatchClaim claim = claim(jobId, generationAttempt, mode);
+        if (claim == null) {
             return;
         }
-
-        SummaryGradingJob job = existing.get();
-        if (job.effectiveGenerationAttempt() != generationAttempt) {
-            log.debug(
-                    "이전 요약 채점 예약 무시 event=grading.summary.schedule "
-                            + "outcome=stale_claim_ignored jobId={} "
-                            + "generationAttempt={} currentGenerationAttempt={}",
-                    jobId, generationAttempt, job.effectiveGenerationAttempt()
-            );
-            return;
-        }
-        if (!isSessionInProgress(job.getExamId())) {
-            return;
-        }
-        Instant now = clock.instant();
-        if (!isEligible(job, mode, now)
-                || job.getDispatchAttempt() >= properties.maxDispatchAttempts()) {
-            return;
-        }
-
-        SummaryGradingJob claimed;
-        try {
-            job.startProcessing(now);
-            claimed = summaryJobRepository.save(job);
-        } catch (OptimisticLockingFailureException lostClaim) {
-            return;
-        }
-
-        SummaryDispatchClaim claim = SummaryDispatchClaim.from(claimed, resolveMockExamId(claimed));
         if (!isSessionInProgress(claim.examId())) {
-            summaryJobRepository.failClaimedAttempt(
-                    claim.jobId(),
-                    claim.generationAttempt(),
-                    claim.dispatchAttempt(),
-                    clock.instant(),
-                    EXAM_ABANDONED
-            );
+            failClaim(claim, EXAM_ABANDONED);
             return;
         }
         if (!isCurrentDispatchClaim(claim)) {
@@ -138,24 +108,15 @@ public class SummaryDispatchScheduler {
             );
         } catch (RuntimeException dispatchFailure) {
             long durationMs = elapsedMillis(startedAt);
-            long updated = summaryJobRepository.failClaimedAttempt(
-                    claim.jobId(),
-                    claim.generationAttempt(),
-                    claim.dispatchAttempt(),
-                    clock.instant(),
-                    SUMMARY_DISPATCH_FAILED
-            );
+            long updated = failClaim(claim, SUMMARY_DISPATCH_FAILED);
             if (updated == 0) {
                 log.debug(
                         "이전 요약 채점 전송 실패 무시 event=grading.summary.dispatch "
                                 + "outcome=stale_failure_ignored "
                                 + "jobId={} generationAttempt={} dispatchAttempt={} "
                                 + "durationMs={} errorType={}",
-                        claim.jobId(),
-                        claim.generationAttempt(),
-                        claim.dispatchAttempt(),
-                        durationMs,
-                        dispatchFailure.getClass().getName()
+                        claim.jobId(), claim.generationAttempt(), claim.dispatchAttempt(),
+                        durationMs, dispatchFailure.getClass().getName()
                 );
             } else {
                 log.error(
@@ -177,6 +138,81 @@ public class SummaryDispatchScheduler {
                 );
             }
         }
+    }
+
+    private SummaryDispatchClaim claim(String jobId, int generationAttempt, DispatchMode mode) {
+        Optional<SummaryGradingJob> existing = summaryJobRepository.findById(jobId);
+        if (existing.isEmpty()) {
+            return null;
+        }
+
+        SummaryGradingJob job = existing.get();
+        if (job.effectiveGenerationAttempt() != generationAttempt) {
+            log.debug(
+                    "이전 요약 채점 예약 무시 event=grading.summary.schedule "
+                            + "outcome=stale_claim_ignored jobId={} "
+                            + "generationAttempt={} currentGenerationAttempt={}",
+                    jobId, generationAttempt, job.effectiveGenerationAttempt()
+            );
+            return null;
+        }
+        if (!isSessionInProgress(job.getExamId())) {
+            return null;
+        }
+        return inCurrentOwnerTransaction(job.getExamId(), () -> {
+            SummaryGradingJob current = summaryJobRepository.findById(jobId).orElse(null);
+            Instant now = clock.instant();
+            if (current == null
+                    || current.effectiveGenerationAttempt() != generationAttempt
+                    || !isEligible(current, mode, now)
+                    || current.getDispatchAttempt() >= properties.maxDispatchAttempts()) {
+                return null;
+            }
+            current.startProcessing(now);
+            SummaryGradingJob claimed = summaryJobRepository.save(current);
+            return SummaryDispatchClaim.from(claimed, resolveMockExamId(claimed));
+        });
+    }
+
+    private long failClaim(SummaryDispatchClaim claim, String reason) {
+        return inCurrentOwnerTransaction(claim.examId(), () -> summaryJobRepository.failClaimedAttempt(
+                claim.jobId(),
+                claim.generationAttempt(),
+                claim.dispatchAttempt(),
+                clock.instant(),
+                reason
+        ));
+    }
+
+    private <T> T inCurrentOwnerTransaction(String examId, java.util.function.Supplier<T> command) {
+        if (userOwnedTransactionExecutor == null || !userOwnedTransactionExecutor.enabled()) {
+            return command.get();
+        }
+        RuntimeException lastFailure = null;
+        for (int attempt = 0; attempt < 3; attempt++) {
+            ExamSession observed = examSessionRepository.findById(examId).orElse(null);
+            if (observed == null) {
+                return null;
+            }
+            try {
+                return userOwnedTransactionExecutor.execute(observed.getUserId(), () -> {
+                    ExamSession current = examSessionRepository.findById(examId).orElse(null);
+                    if (current == null
+                            || !java.util.Objects.equals(current.getUserId(), observed.getUserId())) {
+                        throw new SummaryOwnerChangedException();
+                    }
+                    return command.get();
+                });
+            } catch (UserOwnershipGuardException | SummaryOwnerChangedException race) {
+                lastFailure = race;
+            }
+        }
+        throw lastFailure == null
+                ? new IllegalStateException("Summary owner convergence failed")
+                : lastFailure;
+    }
+
+    private static final class SummaryOwnerChangedException extends RuntimeException {
     }
 
     private boolean isEligible(SummaryGradingJob job, DispatchMode mode, Instant now) {

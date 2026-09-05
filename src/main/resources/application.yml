@@ -77,6 +77,14 @@ app:
       principal-value: ${USER_WITHDRAWN_WORKLOAD_PRINCIPAL_VALUE:}
       max-token-lifetime: ${USER_WITHDRAWN_WORKLOAD_MAX_TOKEN_LIFETIME:}
       clock-skew: ${USER_WITHDRAWN_WORKLOAD_CLOCK_SKEW:}
+  user-merged:
+    writer-enabled: ${USER_MERGED_WRITER_ENABLED:false}
+    consumer-enabled: ${USER_MERGED_CONSUMER_ENABLED:false}
+    source-deny-enabled: ${USER_MERGED_SOURCE_DENY_ENABLED:false}
+    workload:
+      issuer: ${USER_MERGED_WORKLOAD_ISSUER:}
+      jwk-set-uri: ${USER_MERGED_WORKLOAD_JWK_SET_URI:}
+      clock-skew: ${USER_MERGED_WORKLOAD_CLOCK_SKEW:PT30S}
   redis:
     key-prefix: ${REDIS_KEY_PREFIX:learning-core}
   s3:

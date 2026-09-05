@@ -1,13 +1,39 @@
 # Learning Core `UserMerged` consumer 최종 구현 계획
 
 - 작성일: 2026-08-20
+- 최종 갱신일: 2026-09-04
 - 대상 저장소: `Too-Much-I/app-back-end-learning-core`
 - 기준 브랜치: `develop`
 - 기준 계약: Identity `UserMerged` schema version 1
 - 결정 근거: `docs/codex/USER_MERGED_CONTRACT_DECISIONS.md`
 - 사전 검토: `docs/codex/USER_MERGED_CONSUMER_REVIEW.md`
-- 상태: 구현 기준 확정, 운영값·Mongo 성능 gate 이행 필요
-- Jira: 별도 이슈 키 미제공
+- 상태: 사용자 권장안 승인·구현 기준 갱신 완료, 운영값·Mongo 성능 gate 이행 필요
+- Jira: `TMI-125` `[Learning Core] UserMerged consumer 및 ownership migration 구현`
+
+## 0. 5줄 결론
+
+1. Identity가 확정한 UserMerged event만 전용 RS256 workload JWT로 받아 source 시험 소유권과 접근을 target으로 원자 전환한다.
+2. source 또는 target의 Billing 시험 생성 operation이 non-terminal이면 부분 이전하지 않고 `503`으로 재시도하여 operation 종료 뒤 전체 migration한다.
+3. 기존 AttemptGroup outbox와 ExamCreationOperation snapshot은 rewrite하지 않고, 학습 데이터인 Session·Result·Summary만 target history로 이전한다.
+4. UserMerged/UserWithdrawn/사용자 요청은 exact SecurityFilterChain `@Order(0/1/2)`와 목적별 audience로 분리하며 withdrawal 충돌은 `409` fail-closed한다.
+5. direct Transaction은 P99 1초·전체 HTTP 2초 초기 gate를 통과할 때만 production 활성화하고 실제 replica-set `mongoIntegrationTest`를 필수로 실행한다.
+
+### 사용자가 반드시 읽어야 하는 내용
+
+- 이 승인은 구현 착수 기준을 확정한 것이며 production publisher·merge 기능 활성화 승인은 아니다.
+- UserMerged는 Session·Result·Summary만 이전하고 `examId`, 기존 operation/outbox payload, S3·Redis·AI 계약을 바꾸지 않는다.
+- 진행 중 Billing creation operation은 중간 이전하지 않아 merge가 최소 5초 이상 지연될 수 있다.
+
+### 사용자가 결정해야 하는 사항
+
+- C12~C18 권장안은 2026-09-04 승인되어 구현 전 추가 제품 선택은 없다.
+- staging에서 direct 성능 gate가 실패하면 C2-B async 계약을 새로 제시하고 다시 승인받는다.
+
+### 주요 위험과 미확인 사항
+
+- 실제 staging/prod Mongo transaction topology·index, 환경별 issuer/JWKS·key rotation과 network 접근은 아직 운영 증빙이 필요하다.
+- source/target withdrawal 충돌은 자동 복구하지 않고 `409`와 경보로 격리하므로 운영 대응 절차가 필요하다.
+- writer 전환 중 구버전 instance가 남아 있으면 guard를 우회할 수 있으므로 drain/backfill 전 publisher를 켜면 안 된다.
 
 ## 1. 목적과 완료 상태의 정의
 
@@ -19,6 +45,8 @@ Identity가 ACTIVE GUEST를 최종 ACTIVE MEMBER로 merge한 뒤 at-least-once�
 2. 확정된 활성 시험 충돌 정책을 적용한다.
 3. source ownership guard를 `MERGED` deny 상태로 바꾼다.
 4. inbox event를 `PROCESSED`로 저장한다.
+
+단, source 또는 target에 non-terminal `ExamCreationOperation`이 있거나 active withdrawal deny marker가 있으면 위 mutation을 시작하지 않는다. 전자는 `503` 재시도, 후자는 `409` 영구 충돌로 분류한다.
 
 구현 완료는 endpoint가 응답하는 것만을 뜻하지 않는다. 모든 기존 writer와 Callback의 guard 전환, migration 준비, 실제 Mongo transaction 통합 테스트, Identity staging E2E, direct Transaction 성능 gate와 배포 runbook까지 통과해야 한다.
 
@@ -39,6 +67,13 @@ Identity가 ACTIVE GUEST를 최종 ACTIVE MEMBER로 merge한 뒤 at-least-once�
 | C9 | 정상·동일 duplicate는 `204`, 일시적 경합은 `503`으로 고정한다. |
 | C10-A | 인프라가 HTTPS와 network 접근을 제한하고 애플리케이션이 workload credential을 검증한다. |
 | C11-A | publisher OFF 상태에서 guard writer 전환, 구버전 drain과 backfill 후 consumer를 활성화한다. |
+| C12-A | source/target non-terminal `ExamCreationOperation`이 있으면 `503`으로 재시도하고 terminal 이후 migration한다. operation snapshot은 rewrite하지 않는다. |
+| C13-A | 기존 AttemptGroup outbox의 eventId·userId·canonical payload·digest를 불변 유지하고 Billing legacy-source fence로 전달한다. |
+| C14-A | UserMerged/UserWithdrawn/일반 catch-all SecurityFilterChain을 각각 `@Order(0/1/2)`로 분리한다. |
+| C15-A | source/target의 active withdrawal marker는 mutation 없이 `409`, 미확정 Transaction 경합만 `503`으로 처리한다. |
+| C16-A | Identity read timeout `PT3S` 아래 direct Transaction P99 1초 이하·전체 HTTP 2초 미만을 초기 활성화 gate로 사용한다. |
+| C17-A | replica-set Testcontainers 기반 전용 `mongoIntegrationTest` Gradle task를 CI 필수 gate로 둔다. |
+| C18-A | Jira 단건 예외가 아닌 계약 경계 제한형 UserMerged 영구 허용을 `AGENTS.md`에 둔다. |
 
 ### 2.2 유지할 기존 외부 계약
 
@@ -64,6 +99,9 @@ Identity가 ACTIVE GUEST를 최종 ACTIVE MEMBER로 merge한 뒤 at-least-once�
 - Kafka, SQS 또는 새 메시지 큐
 - 스트릭, 챌린지, 단어장처럼 현재 저장소에 없는 aggregate
 - processed merge의 자동 역병합
+- non-terminal/terminal `ExamCreationOperation`의 owner·reservation snapshot rewrite
+- 기존 `attempt_group_event_outbox` event의 owner·payload·digest rewrite 또는 재생성
+- Learning Core가 withdrawal marker를 삭제·해제하거나 Identity lifecycle을 추정하는 동작
 
 ## 3. 현재 코드 기준 ownership과 writer inventory
 
@@ -86,6 +124,9 @@ Identity가 ACTIVE GUEST를 최종 ACTIVE MEMBER로 merge한 뒤 at-least-once�
 | Redis 시험 상태 | `examId` | key/TTL 유지, invalidation 불필요 |
 | S3 제출 객체 | `examId` | key와 객체를 이동하지 않음 |
 | `mock_exams`, `questions` | 비사용자 catalog | migration 금지 |
+| `exam_creation_operations` | `userId`, Billing reservation·idempotency coordination snapshot | source/target non-terminal 문서가 하나라도 있으면 merge를 `503`으로 미루고, terminal 문서는 기존 owner와 purge 정책을 유지하며 rewrite하지 않음 |
+| `attempt_group_event_outbox` | 생성 시점 `userId`와 immutable canonical payload·digest | 기존 event를 rewrite하지 않고 Billing legacy-source fence로 전달, merge 이후 새 event만 target owner 사용 |
+| `withdrawn_user_access_denies` | Identity withdrawal access deny snapshot | source/target active marker 존재 시 `409` fail-closed, Learning Core가 삭제·해제하지 않음 |
 
 ### 3.3 반드시 guard 경계로 전환할 쓰기
 
@@ -101,8 +142,13 @@ Identity가 ACTIVE GUEST를 최종 ACTIVE MEMBER로 merge한 뒤 at-least-once�
 | Azure Callback | `processAzureCallback()` | Session 재조회 + owner guard touch + 결과 insert | 없음 |
 | Session 완료·abandon·legacy 보정 | `ExamSessionManager` repository update | 해당 Session current owner guard와 같은 Transaction | 로그·projection |
 | background Question/Summary Job 전이 | `ExamGradingService`, `SummaryDispatchScheduler` | Session current owner 확인과 guard touch 후 Job claim/전이 | AI 호출 |
+| Billing 시험 생성 saga | `BillingExamCreationSaga`, `BillingExamCreationTransactionService` | operation 준비·Session commit·confirm/cancel local 전이가 current user guard와 같은 Transaction 경계를 사용하고 merge preflight가 non-terminal operation을 감지 | Billing reserve/confirm/cancel/status HTTP는 Transaction 밖에서 수행 |
+| AttemptGroup 상태·terminal 전이 | `AttemptGroupStateCoordinator`, `AttemptGroupSummaryCompletionService` | Session current owner guard + projection·Summary/Job·terminal/outbox local mutation을 기존 단일 Transaction에 참여 | publisher 전달 |
+| AttemptGroup 복구·backfill·outbox 생성 | reconciler, backfill, outbox store | 대상 Session current owner guard를 기존 Transaction/CAS 경계에서 확인·touch | Billing publish는 commit 후 수행 |
 
 순수 조회는 request 시작 시 merged marker를 확인하되 revision을 증가시키지 않는다. guard 확인이 merge commit보다 먼저 선형화된 in-flight read는 완료될 수 있고, merge commit 뒤 시작한 guard 확인은 항상 source를 거절한다. 모든 쓰기는 guard document를 실제로 update해 merge와 Mongo write conflict를 만든다.
+
+서로 다른 기능의 `TransactionTemplate`을 중첩하지 않는다. Billing saga, Summary completion과 AttemptGroup coordinator처럼 이미 Transaction을 가진 command는 같은 manager의 기존 body에 guard touch를 참여시키고 별도 nested Transaction을 시작하지 않는다.
 
 ## 4. 목표 구조
 
@@ -141,7 +187,7 @@ global 구성에는 다음 역할을 분리한다.
 
 ```text
 global/config/
-  MongoTransactionConfig
+  UserOwnedMongoTransactionConfiguration
   UserMergedProperties
   UserMergedStartupValidator
   UserMergedSecurityConfig
@@ -190,7 +236,15 @@ direct v1에서는 `PENDING` inbox를 먼저 commit하지 않는다. migration, 
 
 ### 4.4 Mongo Transaction 기반
 
-`MongoTransactionManager`를 명시적으로 구성하고, user-owned command는 이름이 명확한 `TransactionTemplate` 기반 executor를 사용한다.
+UserMerged/standalone user-owned command용 `MongoTransactionManager`를 이름이 명확한 bean으로 구성하고, user-owned command는 전용 `TransactionTemplate` 기반 executor를 사용한다. 기존 Billing, AttemptGroup과 UserWithdrawn transaction manager는 즉시 하나로 합치지 않는다.
+
+guard repository/service 자체는 새 Transaction을 열지 않는다. 호출 경계가 다음처럼 결정된다.
+
+- 기존 Billing command 안에서는 `billingMongoTransactionManager`의 현재 Transaction에 guard touch가 참여한다.
+- 기존 AttemptGroup command 안에서는 `attemptGroupMongoTransactionManager`의 현재 Transaction에 guard touch가 참여한다.
+- UserWithdrawn consumer는 기존 manager를 유지하고 UserMerged와의 marker 충돌은 UserMerged Transaction에서 read-only preflight한다.
+- 그 밖의 Session/Job/Callback/UserMerged command는 새 명명된 user-owned executor가 Transaction을 연다.
+- 한 command 안에서 다른 feature의 `TransactionTemplate.execute()`를 다시 호출하지 않는다.
 
 프로그램 방식으로 두는 이유는 다음과 같다.
 
@@ -198,6 +252,7 @@ direct v1에서는 `PENDING` inbox를 먼저 commit하지 않는다. migration, 
 - self-invocation으로 annotation이 무시되는 경계를 피한다.
 - DB commit 전 단계와 Redis/S3/AI 같은 commit 후 단계를 명확히 분리한다.
 - transient transaction과 unknown commit result의 수렴 로직을 command별 business key로 검증할 수 있다.
+- 여러 feature flag 조합에서도 transaction manager 선택이 annotation 추론이나 `@Primary` 우연성에 의존하지 않는다.
 
 구현 시 기존 `ExamReadService`와 `ExamServiceImpl`의 `@Transactional(readOnly=true)`를 감사한다. 순수 Mongo read에 불필요한 transaction이 생기지 않도록 제거하거나 transaction manager를 명시한다. Azure Callback의 기존 `@Transactional`은 새 command 경계로 이동한다.
 
@@ -240,6 +295,30 @@ merge가 먼저 commit하면 재시도에서 `MERGED`를 보고 거절한다. pr
 
 외부 단계가 실패하면 기존 Question/Summary Job의 FAILED/retry 상태 전이를 사용한다. 새 Redis Key, queue 또는 outbox를 이 범위에서 추가하지 않는다.
 
+### 4.6 Billing 시험 생성 operation과 merge
+
+`exam_creation_operations`는 학습 이력이 아니라 Billing reservation·idempotency coordination snapshot이다. 다음 상태는 non-terminal로 본다.
+
+```text
+PREPARED, RESERVED, SESSION_COMMITTED, CANCEL_PENDING
+```
+
+source 또는 target에 `activeGuard=true`인 non-terminal operation이 하나라도 있으면 UserMerged Transaction은 어떤 owner mutation도 하지 않고 `503`과 `Retry-After: 5`를 반환한다. 이는 Identity owner-event publisher의 기본 초기 backoff `PT5S`와 맞춘 값이다. Identity가 같은 `eventId`와 payload로 재시도하고, operation이 `SUCCEEDED`, `CANCELED`, `EXPIRED`, `FAILED_TERMINAL` 중 하나로 수렴한 뒤 migration을 다시 수행한다.
+
+- operation의 `userId`, reservationId, attemptGroupId, continuation snapshot은 rewrite하지 않는다.
+- terminal operation은 merge를 차단하지 않고 기존 TTL/purge 정책으로 정리된다.
+- 일부 Session·Result만 먼저 옮기는 partial migration은 금지한다.
+- Billing HTTP reserve/confirm/cancel/status 호출을 UserMerged Transaction 안에서 실행하지 않는다.
+
+### 4.7 기존 AttemptGroup outbox 불변성
+
+merge 전에 생성된 `attempt_group_event_outbox`는 생성 당시의 전달 snapshot이다. 기존 event의 eventId, userId, canonical payload와 digest를 수정하거나 새 event로 대체하지 않는다.
+
+- 기존 event는 Billing `TMI-120`의 exact legacy-source fence로 전달한다.
+- retry는 같은 eventId와 동일 payload를 유지한다.
+- merge commit 이후 새로 생성되는 event부터 Session의 current target owner를 사용한다.
+- UserMerged는 AttemptGroup publisher backlog가 0이 될 때까지 기다리지 않는다.
+
 ## 5. endpoint와 security 설계
 
 ### 5.1 internal endpoint
@@ -255,7 +334,7 @@ Controller는 `BaseResponse`를 사용하지 않는다. 이 endpoint는 사용�
 
 ### 5.2 별도 `SecurityFilterChain`
 
-`@Order(1)`의 internal 전용 chain이 `/internal/v1/events/user-merged`만 match한다.
+`@Order(0)`의 internal 전용 chain이 정확한 `POST /internal/v1/events/user-merged`만 match한다.
 
 - workload 전용 `JwtDecoder`
 - decoder에서 issuer, timestamp, audience와 algorithm 검증
@@ -265,6 +344,16 @@ Controller는 `BaseResponse`를 사용하지 않는다. 이 endpoint는 사용�
 - CORS 비사용
 - 사용자 Access JWT decoder/authority와 bean qualifier 분리
 - local/test legacy chain보다 먼저 match해 internal endpoint permit-all 방지
+
+chain 순서는 다음으로 고정한다.
+
+```text
+@Order(0) UserMerged exact POST /internal/v1/events/user-merged
+@Order(1) UserWithdrawn exact POST /internal/v1/events/withdrawn
+@Order(2) 사용자 JWT 또는 local/test Legacy catch-all
+```
+
+같은 order를 두 internal chain에 중복 지정하지 않는다. 하나의 generic internal token으로 두 endpoint를 모두 허용하지 않으며, 통합 internal chain으로 재구성하려면 path별 decoder/audience authorization을 동일하게 증명하는 별도 계약 변경이 필요하다.
 
 기존 사용자 chain은 다음 순서로 유지한다.
 
@@ -288,22 +377,29 @@ app:
     workload:
       issuer: ${USER_MERGED_WORKLOAD_ISSUER:}
       jwk-set-uri: ${USER_MERGED_WORKLOAD_JWK_SET_URI:}
-      audience: ${USER_MERGED_WORKLOAD_AUDIENCE:}
-      principal-claim: ${USER_MERGED_WORKLOAD_PRINCIPAL_CLAIM:}
-      principal: ${USER_MERGED_WORKLOAD_PRINCIPAL:}
-      algorithm: ${USER_MERGED_WORKLOAD_ALGORITHM:}
-      max-token-lifetime: ${USER_MERGED_WORKLOAD_MAX_TOKEN_LIFETIME:}
-      clock-skew: ${USER_MERGED_WORKLOAD_CLOCK_SKEW:}
+      clock-skew: ${USER_MERGED_WORKLOAD_CLOCK_SKEW:PT30S}
 ```
 
-실제 값과 algorithm allowlist는 Identity·인프라 합의 후 채운다. Secret이나 token을 설정 예시, 테스트 로그, 문서에 넣지 않는다.
+다음 값은 환경 설정으로 자유롭게 바꾸지 않고 Identity `TMI-123`과 같은 코드 계약으로 고정한다.
+
+```text
+algorithm = RS256
+audience = learning-core-user-merged
+principal claim/value = sub / identity-service
+iat = nbf
+maximum token lifetime = PT2M
+required header = typ=JWT, kid
+required jti = 요청별 canonical UUID
+service claim = 사용하지 않음
+```
+
+환경별 issuer·JWKS URI와 key rotation/overlap만 배포 운영값으로 주입한다. Secret이나 실제 token은 설정 예시, 테스트 로그, 문서에 넣지 않는다.
 
 startup validator는 consumer가 enabled인 staging/prod에서 다음을 fail-closed한다.
 
 - blank/placeholder/non-HTTPS issuer·JWKS
-- blank audience/principal claim/value
-- 허용되지 않은 algorithm
-- 비양수 max token lifetime, 음수 clock skew 또는 합의 범위 밖 값
+- 고정 audience/principal/RS256/최대 `PT2M` validator 누락 또는 임의 override
+- 음수 clock skew 또는 합의 범위 밖 값
 - workload decoder/chain 미등록
 - Mongo transaction 미지원 또는 필수 guard/inbox/migration index 누락
 
@@ -333,10 +429,12 @@ payload digest는 확정된 NUL-delimited semantic input과 SHA-256 lowercase he
 | Content-Type 불일치 | `415` | 없음 |
 | field/schema 의미 오류 | `422` | 없음 |
 | eventId/digest 또는 guard 상충 | `409` | 없음 |
+| source/target active withdrawal marker | `409` | 없음, lifecycle 계약 경보 |
 | workload token 누락·유효성 실패 | `401` | 없음 |
 | principal 불허 | `403` | 없음 |
 | rate limit | `429` | 없음, `Retry-After` 가능 |
 | 처리 winner 미확정·일시 DB 장애 | `503` | 성공 추측 금지, `Retry-After` 가능 |
+| source/target non-terminal ExamCreationOperation | `503` | mutation 없음, `Retry-After: 5` 뒤 동일 event 재시도 |
 
 internal 전용 `@RestControllerAdvice`와 security handler가 위 status를 우선 적용한다. 오류 body는 없어도 되며 필요하면 stable internal code와 correlation ID만 포함한다. source/target UUID, raw payload와 token은 응답이나 로그에 넣지 않는다.
 
@@ -359,26 +457,36 @@ internal 전용 `@RestControllerAdvice`와 security handler가 위 status를 우
    ├─ 다른 digest → conflict
    └─ 없음 → 신규 처리
 
-2. source/target UUID를 canonical 문자열 순서로 정렬
-3. 두 guard document를 그 순서로 insert/touch
+2. source/target active withdrawal deny marker 조회
+   ├─ 하나라도 존재 → durable conflict, mutation 없이 409
+   └─ 없음 → 계속
+
+3. source/target non-terminal ExamCreationOperation 조회
+   ├─ 하나라도 존재 → retryable precondition, mutation 없이 503
+   └─ 없음 → 계속
+
+4. source/target UUID를 canonical 문자열 순서로 정렬
+5. 두 guard document를 그 순서로 insert/touch
    - source는 ACTIVE이거나 absent여야 함
    - target은 ACTIVE이거나 absent여야 함
    - target MERGED면 conflict
 
-4. source/target의 effective active Session 조회
+6. source/target의 effective active Session 조회
    ├─ target active + source active → source를 ABANDONED/active=false
    ├─ target active only → target 유지
    ├─ source active only → 상태 유지 후 target owner로 이전
    └─ 둘 다 없음 → history만 이전
 
-5. source exam_results.userId → target
-6. source exam_summaries.userId → target
-7. source exam_sessions.userId → target
-8. source guard ACTIVE → MERGED
+7. source exam_results.userId → target
+8. source exam_summaries.userId → target
+9. source exam_sessions.userId → target
+10. source guard ACTIVE → MERGED
    - targetUserId, occurredAt, eventId 저장
-9. inbox PROCESSED insert
-10. commit
+11. inbox PROCESSED insert
+12. commit
 ```
+
+`exam_creation_operations`, 기존 `attempt_group_event_outbox`와 withdrawal marker는 이 Transaction에서 rewrite하거나 삭제하지 않는다.
 
 활성 source를 abandon하는 update를 Session owner rewrite보다 먼저 수행해 `{userId:1, active:true}` partial unique index 충돌을 피한다. 모든 변경은 같은 Transaction이므로 외부에서는 중간 순서를 관찰할 수 없다.
 
@@ -389,6 +497,8 @@ internal 전용 `@RestControllerAdvice`와 security handler가 위 status를 우
 - winner의 같은 digest `PROCESSED` 확인: `204`
 - winner rollback 또는 제한 시간 안에 결과 미확정: `503`
 - 다른 digest나 guard 상충: `409`와 bounded 경보
+- source/target non-terminal creation operation: `503`과 `Retry-After: 5`
+- source/target withdrawal marker: `409`와 lifecycle 계약 경보
 
 same source/target이라도 다른 `eventId`는 producer 계약 위반이므로 성공으로 숨기지 않는다.
 
@@ -470,6 +580,20 @@ guard update count가 0이면 state를 다시 읽는다.
 - raw Azure/SpeechAce/Feedback payload와 transcript를 새 로그에 남기지 않는다.
 - 기존 멱등 ID와 stale generation/recovery fencing을 유지한다.
 
+#### `BillingExamCreationSaga`와 `BillingExamCreationTransactionService`
+
+- 새 operation 준비와 local Session commit/finalize/cancel 전이는 current user guard와 같은 Transaction command를 사용한다.
+- 외부 Billing reserve/confirm/cancel/status HTTP는 Transaction 밖에서 유지한다.
+- non-terminal operation은 UserMerged preflight가 owner rewrite 없이 `503`으로 미루도록 `activeGuard`와 terminal 상태를 신뢰 가능한 단일 기준으로 유지한다.
+- UserMerged용 별도 `TransactionTemplate`을 기존 Billing transaction body 안에서 중첩하지 않는다.
+
+#### AttemptGroup coordinator·completion·reconciliation
+
+- `AttemptGroupStateCoordinator`, `AttemptGroupSummaryCompletionService`의 기존 Transaction body에 Session current owner guard를 참여시킨다.
+- reconciler, 승인된 backfill과 outbox store도 mutation 전에 current owner를 다시 읽고 같은 Transaction/CAS 경계에서 guard를 touch한다.
+- 이미 만들어진 outbox event는 rewrite하지 않고 새 event 생성 시점에만 current Session owner를 snapshot한다.
+- Billing publisher HTTP는 commit 뒤 기존 흐름을 유지한다.
+
 ### 7.3 merged source 요청 차단
 
 JWT mode의 모든 사용자 API는 controller 진입 전 source marker를 검사한다.
@@ -511,6 +635,8 @@ scripts/mongodb/user-merged-prepare.test.js
 - canonical UUID가 아닌 owner
 - 필요한 index 없음/이름 충돌/정의 불일치/hidden index
 - guard 기존 MERGED/상충 데이터
+- source/target active withdrawal marker와 non-terminal ExamCreationOperation 분포
+- merge 후보가 보유한 PENDING/IN_FLIGHT/BLOCKED_AUTH AttemptGroup outbox 분포는 관측하되 merge 차단 조건으로 사용하지 않음
 - transaction 한 건에서 이동할 예상 P50/P95/P99/max 문서 수와 BSON 크기 근사치
 
 실제 userId는 출력하지 않고 bounded count와 비가역 hash를 사용해야 할 경우에도 운영 승인된 방식만 사용한다.
@@ -547,22 +673,24 @@ Result/Summary userId index는 staging `explain("executionStats")`와 document �
 
 담당: Identity, Learning Core, 인프라/보안, DBA
 
-- workload issuer/JWKS/algorithm/audience/principal claim/value/TTL/skew/rotation 확정
+- 환경별 workload issuer/JWKS와 key rotation/overlap 확정
+- 코드 고정 profile인 RS256, `aud=learning-core-user-merged`, `sub=identity-service`, `iat=nbf`, TTL `PT2M`, UUID `jti`, `typ=JWT`, `kid` 일치 확인
 - Identity 인계서에 C8 producer 불변식과 C9 status/retry 반영
 - TLS 종료, trusted forwarded header, ingress/security group/WAF 4 KiB 책임 확정
 - staging/prod Mongo가 replica set 또는 transaction 지원 sharded cluster인지 확인
-- Identity 5초 read timeout과 retry 설정 재확인
+- Identity connect `PT1S`, read `PT3S` timeout과 retry 설정 재확인
 
 완료 gate: credential 표에 TBD가 없고 Secret 없이 검증 가능한 claim 명세가 승인됨.
 
 ### Phase 1. Mongo Transaction과 guard foundation
 
-- `MongoTransactionConfig`, `UserOwnedTransactionExecutor`
+- `UserOwnedMongoTransactionConfiguration`, `UserOwnedTransactionExecutor`
 - guard entity/repository/service/state
 - bounded retry와 unknown commit convergence
 - `ACCOUNT_MERGED_TOKEN_REJECTED`
 - merged-user authorization filter/handler
 - 기존 `@Transactional` 영향 감사
+- 기존 Billing·AttemptGroup Mongo transaction manager와 중첩 없는 공통 command 경계 확정
 
 완료 gate: replica-set integration test에서 source write/merge, target write/merge와 absent guard insert 경합이 단일 결과로 수렴.
 
@@ -573,6 +701,7 @@ Result/Summary userId index는 staging `explain("executionStats")`와 document �
 - Question/Summary Job DB phase와 external phase 분리
 - 네 Callback transaction 전환
 - scheduler/background claim 전환
+- Billing 시험 생성 saga/Transaction과 AttemptGroup coordinator·summary completion·reconciler·backfill·outbox store 전환
 - Redis/S3/AI 기존 계약 회귀
 
 완료 gate: 모든 repository mutation call site가 guard 적용 대상인지 inventory test/수동 checklist로 확인되고 구버전 writer와 섞이지 않는 배포 artifact 준비.
@@ -591,6 +720,7 @@ Result/Summary userId index는 staging `explain("executionStats")`와 document �
 
 - workload properties/startup validator
 - 별도 SecurityFilterChain/decoder/principal validator
+- UserMerged/UserWithdrawn/사용자·Legacy chain `@Order(0/1/2)`와 exact matcher
 - body limit/content type filter
 - DTO/normalizer/digest
 - internal advice/status mapping
@@ -602,6 +732,8 @@ Result/Summary userId index는 staging `explain("executionStats")`와 document �
 
 - inbox entity/repository
 - direct Transaction service
+- active withdrawal marker `409`와 non-terminal creation operation `503` preflight
+- 기존 AttemptGroup outbox와 terminal ExamCreationOperation snapshot 불변 검증
 - 활성 시험 4-case matrix
 - owner rewrite와 source guard transition
 - concurrent duplicate/response-loss/conflict handling
@@ -615,6 +747,9 @@ Result/Summary userId index는 staging `explain("executionStats")`와 document �
 - publisher timeout/retry/duplicate/response-loss
 - process termination과 재시작
 - source token deny와 target history 확인
+- creation operation 진행 중 `503` 후 terminal 재시도 수렴
+- 기존 source-owner AttemptGroup outbox 전달과 merge 이후 target-owner 신규 event 확인
+- withdrawal marker conflict `409`와 mutation 0건 확인
 - C6 5분 잔여 PUT 시나리오
 - production 유사 P50/P95/P99/max 데이터량과 latency
 
@@ -636,7 +771,7 @@ Result/Summary userId index는 staging `explain("executionStats")`와 document �
 ### 신규 production code
 
 - `src/main/java/web/tosunsaeng/domain/usermerge/**`
-- `src/main/java/web/tosunsaeng/global/config/MongoTransactionConfig.java`
+- `src/main/java/web/tosunsaeng/global/config/UserOwnedMongoTransactionConfiguration.java`
 - `src/main/java/web/tosunsaeng/global/config/UserMergedProperties.java`
 - `src/main/java/web/tosunsaeng/global/config/UserMergedStartupValidator.java`
 - `src/main/java/web/tosunsaeng/global/config/UserMergedSecurityConfig.java`
@@ -652,8 +787,15 @@ Result/Summary userId index는 staging `explain("executionStats")`와 document �
 - `domain/exams/application/ExamSessionManager.java`
 - `domain/exams/application/ExamGradingService.java`
 - `domain/exams/application/SummaryDispatchScheduler.java`
+- `domain/exams/application/BillingExamCreationSaga.java`
+- `domain/exams/application/BillingExamCreationTransactionService.java`
+- `domain/exams/attemptgroup/application/AttemptGroupStateCoordinator.java`
+- `domain/exams/attemptgroup/application/AttemptGroupSummaryCompletionService.java`
+- 관련 AttemptGroup reconciler·backfill·outbox store
+- UserWithdrawn deny repository를 통한 read-only conflict preflight
 - 필요한 Exam repository query/update
 - `src/main/resources/application.yml`
+- `build.gradle`의 전용 `mongoIntegrationTest` source set/task와 CI 실행 연결
 
 ### migration/runbook
 
@@ -691,6 +833,8 @@ Result/Summary userId index는 staging `explain("executionStats")`와 document �
 ### 11.2 Security/MVC 계약 테스트
 
 - 정상 workload token → `204`
+- UserMerged endpoint가 UserMerged 전용 decoder와 `aud=learning-core-user-merged`를 사용
+- UserWithdrawn Token으로 UserMerged endpoint 호출 및 UserMerged Token으로 UserWithdrawn endpoint 호출 → `401`
 - missing/expired/과도한 lifetime/wrong signature/issuer/audience/algorithm → `401`
 - 허용되지 않은 principal → `403`
 - 사용자 Access JWT로 internal endpoint → 거절
@@ -703,7 +847,7 @@ Result/Summary userId index는 staging `explain("executionStats")`와 document �
 
 ### 11.3 Mongo replica-set integration test
 
-mock repository만으로 Transaction 완료를 판정하지 않는다. Testcontainers 또는 CI 전용 replica-set Mongo에서 다음을 검증한다.
+mock repository만으로 Transaction 완료를 판정하지 않는다. 전용 `mongoIntegrationTest`가 Testcontainers replica-set Mongo에서 다음을 검증한다.
 
 - migration 세 collection + source deny + inbox의 all-or-nothing
 - 각 mutation 단계 failure injection rollback
@@ -711,6 +855,10 @@ mock repository만으로 Transaction 완료를 판정하지 않는다. Testconta
 - response loss 뒤 duplicate `204`
 - 같은 eventId/different digest no mutation
 - source/target guard 획득 순서가 반대인 event의 교착/재시도
+- source/target non-terminal ExamCreationOperation이면 전체 mutation 0건과 `503`, terminal 이후 동일 event 성공
+- terminal ExamCreationOperation owner·reservation snapshot 불변과 기존 purge 정책
+- 기존 AttemptGroup outbox eventId·userId·canonical payload·digest 불변, merge 이후 신규 event의 target owner snapshot
+- source/target active withdrawal marker 충돌 `409`와 전체 mutation 0건
 - source write vs merge
 - target write vs merge
 - absent ACTIVE insert vs MERGED insert
@@ -719,7 +867,7 @@ mock repository만으로 Transaction 완료를 판정하지 않는다. Testconta
 - unknown commit result convergence
 - process 종료 후 retry
 
-통합 테스트를 별도 Gradle source set으로 둘 경우 CI 필수 task로 연결하고, 기본 `./gradlew clean test`와 함께 실행 방법을 문서화한다.
+통합 테스트는 `mongoIntegrationTest` Gradle source set/task로 분리하고 Testcontainers replica-set Mongo를 사용한다. CI 필수 task로 연결하고 기본 `./gradlew clean test`와 함께 실행 방법을 문서화한다. 공유 staging MongoDB를 테스트 데이터베이스로 사용하지 않는다.
 
 ### 11.4 기존 계약 회귀
 
@@ -752,7 +900,7 @@ node --test scripts/mongodb/user-merged-prepare.test.js
 
 ```text
 ./gradlew clean test
-./gradlew <mongo-transaction-integration-task>
+./gradlew mongoIntegrationTest
 node --test scripts/mongodb/user-merged-prepare.test.js
 git diff --check
 ```
@@ -777,7 +925,7 @@ metric tag에 eventId, source/target userId, examId를 넣지 않는다.
 
 ## 13. 성능 gate
 
-Identity publisher read timeout은 5초이므로 5초 전체를 DB Transaction 예산으로 사용하지 않는다.
+Identity publisher connect timeout은 `PT1S`, read timeout은 `PT3S`이므로 3초 전체를 DB Transaction 예산으로 사용하지 않는다.
 
 staging에서 다음을 측정한다.
 
@@ -788,7 +936,7 @@ staging에서 다음을 측정한다.
 - 동시 target write/Callback이 있을 때 latency
 - HTTP 전체 latency와 publisher timeout/duplicate율
 
-초기 제안 기준은 P99 2초 이하, 최대 HTTP latency 5초 미만이지만 최종 숫자는 Identity·DBA와 측정 결과로 승인한다. 기준 실패 시 다음을 금지한다.
+사용자 승인에 따른 초기 production 활성화 기준은 **direct Transaction P99 1초 이하, 전체 HTTP latency 2초 미만**이다. max, retry율과 timeout 0건 조건은 production 유사 staging 데이터 분포와 Identity·DBA 측정 결과로 추가 승인한다. 기준 실패 시 다음을 금지한다.
 
 - publisher timeout만 임의로 증가
 - 일부 aggregate만 direct, 나머지는 무기록 background 처리
@@ -827,7 +975,8 @@ publisher 활성화 전에는 guard-aware 버전을 안전하게 재배포하거
 
 ## 15. 완료 acceptance criteria
 
-- [ ] C1 workload profile에서 TBD가 제거되고 실제 값은 Secret 없이 승인 문서에 기록됐다.
+- [ ] 환경별 workload issuer·JWKS URI와 rotation/overlap 문서에 placeholder가 없고 Secret 없이 승인됐다.
+- [ ] 고정 RS256/UserMerged audience/Identity subject/`PT2M` claim profile과 `@Order(0/1/2)` security 경계가 positive·negative test로 고정됐다.
 - [ ] C8 producer 불변식과 C9 status/retry가 Identity 인계서에 반영됐다.
 - [ ] staging/prod Mongo transaction 지원과 retry가 검증됐다.
 - [ ] 모든 user-owned writer와 네 Callback이 guard Transaction 경계를 사용한다.
@@ -835,12 +984,15 @@ publisher 활성화 전에는 guard-aware 버전을 안전하게 재배포하거
 - [ ] 활성 시험 C4-A와 history C5-A가 테스트로 고정됐다.
 - [ ] C6-A 5분 잔여 capability 문구와 E2E가 승인됐다.
 - [ ] 동일 duplicate는 `204`, 상충 event는 `409`, 미확정 일시 장애는 `503`이다.
+- [ ] active withdrawal marker는 `409`, non-terminal ExamCreationOperation은 `503`이며 두 경우 모두 partial mutation이 없다.
+- [ ] terminal ExamCreationOperation과 기존 AttemptGroup outbox snapshot은 rewrite되지 않고, merge 이후 새 outbox만 target owner를 사용한다.
 - [ ] 사용자 JWT가 internal endpoint에 접근할 수 없다.
 - [ ] source JWT는 target alias가 되지 않고 사용자 API에서 안정적인 403 code를 받는다.
 - [ ] 공개 API/DTO/`BaseResponse`, AI/Callback, Redis/S3와 retryCount 계약이 유지된다.
 - [ ] migration dry-run/apply/final verification과 index explain이 성공했다.
 - [ ] rollback injection과 모든 동시성 integration test가 성공했다.
-- [ ] `./gradlew clean test`, Mongo integration task, Node migration test가 성공했다.
+- [ ] `./gradlew clean test`, `./gradlew mongoIntegrationTest`, Node migration test가 성공했다.
+- [ ] direct Transaction P99 1초 이하와 전체 HTTP 2초 미만 초기 gate가 production 유사 staging에서 성공했다.
 - [ ] staging workload auth, duplicate, response-loss, process-kill과 P99 gate가 성공했다.
 - [ ] 구버전 writer drain, dashboard/alert와 no-rollback runbook이 확인됐다.
 - [ ] 위 조건 전에는 production publisher와 merge feature가 OFF다.

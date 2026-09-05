@@ -1,9 +1,12 @@
 # Learning Core `UserMerged` consumer 구현 사전 검토
 
 - 검토일: 2026-08-20
+- 상태 갱신: 2026-09-04
 - 검토 대상: Identity Service 발행 `UserMerged` schema version 1 인계서
 - 저장소 기준: `main` / `98730c9`
 - 결론: 방향은 타당하지만, 현재 인계서만으로 endpoint 구현을 시작하면 안 된다. 아래 차단 사항과 Phase 0 정책을 먼저 확정해야 한다.
+
+> 이 문서는 2026-08-20 당시의 사전 검토 근거를 보존하는 역사적 snapshot이다. 아래의 `TBD`, 5초 timeout, 당시 코드 inventory는 현재 구현 기준이 아니다. 2026-09-04 사용자 승인과 최신 Identity·Billing·Learning Core 코드를 반영한 실제 구현 기준은 `USER_MERGED_CONSUMER_IMPLEMENTATION_PLAN.md`와 `USER_MERGED_CONTRACT_DECISIONS.md`를 따른다. 현재 workload 계약은 RS256, `aud=learning-core-user-merged`, `sub=identity-service`, TTL `PT2M`이며 Identity read timeout은 `PT3S`다. 신규 Billing creation operation·AttemptGroup outbox·UserWithdrawn 경합 정책도 두 최신 문서의 C12~C18에 확정돼 있다.
 
 ## 1. 최우선 결론
 
