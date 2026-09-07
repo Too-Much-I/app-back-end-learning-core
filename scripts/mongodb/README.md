@@ -1,5 +1,18 @@
 # MongoDB maintenance scripts
 
+## TMI-126 Challenge preparation
+
+`challenge-10s-prepare.js`는 기존 연결에서 Challenge 전용 catalog·attempt·Job·receipt와 index를 검증한다.
+기본은 dry-run이며 apply는 `CHALLENGE_PREPARE_APPLY=true`와 `CHALLENGE_WRITERS_DRAINED=true`를 모두 요구한다.
+`MONGODB_URI`, 명시적인 `MONGODB_DATABASE`는 승인된 환경 주입으로 제공한다. 기준일·콘텐츠·기존 시험 데이터는 변경하지 않는다.
+
+```bash
+node scripts/mongodb/challenge-10s-prepare.js
+node --test scripts/mongodb/challenge-10s-prepare.test.js
+```
+
+활성화·중단·apply 절차는 [Challenge rollout](../../docs/codex/TEN_SECOND_CHALLENGE_ROLLOUT.md)을 따른다.
+
 ## TMI-125 UserMerged guard preparation
 
 `user-merged-prepare.js`는 UserMerged consumer를 켜기 전에 기존 Session·Result·Summary

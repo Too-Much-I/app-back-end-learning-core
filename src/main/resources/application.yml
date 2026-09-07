@@ -24,6 +24,13 @@ spring:
       max-request-size: 10MB
 
 app:
+  challenge:
+    enabled: ${CHALLENGE_ENABLED:false}
+    ai-endpoint: ${CHALLENGE_AI_ENDPOINT:}
+    outbound-credential: ${CHALLENGE_AI_OUTBOUND_CREDENTIAL:}
+    callback-credential: ${CHALLENGE_AI_CALLBACK_CREDENTIAL:}
+    poll-ms: ${CHALLENGE_POLL_MS:1000}
+    expiry-poll-ms: ${CHALLENGE_EXPIRY_POLL_MS:10000}
   billing:
     creation-saga-enabled: ${BILLING_CREATION_SAGA_ENABLED:false}
     phone-continuation-enabled: ${BILLING_PHONE_CONTINUATION_ENABLED:false}

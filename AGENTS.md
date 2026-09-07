@@ -460,6 +460,7 @@ TMI-116에서 AttemptGroup outbox/publisher를 제외한 것은 해당 Jira의 �
 - 프론트 API: `docs/contracts/ten-second-challenge-frontend-api.md` v1
 - Learning Core–AI API: `docs/contracts/ten-second-challenge-ai-api.md` v1
 - 상세 결정: `docs/codex/TEN_SECOND_CHALLENGE_API_CONTRACT_DECISIONS.md`
+- 구현 계획 및 2026-09-07 사용자 승인 보완: `docs/codex/TEN_SECOND_CHALLENGE_IMPLEMENTATION_PLAN.md`
 
 위 계약과 다른 URL, HTTP Method, Request/Response field, enum, timeout, retry 또는 Callback 구조를 임의로 추가·변경하지 않는다. 계약 변경이 필요하면 구현보다 먼저 관련 문서와 프론트·AI 합의를 갱신한다.
 
@@ -475,6 +476,7 @@ TMI-116에서 AttemptGroup outbox/publisher를 제외한 것은 해당 Jira의 �
 ## Challenge 사용자와 공개 API
 
 - 10초 챌린지는 Identity의 `MEMBER`만 이용한다. Guest 요청은 `403`으로 거절한다.
+- 2026-09-07 승인: 서명 검증된 Identity JWT의 `account_type=MEMBER`를 사용한다. GUEST·claim 누락·알 수 없는 값은 403이며 Legacy로 우회하지 않는다. Identity claim 발급 구현은 별도 의존 작업이다.
 - 실제 userId는 인증된 Identity에서 가져오며 Request Body, Path, Query와 Response에 추가하지 않는다.
 - 모든 사용자용 attempt·날짜·결과 API는 인증 사용자 소유권을 검증한다.
 - AI Callback에는 사용자용 CurrentUserProvider 소유권 검증을 적용하지 않고 service credential과 Job 식별자로 검증한다.
@@ -502,6 +504,12 @@ TMI-116에서 AttemptGroup outbox/publisher를 제외한 것은 해당 Jira의 �
 - 자정을 지나도 deadline 전에는 기존 attempt 제출을 허용하지만 이전 날짜의 새 attempt는 만들지 않는다.
 - attemptId 기반 server-generated S3 object key를 생성하고 프론트가 key나 URL을 지정하게 하지 않는다.
 - 같은 attempt의 upload URL 재발급은 동일 object key를 사용하고 새 응시로 계산하지 않는다.
+- 사용자 승인 Challenge key는 `temp/challenges/{attemptId}/q_{questionNumber}.m4a`다. retryCount·실제 userId·날짜·추가 prefix를 붙이지 않는다. 기존 시험 `temp/{examId}/q_{questionNumber}_r{retryCount}.wav`는 유지하며 temp lifecycle·권한은 운영 활성화 전에 검증한다.
+- 2026-09-07 사용자 결정: 같은 key의 유효 PUT 덮어쓰기를 허용하고 마지막 성공 업로드를 현재 음성으로 유지한다. version pin·별도 음성 보관본은 만들지 않는다. bucket versioning 변경·과거 객체 삭제를 허용한 것은 아니다. 같은 AI Job에 다른 audio 전송은 기존 AI 멱등 계약과 충돌하므로 별도 합의 없이 변경하지 않는다.
+- 미제출 EXPIRED 결과의 submittedAt과 gradedAt은 null로 반환한다. 만료 시각을 실제 제출 시각으로 기록하지 않는다.
+- 사용자 확인: 재녹음은 answer 제출 전만 허용하고 같은 attempt·deadline·key로 최종 PUT 완료 뒤 제출한다. 최초 AI 전송 bytes의 digest를 HTTP 전에 durable CAS로 선택하고 재시작/재전송에도 유지한다. 다른 bytes를 같은 Job에 보내거나 새 generation으로 우회하지 않는다. 복구 불가면 채점 실패로 종료하되 이미 완료된 결과·제출·풀이 수·참고 답안을 보존한다. version pin·음성 보관본은 추가하지 않는다.
+- 미제출 attempt 만료는 요청 경계 lazy CAS와 bounded scheduler로 수렴한다. 이미 성공한 submit replay를 deadline 경과로 만료 처리하지 않는다.
+- 2026-09-07 사용자 결정: `solvedQuestionCount`는 실제 audio 제출이 접수된 내부 SUBMITTED만 세고 미제출 EXPIRED는 제외한다. `participated`는 실제 제출 수가 1 이상일 때만 true다. AI pending·no-speech·failed는 접수 사실을 바꾸지 않는다. 만료의 다음 문제·참고 답안 접근과 공개 submitted projection은 유지하며 진행 종료 목록을 실제 풀이 수로 집계하지 않는다.
 - audio는 M4A/AAC-LC·`audio/mp4`, 16/44.1/48 kHz, mono/stereo, 최대 2 MiB 계약을 따른다.
 - Challenge용 신규 S3 key를 설계할 수 있지만 기존 시험 S3 key 형식은 변경하지 않는다.
 
@@ -514,9 +522,13 @@ TMI-116에서 AttemptGroup outbox/publisher를 제외한 것은 해당 Jira의 �
 - request와 Callback 모두 `attemptId`, `jobId`, `gradingAttempt`를 검증하고 이전 generation Callback은 상태를 덮어쓰지 않는 성공 no-op으로 처리한다.
 - AI가 referenceAnswer를 Callback으로 echo하게 하지 않는다. 프론트 `aiResult.referenceAnswer`는 Learning Core attempt snapshot에서 조립한다.
 - Callback deadline은 120초, 최대 AI generation은 3회다.
+- 후속 사용자 승인: 각 Job 최초 dispatch부터 202 접수 전 transport 총 예산은 5분(연결/응답/backoff 포함)이며 재시작·lease 회수·재전송으로 초기화하지 않는다. 예산 소진 또는 마지막 generation timeout으로 최종 failed가 확정되면 늦은 유효 Callback은 결과를 바꾸지 않고 204 no-op한다. 기존 인증·payload conflict 검증은 유지하고 예산 회피용 새 generation을 만들지 않는다. 상세는 AI v1 및 구현 계획 C.2를 따른다.
 - transcript와 corrected answer는 각각 최대 1000자, feedback 각 항목은 최대 500자, Callback JSON은 UTF-8 기준 최대 16 KiB다.
 - 방향별 service credential은 서로 분리해 환경변수·secret store로 주입하고 실제 값을 코드·문서·테스트·로그에 기록하지 않는다.
 - 사용자 audio, transcript 전체, prompt·reference answer 전체와 AI provider 원문을 로그에 기록하지 않는다.
+- Callback 전용 exact security chain은 일반 JWT/Legacy catch-all보다 먼저 항상 등록하고 feature OFF이면 deny-all한다. 방향별 opaque Bearer 인증 계약은 유지한다.
+- Learning Core는 S3 존재·metadata MIME·2 MiB를 검증하고 AI는 실제 media profile을 검사한다. 식별자는 구조화 로그에만 허용하며 metric tag에는 고정 enum만 사용한다.
+- 2026-09-07 승인한 history 범위는 요청 월과 `[contentBaseDate, KST 오늘]`의 교집합이다. `CHALLENGE_DATE_CLOSED`는 제거하고 날짜 불일치/미제출 만료의 기존 전용 오류로 구분한다.
 
 ## Challenge 테스트
 

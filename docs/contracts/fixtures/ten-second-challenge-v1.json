@@ -1,0 +1,50 @@
+{
+  "description": "Synthetic contract fixtures; not user recordings or provider output. Credentials are intentionally omitted.",
+  "accepted": {
+    "contract_version": "v1",
+    "job_id": "challenge:10000000-0000-4000-8000-000000000001:grading:1",
+    "grading_attempt": 1,
+    "status": "accepted"
+  },
+  "callbacks": [
+    {
+      "contract_version": "v1",
+      "callback_id": "40000000-0000-4000-8000-000000000001",
+      "attempt_id": "10000000-0000-4000-8000-000000000001",
+      "job_id": "challenge:10000000-0000-4000-8000-000000000001:grading:1",
+      "grading_attempt": 1,
+      "outcome": "completed",
+      "transcript": "This is a synthetic fixture.",
+      "verdict": "correct",
+      "corrected_answer": null,
+      "feedback": {"meaning": "의미 테스트 피드백입니다.", "grammar": "문법 테스트 피드백입니다.", "pronunciation": "발음 테스트 피드백입니다."},
+      "error": null
+    },
+    {
+      "contract_version": "v1",
+      "callback_id": "40000000-0000-4000-8000-000000000002",
+      "attempt_id": "10000000-0000-4000-8000-000000000001",
+      "job_id": "challenge:10000000-0000-4000-8000-000000000001:grading:1",
+      "grading_attempt": 1,
+      "outcome": "no_speech",
+      "transcript": null,
+      "verdict": null,
+      "corrected_answer": null,
+      "feedback": null,
+      "error": null
+    },
+    {
+      "contract_version": "v1",
+      "callback_id": "40000000-0000-4000-8000-000000000003",
+      "attempt_id": "10000000-0000-4000-8000-000000000001",
+      "job_id": "challenge:10000000-0000-4000-8000-000000000001:grading:1",
+      "grading_attempt": 1,
+      "outcome": "failed",
+      "transcript": null,
+      "verdict": null,
+      "corrected_answer": null,
+      "feedback": null,
+      "error": {"code": "MODEL_UNAVAILABLE", "retryable": true}
+    }
+  ]
+}

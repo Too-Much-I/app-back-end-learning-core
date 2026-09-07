@@ -126,7 +126,7 @@ Identity가 verified-phone eligibility candidate를 Entitlement에 멱등 전달
 1. AI 계약 v1의 M4A/AAC 허용 profile·최대 2 MiB·서비스 인증·timeout/retry를 실제 모바일 fixture와 staging contract test로 검증
 2. 승인된 프론트 `aiResult`·no-speech·사전 정의 답안 projection을 구현하고 결과 노출 문구를 E2E 검증
 3. MEMBER 전용 authorization을 구현하고 Guest `403`을 검증
-4. streak를 즉시 제공할지 후속으로 미룰지
+4. streak는 MVP에서 제외한다. 2026-09-07 승인된 account_type·만료 CAS·Callback 보안·audio 검증 분리는 [Challenge 구현 계획](TEN_SECOND_CHALLENGE_IMPLEMENTATION_PLAN.md)을 따른다.
 
 ## 5. 우선 결정할 제품 계약
 
