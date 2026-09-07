@@ -3,10 +3,12 @@
 - 버전: v1
 - 작성일: 2026-08-28
 - 대상: Learning Core 백엔드, Python AI 서버
-- 상태: Learning Core·AI 팀 승인, 구현 전
-- 관련 Jira: `TMI-102`, `TMI-105`, `TMI-106` — Learning Core Challenge backend·AI 연동 전용 Jira는 아직 없음
+- 상태: Learning Core·AI 팀 v1 승인. TMI-126 Learning Core 로컬 구현·테스트 완료, 미배포. AI 서버 실제 적용 확인은 별도다.
+- 보완일: 2026-09-07 — 사용자 권장안 승인 반영. audio 검증 책임·metric 규칙은 AI 팀 전달 및 적용 확인 필요. 기존 endpoint와 payload field는 유지한다.
+- 관련 Jira: `TMI-102`, `TMI-105`, `TMI-106`; Learning Core Challenge backend·AI 연동 구현: [TMI-126](https://to-teacher.atlassian.net/browse/TMI-126). 별도 AI 서버 후속 이슈는 확인되지 않았다.
+- 후속 사용자 승인: 접수 전 총 5분 전송 예산과 최종 실패 후 유효 late Callback 204 no-op을 확정했다. AI 팀의 변경 내용 적용·공유 fixture 검증은 별도 확인한다.
 
-> 이 문서의 API는 Learning Core·AI 팀이 승인한 v1 계약이지만 아직 구현·배포되지 않았다. 기존 모의고사 `/evaluations`와 시험 Feedback Callback 계약을 변경하거나 재사용하지 않고, 10초 챌린지 전용 versioned 계약으로 구현한다. 양쪽 구현은 이 문서와 공유 contract fixture를 기준으로 검증한다.
+> 이 문서의 API는 Learning Core·AI 팀이 승인한 v1 계약이며 Learning Core 로컬 구현·테스트를 완료했다. 운영 배포·AI 서버 적용 확인은 남아 있다. 기존 모의고사 `/evaluations`와 시험 Feedback Callback 계약을 변경하거나 재사용하지 않고, 10초 챌린지 전용 versioned 계약으로 구현했다. 양쪽 구현은 이 문서와 공유 contract fixture(`fixtures/ten-second-challenge-v1.json`)를 기준으로 검증한다.
 
 ## 1. 목표와 처리 흐름
 
@@ -106,6 +108,8 @@ X-Challenge-Contract-Version: v1
 - sample rate나 channel 차이를 평가 점수 또는 verdict에 반영하지 않는다.
 - `Content-Type`, container 또는 codec이 지원 범위 밖이면 영구 오류로 처리한다.
 - 파일이 2 MiB를 초과하면 AI 호출 전에 Learning Core가 거절하는 것이 원칙이며, AI도 같은 상한을 방어적으로 검증한다.
+- Learning Core submit의 검증 범위는 S3 객체 존재·metadata Content-Type·크기다. 실제 container·codec·sample rate·channel·decode 가능 여부는 AI가 검사하며 MIME metadata만으로 정상 audio로 판단하지 않는다.
+- 내구성 있게 접수한 뒤 발견한 지원 불가·손상 audio는 기존 `failed` Callback과 `UNSUPPORTED_AUDIO` 또는 `AUDIO_DECODE_FAILED`, `retryable=false`로 전달한다. 접수 전 발견한 오류는 기존 영구 HTTP 오류 규칙을 따른다. Learning Core는 사용자 제출과 참고 답안을 유지하고 공개 `gradingStatus=failed`로 수렴한다.
 - 사용자 audio와 transcript 전체를 애플리케이션 로그에 기록하지 않는다.
 
 ## 5. AI 평가 요청
@@ -180,6 +184,8 @@ Content-Type: application/json
 - 동일한 `Idempotency-Key`와 동일한 payload 재전송은 새 AI 작업을 만들지 않고 같은 `202` 응답을 반환한다.
 - 동일한 key에 식별자 또는 audio가 다른 요청은 `409 IDEMPOTENCY_CONFLICT`다.
 - AI가 내구성 있게 접수하지 못했다면 `202`를 반환하지 않는다.
+
+2026-09-07 Learning Core 사용자 결정 및 후속 승인: 프론트 재녹음은 answer 제출 전만 제공한다. 같은 upload key의 최종 PUT 완료 뒤 제출하며 version pin·별도 보관본을 만들지 않는다. 최초 AI 전송 bytes의 digest를 HTTP 전에 내구성 있게 기록하고 재전송 bytes를 비교한다. 제출 뒤 예외적으로 바뀐 audio를 같은 Job으로 보내지 않으며 일치하는 bytes 복구가 불가능하면 채점 실패로 종료한다. 이미 완료된 결과·사용자 제출·참고 답안은 유지하고 새 generation으로 변경 음성을 우회 전송하지 않는다. 이는 Learning Core의 방어 정책이며 AI의 기존 동일 key/다른 audio=409와 JSON·timeout 계약을 변경하지 않는다. 실제 적용은 양 팀 fixture로 검증한다.
 
 ## 6. AI 결과 Callback
 
@@ -324,11 +330,12 @@ Callback 크기 제한:
 
 ### 7.1 성공·중복·stale
 
-Learning Core는 다음 세 경우 모두 `204 No Content`를 반환한다.
+Learning Core는 다음 경우 모두 `204 No Content`를 반환한다.
 
 - 현재 generation의 최초 유효 Callback을 저장함
 - 같은 `callback_id`와 같은 payload가 재전송됨
 - 현재보다 작은 `grading_attempt`의 늦은 Callback을 상태 변경 없이 무시함
+- 최종 실패가 이미 확정된 known Job의 유효 late Callback을 결과 변경 없이 무시함(기존 Callback payload conflict는 제외)
 
 AI는 `204`를 받으면 해당 Callback 재시도를 중단한다. Learning Core는 저장, duplicate와 stale을 구조화 로그와 metric으로 구분한다.
 
@@ -339,7 +346,8 @@ AI는 `204`를 받으면 해당 Callback 재시도를 중단한다. Learning Cor
 3. Callback `grading_attempt`이 현재 값보다 작으면 stale 성공 no-op 처리한다.
 4. 현재 값보다 크거나 존재하지 않는 Job이면 `409 GRADING_GENERATION_CONFLICT`로 격리한다.
 5. 현재 generation의 결과가 이미 저장됐다면 같은 payload는 duplicate 성공, 다른 payload는 `409 CALLBACK_PAYLOAD_CONFLICT`다.
-6. 결과 저장과 Job terminal 전환은 하나의 원자적 상태 전이로 처리한다.
+6. 현재 generation에 저장된 Callback 결과가 없고, 이미 로컬 최종 실패가 확정됐다면 유효 late Callback은 `204` no-op으로 처리한다. 실패를 완료로 되돌리지 않는다. 인증·body·식별자 검증과 저장된 Callback의 conflict 규칙은 생략하지 않는다.
+7. 결과 저장과 Job terminal 전환은 하나의 원자적 상태 전이로 처리한다. Callback과 최종 실패가 경쟁하면 먼저 확정된 terminal을 유지한다.
 
 ### 7.3 Callback 오류
 
@@ -363,6 +371,10 @@ AI는 `204`를 받으면 해당 Callback 재시도를 중단한다. Learning Cor
 - `202`를 받기 전 connection failure, timeout, `408`, `425`, `429`, `5xx`는 동일 `job_id`, `grading_attempt`, `Idempotency-Key`로 재전송한다.
 - `400`, `401`, `403`, `404`, `405`, `409`, `413`, `415`, `422`는 자동 transport retry하지 않고 설정·payload 오류로 격리·경보한다.
 - `429`에 `Retry-After`가 있으면 우선 적용한다.
+- 사용자 승인: 202 접수 전 transport 총 시간은 각 Job 최초 dispatch부터 5분이다. 연결·응답·backoff를 모두 포함하며 최초 dispatch 시각/deadline을 내구성 있게 저장한다. 재시작·lease 회수·중복 전송이 예산을 초기화하지 않는다. 아래 Callback 전달 10회와 별개다.
+- 전송 backoff는 1초 시작·30초 상한 exponential backoff+jitter다. Retry-After를 앞당기지 않으며 남은 예산보다 길면 추가 전송 없이 deadline 만료로 수렴한다. HTTP 대기도 기존 timeout과 남은 예산 중 짧은 범위로 제한한다.
+- 유효 202 접수 전 5분이 소진되면 추가 전송을 중단하고 Job/공개 gradingStatus를 failed로 전환·경보한다. 새 generation으로 예산을 우회하지 않는다. 유효 202가 먼저 처리되면 아래의 별도 120초 결과 대기를 적용한다. 중복 202가 최초 acceptedAt을 갱신하지 않는다.
+- 202보다 이른 유효 Callback은 결과를 저장할 수 있다. 실패 확정과 경합하면 원자적 상태 전이의 승자를 유지하며, 최종 실패 뒤에는 7.2의 late Callback 규칙을 적용한다.
 
 ### 8.2 AI 처리 deadline
 
@@ -371,6 +383,7 @@ AI는 `204`를 받으면 해당 Callback 재시도를 중단한다. Learning Cor
 - 사용자 attempt 하나의 최대 AI generation은 3이다.
 - 세 generation을 모두 소진하면 Job과 공개 `gradingStatus`를 `failed`로 전환한다.
 - 이전 generation Callback이 나중에 도착하면 fencing 규칙에 따라 `204` stale no-op으로 처리한다.
+- 사용자 승인: 마지막 generation timeout으로 최종 failed가 확정된 뒤 같은 generation의 유효 Callback이 도착하면 204 no-op으로 처리한다. 실패 상태·제출 기록·참고 답안을 유지하며 결과를 완료로 되돌리지 않는다. 기존 인증/body/generation 및 저장된 Callback payload conflict 검증은 유지한다.
 
 ### 8.3 AI → Learning Core
 
@@ -381,13 +394,15 @@ AI는 `204`를 받으면 해당 Callback 재시도를 중단한다. Learning Cor
 
 ## 9. 관측성과 개인정보
 
-양쪽 구조화 로그와 metric에는 다음 식별값만 사용한다.
+양쪽 구조화 로그에는 다음 필드를 사용할 수 있다. 이 식별자를 metric label/tag로 사용하지 않는다.
 
 - `attempt_id`
 - `job_id`
 - `grading_attempt`
 - `callback_id`
 - stage, outcome, error code, duration
+
+Metric tag는 고정된 stage·outcome·allowlist error code 등 저카디널리티 enum만 사용한다. `attempt_id`, `job_id`, `callback_id`, 실제 userId와 자유 문자열은 metric tag에 금지한다. duration은 tag가 아니라 timer/histogram의 측정값이며 monotonic clock으로 측정한다. 알려지지 않은 error code는 고정 분류로 집계한다.
 
 다음 값은 로그에 기록하지 않는다.
 
@@ -439,4 +454,5 @@ AI는 `204`를 받으면 해당 Callback 재시도를 중단한다. Learning Cor
 - [ ] Callback 204·4xx·429·5xx 재시도 E2E 통과
 - [ ] transcript·audio·credential 로그 비노출 확인
 - [x] 프론트 `aiResult` DTO를 이 계약의 projection으로 최종 동결
-- [ ] Challenge backend·AI 구현 Jira 생성
+- [x] Learning Core Challenge backend·AI 연동 구현 Jira 생성 — TMI-126
+- [ ] AI 서버 측 후속 구현 이슈 필요 여부와 기존 TMI-106 범위 확인

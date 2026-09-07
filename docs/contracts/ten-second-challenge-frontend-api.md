@@ -3,9 +3,11 @@
 - 버전: v1
 - 작성일: 2026-08-28
 - 대상: 앱 프론트엔드
-- 상태: 제품·프론트·백엔드·AI 계약 승인, 구현 전
+- 상태: v1 승인, TMI-126 Learning Core 로컬 구현·테스트 완료 / 미배포. 프론트·AI 적용 확인은 별도다.
+- 보완일: 2026-09-07 — 사용자 권장안 승인 반영. history 범위·오류 의미 보완은 프론트 전달 및 적용 확인 필요.
+- 집계 정책 변경: 2026-09-07 사용자 요청으로 풀이 수·참여 여부는 실제 audio 제출 접수만 기준으로 한다. 미제출 만료는 제외하며 결과 접근·다음 문제 진행은 유지한다. 프론트 적용 확인 필요.
 
-> 이 문서의 API는 승인된 v1 계약이지만 아직 구현·배포되지 않았다. 실제 `challenge_10s_questions` 콘텐츠 구조, 첫 feature 활성화 KST 날짜의 자동 Day 1 고정, 비순환 dayNumber, difficulty 프론트 전달/AI 제외, 녹음 시작 attempt와 녹음 후 S3 upload-url 분리, attempt 제출 유효시간 1시간, 날짜 rollover, MEMBER 전용, AI 결과와 polling 계약을 반영한다.
+> 이 문서의 API는 승인된 v1 계약이며 Learning Core 로컬 구현·테스트를 완료했다. 아직 운영 배포·활성화하지 않았다. 실제 `challenge_10s_questions` 콘텐츠 구조, 첫 feature 활성화 KST 날짜의 자동 Day 1 고정, 비순환 dayNumber, difficulty 프론트 전달/AI 제외, 녹음 시작 attempt와 녹음 후 S3 upload-url 분리, attempt 제출 유효시간 1시간, 날짜 rollover, MEMBER 전용, AI 결과와 polling 계약을 반영한다.
 
 ## 1. 콘텐츠와 제출물
 
@@ -61,7 +63,8 @@ Authorization: Bearer <ACCESS_TOKEN>
 ```
 
 - `userId`는 Request Body, Path, Query에 보내지 않는다.
-- 10초 챌린지는 `accountType=MEMBER`인 사용자만 이용한다. Guest Access Token은 `403 COMMON403`으로 거절한다.
+- 10초 챌린지는 MEMBER만 이용한다. Learning Core는 서명 검증된 Identity Access Token의 `account_type=MEMBER`를 검사한다. GUEST·claim 누락·알 수 없는 값은 `403 COMMON403`으로 거절한다.
+- `account_type`은 Identity가 발급하는 JWT claim이다. 앱은 Request에 계정 유형을 추가하지 않고 기존 Access Token 전달·갱신 흐름을 유지한다. 프로필 응답의 `accountType`과 JWT claim 이름은 별개다. Identity claim 발급기의 운영 선배포와 구형 Token drain 확인이 필요하다.
 - S3 Presigned URL로 업로드할 때는 `Authorization` 헤더를 보내지 않는다.
 - 날짜 문자열은 KST 기준 `YYYY-MM-DD` 형식이다.
 - 시각 문자열은 ISO 8601 UTC 형식이다. 예: `2026-08-24T03:20:10Z`.
@@ -112,6 +115,7 @@ HTTP status와 `code`를 함께 확인한다. 사용자 분기에는 `message` �
 - server 내부의 attempt 생성·업로드 중 상태는 공개 DTO에서 `not_started`로 projection한다.
 - 정상 audio 제출, 무음 결과와 1시간 제출 만료는 공개 DTO에서 모두 `submitted`로 projection한다.
 - `in_progress`, `expired` 같은 내부 상태를 공개 enum에 추가하지 않는다.
+- 공개 `submitted`는 결과 화면 접근 상태이지 실제 음성 제출 여부가 아니다. 미제출 만료도 이 상태를 사용하므로 풀이 수를 이 값으로 세지 말고 서버의 `solvedQuestionCount`를 사용한다.
 
 ### 3.3 AI 처리 상태 `gradingStatus`
 
@@ -210,6 +214,7 @@ Authorization: Bearer <ACCESS_TOKEN>
 ```
 
 - `completedQuestionNumbers`에는 공개 `attemptStatus=submitted`인 문제가 포함된다.
+- `completedQuestionNumbers`와 `dailyStatus`는 만료를 포함한 진행 종료 상태를 유지한다. 실제 풀이 수·참여 여부와 별개이며 이 목록의 길이를 풀이 수로 표시하지 않는다. 세 문제 모두 미제출 만료라면 `dailyStatus=completed`여도 `solvedQuestionCount=0`, `participated=false`다.
 - `nextQuestionNumber`는 서버가 다음 진행 대상으로 판단한 번호다. 모두 완료되면 `null`이다.
 - 앱은 문제 순서를 자체 계산하지 말고 `nextQuestionNumber`를 우선 사용한다.
 - `challengeDateExpiresAt`은 현재 server KST 날짜가 끝나는 절대 시각이다.
@@ -284,6 +289,7 @@ Request Body는 없다.
 
 - 앱은 이 요청이 성공한 뒤에만 녹음을 시작한다.
 - 내부 S3 object key는 attempt 생성 시 `attemptId`를 기반으로 서버가 결정·고정한다. 앱에 key를 노출하지 않는다.
+- 서버 내부 key는 `temp/challenges/{attemptId}/q_{questionNumber}.m4a`로 확정했다. 앱은 경로를 조립하거나 Request에 보내지 않고 upload-url 응답의 URL을 그대로 사용한다. 별도 key field는 추가하지 않는다.
 - 같은 문제에서 네트워크 재시도로 다시 호출하면 새 attempt를 만들지 않는다.
 - server 내부에 제출 전 attempt가 있다면 같은 `attemptId`와 동일한 `submissionDeadlineAt`을 반환한다. 공개 `attemptStatus`는 여전히 `not_started`다.
 - 공개 `attemptStatus=submitted`이면 `409 CHALLENGE_ALREADY_ATTEMPTED`를 반환한다.
@@ -329,9 +335,11 @@ Request Body는 없다.
 - 같은 attempt의 URL 재발급은 새 응시로 계산하지 않고, 항상 attempt에 고정된 동일 S3 object key에 대해서만 발급한다.
 - 녹음 파일은 `.m4a` 확장자의 M4A 컨테이너와 AAC 코덱을 사용하며 업로드 `Content-Type`은 `audio/mp4`로 고정한다.
 - 서버가 생성하는 S3 object key도 `.m4a` 확장자를 사용한다.
-- `maxBytes`는 서버 응답을 따르며 예시의 2 MiB는 최대 파일 크기 확정 전까지 임시값이다.
+- `maxBytes`는 v1 고정 상한 2,097,152 bytes(2 MiB)다.
 - Presigned URL은 짧게 발급하고 만료 시 같은 attemptId로 재발급한다. 예시의 URL은 5분 유효하지만 attempt 제출 유효시간은 1시간이다.
 - URL 자체의 `expiresAt`은 `submissionDeadlineAt`을 넘을 수 없다.
+- 사용자 확인: 다시 녹음은 answer 제출 전에만 제공한다. 같은 attemptId/key/deadline을 유지하고 이전 PUT이 늦게 완료돼 최종 음성을 덮어쓰지 않도록 업로드 순서를 제어한다. 최종 음성 PUT 성공 후 answer를 호출한다. answer를 보낸 뒤 응답이 유실되면 다시 녹음하지 않고 같은 Idempotency-Key 재시도/상태 조회로 접수 여부를 확인한다.
+- 2026-09-07 사용자 결정: 유효한 기존 PUT URL로 같은 key에 덮어쓰기를 허용하고 마지막으로 성공한 업로드를 현재 음성으로 유지한다. 서버는 version pin·별도 보관본을 만들지 않는다. 이미 AI가 접수한 음성/결과가 자동 변경되는 것은 아니며 terminal attempt에 새 URL을 발급하거나 재응시를 허용하지 않는다.
 
 ### 6.5 S3에 audio 업로드
 
@@ -391,7 +399,8 @@ audio 제출 Request:
 ```
 
 - 앱이 timer duration이나 client 시각을 보내지 않는다.
-- 서버가 attempt에 연결된 정확한 S3 object의 존재·형식·크기를 확인한 뒤 `submitted`로 전환한다.
+- 서버가 attempt에 연결된 정확한 S3 object의 존재·metadata Content-Type(`audio/mp4`)·크기(최대 2 MiB)를 확인한 뒤 `submitted`로 전환한다.
+- 실제 M4A/AAC-LC·sample rate·channel·decode 가능 여부는 AI가 검증한다. Content-Type 불일치는 submit의 `415 CHALLENGE_AUDIO_FORMAT_UNSUPPORTED`, 접수 후 발견한 binary 형식 오류는 비동기 `gradingStatus=failed`다. 후자는 참고 답안을 유지하며 새 응시를 허용하지 않는다.
 - 녹음이 10초에 도달해 자동 종료된 경우에도 이 정상 제출 API를 사용한다.
 - 제출 접수 응답에서 `referenceAnswer`를 즉시 반환하므로 AI 처리 완료를 기다리지 않고 학습 결과와 다음 문제를 볼 수 있다.
 - 녹음에 발화가 없더라도 audio를 제출한다. 발화가 감지되지 않으면 `transcript=null`과 발화 없음 안내 문구를 제공하며 별도의 공개 `feedbackType` enum은 추가하지 않는다.
@@ -444,11 +453,12 @@ Query Parameter:
 ```
 
 - 요청한 월의 날짜별 참여 여부와 실제로 푼 문제 수만 반환한다.
-- `participated=true`는 해당 날짜에 공개 `attemptStatus=submitted`인 문제가 하나 이상 있다는 뜻이다.
-- `solvedQuestionCount`는 공개 `attemptStatus=submitted`인 문제 수이며 `0`~`3`이다.
-- 정상 audio 제출, 무음과 1시간 만료 terminal을 프론트 상태에서 구분하지 않으므로 모두 풀이 수에 포함한다.
+- `participated=true`는 해당 날짜에 서버가 실제 audio 제출을 접수한 문제가 하나 이상 있다는 뜻이다(`solvedQuestionCount>0`).
+- `solvedQuestionCount`는 실제 audio 제출이 접수된 문제 수이며 `0`~`3`이다. 서버는 내부 `SUBMITTED`를 기준으로 계산하고 `EXPIRED`는 제외한다.
+- 제출이 접수됐다면 AI 처리 중·정상 완료·무음·최종 채점 실패 모두 풀이 수에 포함한다. 미제출 1시간 만료, 시작만 한 attempt, S3 업로드만 하고 제출 API가 접수하지 않은 문제는 포함하지 않는다. 같은 제출의 재시도는 중복 계산하지 않는다.
 - attempt만 만들고 아직 terminal이 아닌 공개 `not_started` 문제는 풀이 수에 포함하지 않는다.
-- 과거 월은 월 전체 날짜를 반환한다. 현재 월은 KST 오늘까지 반환하고 미래 날짜는 포함하지 않는다.
+- 날짜 범위는 요청 월과 `[contentBaseDate, KST 오늘]`의 교집합이다. 기준일 이전 날짜와 미래 날짜는 포함하지 않는다. 기준일 이전 월은 `dates=[]`이며 이후 과거 월은 월 전체 날짜를 반환한다.
+- 앱은 `dates`에 없는 날짜를 미참여·결석으로 채우지 않고 비활성 날짜로 표시한다. 서버 내부 기준일을 계산하거나 새 Request field를 보낼 필요는 없다. 콘텐츠 소진만으로 기준일 이후 날짜를 이력에서 삭제하지 않는다.
 - 미래 `yearMonth` 요청은 `400 COMMON400`으로 거절한다.
 - 월 단위 최대 31건이므로 cursor와 pagination은 사용하지 않는다.
 
@@ -622,14 +632,15 @@ AI 분석이 정상 완료된 응답:
 - `questionNumber`가 없으면 `question` 또는 `questions` 필드를 반환하지 않는다.
 - `questionNumber`가 있으면 해당 문제 상세를 단일 `question` 객체로 반환한다.
 - 해당 날짜에 풀이가 없으면 `solvedQuestionCount=0`이다.
-- 날짜에는 풀이가 있지만 지정한 문제를 풀지 않았다면 날짜 전체 `solvedQuestionCount`는 유지하고 `question=null`을 반환한다.
+- 지정 문제의 attempt가 없거나 아직 미제출·미만료라면 날짜 전체 `solvedQuestionCount`는 유지하고 `question=null`을 반환한다. 미제출 만료는 풀이 수에 포함하지 않지만 참고 답안을 제공하기 위해 `question`을 반환한다.
 - AI 처리 중에도 HTTP 200과 `gradingStatus=pending|processing`, `aiResult=null`을 반환한다.
 - 공개 `attemptStatus=submitted`인 문제는 AI Callback 도착 여부와 관계없이 항상 결과 조회가 가능해야 한다. 이 경우 `404 CHALLENGE_ATTEMPT_NOT_FOUND`가 발생하면 정상 대기 상태가 아니라 서버 데이터 정합성 오류다.
 - AI 결과가 아직 없을 때도 prompt, 제출 시각과 참고 답안은 유지하고 AI에 의존하는 필드만 `null`로 반환한다.
 - `gradingStatus=failed`는 결과 조회 요청 자체의 실패가 아니므로 root `isSuccess=true`, `code=COMMON_200`을 유지한다. 프론트는 polling을 멈추고 참고 답안과 `피드백을 생성하지 못했어요` 안내를 표시한다.
 - 내부 예외명, AI 응답 원문, 재시도 횟수와 `failureReason`은 공개 DTO에 넣지 않는다. 운영 진단용 Job과 로그에서만 관리한다.
 - 발화가 감지되지 않으면 `gradingStatus=completed`, `aiResult.referenceAnswer`는 non-blank, 나머지 AI 생성 field는 null이다. 프론트는 이 조합에 고정 발화 없음 안내를 표시하고 별도 `feedbackType` enum은 사용하지 않는다.
-- 1시간 만료처럼 개인화 피드백이 없는 terminal도 공개 상태상 푼 문제로 계산하며 문제 번호를 지정하면 참고 답안과 nullable AI 결과를 반환한다.
+- 1시간 미제출 만료는 풀이 수에서 제외한다. 문제 번호를 지정하면 참고 답안과 `gradingStatus=not_requested`, `aiResult=null`인 `question`은 반환한다. 따라서 `solvedQuestionCount=0`이어도 만료 문제의 `question`은 non-null일 수 있다.
+- 만료된 문제의 `submittedAt=null`, `gradedAt=null`을 반환한다. 실제 제출이 없으므로 만료 시각을 제출 시각으로 사용하지 않는다. 프론트는 제출 시각이 null이면 해당 시각 표시를 생략한다.
 
 ## 7. 오류 계약
 
@@ -644,11 +655,10 @@ AI 분석이 정상 완료된 응답:
 | `409` | `CHALLENGE_PREVIOUS_QUESTION_INCOMPLETE` | `nextQuestionNumber` 문제로 이동 |
 | `409` | `CHALLENGE_IDEMPOTENCY_CONFLICT` | 새 요청을 만들지 말고 상태 재조회 |
 | `409` | `CHALLENGE_AUDIO_NOT_UPLOADED` | S3 업로드 성공 여부 확인 후 같은 key로 재시도 |
-| `409` | `CHALLENGE_DATE_CLOSED` | 오늘 진행도를 다시 조회 |
 | `409` | `CHALLENGE_DATE_CHANGED` | 캐시된 날짜·문항 상태를 버리고 오늘 진행도 재조회 |
 | `410` | `CHALLENGE_ATTEMPT_EXPIRED` | 이전 날짜 제출을 중단하고 오늘 진행도 조회 |
 | `413` | `CHALLENGE_AUDIO_TOO_LARGE` | 녹음 파일 크기 오류 안내 |
-| `415` | `CHALLENGE_AUDIO_FORMAT_UNSUPPORTED` | 서버가 지정한 audio 형식으로 다시 인코딩 |
+| `415` | `CHALLENGE_AUDIO_FORMAT_UNSUPPORTED` | upload-url의 Content-Type으로 업로드 후 같은 attempt로 재시도 |
 | `500` | `COMMON500` | 재시도 안내 및 오류 화면 |
 
 아래 Challenge 전용 code 이름과 HTTP mapping은 v1 계약이다.
@@ -685,6 +695,7 @@ AI 분석이 정상 완료된 응답:
 - AI가 실패해도 제출 접수 시 받은 참고 답안은 유지하고 UI에는 `피드백 준비 중` 또는 `피드백 생성 실패`를 표시한다. 사용자 답안을 사라진 것처럼 처리하지 않는다.
 - 60초가 지나도 `pending|processing`이면 foreground polling을 중단하고 `피드백 준비 중`을 표시한다. 서버 Job은 취소하지 않으며 결과 화면 재진입·foreground 복귀 시 다시 조회한다.
 - 서버의 Callback deadline은 120초이고 최대 AI generation은 3회다.
+- 후속 사용자 승인: AI 접수 전 전송은 Job 최초 전송부터 최대 5분이며 소진 시 gradingStatus=failed로 종료한다. 최종 채점 실패 뒤 늦게 온 결과로 자동 완료 전환하지 않는다. 서버의 자동 재시도는 프론트 foreground polling 상한 60초와 별개이고 제출 기록·풀이 수·참고 답안은 유지한다.
 - MVP에서는 사용자 녹음 재생과 `audioUrl`을 제공하지 않는다. S3 audio는 AI 처리용 내부 artifact이며 프론트 결과 DTO에 URL을 노출하지 않는다.
 
 ### 자정 직전 attempt 처리
@@ -696,6 +707,9 @@ AI 분석이 정상 완료된 응답:
 - 자정 이후에는 이전 날짜의 새 attempt를 생성할 수 없다.
 - answer 처리 시 서버는 현재 날짜가 아니라 `attemptId`에 저장된 `challengeDate`를 사용한다.
 - deadline이 지나면 `410 CHALLENGE_ATTEMPT_EXPIRED`를 반환하고 내부 attempt를 만료 terminal로 처리한다. 이후 공개 `attemptStatus=submitted`로 projection해 다음 문제와 결과 화면을 열고 참고 답안만 제공한다.
+- 서버는 만료 후 answer 재호출이 없어도 진행도·결과·history와 다음 문제 진행에 만료를 반영한다. 프론트에 만료 통지 API를 추가하지 않는다. 이미 접수된 동일 제출의 성공 replay는 deadline 경과만으로 410으로 바꾸지 않는다.
+- 만료는 결과 접근과 다음 문제 진행만 열어주며 실제 풀이 수·참여 여부를 증가시키지 않는다. 실제 제출이 한 건도 없는 날짜는 만료된 attempt가 있어도 `participated=false`다.
+- 사용처가 없던 `CHALLENGE_DATE_CLOSED`는 v1 보완에서 제거했다. 날짜 불일치는 `CHALLENGE_DATE_CHANGED`, 미제출 attempt 만료는 `CHALLENGE_ATTEMPT_EXPIRED`로 처리한다.
 - 이 1시간은 10초 녹음 검증 시간이 아니라 S3 업로드·네트워크 재시도·앱 종료·응답 유실을 수습하는 제출 유효시간이다.
 
 ## 9. v1 확정 사항
