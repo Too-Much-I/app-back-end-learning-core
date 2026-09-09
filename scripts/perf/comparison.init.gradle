@@ -1,0 +1,46 @@
+// Opt-in isolated benchmark build. Never writes to or executes the web POC project.
+allprojects {
+    afterEvaluate {
+        def benchDir = new File(rootProject.projectDir, 'build/poc-comparison')
+        tasks.register('compileComparisonServer', JavaCompile) {
+            source = fileTree(new File(rootProject.projectDir, 'scripts/perf/java')) { include '**/*.java' }
+            classpath = configurations.testRuntimeClasspath
+            destinationDirectory = new File(benchDir, 'harness')
+            options.release = 21
+        }
+        tasks.register('compileComparisonWeb', JavaCompile) {
+            def webRoot = providers.gradleProperty('comparisonWebRoot').get()
+            source = fileTree(new File(webRoot, 'src/main/java')) {
+                include 'web/tosunsaeng/domain/exams/**/*.java'
+                include 'web/tosunsaeng/global/common/**/*.java'
+                include 'web/tosunsaeng/global/error/**/*.java'
+                include 'web/tosunsaeng/global/exception/GeneralException.java'
+            }
+            classpath = configurations.testRuntimeClasspath
+            options.annotationProcessorPath = configurations.annotationProcessor
+            classpath += configurations.annotationProcessor
+            options.compilerArgs += ['-parameters']
+            destinationDirectory = new File(benchDir, 'web')
+            options.release = 21
+        }
+        tasks.register('prepareComparison') {
+            dependsOn 'compileJava', 'compileComparisonServer', 'compileComparisonWeb'
+            doLast {
+                benchDir.mkdirs()
+                def jars = configurations.testRuntimeClasspath.asPath
+                new File(benchDir, 'app-classpath.txt').text = new File(benchDir, 'harness').path + File.pathSeparator + sourceSets.main.java.classesDirectory.get().asFile.path + File.pathSeparator + jars
+                new File(benchDir, 'web-classpath.txt').text = new File(benchDir, 'harness').path + File.pathSeparator + new File(benchDir, 'web').path + File.pathSeparator + jars
+                new File(benchDir, 'java-path.txt').text = javaToolchains.launcherFor { languageVersion = JavaLanguageVersion.of(21) }.get().executablePath.asFile.path
+            }
+        }
+        tasks.register('prepareAppComparison') {
+            dependsOn 'compileJava', 'compileComparisonServer'
+            doLast {
+                benchDir.mkdirs()
+                def jars = configurations.testRuntimeClasspath.asPath
+                new File(benchDir, 'app-classpath.txt').text = new File(benchDir, 'harness').path + File.pathSeparator + sourceSets.main.java.classesDirectory.get().asFile.path + File.pathSeparator + jars
+                new File(benchDir, 'java-path.txt').text = javaToolchains.launcherFor { languageVersion = JavaLanguageVersion.of(21) }.get().executablePath.asFile.path
+            }
+        }
+    }
+}

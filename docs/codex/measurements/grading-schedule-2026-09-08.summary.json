@@ -1,0 +1,758 @@
+{
+  "source": "docs/codex/measurements/grading-schedule-2026-09-08.json",
+  "interpretation": "Per-run p50/p95 medians; scaled artificial timeline and mock grading, not production latency or cost.",
+  "summary": [
+    {
+      "key": "single-four/per-question",
+      "exams": 3,
+      "complete": 3,
+      "afterEndP50Ms": {
+        "median": 2843.148083,
+        "min": 2839.9284159999806,
+        "max": 2888.3541249999544
+      },
+      "afterEndP95Ms": {
+        "median": 2843.148083,
+        "min": 2839.9284159999806,
+        "max": 2888.3541249999544
+      },
+      "afterFinalSubmitAckP95Ms": {
+        "median": 2762.8409159999574,
+        "min": 2758.432707999993,
+        "max": 2808.3964999999152
+      },
+      "completedByEnd": {
+        "n": 3,
+        "p50": 10,
+        "p95": 10,
+        "max": 10
+      },
+      "aiPeakActive": {
+        "median": 2,
+        "min": 2,
+        "max": 2
+      },
+      "aiPeakWaiting": {
+        "median": 0,
+        "min": 0,
+        "max": 0
+      },
+      "queueWaitP95Ms": {
+        "median": 0.01825000000098953,
+        "min": 0.011124999960884452,
+        "max": 0.022500000020954758
+      },
+      "questionRequests": 33,
+      "summaryRequests": 3,
+      "questionStarts": 33,
+      "heldNotExecuted": 0,
+      "startedByDrop": null,
+      "completedAfterDrop": null,
+      "errors": 0,
+      "maxGeneratorLagMs": 1.4381249999860302,
+      "byRepeat": [
+        {
+          "repeat": 1,
+          "afterEndMs": {
+            "n": 1,
+            "p50": 2843.148083,
+            "p95": 2843.148083,
+            "max": 2843.148083
+          },
+          "completedByEnd": [
+            10
+          ],
+          "aiPeakWaiting": 0,
+          "aiPeakActive": 2
+        },
+        {
+          "repeat": 2,
+          "afterEndMs": {
+            "n": 1,
+            "p50": 2839.9284159999806,
+            "p95": 2839.9284159999806,
+            "max": 2839.9284159999806
+          },
+          "completedByEnd": [
+            10
+          ],
+          "aiPeakWaiting": 0,
+          "aiPeakActive": 2
+        },
+        {
+          "repeat": 3,
+          "afterEndMs": {
+            "n": 1,
+            "p50": 2888.3541249999544,
+            "p95": 2888.3541249999544,
+            "max": 2888.3541249999544
+          },
+          "completedByEnd": [
+            10
+          ],
+          "aiPeakWaiting": 0,
+          "aiPeakActive": 2
+        }
+      ]
+    },
+    {
+      "key": "cohort-six/per-question",
+      "exams": 18,
+      "complete": 18,
+      "afterEndP50Ms": {
+        "median": 3010.2375829999946,
+        "min": 3004.304166999995,
+        "max": 3022.916790999938
+      },
+      "afterEndP95Ms": {
+        "median": 3423.547458000001,
+        "min": 3247.7010829999344,
+        "max": 3433.0095000000438
+      },
+      "afterFinalSubmitAckP95Ms": {
+        "median": 3340.899541999999,
+        "min": 3164.859957999899,
+        "max": 3363.51233399997
+      },
+      "completedByEnd": {
+        "n": 18,
+        "p50": 10,
+        "p95": 10,
+        "max": 10
+      },
+      "aiPeakActive": {
+        "median": 4,
+        "min": 4,
+        "max": 4
+      },
+      "aiPeakWaiting": {
+        "median": 7,
+        "min": 7,
+        "max": 7
+      },
+      "queueWaitP95Ms": {
+        "median": 2158.6582079999935,
+        "min": 2139.7954999999492,
+        "max": 2171.8125410000794
+      },
+      "questionRequests": 198,
+      "summaryRequests": 18,
+      "questionStarts": 198,
+      "heldNotExecuted": 0,
+      "startedByDrop": null,
+      "completedAfterDrop": null,
+      "errors": 0,
+      "maxGeneratorLagMs": 1.6236250000074506,
+      "byRepeat": [
+        {
+          "repeat": 1,
+          "afterEndMs": {
+            "n": 6,
+            "p50": 3010.2375829999946,
+            "p95": 3423.547458000001,
+            "max": 3423.547458000001
+          },
+          "completedByEnd": [
+            10,
+            10,
+            10,
+            10,
+            10,
+            10
+          ],
+          "aiPeakWaiting": 7,
+          "aiPeakActive": 4
+        },
+        {
+          "repeat": 2,
+          "afterEndMs": {
+            "n": 6,
+            "p50": 3004.304166999995,
+            "p95": 3433.0095000000438,
+            "max": 3433.0095000000438
+          },
+          "completedByEnd": [
+            10,
+            10,
+            10,
+            10,
+            10,
+            10
+          ],
+          "aiPeakWaiting": 7,
+          "aiPeakActive": 4
+        },
+        {
+          "repeat": 3,
+          "afterEndMs": {
+            "n": 6,
+            "p50": 3022.916790999938,
+            "p95": 3247.7010829999344,
+            "max": 3247.7010829999344
+          },
+          "completedByEnd": [
+            10,
+            10,
+            10,
+            10,
+            10,
+            10
+          ],
+          "aiPeakWaiting": 7,
+          "aiPeakActive": 4
+        }
+      ]
+    },
+    {
+      "key": "single-sixteen/per-question",
+      "exams": 3,
+      "complete": 3,
+      "afterEndP50Ms": {
+        "median": 2820.735875000013,
+        "min": 2807.385957999999,
+        "max": 2843.23208300001
+      },
+      "afterEndP95Ms": {
+        "median": 2820.735875000013,
+        "min": 2807.385957999999,
+        "max": 2843.23208300001
+      },
+      "afterFinalSubmitAckP95Ms": {
+        "median": 2737.442875000066,
+        "min": 2722.9425829999964,
+        "max": 2764.191416000016
+      },
+      "completedByEnd": {
+        "n": 3,
+        "p50": 10,
+        "p95": 10,
+        "max": 10
+      },
+      "aiPeakActive": {
+        "median": 2,
+        "min": 2,
+        "max": 2
+      },
+      "aiPeakWaiting": {
+        "median": 0,
+        "min": 0,
+        "max": 0
+      },
+      "queueWaitP95Ms": {
+        "median": 0.015124999918043613,
+        "min": 0.012208999949507415,
+        "max": 0.01770799999940209
+      },
+      "questionRequests": 33,
+      "summaryRequests": 3,
+      "questionStarts": 33,
+      "heldNotExecuted": 0,
+      "startedByDrop": null,
+      "completedAfterDrop": null,
+      "errors": 0,
+      "maxGeneratorLagMs": 1.3414999999804422,
+      "byRepeat": [
+        {
+          "repeat": 1,
+          "afterEndMs": {
+            "n": 1,
+            "p50": 2807.385957999999,
+            "p95": 2807.385957999999,
+            "max": 2807.385957999999
+          },
+          "completedByEnd": [
+            10
+          ],
+          "aiPeakWaiting": 0,
+          "aiPeakActive": 2
+        },
+        {
+          "repeat": 2,
+          "afterEndMs": {
+            "n": 1,
+            "p50": 2843.23208300001,
+            "p95": 2843.23208300001,
+            "max": 2843.23208300001
+          },
+          "completedByEnd": [
+            10
+          ],
+          "aiPeakWaiting": 0,
+          "aiPeakActive": 2
+        },
+        {
+          "repeat": 3,
+          "afterEndMs": {
+            "n": 1,
+            "p50": 2820.735875000013,
+            "p95": 2820.735875000013,
+            "max": 2820.735875000013
+          },
+          "completedByEnd": [
+            10
+          ],
+          "aiPeakWaiting": 0,
+          "aiPeakActive": 2
+        }
+      ]
+    },
+    {
+      "key": "drop-five/per-question",
+      "exams": 6,
+      "complete": 0,
+      "afterEndP50Ms": null,
+      "afterEndP95Ms": null,
+      "afterFinalSubmitAckP95Ms": null,
+      "completedByEnd": {
+        "n": 6,
+        "p50": 3,
+        "p95": 3,
+        "max": 3
+      },
+      "aiPeakActive": {
+        "median": 3,
+        "min": 3,
+        "max": 3
+      },
+      "aiPeakWaiting": {
+        "median": 0,
+        "min": 0,
+        "max": 0
+      },
+      "queueWaitP95Ms": {
+        "median": 0.018542000005254522,
+        "min": 0.010249999933876097,
+        "max": 0.06287499994505197
+      },
+      "questionRequests": 30,
+      "summaryRequests": 0,
+      "questionStarts": 30,
+      "heldNotExecuted": 0,
+      "startedByDrop": 24,
+      "completedAfterDrop": 12,
+      "errors": 0,
+      "maxGeneratorLagMs": 1.6756250000034925,
+      "byRepeat": [
+        {
+          "repeat": 1,
+          "afterEndMs": {
+            "n": 0,
+            "p50": null,
+            "p95": null,
+            "max": null
+          },
+          "completedByEnd": [
+            3,
+            3
+          ],
+          "aiPeakWaiting": 0,
+          "aiPeakActive": 3
+        },
+        {
+          "repeat": 2,
+          "afterEndMs": {
+            "n": 0,
+            "p50": null,
+            "p95": null,
+            "max": null
+          },
+          "completedByEnd": [
+            3,
+            3
+          ],
+          "aiPeakWaiting": 0,
+          "aiPeakActive": 3
+        },
+        {
+          "repeat": 3,
+          "afterEndMs": {
+            "n": 0,
+            "p50": null,
+            "p95": null,
+            "max": null
+          },
+          "completedByEnd": [
+            3,
+            3
+          ],
+          "aiPeakWaiting": 0,
+          "aiPeakActive": 3
+        }
+      ]
+    },
+    {
+      "key": "single-four/after-eleven",
+      "exams": 3,
+      "complete": 3,
+      "afterEndP50Ms": {
+        "median": 5444.078208000021,
+        "min": 5419.7516659999965,
+        "max": 5445.6541669999715
+      },
+      "afterEndP95Ms": {
+        "median": 5444.078208000021,
+        "min": 5419.7516659999965,
+        "max": 5445.6541669999715
+      },
+      "afterFinalSubmitAckP95Ms": {
+        "median": 5359.329791000026,
+        "min": 5345.149999999965,
+        "max": 5364.853416999918
+      },
+      "completedByEnd": {
+        "n": 3,
+        "p50": 0,
+        "p95": 0,
+        "max": 0
+      },
+      "aiPeakActive": {
+        "median": 4,
+        "min": 4,
+        "max": 4
+      },
+      "aiPeakWaiting": {
+        "median": 7,
+        "min": 7,
+        "max": 7
+      },
+      "queueWaitP95Ms": {
+        "median": 2544.8095840000024,
+        "min": 2538.802665999974,
+        "max": 2550.0786249999655
+      },
+      "questionRequests": 33,
+      "summaryRequests": 3,
+      "questionStarts": 33,
+      "heldNotExecuted": 0,
+      "startedByDrop": null,
+      "completedAfterDrop": null,
+      "errors": 0,
+      "maxGeneratorLagMs": 1.9222500000032596,
+      "byRepeat": [
+        {
+          "repeat": 1,
+          "afterEndMs": {
+            "n": 1,
+            "p50": 5444.078208000021,
+            "p95": 5444.078208000021,
+            "max": 5444.078208000021
+          },
+          "completedByEnd": [
+            0
+          ],
+          "aiPeakWaiting": 7,
+          "aiPeakActive": 4
+        },
+        {
+          "repeat": 2,
+          "afterEndMs": {
+            "n": 1,
+            "p50": 5419.7516659999965,
+            "p95": 5419.7516659999965,
+            "max": 5419.7516659999965
+          },
+          "completedByEnd": [
+            0
+          ],
+          "aiPeakWaiting": 7,
+          "aiPeakActive": 4
+        },
+        {
+          "repeat": 3,
+          "afterEndMs": {
+            "n": 1,
+            "p50": 5445.6541669999715,
+            "p95": 5445.6541669999715,
+            "max": 5445.6541669999715
+          },
+          "completedByEnd": [
+            0
+          ],
+          "aiPeakWaiting": 7,
+          "aiPeakActive": 4
+        }
+      ]
+    },
+    {
+      "key": "cohort-six/after-eleven",
+      "exams": 18,
+      "complete": 18,
+      "afterEndP50Ms": {
+        "median": 21530.48199999996,
+        "min": 21520.53220799999,
+        "max": 21568.443917000026
+      },
+      "afterEndP95Ms": {
+        "median": 21895.965666000033,
+        "min": 21880.026083000004,
+        "max": 21927.90274999995
+      },
+      "afterFinalSubmitAckP95Ms": {
+        "median": 21814.233833000064,
+        "min": 21801.460041000013,
+        "max": 21858.501499999955
+      },
+      "completedByEnd": {
+        "n": 18,
+        "p50": 0,
+        "p95": 0,
+        "max": 0
+      },
+      "aiPeakActive": {
+        "median": 4,
+        "min": 4,
+        "max": 4
+      },
+      "aiPeakWaiting": {
+        "median": 56,
+        "min": 56,
+        "max": 56
+      },
+      "queueWaitP95Ms": {
+        "median": 17872.522125000018,
+        "min": 17867.819374999963,
+        "max": 17928.625042
+      },
+      "questionRequests": 198,
+      "summaryRequests": 18,
+      "questionStarts": 198,
+      "heldNotExecuted": 0,
+      "startedByDrop": null,
+      "completedAfterDrop": null,
+      "errors": 0,
+      "maxGeneratorLagMs": 1.915666000044439,
+      "byRepeat": [
+        {
+          "repeat": 1,
+          "afterEndMs": {
+            "n": 6,
+            "p50": 21520.53220799999,
+            "p95": 21880.026083000004,
+            "max": 21880.026083000004
+          },
+          "completedByEnd": [
+            0,
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          "aiPeakWaiting": 56,
+          "aiPeakActive": 4
+        },
+        {
+          "repeat": 2,
+          "afterEndMs": {
+            "n": 6,
+            "p50": 21568.443917000026,
+            "p95": 21927.90274999995,
+            "max": 21927.90274999995
+          },
+          "completedByEnd": [
+            0,
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          "aiPeakWaiting": 56,
+          "aiPeakActive": 4
+        },
+        {
+          "repeat": 3,
+          "afterEndMs": {
+            "n": 6,
+            "p50": 21530.48199999996,
+            "p95": 21895.965666000033,
+            "max": 21895.965666000033
+          },
+          "completedByEnd": [
+            0,
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          "aiPeakWaiting": 56,
+          "aiPeakActive": 4
+        }
+      ]
+    },
+    {
+      "key": "single-sixteen/after-eleven",
+      "exams": 3,
+      "complete": 3,
+      "afterEndP50Ms": {
+        "median": 2800.5965000000433,
+        "min": 2797.174708000035,
+        "max": 2813.030875000055
+      },
+      "afterEndP95Ms": {
+        "median": 2800.5965000000433,
+        "min": 2797.174708000035,
+        "max": 2813.030875000055
+      },
+      "afterFinalSubmitAckP95Ms": {
+        "median": 2728.0065830000094,
+        "min": 2713.995958000014,
+        "max": 2731.7677080000285
+      },
+      "completedByEnd": {
+        "n": 3,
+        "p50": 0,
+        "p95": 0,
+        "max": 0
+      },
+      "aiPeakActive": {
+        "median": 11,
+        "min": 11,
+        "max": 11
+      },
+      "aiPeakWaiting": {
+        "median": 0,
+        "min": 0,
+        "max": 0
+      },
+      "queueWaitP95Ms": {
+        "median": 0.038416000024881214,
+        "min": 0.018207999994046986,
+        "max": 0.04183299990836531
+      },
+      "questionRequests": 33,
+      "summaryRequests": 3,
+      "questionStarts": 33,
+      "heldNotExecuted": 0,
+      "startedByDrop": null,
+      "completedAfterDrop": null,
+      "errors": 0,
+      "maxGeneratorLagMs": 1.0106249999953434,
+      "byRepeat": [
+        {
+          "repeat": 1,
+          "afterEndMs": {
+            "n": 1,
+            "p50": 2797.174708000035,
+            "p95": 2797.174708000035,
+            "max": 2797.174708000035
+          },
+          "completedByEnd": [
+            0
+          ],
+          "aiPeakWaiting": 0,
+          "aiPeakActive": 11
+        },
+        {
+          "repeat": 2,
+          "afterEndMs": {
+            "n": 1,
+            "p50": 2800.5965000000433,
+            "p95": 2800.5965000000433,
+            "max": 2800.5965000000433
+          },
+          "completedByEnd": [
+            0
+          ],
+          "aiPeakWaiting": 0,
+          "aiPeakActive": 11
+        },
+        {
+          "repeat": 3,
+          "afterEndMs": {
+            "n": 1,
+            "p50": 2813.030875000055,
+            "p95": 2813.030875000055,
+            "max": 2813.030875000055
+          },
+          "completedByEnd": [
+            0
+          ],
+          "aiPeakWaiting": 0,
+          "aiPeakActive": 11
+        }
+      ]
+    },
+    {
+      "key": "drop-five/after-eleven",
+      "exams": 6,
+      "complete": 0,
+      "afterEndP50Ms": null,
+      "afterEndP95Ms": null,
+      "afterFinalSubmitAckP95Ms": null,
+      "completedByEnd": {
+        "n": 6,
+        "p50": 0,
+        "p95": 0,
+        "max": 0
+      },
+      "aiPeakActive": {
+        "median": 0,
+        "min": 0,
+        "max": 0
+      },
+      "aiPeakWaiting": {
+        "median": 0,
+        "min": 0,
+        "max": 0
+      },
+      "queueWaitP95Ms": null,
+      "questionRequests": 30,
+      "summaryRequests": 0,
+      "questionStarts": 0,
+      "heldNotExecuted": 30,
+      "startedByDrop": 0,
+      "completedAfterDrop": 0,
+      "errors": 0,
+      "maxGeneratorLagMs": 1.2433339999988675,
+      "byRepeat": [
+        {
+          "repeat": 1,
+          "afterEndMs": {
+            "n": 0,
+            "p50": null,
+            "p95": null,
+            "max": null
+          },
+          "completedByEnd": [
+            0,
+            0
+          ],
+          "aiPeakWaiting": 0,
+          "aiPeakActive": 0
+        },
+        {
+          "repeat": 2,
+          "afterEndMs": {
+            "n": 0,
+            "p50": null,
+            "p95": null,
+            "max": null
+          },
+          "completedByEnd": [
+            0,
+            0
+          ],
+          "aiPeakWaiting": 0,
+          "aiPeakActive": 0
+        },
+        {
+          "repeat": 3,
+          "afterEndMs": {
+            "n": 0,
+            "p50": null,
+            "p95": null,
+            "max": null
+          },
+          "completedByEnd": [
+            0,
+            0
+          ],
+          "aiPeakWaiting": 0,
+          "aiPeakActive": 0
+        }
+      ]
+    }
+  ]
+}

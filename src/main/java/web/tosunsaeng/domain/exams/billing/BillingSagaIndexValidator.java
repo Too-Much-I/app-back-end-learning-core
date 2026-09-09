@@ -60,7 +60,7 @@ public class BillingSagaIndexValidator implements ApplicationRunner {
         }
     }
 
-    void validate(boolean failClosed) {
+    public void validate(boolean failClosed) {
         List<IndexInfo> operationIndexes = mongoTemplate
                 .indexOps(ExamCreationOperation.class).getIndexInfo();
         List<IndexInfo> sessionIndexes = mongoTemplate

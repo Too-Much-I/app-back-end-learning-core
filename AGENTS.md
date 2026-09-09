@@ -296,6 +296,35 @@ AI Callback에서는 examId로 ExamSession을 조회하여 실제 userId를 찾�
 - feature flag를 staging/prod에서 켜기 전에 프론트 header 선배포와 Mongo index·Lattice security·장애 복구 E2E를 완료한다.
 - 이 예외는 Jira TMI-116에만 적용되며 완료 후 또는 다른 작업에 자동 적용되지 않는다.
 
+## Reservation 장애 자동 복구 구현 허용 규칙
+
+- 2026-09-08 사용자 승인으로 Learning Core Reservation background reconciliation과 기존 Sentry 경보 연동을 구현 범위에 포함한다.
+- TMI-128은 최초 구현 이력이며 같은 계약 안의 후속 수정·테스트에도 적용한다. TMI-116 및 AttemptGroup 절의 제외는 해당 과제 경계이며 이 전용 허용을 취소하지 않는다.
+- 기준은 `docs/codex/BILLING_RESERVATION_RECONCILIATION_IMPLEMENTATION_PLAN.md` 승인본이다. 이번 계획 승인/Jira 등록 자체는 runtime 구현 요청이나 production 활성화 승인이 아니다.
+
+허용 범위:
+
+- 이미 저장된 INITIAL/REPLACEMENT/PHONE_REJOIN operation의 status-first 복구와 동일 key confirm/cancel, 로컬 Session/operation 원자 정리를 추가할 수 있다.
+- HTTP saga와 worker의 공통 operation lease/version CAS, cleanup intent, 전송 전 durable marker와 bounded scheduler를 추가할 수 있다. Session commit과 cleanup이 같은 문서 write conflict를 만들도록 기존 직접 cancel 경로도 보호한다.
+- 외부 HTTP는 Mongo Transaction 밖에서 수행하고 owner guard·Session·operation 변경은 기존 같은 manager의 Transaction 안에 참여시킨다. unknown commit은 fresh majority evidence로 수렴하고 abort된 Transaction을 계속 사용하지 않는다.
+- default-off flag, index/dry-run migration·승인 allowlist 편입, durable retry·격리/auth circuit, 최소 로컬7일 terminal 증거 보존과 미해결 무TTL을 추가할 수 있다.
+- 기존 Sentry IHub/프로젝트를 재사용하는 worker 전용 reporter와 고정 사유/opaque incident context의 sanitizer 최소 허용 확장, 기존 문서에 pending alert metadata 및 bounded 회수, privacy·중복 제한·metric·runbook과 테스트를 추가할 수 있다. 기존 HTTP 개인정보 정제는 유지한다.
+
+확정 기본값과 안전 경계:
+
+- precommit 정체2분은 cleanup 후보 기준이며 종료 증명이 아니다. poll10초/batch20/instance동시2/lease30초/attempt20초/HTTP최대2회를 기본으로 한다.
+- backoff5초→15초→1분→5분→15분 상한+양의 jitter와 Retry-After를 지킨다. 최초 복구부터24시간/200회 중 먼저 도달하면 NEEDS_REVIEW로 격리하며 guard/증거를 유지한다.
+- 인증 오류는 전역 circuit을 차단하고15분마다 status-only 단일 probe한다. owner deny는 BLOCKED_OWNER로 중지하며 marker를 해제하지 않는다.
+- 신규 검증 데이터만 자동 편입하고 기존 데이터는 dry-run/승인 allowlist를 사용한다. 구버전 HTTP drain·Mongo/Lattice·staging 경합·Sentry 수신 확인 전 worker를 활성화하지 않는다.
+- `./gradlew clean test`, `./gradlew mongoIntegrationTest`, migration Node test, `git diff --check`와 원격 성공 유실/lease·commit-cleanup race/privacy 회귀를 검증한다.
+
+금지 범위:
+
+- worker의 새 reserve/continuation discovery/Session 생성, CANCELED·EXPIRED repair-confirm, CONFIRMED cancel, 새 무료권 지급·TrialClaim/consumption 변경, owner rewrite·alias를 금지한다.
+- 404·timeout·lease 만료·retry 소진만으로 cancel/terminal/activeGuard 해제를 확정하지 않는다. 기존 결과·outbox payload·Billing ledger를 고치지 않는다.
+- 기존 공개 API·Request/Response/BaseResponse·Idempotency-Key 의미·retryCount·AI user_id=examId·S3/Redis 계약, Billing 저장소/유료 결제/Challenge 기능은 변경하지 않는다.
+- 신규 관리자 repair API·메시지 큐·실제 AWS/Sentry 운영 설정·배포 변경과 credential/PII/원문 로그 추가를 허용하지 않는다. Sentry 미제안 운영값은 별도 확인한다.
+
 ## Phone 재가입 시험 continuation 구현 허용 규칙
 
 - 사용자 결정에 따라 Learning Core의 phone 재가입 시험 continuation discovery와 기존 Billing 시험 생성 saga의 해당 확장은 신규 구현 범위에 포함한다.

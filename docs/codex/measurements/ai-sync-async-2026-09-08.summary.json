@@ -1,0 +1,306 @@
+{
+  "source": "docs/codex/measurements/ai-sync-async-2026-09-08.json",
+  "interpretation": "Historical-source-backed controlled HTTP ordering simulation, not a historical deployment benchmark. Fixed web backend and mock AI computation.",
+  "backend": "web-back-end 89c8f9d23761678e1a03328550d0f45f4d1a680f, same code in both arms",
+  "historicalSync": "https://github.com/Too-Much-I/web-ai/blob/fd43a983c9b9976e9320fa426a81d5ee0b9c0cea/app/api/server.py",
+  "historicalQueue": "https://github.com/Too-Much-I/web-ai/commit/1134e1c5f454b2aaa2a3da11e2113bc37c8598e2",
+  "hashes": {
+    "scripts/perf/run-comparison.mjs": "f2acc0c3c34f8aceaf41358332ab4645222935597be64fa821c644b9fabe110e",
+    "scripts/perf/java/ComparisonServer.java": "66107ec1bc23c00516eb9e0d70328cd89e33e51d2e9637bb9809f0275575ba49"
+  },
+  "summary": [
+    {
+      "key": "timing-low/sync",
+      "exams": 6,
+      "completedWithinObservation": 6,
+      "notCompletedWithinObservation": 0,
+      "submissions": 66,
+      "submissionFailures": 0,
+      "submissionFailurePercent": 0,
+      "callbackErrors": 0,
+      "aiQuestionRequests": 66,
+      "aiSummaryRequests": 6,
+      "submitP95Ms": {
+        "median": 2071.365042000005,
+        "min": 2071.012666999999,
+        "max": 2073.6218339999905
+      },
+      "successfulSubmitP95Ms": {
+        "median": 2071.365042000005,
+        "min": 2071.012666999999,
+        "max": 2073.6218339999905
+      },
+      "pollP95Ms": {
+        "median": 6.947458000009647,
+        "min": 6.91150000000016,
+        "max": 7.842416999992565
+      },
+      "completionP95Ms": {
+        "median": 2630.6487080000225,
+        "min": 2616.873875000001,
+        "max": 2641.402583000003
+      },
+      "busyMean": {
+        "median": 6.598265895953757,
+        "min": 6.587896253602305,
+        "max": 6.606936416184971
+      },
+      "busyP95": {
+        "median": 11,
+        "min": 11,
+        "max": 11
+      },
+      "peakBusy": 12,
+      "capacitySamplePercent": {
+        "median": 0,
+        "min": 0,
+        "max": 0
+      },
+      "maxGeneratorLagMs": 1.2186660000006668,
+      "byRepeat": [
+        {
+          "repeat": 1,
+          "complete": 2,
+          "failed": 0,
+          "submitFailures": 0,
+          "httpErrors": {}
+        },
+        {
+          "repeat": 2,
+          "complete": 2,
+          "failed": 0,
+          "submitFailures": 0,
+          "httpErrors": {}
+        },
+        {
+          "repeat": 3,
+          "complete": 2,
+          "failed": 0,
+          "submitFailures": 0,
+          "httpErrors": {}
+        }
+      ]
+    },
+    {
+      "key": "timing-loaded/sync",
+      "exams": 18,
+      "completedWithinObservation": 15,
+      "notCompletedWithinObservation": 3,
+      "submissions": 198,
+      "submissionFailures": 198,
+      "submissionFailurePercent": 100,
+      "callbackErrors": 0,
+      "aiQuestionRequests": 198,
+      "aiSummaryRequests": 18,
+      "submitP95Ms": {
+        "median": 10001.812874999974,
+        "min": 10001.712792000006,
+        "max": 10002.089333
+      },
+      "successfulSubmitP95Ms": null,
+      "pollP95Ms": {
+        "median": 9881.441374999995,
+        "min": 9876.537540999998,
+        "max": 9883.821
+      },
+      "completionP95Ms": {
+        "median": 14570.81349999999,
+        "min": 14564.107208000001,
+        "max": 14574.631624999998
+      },
+      "busyMean": {
+        "median": 17.150561797752808,
+        "min": 17.147191011235954,
+        "max": 17.15393258426966
+      },
+      "busyP95": {
+        "median": 20,
+        "min": 20,
+        "max": 20
+      },
+      "peakBusy": 20,
+      "capacitySamplePercent": {
+        "median": 78.87640449438203,
+        "min": 78.76404494382022,
+        "max": 78.87640449438203
+      },
+      "maxGeneratorLagMs": 1.1176249999989523,
+      "byRepeat": [
+        {
+          "repeat": 1,
+          "complete": 5,
+          "failed": 1,
+          "submitFailures": 66,
+          "httpErrors": {
+            "500": 40,
+            "TimeoutError": 26
+          }
+        },
+        {
+          "repeat": 2,
+          "complete": 5,
+          "failed": 1,
+          "submitFailures": 66,
+          "httpErrors": {
+            "500": 40,
+            "TimeoutError": 26
+          }
+        },
+        {
+          "repeat": 3,
+          "complete": 5,
+          "failed": 1,
+          "submitFailures": 66,
+          "httpErrors": {
+            "500": 40,
+            "TimeoutError": 26
+          }
+        }
+      ]
+    },
+    {
+      "key": "timing-low/async",
+      "exams": 6,
+      "completedWithinObservation": 6,
+      "notCompletedWithinObservation": 0,
+      "submissions": 66,
+      "submissionFailures": 0,
+      "submissionFailurePercent": 0,
+      "callbackErrors": 0,
+      "aiQuestionRequests": 66,
+      "aiSummaryRequests": 6,
+      "submitP95Ms": {
+        "median": 62.14604099999997,
+        "min": 61.837500000001455,
+        "max": 62.300333999999566
+      },
+      "successfulSubmitP95Ms": {
+        "median": 62.14604099999997,
+        "min": 61.837500000001455,
+        "max": 62.300333999999566
+      },
+      "pollP95Ms": {
+        "median": 7.567125000001397,
+        "min": 7.056375000014668,
+        "max": 8.049333999995724
+      },
+      "completionP95Ms": {
+        "median": 2624.897582999998,
+        "min": 2624.0538749999832,
+        "max": 2636.0118749999965
+      },
+      "busyMean": {
+        "median": 0.2254335260115607,
+        "min": 0.2254335260115607,
+        "max": 0.23410404624277456
+      },
+      "busyP95": {
+        "median": 2,
+        "min": 2,
+        "max": 2
+      },
+      "peakBusy": 3,
+      "capacitySamplePercent": {
+        "median": 0,
+        "min": 0,
+        "max": 0
+      },
+      "maxGeneratorLagMs": 1.2217079999973066,
+      "byRepeat": [
+        {
+          "repeat": 1,
+          "complete": 2,
+          "failed": 0,
+          "submitFailures": 0,
+          "httpErrors": {}
+        },
+        {
+          "repeat": 2,
+          "complete": 2,
+          "failed": 0,
+          "submitFailures": 0,
+          "httpErrors": {}
+        },
+        {
+          "repeat": 3,
+          "complete": 2,
+          "failed": 0,
+          "submitFailures": 0,
+          "httpErrors": {}
+        }
+      ]
+    },
+    {
+      "key": "timing-loaded/async",
+      "exams": 18,
+      "completedWithinObservation": 18,
+      "notCompletedWithinObservation": 0,
+      "submissions": 198,
+      "submissionFailures": 0,
+      "submissionFailurePercent": 0,
+      "callbackErrors": 0,
+      "aiQuestionRequests": 198,
+      "aiSummaryRequests": 18,
+      "submitP95Ms": {
+        "median": 61.23016700000153,
+        "min": 61.196165999994264,
+        "max": 61.49104100000113
+      },
+      "successfulSubmitP95Ms": {
+        "median": 61.23016700000153,
+        "min": 61.196165999994264,
+        "max": 61.49104100000113
+      },
+      "pollP95Ms": {
+        "median": 6.877290999997058,
+        "min": 6.564083000004757,
+        "max": 6.887665999995079
+      },
+      "completionP95Ms": {
+        "median": 2615.4400830000013,
+        "min": 2612.1514580000076,
+        "max": 2690.8621249999997
+      },
+      "busyMean": {
+        "median": 0.5631313131313131,
+        "min": 0.5454545454545454,
+        "max": 0.5656565656565656
+      },
+      "busyP95": {
+        "median": 2,
+        "min": 2,
+        "max": 2
+      },
+      "peakBusy": 4,
+      "capacitySamplePercent": {
+        "median": 0,
+        "min": 0,
+        "max": 0
+      },
+      "maxGeneratorLagMs": 1.3151659999857657,
+      "byRepeat": [
+        {
+          "repeat": 1,
+          "complete": 6,
+          "failed": 0,
+          "submitFailures": 0,
+          "httpErrors": {}
+        },
+        {
+          "repeat": 2,
+          "complete": 6,
+          "failed": 0,
+          "submitFailures": 0,
+          "httpErrors": {}
+        },
+        {
+          "repeat": 3,
+          "complete": 6,
+          "failed": 0,
+          "submitFailures": 0,
+          "httpErrors": {}
+        }
+      ]
+    }
+  ]
+}

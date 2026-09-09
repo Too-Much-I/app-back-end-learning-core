@@ -10,6 +10,7 @@ import org.springframework.data.mongodb.core.mapping.Document;
 import web.tosunsaeng.domain.exams.domain.enums.BillingReservationKind;
 import web.tosunsaeng.domain.exams.domain.enums.ExamCreationState;
 import web.tosunsaeng.domain.exams.domain.enums.BillingContinuationReason;
+import web.tosunsaeng.domain.exams.billing.reconciliation.ReservationRecovery;
 
 import java.time.Instant;
 import java.util.UUID;
@@ -45,6 +46,7 @@ public class ExamCreationOperation {
     private Instant updatedAt;
     private Instant terminalAt;
     private Instant purgeAt;
+    private ReservationRecovery recovery;
 
     @Version
     private Long version;
@@ -95,12 +97,48 @@ public class ExamCreationOperation {
                 cycleNumber, ExamCreationState.PREPARED, null, null, null,
                 replacementSourceSessionId, expectedAttemptGroupId, expectedMockExamId,
                 continuationReason, continuationId, null,
-                null, null, null, true, now, now, null, null, null
+                null, null, null, true, now, now, null, null, ReservationRecovery.prepared(now), null
         );
     }
 
     public boolean isPhoneContinuation() {
         return continuationReason == BillingContinuationReason.PHONE_REJOIN;
+    }
+
+    /** Preserve the durable lease after the transaction fence increments @Version. */
+    public void adoptExecutionMetadata(ExamCreationOperation fenced) {
+        this.version = fenced.version;
+        this.recovery = fenced.recovery;
+    }
+
+    public void initializeLegacyRecovery(Instant now) {
+        if (recovery == null) {
+            recovery = ReservationRecovery.prepared(now);
+            // A legacy record never proves that reserve was not sent.
+            recovery.setSchemaVersion(0);
+            recovery.setDispatch(ReservationRecovery.Dispatch.MAY_HAVE_BEEN_SENT);
+        }
+    }
+
+    public void observeReservation(String id, BillingReservationKind kind, String group, Instant expiresAt) {
+        if (state != ExamCreationState.PREPARED) {
+            throw new IllegalStateException("Only PREPARED can adopt a reservation snapshot");
+        }
+        reservationId = id;
+        reservationKind = kind;
+        attemptGroupId = group;
+        reservationExpiresAt = expiresAt;
+    }
+
+    public void completeRecovery(Instant resolvedAt) {
+        if (!isTerminal() || recovery == null) return;
+        recovery.setStatus(ReservationRecovery.Status.DONE);
+        recovery.setResolvedAt(resolvedAt);
+        recovery.setLeaseToken(null);
+        recovery.setLeaseOwner(null);
+        recovery.setLeaseUntil(null);
+        Instant minimum = resolvedAt.plus(java.time.Duration.ofDays(7));
+        if (purgeAt == null || purgeAt.isBefore(minimum)) purgeAt = minimum;
     }
 
     public boolean isTerminal() {
@@ -122,6 +160,7 @@ public class ExamCreationOperation {
         this.reservationKind = reservationKind;
         this.attemptGroupId = attemptGroupId;
         this.reservationExpiresAt = reservationExpiresAt;
+        if (recovery != null) recovery.setDispatch(ReservationRecovery.Dispatch.OBSERVED);
         this.state = ExamCreationState.RESERVED;
         this.updatedAt = now;
     }
@@ -157,7 +196,7 @@ public class ExamCreationOperation {
     }
 
     public void markCancelPending(Instant now) {
-        if (state != ExamCreationState.RESERVED
+        if (state != ExamCreationState.PREPARED && state != ExamCreationState.RESERVED
                 && state != ExamCreationState.SESSION_COMMITTED
                 && state != ExamCreationState.CANCEL_PENDING) {
             throw new IllegalStateException("Exam creation operation cannot enter CANCEL_PENDING");
@@ -167,7 +206,7 @@ public class ExamCreationOperation {
     }
 
     public void markCanceled(Instant terminalAt, Instant purgeAt) {
-        if (state != ExamCreationState.RESERVED
+        if (state != ExamCreationState.PREPARED && state != ExamCreationState.RESERVED
                 && state != ExamCreationState.SESSION_COMMITTED
                 && state != ExamCreationState.CANCEL_PENDING) {
             throw new IllegalStateException("Exam creation operation cannot enter CANCELED");
@@ -177,7 +216,7 @@ public class ExamCreationOperation {
     }
 
     public void markExpired(Instant terminalAt, Instant purgeAt) {
-        if (state != ExamCreationState.RESERVED
+        if (state != ExamCreationState.PREPARED && state != ExamCreationState.RESERVED
                 && state != ExamCreationState.SESSION_COMMITTED
                 && state != ExamCreationState.CANCEL_PENDING) {
             throw new IllegalStateException("Exam creation operation cannot enter EXPIRED");

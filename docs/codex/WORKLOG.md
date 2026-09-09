@@ -9131,3 +9131,851 @@
 - 보존 계약: 기존 시험 공개 API/DTO/BaseResponse, retryCount, AI user_id=examId, Redis 및 시험 S3 key, 기존 security chain 순서를 변경하지 않았다. Challenge의 승인된 프론트/AI URL·Method·field·enum·timeout 계약도 유지했다. 과거 WORKLOG 기록은 수정·삭제하지 않고 이번 항목만 끝에 추가했다.
 - 남은 운영 gate: Identity claim 운영 선배포와 구형 Token drain, 프론트 최종 PUT/answer 순서·null fixture, AI 실제 배포/인증·TLS·멱등/late Callback E2E, iOS/Android 실제 audio profile, catalog/index 운영 적용, temp prefix 권한/lifecycle, 개인정보 보존/삭제 및 경보 수신 확인. 기능 기본 OFF이며 로컬 성공을 운영 활성화 승인으로 취급하지 않는다.
 - 범위/다음 단계: 예상 밖 코드 변경 없음. 이번 작업에서 운영 DB migration·S3/IAM 변경·배포·Jira 상태 전환·commit·push는 하지 않았다. 다음은 변경사항 리뷰/PR 후 rollout 문서의 staging 검증이며 Jira TMI-126 종료 여부는 별도 확인한다. Secret과 Token은 기록하지 않았다.
+
+## 2026-09-07 — TMI-126 이후 작업 우선순위 안내
+
+<!-- codex-turn:01a07b88-1689-7420-9231-ec11d63c968c -->
+
+- 사용자 요청: 다음 작업을 설명한다.
+- 확인: CURRENT_STATE와 Challenge rollout 문서를 대조했다. 이전 확인의 PR #30 develop 병합·CI 성공과 실제 운영 연동 검증은 구분한다. 우선 Identity MEMBER claim, AI endpoint/방향별 credential·Callback, Mongo catalog/index, S3 prefix 권한/lifecycle을 준비하고 staging에서 전체 제출·채점·결과 흐름 및 예외를 검증하도록 권장한다.
+- 주의: 최초 enabled 기동이 해당 환경 Day 1을 결정하므로 staging/production metadata 격리와 출시 날짜를 확인한다. production 활성화는 별도 승인 대상이다. 새 코드 개발을 이어가면 Billing Reservation background reconciliation은 기존 AttemptGroup outbox 복구와 별도 후속 범위다.
+- 변경·검증: CURRENT_STATE/WORKLOG만 갱신했다. 문서 안내이므로 Gradle 테스트를 재실행하지 않고 git diff --check와 marker 단일 포함을 확인한다. 기존 사용자 변경과 과거 기록을 보존했다.
+- 범위: 코드·계약·Jira·AWS·운영 DB 변경, 배포·활성화·commit·push·branch 전환을 수행하지 않았으며 Secret/Token을 기록하지 않았다.
+
+## 2026-09-06 — 토선생 포트폴리오 소재 전체 조사
+
+<!-- codex-turn:01a07652-043d-7811-9b51-fd4c90e0c709 -->
+
+- 날짜: 2026-09-06
+- 현재 브랜치: `develop`
+- Jira: 별도 Jira 이슈가 없는 포트폴리오 조사·문서화 작업이다.
+- 사용자 요청: 토선생 프로젝트로 포트폴리오에 쓸 수 있는 내용을 빠짐없이 후보화하고, 웹 POC 활용·MSA 선택·동기 AI 채점 Thread 고갈·비동기 전환·MongoDB 선택 이유를 더 정확하고 풍부하게 정리한다.
+- 결과 문서: `docs/codex/TOSUNSAENG_PORTFOLIO_CONTENT_INVENTORY.md`를 추가했다. 5줄 결론, 필독 내용, 사용자 결정, 위험·미확인, 상세 후보와 부록 구조로 작성했다.
+- 핵심 정리: 대표 서사는 (1) 웹 POC를 앱용 Identity·Learning Core·Billing·AI 책임으로 분리하고 분산 실패를 Saga·Outbox·멱등성으로 다룬 과정, (2) 장시간 동기 채점 완료 대기에서 Job·Callback·Polling·재처리로 전환한 과정, (3) 중첩·가변 AI 결과와 문항 aggregate에 맞춘 MongoDB document 모델이다.
+- 추가 후보: S3 Presigned upload, Redis status projection, command idempotency, Billing Reservation Saga, AttemptGroup evidence와 Outbox lease/CAS, UserMerged owner migration, withdrawal fail-closed deny, 시험지 순환/migration, JWT·SigV4, 관측·Sentry 개인정보 정제, feature flag와 rollout gate를 포함했다.
+- 문안 산출물: 추천 목차 13개, 경력기술서 bullet 10개, 면접 질문 8개, 문제 해결 사례 10개, 성과 지표 수집표와 구현/조건부/계획 구분표를 제공했다.
+- 사실 검증: Learning Core `develop@88b46c6`, Identity `develop@fa9843e`, Billing `develop@7138810`과 관련 코드·계약·이력을 확인했다. 문서의 Markdown 링크 59개가 모두 존재함을 검사했다.
+- 테스트·결과: 코드 변경이 없는 조사 작업이라 새 Gradle test는 실행하지 않았다. 기존 JUnit XML 기준 기본 Java 496개는 failures/errors/skipped 0이고 별도 `mongoIntegrationTest`는 로컬 Docker 부재에 따른 실패 기록이 있어 한계로 명시했다. `git diff --check`를 실행한다.
+- 유지한 외부 계약: 애플리케이션 코드와 공개 API·DTO·`BaseResponse`, AI `user_id=examId`, S3·Redis·Billing 계약을 변경하지 않았다.
+- 남은 위험·배포 전 확인: 동기/비동기 전후 p95·Thread·오류율, MongoDB 비교 benchmark, AI-human 품질 일치율과 본인 실제 기여 범위가 미확인이다. 수치가 확보되기 전에는 성능 향상률과 production 완료를 단정하지 않는다.
+- 예상 밖 변경: 작업 트리에 기존 문서 변경이 있을 수 있으나 이번 작업은 신규 포트폴리오 문서와 필수 CURRENT_STATE·WORKLOG만 변경했다. 기존 사용자 변경을 되돌리거나 수정하지 않았다.
+- 다음 작업 전 확인: 지원 직무, 본인 기여 범위와 대표 사례 3개를 사용자가 선택하면 실제 포트폴리오 페이지 문안·도식·성과 표로 압축한다.
+- 보안·Git: Secret·Token·AWS 계정·ARN·사용자 음성·전체 transcript를 기록하지 않았고 commit·push·PR·배포를 수행하지 않았다.
+
+## 2026-09-06 — 포트폴리오 구조화 로그·AI 재시도 사례 보강
+
+<!-- codex-turn:01a0765b-8f0e-7542-9b90-b68f25718f70 -->
+
+- 날짜·브랜치·Jira: 2026-09-06, Learning Core `develop`, 별도 Jira가 없는 포트폴리오 문서 보강 작업이다.
+- 사용자 요청: 기존 포트폴리오 후보에 구조화 로그 적용과 AI 오류 후 재시도 로직이 포함됐는지 확인하고 사례로 정리한다.
+- 문서 변경: `docs/codex/TOSUNSAENG_PORTFOLIO_CONTENT_INVENTORY.md`에 `구조화 로그로 분산 채점 흐름 추적`과 `AI 오류·지연의 선택적 재시도와 stale Callback 방어`를 독립 섹션으로 추가했다. 두 사례를 문제·원인·구현·효과·검증·한계 구조로 기록하고 문제 해결 표, 경력기술서 bullet, 면접 질문과 부록 근거도 보강했다.
+- 구조화 로그 사실: 요청별 UUID requestId를 MDC에 저장·복원하고 TaskDecorator로 Summary 비동기 실행까지 전파한다. 로그는 JSON이 아니라 `event/outcome/reason/stage/durationMs` 중심의 key=value 형식이며 Sentry 민감정보 정제와 함께 사용한다.
+- AI 복구 사실: 영속 Question/Summary Job, PENDING·PROCESSING timeout, 최대 dispatch 횟수, 시험 단위 retry API, Summary generationAttempt와 stale Callback no-op을 설명했다. 완료·처리 중·제출 누락·재전송 대상을 구분하고 사용자 새 녹음 retryCount>0은 최초 시험 복구에서 제외한다.
+- 정확성 경계: Question submit의 S3 download와 AI 접수 HTTP는 blocking이며 문항 재전송은 완전 자동 background worker가 아니라 API 기반 선택적 복구다. 운영 MTTR·탐지시간·retry 성공률은 측정 자료가 없어 수치 성과로 단정하지 않는다.
+- 검증·변경 범위: 코드 변경이 없는 문서 작업이므로 Gradle 테스트는 새로 실행하지 않는다. Markdown 근거 링크와 `git diff --check`를 확인하며 공개 API·DTO·AI Callback·S3·Redis 계약과 애플리케이션 코드는 변경하지 않았다.
+- Git·외부 작업·보안: commit·push·PR·배포·Jira·AWS·Mongo 운영 변경을 수행하지 않았고 Secret·Token·사용자 음성·전체 transcript를 기록하지 않았다.
+
+## 2026-09-07 — 10초 챌린지 구현 착수 가능 여부 확인
+
+<!-- codex-turn:01a07a38-f512-7491-bb33-36266ded048f -->
+
+- 날짜·브랜치·Jira: 2026-09-07, Learning Core `develop`, 10초 챌린지 Learning Core 전용 Jira는 아직 없다.
+- 사용자 요청: 선행 UserMerged 작업 이후 이제 10초 챌린지 구현을 시작해도 되는지 확인한다.
+- 확인 결과: TMI-125 후속 production safety 수정은 PR #29 merge commit `88b46c6`으로 `develop`과 `origin/develop`에 반영됐다. 프론트·AI Challenge v1 계약과 `AGENTS.md` 구현 허용 범위도 확정됐으므로 10초 챌린지 개발을 시작할 수 있다.
+- 권장 착수 순서: 현재 `develop` 기준 계약·계획 재검토, 전용 Jira 생성, feature branch 생성 후 catalog validator·최초 활성 KST 기준일·비순환 dayNumber resolver·MEMBER 전용 1시간 ChallengeAttempt·snapshot/소유권·today/question/attempt/upload-url 기반을 먼저 구현한다. 이어 AI dispatch Job·Callback·timeout/최대 3회 generation·결과/history·migration/index·staging E2E를 구현한다.
+- 병행 운영 gate: TMI-125의 Docker replica-set CI 실제 성공, Mongo migration, workload issuer/JWKS·Identity retry E2E와 direct Transaction 성능 검증은 production UserMerged 활성화 전 조건이며 Challenge 코드 착수를 막지 않는다.
+- 변경·테스트·외부 작업: 이번 turn은 상태 판단과 필수 작업 기록 갱신만 수행했다. 애플리케이션 코드, Jira, AWS, Mongo와 배포 상태는 변경하지 않았고 코드 변경이 없어 Gradle 테스트는 실행하지 않는다.
+- Git·보안: commit·push·PR을 수행하지 않았고 Secret·Token을 기록하지 않았다.
+
+## 2026-09-07 — 10초 챌린지 구현 전 계약·코드 적합성 재검토
+
+<!-- codex-turn:01a07a4e-457a-75d2-94bd-264afed8c6c4 -->
+
+- 날짜·브랜치·Jira: 2026-09-07, Learning Core `develop@88b46c6`, Challenge backend 전용 Jira는 아직 없다.
+- 사용자 요청: 10초 챌린지를 구현하기 전에 승인된 프론트·AI 계약, 결정서와 현재 Learning Core/Identity 코드가 실제로 맞물리는지 재검토한다.
+- 결론: catalog·날짜·attempt·S3·AI Job 등 Challenge domain 구현은 시작할 수 있지만 현재 문서만으로 전체 v1을 안전하게 완료할 수는 없다. MEMBER authorization 근거와 expiration materialization은 구현 전에 반드시 보완해야 한다.
+- P1 MEMBER 경계: Identity `JwtAccessTokenIssuer`는 `sub`, issuer, audience, 시각, jti와 공통 scope만 발급한다. Guest와 MEMBER가 모두 같은 기본 `learning:read learning:write` scope를 사용하고 Learning Core `JwtCurrentUserProvider`도 `sub`만 읽으므로 계약의 Guest `403`을 판정할 수 없다. 계정 유형 claim 또는 MEMBER 전용 scope를 wire 계약으로 확정하고 Identity 선배포·기존 Access Token 만료 후 Challenge flag를 활성화해야 한다.
+- P1 만료 수렴: 계약은 deadline이 지난 attempt를 공개 `submitted`, 내부 `EXPIRED`로 만들어 다음 문제와 history를 열지만, 사용자가 늦은 answer를 보내지 않은 경우 누가 언제 이 상태 전이를 만드는지 정의하지 않았다. today/question/attempt/upload/answer/result/history 경계의 원자 CAS 기반 lazy expiration과 제한된 scheduler/reconciler 책임을 구현 계획에 고정해야 한다.
+- P1 Callback 보안: 기존 exact UserMerged chain은 order 0, UserWithdrawn은 1, JWT/Legacy catch-all은 2다. Challenge Callback은 opaque service Bearer credential 계약이므로 catch-all JWT decoder에 도달하기 전에 exact matcher와 전용 인증 filter로 격리하고 Legacy에서도 공개되지 않도록 순서·feature 조건·401/403 테스트를 계획해야 한다.
+- P2 audio 검증: S3 HEAD로 확인 가능한 것은 object 존재·Content-Type·크기이며 실제 M4A container, AAC-LC codec, sample rate와 channel 검증 수단은 현재 Java dependency에 없다. submit에서 동기 media probe를 할지, Learning Core는 metadata만 확인하고 AI가 binary profile을 검증해 grading failure로 수렴할지 책임과 공개 415 의미를 계약에 명확히 해야 한다.
+- P2 문서 정합성: 프론트 계약의 `maxBytes` 2 MiB 임시값 문구와 결정서의 sample rate/channel/최대 크기 추가 확정 필요 문구는 같은 문서의 v1 확정값과 충돌한다. AI 계약의 `attempt_id`·`job_id`·`callback_id`를 log와 metric 모두에 허용하는 표현은 식별자는 구조화 로그에만 허용하고 metric tag는 고정 outcome/stage 같은 저카디널리티 값만 허용하도록 정정해야 한다. 사용처가 정의되지 않은 `CHALLENGE_DATE_CLOSED`와 history의 baseDate 이전·catalog 소진 날짜 표현도 계획/계약에서 명시하는 편이 안전하다.
+- 권장 후속 순서: 위 계약 보완과 구현 계획서 작성, Identity Token 계약 작업 분리 또는 의존성 등록, Challenge Jira 생성, feature branch 생성 후 catalog/baseDate/attempt foundation부터 구현한다. Callback 보안과 AI transport는 후속 vertical slice로 분리하되 최종 PR 전에 전체 contract fixture와 replica-set 경합 테스트를 통과시킨다.
+- 변경·테스트·외부 작업: 이번 작업은 읽기 전용 검토와 필수 상태 기록만 수행했다. 애플리케이션·계약 본문·Identity 코드·Jira·AWS·Mongo·배포를 변경하지 않았고 코드 변경이 없어 Gradle 테스트는 실행하지 않는다.
+- Git·보안: 기존 사용자 소유 문서 변경을 보존했고 commit·push·PR을 수행하지 않았으며 Secret·Token을 기록하지 않았다.
+
+## 2026-09-07 — 10초 챌린지 선행 쟁점 선택지·권장안 정리
+
+<!-- codex-turn:01a07a55-75a3-71f1-ae6b-ac1eab6c56fd -->
+
+- 날짜·브랜치·Jira: 2026-09-07, Learning Core `develop@88b46c6`, Challenge backend 전용 Jira는 아직 없다.
+- 사용자 요청: 구현 전 재검토에서 발견한 MEMBER 검증, 만료 수렴, Callback 보안, audio 검증과 문서 정합성 각각에 대해 선택지와 장단점을 설명한다.
+- MEMBER 선택지: Access Token에 계정 유형 claim을 추가하면 도메인 의미가 명확하고 Learning Core가 무상태로 즉시 판정할 수 있지만 Identity 변경·선배포와 기존 Token drain이 필요하다. MEMBER 전용 scope는 OAuth 인가 확장성이 있으나 계정 유형과 권한 정책이 중복되고 모든 발급 경로 수정이 필요하다. 요청마다 Identity를 조회하면 최신 상태를 얻지만 강한 런타임 결합·지연·장애 전파가 생긴다. `account_type` claim 방식을 권장한다.
+- 만료 선택지: 요청 시 CAS lazy expiration은 client correctness가 단순하고 scan 부하가 없지만 접근하지 않은 문서는 늦게 수렴한다. scheduler-only는 선제적으로 정리하지만 실행 지연 동안 사용자가 막힐 수 있고 다중 instance lease가 필요하다. lazy CAS를 correctness 기준으로 하고 bounded scheduler를 cleanup으로 병행하는 hybrid를 권장한다.
+- Callback 보안 선택지: 승인된 방향별 opaque Bearer를 exact 전용 chain과 상수시간 비교 filter로 검증하면 계약 변경이 작고 경계가 분명하지만 secret rotation 운영이 필요하다. workload JWT/JWKS는 짧은 TTL·issuer/audience가 강점이나 AI와 계약·키 운영 변경이 커진다. controller permit-all 후 직접 비교는 Legacy 노출·보안 실수 위험으로 채택하지 않는다. v1은 항상 등록되는 exact chain, catch-all 이전 order, flag OFF deny-all을 권장한다.
+- audio 선택지: Learning Core가 동기 download/media probe하면 submit 단계에서 정확한 415와 재업로드를 제공하지만 요청 지연·native/parser 의존성·중복 download·비신뢰 파일 처리 부담이 생긴다. Learning Core가 S3 존재·MIME·크기만 확인하고 AI가 실제 decode profile을 검증하면 책임이 자연스럽고 단순하지만 실제 codec 오류는 submit 415가 아니라 비동기 grading failed가 된다. 별도 preflight API는 계약과 왕복을 늘린다. MVP는 metadata는 Learning Core, binary profile은 AI가 담당하도록 계약을 정정하는 안을 권장한다.
+- 문서 선택지: 확정값과 충돌하는 임시 문구는 선택 없이 정정해야 한다. ID는 구조화 로그에만 허용하고 metric tag는 outcome/stage 등 고정 enum만 허용하는 저카디널리티 정책을 권장한다. `CHALLENGE_DATE_CLOSED`는 현재 `DATE_CHANGED`와 `ATTEMPT_EXPIRED`로 모두 표현되므로 제거를 권장하며, 유지하려면 정확한 발생 endpoint를 정의해야 한다. history는 baseDate 이전을 미참여로 표시하면 구현은 단순하지만 출시 전 결석처럼 보이므로 baseDate 이전 날짜를 `dates`에서 제외하는 안을 권장한다. unavailable 표시가 필요하면 새 field 계약이 필요하다.
+- 전체 권장 패키지: account_type claim, lazy+bounded scheduler expiration, exact opaque-Bearer Callback chain, Learning Core metadata/AI binary audio 검증 분리, stale 문구·metric·오류 code·history range 정리를 구현 계획서와 계약에 먼저 반영한 뒤 Identity 의존성과 Challenge Jira를 생성한다.
+- 변경·테스트·외부 작업: 선택지를 설명하고 상태 기록만 갱신했다. 사용자 승인 전이므로 애플리케이션·계약 본문·Identity 코드·Jira·AWS·Mongo·배포는 변경하지 않았고 Gradle 테스트는 실행하지 않는다.
+- Git·보안: 기존 사용자 소유 문서 변경을 보존했고 commit·push·PR을 수행하지 않았으며 Secret·Token을 기록하지 않았다.
+
+## 2026-09-07 — 10초 챌린지 권장안 승인·계약과 구현 계획 반영
+
+<!-- codex-turn:01a07a66-0744-7552-8505-a69afd2b832f -->
+
+- 날짜·브랜치·Jira: 2026-09-07, Learning Core develop. Challenge 전용 Jira는 미생성이며 AI 계약 관련 이력 TMI-102·TMI-105·TMI-106은 참조만 유지했다.
+- 사용자 요청: 앞서 제시한 권장안으로 진행하고 프론트·AI에서 수정해야 할 부분이 있는지 설명한다.
+- 승인 반영: 프론트·AI 계약, 상세 결정서, release plan 및 AGENTS.md에 account_type MEMBER 인가, lazy CAS+bounded scheduler, exact Callback chain·OFF deny-all, audio 검증 분리, metric tag 제한, DATE_CLOSED 제거와 baseDate 이전 history 제외를 반영했다.
+- 계획 산출물: TEN_SECOND_CHALLENGE_IMPLEMENTATION_PLAN.md를 신규 작성했다. 5줄 결론·필독·승인 상태·위험·단계별 구현·테스트/배포·파일 지도와 근거 링크를 포함한다. Identity claim 발급 의존성, submit/expiry CAS, Callback 선도착·generation 경합, S3 audio identity와 transport retry 설계 검증도 기록했다.
+- 외부 영향: 프론트/AI URL·Method·Request/Response field는 유지된다. 프론트는 history 누락 날짜를 비활성으로 표시하고 DATE_CLOSED 분기·submit MIME 415와 비동기 binary failed UX를 대조해야 한다. AI는 media profile·decode 및 non-retryable 실패 처리와 ID metric tag 비사용을 확인해야 한다. 외부 코드를 직접 확인하지 않아 추가 수정 없음으로 단정하지 않았다.
+- 승인·구현 경계: 사용자 보완 승인과 상대 팀의 적용 확인을 구분했다. Identity claim 추가·모든 발급 경로 전환은 별도 구현이며 구버전 발급 instance drain 뒤 실제 최대 Token TTL+skew를 기다려 활성화한다. 외부 메시지·Jira 생성·Identity/AI/프론트 코드 변경은 수행하지 않았다.
+- 검증: 문서 작업으로 Gradle 테스트는 실행하지 않는다. 변경 문서의 JSON 예시 parse, 계획서 상대 링크, diff whitespace와 turn marker 단일 포함을 검사한다.
+- Git·보안: 기존 포트폴리오와 상태 문서의 사용자 변경을 보존했다. 변경 범위는 위 계약·계획·지침·필수 기록이며 예상 밖 애플리케이션 변경은 없다. commit·push·배포·운영 DB 변경과 Secret/Token 기록은 수행하지 않았다.
+
+## 2026-09-07 — Identity claim 선행 작업과 Challenge 병행 개발 설명
+
+<!-- codex-turn:01a07a69-cb1b-7e26-bd26-4754b27746a5 -->
+
+- 사용자 요청: 권장안 적용을 위해 Identity가 먼저 수정돼야 하는지 확인한다.
+- 결론: 다음 선행 작업은 Identity 사용자 Access Token의 account_type=MEMBER|GUEST 발급이다. signup/login/exchange/refresh/Guest upgrade/merge 등 모든 발급 경로에서 현재 User 계정 유형을 사용해야 한다. 기존 claim과 로그인 응답 구조는 유지한다.
+- 순서: Identity 구현·테스트·전체 발급 instance 전환 후 구형 Token의 최대 TTL+허용 skew가 지나면 Challenge MEMBER gate를 활성화한다. Learning Core catalog·attempt·Job 구현과 fixture 기반 인가 테스트는 병행 가능하다.
+- Jira: 전용 Identity claim 및 Challenge Jira는 아직 없고 이번 설명에서 생성·변경하지 않았다.
+- 변경·검증: CURRENT_STATE와 WORKLOG만 갱신했다. 코드 변경이 없어 Gradle 테스트는 실행하지 않고 git diff --check로 문서 형식을 검증한다. 기존 사용자 변경을 보존했다.
+- Git·보안: commit·push·배포·외부 메시지·운영 DB 변경을 수행하지 않았으며 Secret과 Token을 기록하지 않았다.
+
+## 2026-09-07 — Identity 선행 작업 설명 종료 훅 동기화
+
+<!-- codex-turn:01a07a69-c789-74a0-8a42-53a8aae56b5f -->
+
+- 사용자 요청 및 결론: Identity가 먼저 수정돼야 하는지 설명했다. 다음 선행 작업은 모든 사용자 Access Token 발급 경로에 현재 계정 유형 account_type을 포함하는 변경이다.
+- 현재 상태: Identity claim 구현은 아직 시작하지 않았다. Learning Core catalog·attempt·Job 개발은 병행할 수 있고 MEMBER 제한의 운영 활성화는 발급 전환 및 구형 Token TTL+skew 경과 후 수행한다.
+- Jira: 이 변경 전용 Jira는 아직 없으며 이번 작업에서 Jira를 변경하지 않았다.
+- 기록·검증: 과거 WORKLOG 항목을 보존하고 지정 marker로 끝에 새 항목을 추가했다. CURRENT_STATE를 동기화하고 git diff --check 및 marker 단일 포함을 확인한다. 코드 변경이 없어 Gradle 테스트는 실행하지 않았다.
+- Git·보안: commit·push·배포·외부 메시지·운영 데이터 변경을 수행하지 않았으며 Secret과 Token을 기록하지 않았다.
+
+## 2026-09-07 — Identity account_type JWT 구현 인계 문안 작성
+
+<!-- codex-turn:01a07a6a-bf22-7696-9ba7-27ab38c2c3bf -->
+
+- 사용자 요청: Identity 담당자에게 수정 범위를 인계할 수 있도록 전달 내용을 정리한다.
+- 조사: JwtAccessTokenIssuer와 AccessTokenIssuer, GuestAuthService·LoginService·FirebaseSignupService·FirebaseExchangeService·TokenReissueService·FirebaseGuestUpgradeService·FirebaseGuestMergeService의 발급 호출을 읽기 전용으로 재확인했다.
+- 전달 규격: 사용자 Access Token에 account_type=MEMBER|GUEST를 필수 발급하며 신뢰된 User의 현재 계정 유형을 사용한다. 프론트 요청·기존 Token claim·provider 문자열로 유형을 추정하지 않는다. refresh는 현재 계정 유형을 재평가하고 upgrade/merge는 성공한 결과 계정을 기준으로 발급한다. 기존 lifecycle 차단·UserAccountType 호환 처리를 유지한다.
+- 경계·검증: 기존 RS256/kid/JWKS·표준 claim·scope·로그인 응답·RefreshSession 계약은 유지하고 workload JWT는 대상에서 제외한다. 누락 없는 발급 경로·Guest/Member·refresh·승격·merge·구형 Token 호환과 개인정보 비노출 회귀 테스트, 전체 instance 전환 및 마지막 구형 Token TTL+skew 이후 Challenge 활성화 조건을 인계한다.
+- Jira·외부 작업: 전용 Jira는 아직 없다. 이번 답변은 복사해 전달할 문안이며 외부 발송, Identity 코드 수정, Jira 생성·전환과 배포는 수행하지 않았다.
+- 기록·테스트·Git: WORKLOG append와 CURRENT_STATE만 갱신했다. 코드 변경이 없어 Gradle 테스트를 실행하지 않고 git diff --check를 확인한다. 사용자 문서 변경을 보존하고 commit·push를 수행하지 않았으며 Secret·Token을 기록하지 않았다.
+
+## 2026-09-07 — Identity 인계 문안 종료 훅 동기화
+
+<!-- codex-turn:01a07a6a-bf22-7af0-8a7c-de032d21cd47 -->
+
+- 작업 결과: Identity 담당자에게 전달할 account_type JWT 발급 계약, 발급 경로 7곳, 회귀 테스트와 배포 순서를 답변에 정리했다.
+- 현재 상태: 인계 문안 작성 완료이며 Identity 코드 구현·외부 전달·배포는 수행하지 않았다. 전용 Jira는 아직 없고 이번 작업에서 Jira를 변경하지 않았다.
+- 기록·검증: 과거 기록을 보존하며 WORKLOG 끝에 지정 marker를 추가하고 CURRENT_STATE를 갱신했다. marker 단일 포함과 git diff --check를 검증한다. 코드 변경이 없어 Gradle 테스트는 실행하지 않았다.
+- Git·보안: 기존 사용자 변경을 보존하고 commit·push·운영 데이터 변경을 수행하지 않았다. Secret과 Token은 기록하지 않았다.
+
+## 2026-09-07 — Identity account_type 병합·회귀 검증 및 Challenge 다음 작업 안내
+
+<!-- codex-turn:01a07a81-359f-7d21-94c6-9331c0b0f7c1 -->
+
+- 사용자 요청: Identity 작업 결과를 확인하고 Learning Core에서 이어서 진행할 작업을 설명한다.
+- 확인 근거: Identity 로컬 develop과 origin/develop 참조가 PR #39 merge commit fe9c7f6이며 구현 commit 6b34f44를 포함한다. 원격 fetch와 운영 배포 조회는 수행하지 않았다.
+- 코드 검토: AccessTokenIssuer에 UserAccountType 필수 인자가 추가됐고 issuer는 null 거절·enum 문자열 발급을 수행한다. GuestAuth/Login/FirebaseSignup/FirebaseExchange/TokenReissue/FirebaseGuestUpgrade/FirebaseGuestMerge 7개 발급 경로가 User.getAccountType()을 전달한다. refresh의 현재 DB 유형 사용, 승격 성공 후 같은 userId MEMBER, merge target MEMBER, 기존 claim·workload 분리 및 구형 Token 호환을 확인했다. 검토 범위에서 진행을 막는 결함을 발견하지 않았다.
+- 테스트: 샌드박스 Gradle cache 접근 실패 후 권한 승인 경로로 ./gradlew clean test --no-daemon을 실행해 BUILD SUCCESSFUL을 확인했다. JUnit XML 합계는 123 suites·640 tests, failures/errors/skipped 모두 0이다.
+- 다음 작업: Learning Core Challenge 전용 Jira 범위 등록 후 MEMBER gate·catalog validator·최초 활성 KST baseDate·비순환 day resolver·1시간 attempt snapshot/소유권·lazy CAS 만료·S3/내구성 submit 기반부터 구현한다. 이어 독립 AI Job·Callback fencing·결과/history·replica-set 통합 테스트를 진행한다. 기존 승인 계획을 적용하며 이번 turn에서는 코드 구현과 Jira 변경을 하지 않았다.
+- 운영 경계: Identity 배포와 마지막 구버전 발급 종료 UTC 시각·실제 최대 TTL·Learning Core 사용자 JWT skew 확인은 남아 있다. 이는 Challenge 활성화 조건이며 Learning Core 구현 착수는 가능하다.
+- Jira·변경·보안: account_type 및 Challenge 전용 Jira 키는 확인되지 않았다. Learning Core CURRENT_STATE와 WORKLOG만 갱신하며 기존 사용자 문서 변경을 보존했다. commit·push·배포·외부 메시지·운영 DB 변경과 Secret/Token 기록은 수행하지 않았다. git diff --check 및 현재 marker 단일 포함을 확인한다.
+
+## 2026-09-07 — Learning Core 10초 챌린지 구현 Jira 생성
+
+<!-- codex-turn:01a07a94-4879-7782-97ca-37ce09c8b88b -->
+
+- 사용자 요청: 승인된 계획을 기준으로 Learning Core 10초 챌린지 구현 Jira를 생성한다.
+- Jira: 중복 검색과 프로젝트 작업 유형 필수 필드 확인 후 TMI-126 `[Learning Core] 10초 챌린지 API 및 비동기 AI 채점 구현`을 생성했다. 재조회로 제목과 해야 할 일 상태를 확인했다. 관련 TMI-102·TMI-105·TMI-106은 변경하지 않았다.
+- 등록 범위: MEMBER gate·catalog/baseDate·1시간 attempt snapshot·만료 CAS·S3/내구성 submit·독립 AI Job/Callback fencing·no-speech 참고 답안·결과/history, replica-set 통합 검증과 default-off rollout이다. Identity PR #39 로컬 병합/640개 테스트 선행 확인과 미확인 운영 배포를 구분했다.
+- 미확인 사항: 제출 audio identity 고정용 S3 versioning 또는 immutable artifact, 202 이전 transport retry 예산과 late Callback 상태표, 실제 Identity TTL/skew·AI 인증/TLS·모바일 staging E2E가 남아 있다. 구현 전 기술 확인과 운영 활성화 gate를 이슈에 기록했다.
+- 변경 파일: TEN_SECOND_CHALLENGE_IMPLEMENTATION_PLAN.md, TEN_SECOND_CHALLENGE_API_CONTRACT_DECISIONS.md, ten-second-challenge-ai-api.md의 Jira metadata 및 선행 상태, CURRENT_STATE와 WORKLOG를 갱신했다. 기존 사용자 문서 변경을 보존했고 예상 밖의 runtime 변경은 없다.
+- 검증: 생성 이슈 재조회, git diff --check와 현재 marker 단일 포함을 확인한다. 문서·Jira 등록만 수행해 Gradle 테스트는 재실행하지 않았다. 기존 프론트/AI wire·시험 API·S3/Redis 계약은 변경하지 않았다.
+- 다음 단계·보안: TMI-126 기준 구현을 시작할 수 있으나 이번 turn에서는 runtime 구현·commit·push·배포·운영 DB 변경을 하지 않았다. Secret과 Token은 기록하지 않았다.
+
+## 2026-09-07 — TMI-126 10초 챌린지 상세 구현 계획 작성
+
+- 사용자 요청: 등록한 Jira 기준으로 구현 계획서를 작성한다.
+- 변경 파일: TEN_SECOND_CHALLENGE_IMPLEMENTATION_PLAN.md를 상세화하고 CURRENT_STATE 및 이 WORKLOG를 갱신했다. 기존 계획·계약·사용자 변경을 보존하며 다른 문서와 runtime 코드는 이번 작업에서 수정하지 않았다.
+- 근거 확인: 프론트/AI v1, Challenge AGENTS 규칙, SecurityConfig, UserOwnedTransactionExecutor/guard/filter와 S3/Mongo 테스트 기반을 대조했다. Identity 검증은 직전 작업의 로컬 PR #39/640개 테스트 증거를 인용했으며 이번에 테스트나 원격 조회를 재수행한 것은 아니다.
+- 설계 내용: 담당 클래스·collection/index, MEMBER/소유권·날짜·순차 진행·1시간 deadline, 내부/공개 상태 projection, submit receipt·원자 저장·unknown commit 재조회, 제출 audio 고정 대안, lease·202/Callback 선도착·timeout/generation 경합, 결과/history와 단계별 테스트·rollout/drain을 구체화했다.
+- 구분한 위험: writer flag OFF의 UserOwnedTransactionExecutor는 Transaction을 만들지 않으므로 Challenge의 독립 원자성 경계가 필요하다. S3 versioning/immutable artifact 선택, transport 총 예산·마지막 generation late Callback 계약, EXPIRED submittedAt null fixture 및 운영 보존/삭제 정책 확인은 남아 있다. 제안 수치를 승인된 AI 계약으로 변경하지 않았다.
+- 외부 계약·Jira: 기존 Exam 및 Challenge URL/Method/DTO/BaseResponse·AI field/timeout·S3/Redis 계약을 변경하지 않았다. TMI-126을 문서에 유지하고 Jira 본문·상태를 수정하거나 외부 메시지를 발송하지 않았다.
+- 검증: git diff --check 통과. 문서 작성이므로 Gradle 및 Mongo/Node 테스트는 실행하지 않았다. 새 script/class 이름은 구현 예정임을 명시했다. 예상 밖의 변경 범위는 없다.
+- 다음 단계·배포: MEMBER/fixture/catalog/attempt 기반부터 구현 가능하며 submit artifact와 AI 미확정 경계는 해당 단계 전에 확인한다. Identity 실제 rollout·catalog/index·TLS/credential·모바일 staging E2E 전에는 production 활성화하지 않는다. commit·push·운영 DB 변경·배포와 Secret/Token 기록은 하지 않았다.
+
+## 2026-09-07 — TMI-126 상세 계획 작성 종료 기록 동기화
+
+<!-- codex-turn:01a07a98-8b25-7011-b647-c3eb6a28c321 -->
+
+- 작업 결과: TMI-126 10초 챌린지 구현 계획에 클래스 책임·저장 모델/index·원자적 submit과 replay·음성 고정·AI 상태 전이·테스트·운영 체크리스트를 상세화했다. 전체 내용은 바로 앞 작업 기록과 TEN_SECOND_CHALLENGE_IMPLEMENTATION_PLAN.md에 유지한다.
+- 남은 확인: S3 제출 artifact 방식, AI transport retry 종료와 마지막 generation late Callback, EXPIRED 제출 시각 null fixture 및 배포 조건이다. 미확정 제안은 기존 승인 계약과 구분했고 구현은 시작하지 않았다.
+- 종료 훅: 과거 WORKLOG를 보존하고 지정 marker를 새 항목에 한 번 추가했으며 CURRENT_STATE를 동기화했다. git diff --check 및 marker 단일 포함을 확인한다. 문서 기록만 변경해 Gradle 테스트는 재실행하지 않았다.
+- Jira·보안: TMI-126 상태·본문 변경, commit·push·배포·운영 DB 작업을 수행하지 않았다. Secret과 Token을 기록하지 않았다.
+
+## 2026-09-07 — TMI-126 구현 계획 설명
+
+<!-- codex-turn:01a07aaf-1df3-7e92-beeb-15c3d9e55ddc -->
+
+- 사용자 요청: 작성한 10초 챌린지 구현 계획을 이해하기 쉽게 설명한다.
+- 설명 기준: TEN_SECOND_CHALLENGE_IMPLEMENTATION_PLAN.md의 최신 본문과 미확정 경계·테스트·운영 체크리스트를 확인했다. 기존 시험과 분리된 MEMBER 전용 기능, 콘텐츠 날짜 고정, 녹음 시작 attempt/1시간 제출, S3 제출 접수와 AI 비동기 채점 분리, no-speech 참고 답안, 결과/history를 사용자 흐름 중심으로 설명한다.
+- 핵심 설계: attempt·Job·제출 receipt의 원자 저장, 응답 유실 replay, 음성 고정, Callback 중복/이전 generation 차단과 실제 Mongo 경합 검증은 중복 응시·결과 유실·상태 덮어쓰기를 막기 위한 장치다. 구현은 5단계로 진행하며 아직 시작하지 않았다.
+- 미확정 사항: S3 version pin/private snapshot 선택, AI transport retry 총 예산과 최종 late Callback 정책, 만료 결과 submittedAt null의 프론트 확인을 기존 승인 계약과 구분해 안내한다. Identity 코드 선행 확인과 실제 운영 배포도 구분한다.
+- 변경·검증: 설명과 CURRENT_STATE/WORKLOG 기록만 수행한다. 계획서·외부 계약·runtime 코드·Jira TMI-126 상태는 변경하지 않았다. git diff --check와 marker 단일 포함을 확인하고 코드 변경이 없어 Gradle 테스트는 실행하지 않는다. 기존 사용자 변경을 보존하며 예상 밖의 변경은 없다.
+- 보안·다음 작업: 기반 구현은 진행 가능하나 관련 미확정 경계는 해당 단계 전에 확인해야 한다. commit·push·배포·운영 DB 변경·Secret/Token 기록은 하지 않았다.
+
+## 2026-09-07 — TMI-126 만료 attempt의 풀이 수 의미 설명
+
+<!-- codex-turn:01a07ab3-e5d8-7c71-a02d-c21ff0fc40e1 -->
+
+- 사용자 요청: 만료된 문제를 풀이 수에 포함한다는 의미를 설명한다.
+- 확인: 프론트 v1의 상태·history·만료 규칙은 생성된 attempt가 1시간 미제출로 만료되면 공개 submitted, gradingStatus=not_requested로 투영하고 solvedQuestionCount에 포함한다. 시작하지 않은 문제는 날짜가 지나도 자동으로 포함하지 않는다.
+- 설명: 실제 음성 제출 없이도 시작 후 만료된 문제는 종료된 응시로 세며 참고 답안과 다음 문제를 열어 주는 현재 문서 정책이다. 이는 실제 제출 수와 종료된 응시 수를 같은 풀이 수로 표현한 것으로 혼동 가능성이 있다. 다음 문제 진행 허용과 실제 풀이 수 집계는 별개로 설계 가능하지만 변경 시 계약을 먼저 갱신해야 한다.
+- 변경·검증: CURRENT_STATE와 WORKLOG만 갱신했다. TMI-126 계획·프론트/AI 계약·코드·Jira 상태는 변경하지 않았다. git diff --check와 marker 단일 포함을 확인하며 코드 변경이 없어 테스트는 실행하지 않는다.
+- 보안: 사용자 변경과 과거 기록을 보존했고 commit·push·배포·운영 DB 변경·Secret/Token 기록은 수행하지 않았다.
+
+## 2026-09-07 — TMI-126 풀이 수를 실제 제출 접수 기준으로 변경
+
+- 사용자 요청: 미제출 만료를 제외하고 실제 제출한 문제만 풀이 수로 센다.
+- 변경한 정책: history/results의 solvedQuestionCount는 내부 SUBMITTED만 세며 EXPIRED·CREATED·S3 업로드만 한 문제는 제외한다. participated는 실제 제출 수>0이다. 채점 대기·무음·AI 실패는 이미 접수된 제출이므로 포함하고 같은 제출 replay는 중복 계산하지 않는다.
+- 유지한 동작: 미제출 만료의 참고 답안·다음 문제 접근·공개 submitted와 dailyStatus/completedQuestionNumbers의 진행 종료 기준은 유지한다. 따라서 전부 만료면 진행 완료라도 풀이 수 0/미참여이며, 만료 상세 question은 non-null일 수 있다. 프론트는 공개 상태/목록 길이로 계산하지 않고 서버 풀이 수를 사용해야 한다.
+- 변경 파일: AGENTS.md, TEN_SECOND_CHALLENGE_IMPLEMENTATION_PLAN.md, TEN_SECOND_CHALLENGE_API_CONTRACT_DECISIONS.md, ten-second-challenge-frontend-api.md, CURRENT_STATE.md와 WORKLOG.md. 기존 사용자 변경을 보존했고 관련 없는 runtime 변경은 없다.
+- Jira: TMI-126 본문의 기존 만료 포함 규칙을 교체하고 후속 사용자 결정 및 검증 사례를 추가했다. 재조회로 새 정책·이전 문구 제거·해야 할 일 상태 유지 여부를 확인했다.
+- 검증: git diff --check 통과, 활성 계약/계획의 이전 집계 규칙을 검색해 대조했다. 문서·Jira 변경이므로 Gradle 테스트는 실행하지 않았다. 전부 만료=0, 제출1+만료2=1, AI 실패도 포함, replay 증가 없음 등을 구현 테스트 기준에 추가했다.
+- 외부 계약·남은 작업: 공개 URL/field/enum/BaseResponse 및 AI wire는 유지하고 풀이 수/참여 여부의 의미만 사용자 승인으로 변경했다. runtime은 미구현이며 프론트 적용 확인이 필요하다. commit·push·배포·운영 DB 변경과 Secret/Token 기록은 수행하지 않았다.
+
+## 2026-09-07 — TMI-126 실제 제출 집계 변경 종료 기록 동기화
+
+<!-- codex-turn:01a07ab5-0dca-7110-9a66-afe67071407b -->
+
+- 작업 결과: 사용자 승인에 따라 실제 audio 제출 접수만 풀이 수·참여 여부에 반영하고 미제출 만료는 제외하도록 계획·계약·AGENTS 및 TMI-126 본문을 갱신했다. 만료의 참고 답안과 다음 문제 접근은 유지한다.
+- 현재 상태: 문서와 Jira 반영 완료, runtime 구현 미착수, 프론트 적용 확인 필요다. 기존 공개 field/enum과 AI wire는 유지한다.
+- 종료 기록: 과거 WORKLOG를 수정하지 않고 지정 marker를 새 항목에 한 번 추가했으며 CURRENT_STATE를 동기화했다. git diff --check와 marker 단일 포함을 확인한다. 문서 기록만 변경해 Gradle 테스트는 재실행하지 않았다.
+- 보안: 이번 동기화에서는 Jira를 추가 변경하지 않았으며 commit·push·배포·운영 DB 작업·Secret/Token 기록을 수행하지 않았다.
+
+## 2026-09-07 — TMI-126 음성 덮어쓰기·만료 시각 확정 및 AI 재시도 수치 확인
+
+- 사용자 요청: 마지막 업로드가 남도록 음성 덮어쓰기를 허용하고, 기존 AI 재시도 수치를 확인하며, 미제출 만료의 submittedAt=null을 확정한다.
+- 확정 반영: 같은 key의 유효 PUT 덮어쓰기를 유지하며 version pin·별도 보관본·제출 파일 복제를 계획에서 제외했다. 기존 bucket versioning 비활성화나 과거 version 삭제는 수행하지 않는다. terminal 새 URL 금지, 실제 제출만 풀이 수 집계, EXPIRED 참고 답안·다음 문제 접근은 유지한다. EXPIRED submittedAt/gradedAt null을 프론트 계약에 명시했다.
+- AI 근거: v1 8.1~8.3의 연결 3초·접수 응답 15초·202 이후 Callback 120초·최대 generation 3회, AI→LC Callback backoff 5초 시작/최대 간격 10분/최대 시도 10회를 재확인했다. 10회는 LC→AI 접수 전 전송 한도가 아니며, 계획서의 1초/30초/5분은 미확정 제안임을 구분했다.
+- 미확정 경계: 접수 전 transport 총 예산 및 마지막 generation timeout 뒤 같은 generation의 late Callback 정책은 계약에 없다. 같은 job/key에 다른 audio면 409라는 기존 규칙은 그대로여서 덮어쓰기 후 재다운로드 재전송 전략은 AI와 대조가 필요하다. 마지막 S3 객체가 이미 채점된 음성/결과를 자동 교체하는 것은 아니다. 임의 새 generation이나 AI 멱등성 변경으로 우회하지 않는다.
+- 변경 파일: AGENTS.md, TEN_SECOND_CHALLENGE_IMPLEMENTATION_PLAN.md, TEN_SECOND_CHALLENGE_API_CONTRACT_DECISIONS.md, ten-second-challenge-frontend-api.md, ten-second-challenge-ai-api.md, CURRENT_STATE와 WORKLOG. 기존 사용자 변경을 보존했으며 runtime은 변경하지 않았다.
+- Jira·검증: TMI-126의 이전 immutable artifact 제안을 교체하고 결정·계약 수치·남은 충돌을 기록했다. 재조회로 반영과 해야 할 일 상태를 확인했다. git diff --check 및 낡은 제안 문구 검색을 수행했다. 문서 작업이므로 Gradle 테스트는 실행하지 않았다.
+- 보안·운영: 프론트 null 처리와 AI 재전송 경계의 적용 확인이 남아 있으며 구현·S3 업로드/삭제·배포·commit·push를 수행하지 않았다. Secret과 Token을 기록하지 않았다.
+
+## 2026-09-07 — TMI-126 음성·만료·AI 계약 확인 종료 기록 동기화
+
+<!-- codex-turn:01a07ab8-14f8-7172-ae75-2f524dcebaa5 -->
+
+- 결과: 같은 upload key 마지막 성공 PUT 유지, version pin·별도 보관본 제외, EXPIRED submittedAt=null을 계획/계약/AGENTS 및 TMI-126에 반영했다. 기존 AI timeout·generation·Callback 전달 수치를 재확인하고 미확정 transport 총 한도·최종 late Callback과 구분했다.
+- 남은 사항: 같은 Job의 바뀐 audio는 기존 AI 계약상 409이므로 덮어쓰기 이후 재전송 전략의 합의와 프론트 null 처리 검증이 필요하다. 구현은 미착수다.
+- 종료 동기화: 과거 기록을 보존하고 지정 marker를 새 WORKLOG 항목에 한 번 추가했다. CURRENT_STATE를 갱신하고 git diff --check 및 marker 단일 포함을 확인한다. 문서 기록만 변경해 Gradle 테스트는 실행하지 않았다.
+- 보안: 이번 종료 동기화에서는 Jira·코드·운영 DB·S3·배포를 변경하지 않았고 commit·push·Secret/Token 기록을 수행하지 않았다.
+
+## 2026-09-07 — TMI-126 최종 확정 사항 및 잔여 예외 경계 정리
+
+- 사용자 요청: 더 정할 내용이 없는지 확인하고 최종 정리한다.
+- 확인: 최신 계획의 사용자 결정·음성 덮어쓰기·AI 예외 경계를 재확인했다. 제품 규칙은 대부분 확정됐지만 접수 전 transport 총 한도, 최종 generation timeout 이후 late Callback, 같은 Job의 바뀐 audio 처리 세 항목은 미정이다. 마지막 음성 저장 정책을 마지막 음성 자동 재채점 승인으로 확대 해석하지 않는다.
+- 안내: MEMBER·공통 3문제·첫 활성 KST Day 1·비순환·1시간 attempt·실제 제출만 집계·만료 참고 답안/다음 문제·submittedAt null·덮어쓰기 정책과 기존 AI 연결 3초/접수 15초/결과 120초/최대 generation 3회·Callback 전달 최대 10회를 구분해 정리한다. 예외 권장안은 미승인 제안으로만 안내한다.
+- 변경·검증: CURRENT_STATE와 WORKLOG만 갱신했다. 계획·계약·Jira TMI-126·runtime을 변경하지 않았다. git diff --check를 확인하며 코드 변경이 없어 Gradle 테스트는 실행하지 않았다. 기존 사용자 변경을 보존했다.
+- 다음 단계·보안: 기반 개발은 가능하지만 AI 예외 계약 확정과 운영 배포/인증/index/E2E 확인을 전체 완료로 간주하지 않는다. commit·push·배포·운영 DB/S3 변경 및 Secret/Token 기록을 수행하지 않았다.
+
+## 2026-09-07 — TMI-126 최종 결정 현황 설명 종료 기록 동기화
+
+<!-- codex-turn:01a07abb-8325-7762-82c6-04cc5a8026da -->
+
+- 작업 결과: 확정된 Challenge 제품 정책과 기존 AI 수치를 정리하고, 접수 전 재전송 총 한도·최종 timeout 뒤 late Callback·덮어쓰기 후 같은 Job audio 변경 처리의 세 미확정 경계를 설명했다. 권장안은 승인된 정책으로 간주하지 않았으며 구현은 미착수다.
+- Jira: TMI-126 관련 설명이며 이번 작업에서는 이슈 본문·상태를 변경하지 않았다. 기반 구현은 가능하지만 AI 연동 경계 확정 및 운영 검증은 남아 있다.
+- 종료 동기화: 과거 WORKLOG를 보존하고 지정 marker를 새 항목에 한 번 추가했으며 CURRENT_STATE를 갱신했다. git diff --check와 marker 단일 포함을 확인한다. 문서 기록만 변경해 Gradle 테스트는 실행하지 않았다.
+- 보안: 코드·계약·운영 DB/S3·배포·commit·push를 변경하지 않았으며 Secret과 Token을 기록하지 않았다.
+
+## 2026-09-07 — TMI-126 프론트 재녹음과 AI 제출 경계 설명
+
+<!-- codex-turn:01a07abf-1258-7aa0-81e5-b2be8db81ef6 -->
+
+- 사용자 요청: 프론트에서 재녹음 후 다시 업로드할 수 있는 경우 기존 AI 멱등 계약과 어떻게 동작하는지 설명한다.
+- 확인: 프론트 계약의 upload-url/answer 및 계획의 마지막 업로드 규칙을 대조했다. S3 PUT과 answer 접수는 별개이며, 제출 전 동일 attempt의 재녹음·덮어쓰기는 아직 AI Job이 없어 동일 Job audio 충돌을 만들지 않는다. 같은 1시간 deadline을 유지하고 최종 업로드 완료 후 answer를 호출해야 한다.
+- 구분: answer 접수 뒤 재녹음은 기존 응시 1회·submit replay 계약 밖이다. 파일만 바꾸면 AI 결과가 자동 교체되지 않고, 같은 Job으로 다른 audio를 보내면 409다. 이 위험은 제출 전 재녹음 자체에 해당하는 설명이 아님을 명확히 한다.
+- 미확인: 실제 프론트 코드를 조회하지 않았으므로 다시 녹음 버튼이 answer 전인지 후인지 단정하지 않는다. answer 요청 전송 이후 응답 유실 때도 접수됐을 수 있으므로 재녹음보다 같은 key replay/상태 확인이 필요하다. 오래된 PUT이 최종 음성을 뒤늦게 덮어쓰지 않도록 업로드 순서 제어도 확인 대상이다.
+- 변경·검증: CURRENT_STATE/WORKLOG만 갱신했다. 계획·프론트/AI 계약·Jira TMI-126·runtime은 변경하지 않았고 구현은 미착수다. git diff --check와 marker 단일 포함을 확인한다. 코드 변경이 없어 Gradle 테스트는 실행하지 않았다.
+- 보안: 기존 사용자 변경과 과거 기록을 보존했고 commit·push·배포·운영 DB/S3 변경·Secret/Token 기록은 수행하지 않았다.
+
+## 2026-09-07 — TMI-126 제출 전 재녹음 확인 및 변경 음성 방어 승인 반영
+
+- 사용자 확인: 프론트 다시 녹음은 제출 전에만 가능하며 권장안 적용에 동의했다. 실제 프론트 코드를 조회해 검증한 것은 아니다.
+- 반영 범위: 같은 attempt/key/최초 deadline에서 재녹음·최종 업로드 완료 후 answer를 한 번 접수한다. answer 응답 유실은 same-key replay로 복구한다. 최초 AI 전송 bytes의 SHA-256을 HTTP 전에 durable CAS로 확정하고 재시작·lease 회수·generation retry에도 유지한다. 변경 음성을 같은 Job으로 재전송하지 않고 복구 불가 시 채점 실패로 종료하며 이미 완료된 결과·제출·풀이 수·참고 답안을 보존한다.
+- 계약 경계: version pin·별도 음성 보관본·임의 새 generation·AI 409 규칙 변경은 추가하지 않는다. 제출과 최초 AI 읽기 사이의 덮어쓰기를 digest만으로 방지한다고 주장하지 않는다. 별도 접수 전 재시도 총 한도·최종 late Callback 수치는 이번 재녹음 확인의 추가 승인으로 추정하지 않았다.
+- 변경 파일: AGENTS.md, TEN_SECOND_CHALLENGE_IMPLEMENTATION_PLAN.md, TEN_SECOND_CHALLENGE_API_CONTRACT_DECISIONS.md, ten-second-challenge-frontend-api.md, ten-second-challenge-ai-api.md, CURRENT_STATE와 WORKLOG. 기존 사용자 변경을 보존했다.
+- Jira·검증: TMI-126에 후속 승인 절과 테스트 기준을 추가해 기존 음성 처리 미확정 문구를 대체하도록 명시했다. git diff --check 통과. 문서 작업이므로 Gradle 테스트는 실행하지 않았으며 runtime 구현은 미착수다. 기존 API URL/field/enum·AI payload/timeout 수치는 변경하지 않았다.
+- 남은 검증·보안: 프론트 최종 PUT 순서·digest CAS/재시작/변경 audio 회귀·양 팀 fixture와 운영 E2E는 후속이다. commit·push·배포·운영 DB/S3 변경·Secret/Token 기록을 수행하지 않았다.
+
+## 2026-09-07 — TMI-126 제출 전 재녹음 승인 종료 기록 동기화
+
+<!-- codex-turn:01a07ac0-33cc-7f61-ae7b-7ab4c4e7d1cc -->
+
+- 작업 결과: 사용자 확인에 따라 재녹음은 answer 제출 전만 허용하고 최종 업로드 후 한 번 제출하도록 계획·계약·AGENTS·TMI-126을 갱신했다. 최초 AI 전송 digest와 다른 음성 재전송을 차단하고 복구 불가 시 채점 실패로 종료하되 제출·참고 답안·완료 결과는 보존한다.
+- 현재 상태: 문서/Jira 반영 완료·runtime 구현 미착수다. 별도 접수 전 총 재시도 한도와 최종 late Callback 정책, 프론트/AI 적용 및 운영 검증은 남아 있다.
+- 종료 기록: 과거 WORKLOG를 보존하고 지정 marker를 새 항목에 한 번 추가했으며 CURRENT_STATE를 동기화했다. git diff --check와 marker 단일 포함을 확인한다. 문서 기록만 변경해 Gradle 테스트는 실행하지 않았다.
+- 보안: 이번 종료 동기화에서 Jira·코드·운영 DB/S3·배포를 추가 변경하지 않았으며 commit·push·Secret/Token 기록을 수행하지 않았다.
+
+## 2026-09-07 — TMI-126 최종 구현 기준 요약
+
+<!-- codex-turn:01a07ac5-3762-7d50-b883-c820d335a002 -->
+
+- 사용자 요청: 마지막으로 전체 결정 내용을 정리한다.
+- 확인·설명: 최신 계획에서 MEMBER·공통 하루 3문제·비순환 Day 1·1시간 attempt·제출 전 재녹음/최종 PUT 뒤 answer·변경 음성 재전송 차단·실제 제출만 풀이 수 집계·만료 제출 시각 null·참고 답안/no-speech 정책을 확인했다. 기존 AI 연결 3초/접수 15초/결과 대기 120초/총 3 generation·Callback 전달 최대 10회를 구분해 요약한다.
+- 남은 경계: 접수 전 transport 총 한도와 마지막 generation timeout 뒤 late Callback은 현재 문서상 미확정이며 5분 한도·실패 유지/늦은 결과 no-op은 제안이다. 직전 재녹음 권장안 승인을 이 두 정책까지 확정한 것으로 확대하지 않는다. 운영 적용·통합 검증은 별도다.
+- 변경·검증: CURRENT_STATE와 WORKLOG만 갱신했다. 계획·계약·Jira TMI-126·runtime은 변경하지 않았다. git diff --check와 marker 단일 포함을 확인하며 코드 변경이 없어 Gradle 테스트는 실행하지 않았다.
+- 상태·보안: 구현은 미착수이며 기반 개발은 가능하다. 기존 사용자 변경을 보존하고 commit·push·배포·운영 DB/S3 변경·Secret/Token 기록을 수행하지 않았다.
+
+## 2026-09-07 — TMI-126 AI 전송 5분 예산 및 최종 실패 후 late Callback 정책 확정
+
+- 사용자 요청: 마지막으로 제안한 접수 전 총 5분 한도와 최종 실패 유지/늦은 결과 no-op을 확정한다.
+- 결정: 각 Job 최초 dispatch부터 접수 전 전송 총 예산 5분에 연결/응답/backoff를 포함하고 재시작·lease 회수·재전송으로 늘리지 않는다. backoff 1초 시작/30초 상한+jitter, Retry-After를 앞당기지 않고 남은 예산을 지킨다. 유효 202 접수 후에는 기존 최초 acceptedAt+120초 결과 대기로 전환한다. 예산 소진은 최종 failed/경보이며 새 generation으로 우회하지 않는다.
+- 늦은 결과: 마지막 generation timeout 및 접수 예산 소진 등 로컬 최종 실패 뒤 known Job의 유효 Callback은 204 no-op, 실패 상태 유지다. 이미 저장된 Callback conflict와 인증/body/generation 검증은 유지한다. early Callback/실패 경합은 CAS·Transaction의 먼저 확정된 terminal을 보존한다. 제출·풀이 수·참고 답안은 유지한다.
+- 변경 파일: AGENTS.md, TEN_SECOND_CHALLENGE_IMPLEMENTATION_PLAN.md, TEN_SECOND_CHALLENGE_API_CONTRACT_DECISIONS.md, ten-second-challenge-ai-api.md, ten-second-challenge-frontend-api.md, CURRENT_STATE 및 WORKLOG. 기존 사용자 변경을 보존했으며 runtime 코드 변경은 없다.
+- Jira: TMI-126 최상단에 최종 사용자 승인 및 검증 기준을 추가해 과거 미확정 표현을 대체하도록 명시했다. 재조회로 반영 및 해야 할 일 상태 유지를 확인했다.
+- 검증: git diff --check 통과, 활성 계획/AI 계약의 낡은 미확정 문구 제거 확인. 문서 변경이므로 Gradle 테스트는 실행하지 않았다. 5분 경계·재시작/lease·Retry-After 초과·early Callback 경쟁·최종 실패 후 유효/비정상 Callback 회귀 기준을 추가했다.
+- 계약·운영: 기존 URL/field/enum·연결3초/접수15초/결과120초/총3 generation·AI→LC Callback 최대10회는 유지한다. 이번 사용자 정책 확정이 AI 팀 실제 적용·배포 완료를 의미하지 않는다. 구현·양 팀 fixture·운영 E2E는 남아 있다. commit·push·운영 DB/S3·배포·Secret/Token 기록은 수행하지 않았다.
+
+## 2026-09-07 — TMI-126 AI 종료 정책 확정 종료 기록 동기화
+
+<!-- codex-turn:01a07ac6-af03-7760-8797-e50ae14bf7d4 -->
+
+- 작업 결과: 사용자 승인으로 AI 접수 전 각 Job 최초 전송부터 총 5분 예산과 최종 실패 후 유효 late Callback 204 no-op을 계획·계약·AGENTS·TMI-126에 반영했다. 제출 기록·참고 답안은 유지한다.
+- 현재 상태: 논의한 기능·예외 처리 기준 확정, runtime 구현 미착수다. AI 팀 실제 적용·공유 fixture·통합 테스트·운영 검증은 남아 있으며 Jira는 해야 할 일이다.
+- 종료 동기화: 과거 WORKLOG를 보존하고 지정 marker를 새 항목에 한 번 추가했으며 CURRENT_STATE를 갱신했다. git diff --check와 marker 단일 포함을 확인한다. 문서 기록만 변경해 Gradle 테스트는 실행하지 않았다.
+- 보안: 이번 동기화에서 Jira·코드·운영 DB/S3·배포를 추가 변경하지 않았으며 commit·push·Secret/Token 기록을 수행하지 않았다.
+
+## 2026-09-07 — TMI-126 프론트·AI 통신 규격 유지 여부 확인
+
+- 사용자 요청: 최근 정책 확정으로 프론트/AI 응답 구조·API·요청 방식이 바뀌었는지 확인한다.
+- 확인: 현재 프론트/AI 계약에서 최근 확정은 기존 URL/Method/header/Request·Response field와 enum, BaseResponse, S3 PUT 및 AI multipart/Callback JSON 형식을 유지한다. 프론트의 attempt 생성→녹음/재녹음→최종 PUT→answer→polling 흐름과 방향별 인증도 유지한다.
+- 구분할 변경: 실제 제출만 풀이 수/참여 여부로 집계, EXPIRED submittedAt=null, 접수 전 총5분 제한 및 최종 실패 뒤 유효 Callback 204 no-op은 의미/허용값/처리 정책 보완이다. 통신 형식 불변을 상대 코드 수정 불필요 보장으로 표현하지 않는다. 프론트는 서버 풀이 수와 null 시각을 처리하고 AI는 204에서 전달 재시도를 멈추는 기존 규칙을 확인해야 한다.
+- 변경·검증: CURRENT_STATE/WORKLOG만 갱신했다. 계획·계약·Jira TMI-126·runtime은 변경하지 않았다. git diff --check를 확인하며 코드 변경이 없어 Gradle 테스트는 실행하지 않는다. 실제 프론트/AI 코드 적용 여부는 이번 확인 대상이 아니었다.
+- 보안: 기존 사용자 변경과 과거 기록을 보존했다. commit·push·배포·운영 DB/S3 변경·Secret/Token 기록을 수행하지 않았다.
+
+## 2026-09-07 — TMI-126 프론트·AI 통신 형식 및 의미 변경 대조 완료
+
+<!-- codex-turn:01a07acb-190e-7283-8a8b-74357da85a81 -->
+
+- 사용자 요청: 최근 확정이 프론트/AI API·응답 구조·요청 방식에 영향을 주는지 확인한다.
+- 근거: 프론트/AI 계약의 현재 git diff를 확인했다. URL·HTTP Method·요청 field·응답 field 이름/중첩·인증 header·S3 raw PUT·AI multipart 및 Callback JSON 형식은 유지한다. EXPIRED submittedAt null 허용은 클라이언트 타입/렌더링 영향이 있을 수 있어 구조 불변만으로 수정 불필요를 보장하지 않는다.
+- 의미·예외 변경: 실제 제출만 풀이 수/참여 여부 집계, 만료 상세 null 시각, history 기준일 범위, 기존 CHALLENGE_DATE_CLOSED 제거와 415 의미 보완, 접수 전 총5분과 최종 실패 late Callback 204 no-op을 구분한다. 최신 논의와 그 이전 2026-09-07 보완이 포함된 누적 diff임을 유의한다.
+- 검증·범위: CURRENT_STATE/WORKLOG만 갱신하고 git diff --check 및 marker 단일 포함을 확인한다. 코드 변경이 없어 Gradle 테스트는 실행하지 않았다. TMI-126·계획·계약·runtime을 추가 변경하지 않았고 실제 프론트/AI 코드 적용 여부는 미검증이다.
+- 보안: 사용자 변경·과거 기록을 보존하고 commit·push·배포·운영 DB/S3·Secret/Token 기록을 수행하지 않았다.
+
+## 2026-09-07 — TMI-126 전체 확정 계약 및 구현 범위 종합 안내
+
+<!-- codex-turn:01a07acd-3ebb-7530-a20b-b48fab5e4b5e -->
+
+- 사용자 요청: 지금까지의 전체 결정을 마지막으로 종합 설명한다.
+- 확인·설명: 최신 계획의 사용자 승인·AI 종료 기준을 재확인했다. MEMBER/콘텐츠/비순환 KST 기준일, 생성 시 snapshot과 1시간 deadline, 제출 전 재녹음/최종 PUT 후 answer, 음성 digest 방어, 실제 제출만 집계, 만료 null 시각/결과 접근, 비동기 AI/no-speech, 일곱 공개 API·서버 간 전송, 원자 저장/멱등성·운영 gate를 정리한다.
+- 최종 기준: 접수 전 각 Job 최초 dispatch부터 총5분, 연결3초/접수15초/결과120초/총3 generation, AI→LC Callback 최대10회, 최종 실패 후 유효 late Callback 204 no-op은 사용자 확정 사항이다. 기능/예외 정책을 다시 미확정으로 표시하지 않는다. 상대 팀 적용과 운영 검증은 별개다.
+- 범위·상태: TMI-126 계획/계약/Jira 등록은 완료됐으며 runtime 구현은 미착수다. 기존 시험 API·AI·S3/Redis 계약은 유지한다. 신규 결제·reward·랭킹·스트릭·음성 재생은 제외한다. 이번 종합 설명에서는 계획·계약·Jira·코드를 변경하지 않았다.
+- 변경·검증: CURRENT_STATE와 WORKLOG만 갱신했다. git diff --check와 marker 단일 포함을 확인한다. 코드 변경이 없어 Gradle 테스트는 실행하지 않았다. 기존 사용자 변경 및 과거 기록을 보존했다.
+- 보안: commit·push·배포·운영 DB/S3 변경·Secret/Token 기록을 수행하지 않았다.
+
+## 2026-09-07 — TMI-126 Challenge S3 object key 확정
+
+<!-- codex-turn:01a07adb-19ee-7652-b3d5-8575632154b3 -->
+
+- 사용자 승인: 모의고사와 유사한 temp/challenges/{attemptId}/q_{questionNumber}.m4a 경로를 사용한다.
+- 변경: 계획서·계약 결정서·프론트 명세·AGENTS에 정확한 key와 동일 attempt 덮어쓰기·URL 재발급 불변을 명시했다. TMI-126에 승인 경로 및 경로/기존 시험 회귀/lifecycle·권한 검증 기준을 추가하고 재조회로 반영과 해야 할 일 상태를 확인했다.
+- 유지 범위: 기존 시험 temp/{examId}/q_{questionNumber}_r{retryCount}.wav, 프론트 Request/Response·Presigned PUT, AI multipart/Callback 계약은 유지한다. Challenge에는 retryCount·실제 userId·날짜·추가 prefix를 붙이지 않는다. 기존 버킷 설정을 사용한다.
+- 변경 파일: AGENTS.md, TEN_SECOND_CHALLENGE_IMPLEMENTATION_PLAN.md, TEN_SECOND_CHALLENGE_API_CONTRACT_DECISIONS.md, ten-second-challenge-frontend-api.md, CURRENT_STATE.md 및 WORKLOG.md. 사용자 기존 변경과 과거 기록을 보존했고 runtime 변경은 없다.
+- 검증: git diff --check 및 marker 단일 포함을 확인한다. 문서·Jira 반영만 수행해 Gradle 테스트는 실행하지 않았다. 정확한 key 생성 및 재발급 불변은 구현 시 테스트한다.
+- 운영·보안: temp lifecycle이 AI 처리/재시도 도중 삭제하지 않는지와 prefix 권한은 배포 전 확인한다. 실제 S3·IAM·lifecycle·운영 DB 변경, 구현·commit·push·배포·Secret/Token 기록은 수행하지 않았다.
+
+## 2026-09-07 — TMI-126 Challenge S3 key와 모의고사 경로 비교
+
+<!-- codex-turn:01a07ad8-cb96-7232-9ad5-bf3720ae5d55 -->
+
+- 사용자 요청: 현재 Challenge S3 경로와 모의고사와 유사하게 구성하는 방안을 확인한다.
+- 확인 근거: ExamServiceImpl.java의 업로드 URL 생성은 temp/{examId}/q_{questionNumber}_r{retryCount}.wav와 5분 Presigned PUT을 사용한다. Challenge runtime은 없고 계획/계약에는 attemptId 기반 server-generated 고정 .m4a key만 정해져 있어 구체적인 prefix는 아직 구현·확정하지 않았다. application.yml의 app.s3.key-prefix 설정이 이 시험 key에 자동 적용된다고 가정하지 않는다.
+- 제안: 모의고사 구조를 참고해 temp/challenges/{attemptId}/q_{questionNumber}.m4a로 분리한다. 같은 attempt 재녹음은 동일 key 덮어쓰기, Challenge에는 시험 retryCount를 추가하지 않는다. 사용자 UUID/날짜를 경로에 추가하지 않고 기존 시험 key도 수정하지 않는다.
+- 주의: temp/를 사용하면 기존 bucket lifecycle/권한 범위가 Challenge에도 적용될 수 있으므로 AI 전송·복구가 끝나기 전에 지워지지 않는지 운영 검증이 필요하다. 실제 bucket 설정은 조회하지 않았다. 프론트는 받은 URL에 PUT하고 AI에는 binary를 보내므로 외부 Request/Response field 변경은 필요하지 않다.
+- 변경·검증: CURRENT_STATE/WORKLOG만 갱신했다. 제안 단계이며 계획·계약·Jira TMI-126·코드·S3는 변경하지 않았다. git diff --check와 marker 단일 포함을 확인하고 코드 변경이 없어 Gradle 테스트는 실행하지 않았다. 사용자 변경과 과거 기록을 보존했다.
+- 보안: commit·push·배포·운영 DB/S3 변경·Secret/Token 기록을 수행하지 않았다.
+
+## 2026-09-07 — TMI-126 10초 챌린지 구현 및 격리 통합 검증
+
+<!-- codex-turn:01a07ae7-52ba-7143-9949-34de6e7937e7 -->
+
+- 사용자 요청: 승인한 계획대로 10초 챌린지를 구현하고 이어서 완료한다. 작업 중 제공된 AGENTS 교체 지시를 존중하며 기존 시험 계약과 앱 전용 범위를 유지했다. 사용자가 준비한 feat/TMI-126-ten-second-challenge 브랜치에서 파일 수정·테스트만 수행했다.
+- 변경 파일: domain/challenge Java 21개, application.yml default-off 설정, Challenge 일반 테스트 4개 클래스와 replica-set 통합 테스트 1개 클래스, challenge-10s-prepare.js/Node test·Mongo README, shared synthetic JSON fixture, rollout 안내, 계획/계약 상태 문구, CURRENT_STATE/WORKLOG. 기존 AGENTS·release plan·portfolio 등 사용자 변경은 보존했고 관련 없는 runtime 파일은 수정하지 않았다.
+- 동작: 7개 공개 API, verified JWT account_type MEMBER 인가, 기존 withdrawal/merged gate 유지, Callback 전용 exact -1 chain, catalog 검증·최초 enabled KST Day 1 singleton·비순환, 콘텐츠 snapshot·1시간 attempt, 동일 생성 복구·순차 진행·자정 경계·lazy/bounded expiry, 실제 SUBMITTED만 집계, expired null timestamp·참고 답안·no-speech projection을 구현했다.
+- 제출/S3: 고정 temp/challenges/{attemptId}/q_{questionNumber}.m4a와 최대 deadline 이내 PUT URL, MIME/2 MiB 검증과 bounded download, rejected stream abort. Attempt+Job+success receipt를 명시적 Mongo Transaction/version CAS로 저장한다. optional ownership guard는 같은 Mongo 경계에 참여하며 unknown commit은 Transaction 밖 majority-visible receipt·Attempt/Job evidence로 수렴한다. 실패한 Transaction 안에서 duplicate 예외를 잡고 계속하지 않는다.
+- AI: 승인 multipart/전용 credential, 결정적 Job id, 30초 lease, 최초 bytes SHA-256 durable CAS와 변경 음성 차단, 3초 connect/15초 accept/Job별 총5분 budget, Retry-After·bounded body/HTTP timeout, 최초202+120초·최대3 generation, strict16KiB Callback·semantic digest·receipt·duplicate/stale/conflict·early/late Callback CAS, 완료/실패 보존을 구현했다. private lifecycle executor로 기존 시험 scheduler를 대체하지 않는다. 고정 outcome metric/histogram·정제 로그만 기록한다.
+- 검증: 최종 JAVA_TOOL_OPTIONS=-Dapi.version=1.44 ./gradlew clean test mongoIntegrationTest 성공. 일반 Java 529개(Challenge 33), Mongo 통합 40개(Challenge 29), 실패·error·skip 모두0. node --test scripts/mongodb/*.test.js 전체90개(Challenge7) 성공. git diff --check 성공. 실제 Mongo는 Testcontainers 7.0.14의 격리 DB이며 실제 운영 Atlas/S3/Redis/AI/credential을 사용하지 않았다.
+- 검증 중 수정: Testcontainers 기본 Docker API 1.32와 로컬 daemon의 최소 버전 차이를 테스트 JVM 설정만으로 보완했다. mongosh 비동기 실행의 completion value가 사라져 검사를 건너뛰던 script 문제를 실제 컨테이너 dry-run/apply 테스트로 발견·수정했다. 기존 withdrawal401/merged403 계약을 테스트 expectation에 정확히 반영했다. 최종 테스트는 수정된 코드로 전체 재실행했다.
+- 보존 계약: 기존 시험 공개 API/DTO/BaseResponse, retryCount, AI user_id=examId, Redis 및 시험 S3 key, 기존 security chain 순서를 변경하지 않았다. Challenge의 승인된 프론트/AI URL·Method·field·enum·timeout 계약도 유지했다. 과거 WORKLOG 기록은 수정·삭제하지 않고 이번 항목만 끝에 추가했다.
+- 남은 운영 gate: Identity claim 운영 선배포와 구형 Token drain, 프론트 최종 PUT/answer 순서·null fixture, AI 실제 배포/인증·TLS·멱등/late Callback E2E, iOS/Android 실제 audio profile, catalog/index 운영 적용, temp prefix 권한/lifecycle, 개인정보 보존/삭제 및 경보 수신 확인. 기능 기본 OFF이며 로컬 성공을 운영 활성화 승인으로 취급하지 않는다.
+- 범위/다음 단계: 예상 밖 코드 변경 없음. 이번 작업에서 운영 DB migration·S3/IAM 변경·배포·Jira 상태 전환·commit·push는 하지 않았다. 다음은 변경사항 리뷰/PR 후 rollout 문서의 staging 검증이며 Jira TMI-126 종료 여부는 별도 확인한다. Secret과 Token은 기록하지 않았다.
+
+## 2026-09-07 — 채팅·작업 기록 기반 포트폴리오 트러블슈팅 조사
+
+<!-- codex-turn:01a07bba-b2a1-7a13-bc65-9e654e86ea46 -->
+
+- 사용자 요청: 프로젝트 작업 기록과 채팅에서 실제 트러블슈팅 소재를 찾아 기존 포트폴리오에 추가한다.
+- 확인 기준: Learning Core develop@cb5f6ee, 앱 관련 채팅 작업 4개의 선택 페이지, Learning Core·Identity·Billing WORKLOG, Learning Core 수정 커밋·현재 코드·테스트를 대조했다. 채팅 전체를 읽었다고 주장하지 않고 조사 범위를 사례집 부록에 기록했다.
+- 산출물: docs/codex/TOSUNSAENG_TROUBLESHOOTING_CASEBOOK.md를 추가했다. 요청한 6단계 문서 계층으로 상세 사례 16개와 후속 확인용 진단 6개, 추천 3개, 포트폴리오 문장 후보, 날짜별 테스트 증거와 채팅 출처를 정리했다. 기존 TOSUNSAENG_PORTFOLIO_CONTENT_INVENTORY.md에 탐색 링크·추천 표·경력 문장을 추가했다.
+- 핵심 사례: 빈 Summary 피드백과 선택적 재생성, stale dispatch 실패 덮어쓰기, Callback 내부 동기 Summary, 파트 점수 누적, CI flaky 동시성 테스트, SENTRY_RELEASE 우선순위, NamespaceNotFound, Mongo aborted Transaction hotfix, Part 4 text 누락, modelAnswer 조기 노출, Sentry stack·정제, UserMerged unknown commit·검증 공백, migration 경쟁, Docker API 버전·mongosh 조기 종료다.
+- 관련 이슈: TMI-25·31·61·118·122·125·126, 추가 연동 진단의 Identity TMI-123·103·104·107을 근거에 연결했다. Jira 조회·변경·댓글·상태 전환은 수행하지 않았다.
+- 사실 보정: Summary generation은 FEEDBACK_GENERATION_FAILED의 사용자 retry에서만 증가하며 동일 generation transport retry는 증가시키지 않는다고 수정했다. 09-05 Docker 실패 이후 09-07 Java 529개·Mongo 40개·Node 90개 성공 기록 및 Challenge 구현 상태를 포트폴리오에 반영했다. 과거 수치를 이번 실행 결과로 표시하지 않았다.
+- 검증: 두 산출물의 로컬 근거 링크·행 참조 149개 모두 존재하며 git diff --check가 성공했다. 커밋 제목과 실제 diff를 대조했고 98730c9의 실제 변경이 workflow임을 기록했다. 문서 변경만 있어 Gradle 테스트를 새로 실행하지 않았다.
+- 유지 범위: 공개 API·DTO·BaseResponse·AI request/Callback·S3·Redis·Billing 계약과 애플리케이션 코드는 변경하지 않았다. 실제 발생·리뷰 발견·원인 진단·운영 미확인을 구분하고 성능·비용·피해 수치를 만들지 않았다.
+- 변경 파일: 신규 사례집, 기존 포트폴리오 목록, CURRENT_STATE와 이번 WORKLOG EOF append다. 시작 전부터 수정된 CURRENT_STATE·WORKLOG와 과거 중복 기록은 보존했다. 예상 밖 코드 변경은 없으며 다른 저장소는 읽기만 했다.
+- 남은 확인: 사용자가 본문 사례와 실제 기여 범위를 선택하고, 운영 장애로 소개할 항목에는 안전하게 정리한 당시 로그·배포 결과를 연결한다. 문서 자체의 배포 작업은 없고 실제 서비스의 staging/production gate는 기존대로 별도다.
+- 보안·Git: Secret·Token·계정·ARN·사용자 음성·전체 payload를 새 문서에 기록하지 않았으며 commit·push·PR·배포·AWS·Mongo 운영 변경을 수행하지 않았다.
+
+## 2026-09-07 — 포트폴리오 트러블슈팅 조사 종료 훅 동기화
+
+<!-- codex-turn:01a07bba-d664-71c2-9fba-b137fbe4a97d -->
+
+- 사용자 요청: 종료 훅이 지정한 현재 turn 식별자로 작업 기록을 append하고 CURRENT_STATE를 동기화한다.
+- 완료 상태: 채팅·세 서버 WORKLOG·Learning Core 수정 diff를 근거로 상세 트러블슈팅 16개와 추가 진단 6개를 TOSUNSAENG_TROUBLESHOOTING_CASEBOOK.md에 작성했고 기존 포트폴리오 목록에 연결했다. 실제 발생·리뷰 발견·진단·미확인을 구분했다.
+- 관련 Jira: TMI-25, TMI-31, TMI-61, TMI-118, TMI-122, TMI-125, TMI-126과 추가 연동 진단의 Identity TMI-123, TMI-103, TMI-104, TMI-107. Jira 자체는 변경하지 않았다.
+- 검증: 직전 조사에서 로컬 참조 149개와 git diff --check가 통과했다. 이번 문서 동기화 후에도 diff와 새 marker 단일 포함을 확인한다. 코드 변경이 없어 Gradle 테스트는 실행하지 않는다.
+- 변경 범위: CURRENT_STATE와 WORKLOG EOF append만 수행하고 과거 기록·기존 사용자 변경을 보존했다. 애플리케이션·공개 API·AI·S3·Redis 계약과 기존 산출물은 추가 변경하지 않았다.
+- 보안·외부 작업: Secret과 Token을 기록하지 않았으며 commit·push·PR·배포·AWS·Mongo 운영 변경을 수행하지 않았다.
+
+## 2026-09-07 — 팀원 토선생 회고 3편 기반 백엔드 포트폴리오 보강
+
+<!-- codex-turn:01a07bc1-ee95-79f3-a55e-e2ae423ba62b -->
+
+- 사용자 요청: 팀원 Velog의 토선생 회고 3편을 읽고 백엔드와 관련된 경험을 기존 포트폴리오·트러블슈팅 목록에 추가한다.
+- 조사: JINI의 7월 회고, 8월 회고, 개발 일지 #01 멈춰버린 서비스 본문을 브라우저로 읽고 현재 develop@cb5f6ee의 시험지 배정·S3 URL·catalog·retry·DTO/Converter·구조화 로그·Challenge no_speech 코드와 관련 테스트를 대조했다. 해당 S3 장애와 직접 일치하는 수정 기록은 이번 WORKLOG 키워드 조회에서 찾지 못했으며 원인·사용자 영향은 팀원 회고 근거로 표시했다.
+- 산출물: TOSUNSAENG_TEAM_RETROSPECTIVE_BACKEND_SUPPLEMENT.md를 6계층 구조로 추가했다. 9개 운영·협업·비용·콘텐츠 소재, 원문 3편 링크, 구현 사실·회고 사실·추론·미구현 제안, 수치 의미와 개인 기여 확인 항목을 정리했다. 기존 사례집에 TS-23 S3 음성 이동·신규 사용자 Q5 중단, TS-24 AI 피드백 약10분 대기 후 이탈을 추가해 24개 후보로 확장했다. 포트폴리오 목록에 선택 표와 설명을 연결하고 CURRENT_STATE를 갱신했다.
+- 사실 경계: AI field-level repair·STT metadata/no-speech guard는 팀원 성과, 문항/Summary 복구·Challenge no_speech는 현재 백엔드 구현으로 분리했다. 7월 대기 사건을 동기 호출 thread 고갈과 동일시하지 않았다. 기존 catalog/Presigned GET 발급은 리소스 존재·재생 검증과 다르며 manifest/smoke/안전한 콘텐츠 전환은 제안으로만 기록했다.
+- 수치: 웹+앱 전체 시험 완료100회(8월31일21시), 앱17명/30회와 콘텐츠100세트를 구분했다. 두 모델100입력 중98판단 일치를 정확도98%로 쓰지 않았고 GPU 실험과 운영 SLA, 골든 데이터셋 계획과 완료 성과도 구분했다. 운영 DB로 재집계하지 않았다.
+- 관련 Jira: 신규 이슈 없음. 기존 TMI-25의 채점 복구, TMI-31의 시험지 배정, TMI-126의 Challenge 구현이 연결 배경이며 이 회고 장애의 직접 수정 이슈로 확정하지 않았다. Jira 조회·수정·댓글·상태 변경은 수행하지 않았다.
+- 검증: 세 산출물의 로컬 파일/행 참조192개가 모두 유효했다. git diff --check로 형식을 검증했다. 문서만 변경해 Gradle 테스트를 새로 실행하지 않았으며 기존 테스트 파일·기록 검토를 이번 실행 결과로 주장하지 않았다.
+- 변경 범위: 보강 문서·사례집·포트폴리오·CURRENT_STATE·WORKLOG EOF append 5개 문서다. 시작 전부터 수정된 파일과 미추적 사례집을 보존했고 과거 WORKLOG는 수정·삭제하지 않았다. 예상 밖 애플리케이션 파일 변경은 없다.
+- 외부 계약·배포: 공개 API·DTO·BaseResponse·retryCount·AI 요청/Callback·S3/Redis 계약을 변경하지 않았다. 웹 POC 코드 조회·수정, AWS/S3/운영 DB 변경, 배포·commit·push는 하지 않았다. 문서 작업 자체에 배포 gate는 없으며 기존 서비스 rollout gate는 유지한다.
+- 남은 위험·다음 단계: 당시 직접 기여·S3 복구 방법과 성공·AI 사건 직후 조치를 본인 기록으로 확인하고 본문 소재를 선택해야 한다. 성능·비용 절감·복구시간·이탈률 개선은 추가 실측 전까지 기재하지 않는다. Secret·Token·사용자 원본 음성·전체 payload는 기록하지 않았다.
+
+## 2026-09-07 — 구현 후 수정 이유·설계 진화 포트폴리오 조사
+
+<!-- codex-turn:01a07bc8-c6b7-70a2-8f95-a09e30a74316 -->
+
+- 사용자 요청: 이미 개발한 것을 수정한 사례와 왜 수정했는지 찾아 포트폴리오에 추가한다.
+- 조사 범위: Learning Core develop@cb5f6ee의 WORKLOG·설계/계약/상품 결정서·현재 코드와 테스트, 로컬 Git 변경 이력을 대조했다. 핵심 f640256, e3f5280, 804b224, fb354b6의 diff/부모 코드에서 전후 구조를 확인했다. 모든 서버의 전체 이력·모든 채팅을 새로 전수 조사했다고 주장하지 않는다.
+- 산출물: TOSUNSAENG_DESIGN_EVOLUTION_CASEBOOK.md를 추가했다. 6계층 구조로 이전 방식→계기→변경 이유→수정→대가·검증을 정리했다. EV-01~15는 구현 수정/확장, EV-16~17은 구현 전 계약 보정 후 구현, EV-18은 상품 계획 변경이다. 기존 포트폴리오에 추천 변화 표, TS 사례집에 탐색 링크를 추가하고 CURRENT_STATE를 갱신했다.
+- 주요 사례: 회차 내 최신 조회, ExamSummary 분리, Session 재사용→신규/폐기→Billing command replay, Part 4 이미지/고정 DTO→원본 Map, Q11 trigger→완료 evidence, Summary generation, 로그/Sentry 재설계, AWS Default Provider, JWT 운영 fail-closed와 미사용 HMAC 정리, AI base URL 설정화, Reservation Saga, 상태 outbox, phone continuation, History 응답 보강, Challenge 실제 제출 수/총 예산, credit→기간제 상품 계획이다.
+- 사실 구분: 초기 동기가 기록에 없는 Session UX·상품 사업 이유는 미확인으로 남겼다. HMAC은 실제 운영 인증 교체가 아니라 미사용 코드 정리다. 초기 History도 batch 조회였으므로 N+1 장애 개선으로 쓰지 않았다. 9월3일 무료 재시작 문서 정정은 runtime 수정이 아니다. EV와 기존 TS를 독립 장애 건수로 합산하지 않는다.
+- 관련 Jira: TMI-10 완료 후 보완, TMI-14·25·31·61·77·116·118·122·126을 연결했다. credit/기간제 결정에 언급된 Billing 기반 이력과 유료 기간제 전용 미정 이슈를 구분했으며 신규 Jira 생성·조회·댓글·필드·상태 변경은 하지 않았다.
+- 검증: 포트폴리오 관련 4개 문서의 로컬 파일·행 참조 274개 모두 유효했다. git diff --check 및 신규 EV 문서의 no-index whitespace 검사를 통과했다. 코드 변경이 없어 Gradle 테스트는 실행하지 않았으며 과거 실행 기록·현재 테스트 파일 확인을 이번 실행 결과로 쓰지 않았다.
+- 변경 파일: 신규 EV 문서, 기존 포트폴리오 목록·TS 사례집·CURRENT_STATE, 이번 WORKLOG EOF append 총5개다. 시작 전 dirty 파일·기존 미추적 사례집·팀원 회고 문서와 과거 WORKLOG를 보존했다. 예상 밖 runtime 변경은 없다.
+- 외부 계약·배포: 이번에는 공개 API/DTO/BaseResponse·AI request/Callback·retryCount·S3/Redis·Billing 계약을 변경하지 않았다. 역사적으로 승인된 Part 4 response 대체와 Summary generation wire 변경이 있었음은 정확히 기록했다. 웹 POC·운영 DB/AWS·다른 저장소 코드·Git 이력을 변경하지 않았으며 commit·push·배포는 하지 않았다. 문서 자체에 서비스 배포는 필요 없다.
+- 남은 위험·다음 단계: 본인이 내린 결정과 참여 범위, 기록에 없는 직접 동기, 실제 배포 시점과 전후 성과 수치를 확인한 뒤 대표 2~3개를 선택한다. 구현/로컬 검증을 운영 활성화로 과장하지 않으며 기존 rollout gate를 유지한다. Secret·Token·원본 음성·전체 AI payload는 새 문서에 기록하지 않았다.
+
+
+## 2026-09-08 다우기술 노션 포트폴리오 토선생 소재 선별
+
+- 브랜치: develop. 신규 Jira 없음.
+- 목표: 사용자 요청에 따라 토선생 상세 페이지에 넣을 내용을 선별.
+- 조사: 기존 포트폴리오 소재·트러블슈팅 문서, 각 서비스 현재 상태와 Learning Core 복구·Saga 테스트 및 MDC 구현을 대조.
+- 결정: 빈 종합 피드백과 선택적 채점 복구, 시험 생성·사용권 Reservation Saga를 대표 사례로 추천하고 구조화 로그를 보조 사례로 제안. 인증·저장 모델·S3는 구조 설명에 배치.
+- 구분: 구현 및 과거 테스트 기록은 운영 활성화 증거와 다르며 실제 결제·환불은 현재 구현 성과로 사용하지 않음. 처리량·비용·장애 감소 수치 미측정.
+- 변경 파일: 이 저장소의 docs/codex/WORKLOG.md와 CURRENT_STATE.md에 조사 기록만 추가. 기존 미커밋 작업 보존.
+- 검증: 소스·테스트 정적 조회. 애플리케이션 변경이 없어 Gradle 테스트는 재실행하지 않음.
+- 유지: API·AI 계약·feature flag·코드·외부 서비스·Git 이력 변경 없음.
+- 다음: 본인 역할과 사례별 설명 가능 범위 확인 후 노션 본문 작성.
+
+## 2026-09-08 — 1차 업데이트 현재 개발 범위 재점검
+
+<!-- codex-turn:01a07ebd-a163-7891-9fcb-90931537552b -->
+
+- 날짜·브랜치: 2026-09-08, Learning Core `develop@cb5f6ee`, Identity `develop@fe9c7f6`, Billing `develop@eb0ae14`.
+- 사용자 요청: 세 저장소와 최신 계약을 기준으로 현재 개발된 1차 업데이트 범위를 갱신한다.
+- 구현 완료: Identity SNS/phone/Guest·탈퇴 lifecycle, `TMI-123` owner event fan-out과 사용자 JWT `account_type`; Billing `TMI-110/112/113/115/117/120`의 무료 권리·Reservation·AttemptGroup·owner rebind/phone continuation 및 Jira 없는 `PLAN-007` 공개 무료 사용권 reader; Learning Core `TMI-109/116/118/122/125`와 후속 안전성 보완, `TMI-126` Challenge backend가 각 `develop`에 병합됐다.
+- Challenge 결과: `TMI-126`은 별도 domain·7개 공개 API·MEMBER 인가·catalog/baseDate·attempt/deadline·S3·원자 submit/Job·AI dispatch/Callback·result/history를 구현했다. 최신 기록상 일반 Java 529개, Mongo replica-set 40개, Node migration 90개가 실패·skip 없이 성공했다. 실제 Identity/AI/S3/IAM/mobile staging rollout과 Jira 상태 정리는 남는다.
+- Billing reader 결과: PR #9의 `GET /api/v1/entitlements`, read-only snapshot·owner epoch·사용자 JWT/scope 경계가 구현됐고 전체 236개 테스트가 성공했다. Identity Billing audience·`billing:read` 발급은 계획만 있으며 Jira·runtime 미구현이라 reader/public connector는 기본 OFF다.
+- 결제 상태: 최신 승인안은 `PREMIUM_1D/3D/7D/14D/28D`, 24/72/168/336/672시간, Apple·Google consumable one-time과 RevenueCat 연동이다. Billing ADR-004·계약 초안은 있으나 별도 결제 PLAN·Jira·payment/entitlement runtime, Learning Core paid evaluator와 모바일 구매·동기화는 아직 없다.
+- 추가 개발·운영: Billing Reservation background reconciliation은 미구현이다. Mongo migration, 실제 Lattice/IAM/SG·workload issuer/JWKS, RevenueCat/Store·AI/Callback, Challenge catalog/index·S3 lifecycle, multi-instance/failure-injection·mobile E2E와 canary/feature flag rollout은 production gate다.
+- 변경 파일: `docs/codex/FIRST_UPDATE_PROGRESS_CHECKLIST.md`, `docs/codex/FIRST_RELEASE_FIXED_TERM_PASS_SCOPE.md`, `docs/codex/CURRENT_STATE.md`, 이 WORKLOG만 갱신했다. 기존 dirty portfolio 문서·미추적 `.DS_Store`와 사례집 파일은 보존했고 애플리케이션·외부 API·Jira·AWS·DB·다른 저장소는 변경하지 않았다.
+- 검증·계약: 코드 변경이 없는 상태 분석이라 Gradle을 재실행하지 않고 현재 commit·과거 성공 기록·정적 문서/코드를 대조했다. `git diff --check`, marker 단일 포함과 WORKLOG EOF를 확인한다. 기존 Exam/Challenge URL·Method·DTO·BaseResponse, retryCount, AI `user_id=examId`, S3/Redis 계약을 변경하지 않았고 Secret·Token을 기록하지 않았다.
+- 다음 작업: Identity Billing reader token 구현, Challenge staging rollout, RevenueCat 결제 PLAN/Jira와 Billing vertical slice, Learning Core paid evaluator·모바일 결제 연결, Reservation reconciliation, 전체 cross-service E2E 순으로 진행한다.
+
+## 2026-09-08 — Reservation 자동 복구 이후 1차 코드 완료 여부 구분
+
+<!-- codex-turn:01a07ec6-7eab-7e53-b64d-e79929405ee7 -->
+
+- 사용자 요청: Billing Reservation background reconciliation 구현까지 하면 코드 개발 관점에서 1차 업데이트가 완료되는지 확인한다.
+- 근거: 최신 FIRST_UPDATE_PROGRESS_CHECKLIST와 CURRENT_STATE, 과거 개정 계획·기간제 범위 문서를 대조했다. 과거 결제 연기 계획과 달리 2026-09-08 체크리스트의 1차 범위는 기간제 유료 이용권을 포함한다.
+- 결론: 기존 무료시험·Challenge Learning Core 범위의 마지막 주요 신규 코드 항목과 전체 제품 코드 완료를 구분한다. Reservation 자동 복구 외에 Identity Billing reader audience/scope, Billing 기간제 결제/권리·RevenueCat runtime, Learning Core 유료 권리 연동과 프론트 구매/복원·조회 연동이 남는다. TMI-116·118·122·125·126 구현 기반 완료가 유료 기능 완료를 의미하지 않는다.
+- 검증 경계: 이번에는 해당 문서의 최신 기록만 확인했고 타 저장소·원격·Jira·프론트·AI runtime을 재검증하지 않았다. 구현 중 추가 결함이 없을 것이라고 보장하지 않는다. 실제 staging/운영 검증은 코드 개발과 별도로 남는다.
+- 변경·검증: CURRENT_STATE와 WORKLOG만 갱신하고 기존 dirty 파일과 과거 기록을 보존했다. 문서 분석이므로 Gradle을 재실행하지 않고 git diff --check와 marker 단일 포함을 확인한다. 신규 Jira·코드·계약·AWS/DB 변경·배포·commit·push를 수행하지 않았고 Secret/Token을 기록하지 않았다.
+
+## 2026-09-08 — Learning Core Reservation background reconciliation 계획 작성
+
+<!-- codex-turn:01a07ec9-e8e6-7301-9abc-c5daf53eb649 -->
+
+- 사용자 요청: Reservation 장애 자동 복구 구현 계획서를 작성한다. 구현은 요청되지 않았다.
+- 조사: AGENTS, TMI-116 saga/operation/Transaction service/client/properties/migration, UserMerged guard·operation precondition, Billing 로컬 서비스 계약 및 ADR-001 confirm/cancel/status wire를 읽었다. TMI-118 outbox 복구와 별도 범위이며 TMI-122 phone snapshot과 TMI-125 ownership 경계를 유지한다. TMI-126 Challenge는 변경 대상이 아니다.
+- 산출물: BILLING_RESERVATION_RECONCILIATION_IMPLEMENTATION_PLAN.md에 5줄 결론·사용자 필독·승인 결정·위험·단계별 구현·근거 부록을 작성했다. Session commit 이후 동일 operation confirm 복구, precommit cleanup 권장, worker 새 reserve/Session 금지, HTTP/worker 공유 실행권과 cleanup intent CAS, 전송 전 marker, status-first 상태표, 404/unknown commit/계약 모순 격리와 owner/auth 차단을 명시했다.
+- 신규 결정: 정체 2분, poll10초/batch20/concurrency2/lease30초/attempt20초, 24시간 또는200회 retry, 15분 auth probe, legacy allowlist와 로컬 복구 후 최소7일 보존은 확정 계약이 아닌 승인 대기 초안이다. v1은 privileged repair·운영 mutation API를 추가하지 않는다. unclear operation의 activeGuard를 해제하지 않는 가용성 비용도 설명했다.
+- 구현 전 gate: 기존 AGENTS는 해당 background 구현을 자동 허용하지 않으므로 승인 후 독립 허용 절과 신규 Jira를 작성한다. Billing status snapshot 의미/404·보존 경계와 실제 배포는 후속 확인 대상이다. Billing 코드 변경을 전제하지 않는다.
+- 변경 파일: 신규 계획서, CURRENT_STATE, WORKLOG만 이번 요청으로 갱신했다. 기존 dirty release/progress/portfolio 문서와 미추적 사례집/.DS_Store를 보존했다. 기존 WORKLOG는 수정하지 않았다.
+- 검증: 계획서 로컬 참조 17개 존재를 확인했다. git diff --check, 신규 문서 whitespace 검사와 marker 단일 포함을 검증한다. 코드 변경이 없어 Gradle을 실행하지 않았다. runtime·외부 API·AI/S3/Redis 계약·AGENTS·Jira·AWS/DB·타 저장소·배포·commit/push는 변경하지 않았고 Secret/Token을 기록하지 않았다.
+
+## 2026-09-08 — Reservation 자동 복구 계획 쉬운 설명
+
+<!-- codex-turn:01a07ed2-6f30-78a0-b59f-9b977b6ef9c0 -->
+
+- 사용자 요청: Reservation 장애 자동 복구 계획서를 이해하기 쉽게 설명한다.
+- 확인·설명: 현재 계획서를 재독했다. Reservation/Session/operation 역할, 기존 same-key 사용자 재요청 복구와 신규 worker 차이, Session 저장 전 cleanup과 저장 후 confirm/status 수렴을 사례로 구분한다. 응답 없음이 처리 실패의 증거가 아닌 이유와 동일 operation 멱등성·lease/CAS·cleanup intent의 목적을 설명한다.
+- 정책 구분: 2분 정체/24시간·200회 재시도/15분 인증 probe/기존 allowlist/최소 로컬7일 보존은 승인 대기 초안이다. 24시간은 예약 유효기간 연장이 아니며 Billing의 5분 expiry·terminal 불가역은 유지한다. 미확정 격리는 기록 삭제나 자동 실패 확정이 아니고 새 시험/UserMerged를 차단할 수 있음을 안내한다.
+- 범위: 기반 TMI-116·118·122·125에 대한 설명이며 신규 Jira·AGENTS·계획 정책·runtime 변경과 TMI-126 Challenge 변경은 없다. 프론트·AI API 불변, Billing 기존 API 재사용 및 운영 상태 미확인을 유지한다.
+- 변경·검증: CURRENT_STATE/WORKLOG만 갱신했다. 과거 기록·기존 사용자 변경을 보존했다. 코드 변경이 없어 Gradle을 실행하지 않고 git diff --check와 marker 단일 포함을 확인한다. 배포·AWS/DB 변경·commit/push·Secret/Token 기록은 수행하지 않았다.
+
+## 2026-09-08 — Atlas sample_mflix 삭제 가능성 검토
+
+<!-- codex-turn:01a07f2e-838d-73b1-b122-6b9ef35d53e4 -->
+
+- 사용자 요청: MongoDB cluster 저장공간 67% 경고 상황에서 `sample_mflix`를 삭제해도 되는지, `local`은 보존해야 하는지 판단한다.
+- 읽기 전용 확인: Learning Core와 Identity 저장소에서 MongoDB database 설정과 `sample_mflix` 참조를 검색했다. `sample_mflix` 참조는 없고 기본 DB는 Learning Core `to-teacher-app`, Identity `to-teacher-identity`다.
+- 판단: `sample_mflix`가 Atlas가 적재한 표준 샘플 영화 DB이고 별도 분석·테스트 client가 사용하지 않는다면 앱과 무관하므로 삭제 후보이다. 삭제 전 Atlas Data Explorer에서 DB 이름·collection·크기와 별도 사용자 여부를 한 번 더 확인한다.
+- 보존 대상: `local`은 MongoDB 시스템 DB로 replica set/oplog 등 내부 상태에 사용될 수 있으므로 삭제하지 않는다. `admin`, `config`도 동일하게 임의 삭제하지 않는다.
+- 범위: 실제 Atlas 사용량·외부 client·backup은 조회하지 않았으며 DB 삭제, AWS/Atlas/Jira 변경, 코드·API 변경, 배포·commit·push를 수행하지 않았다. 관련 Jira는 없다. Secret과 Token을 기록하지 않았다.
+
+## 2026-09-08 — Reservation operation 의미와 polling 부하 설명
+
+<!-- codex-turn:01a07f30-d3b9-75d0-93f1-d99ef8eb462f -->
+
+- 사용자 요청: operation이 DB 로그인지, 10초 주기 자동 복구가 서버에 부담을 주는지 설명한다.
+- 확인: TMI-116 ExamCreationOperation의 현재 필드와 자동 복구 계획의 poll/batch/concurrency/backoff를 재확인했다. operation은 요청당 현재 상태를 갱신하는 업무 제어 문서이며 append 로그와 다르고 기존에 존재한다. 10초마다 새 operation을 생성하는 계획이 아니다.
+- 설명: poll10초는 instance당 분당 약6회 후보 확인이며 매번 전체 operation/예약을 복구하는 뜻이 아니다. index 기반 due 조회, terminal 제외, batch20/동시2, 원격 호출 최대2회/attempt와 backoff가 부하를 제한한다. claim·상태 갱신·lease/auth 조회 등 추가 DB 작업 및 instance 수에 따른 총량은 별개이며 실제 부하 미측정 상태에서 안전을 보장하지 않는다.
+- 검증 경계: index explain, DB latency/CPU/연결 수와 backlog/복구 지연을 staging에서 관측한 뒤 poll·동시성을 조절하도록 안내한다. 주기를 늘리면 복구 지연이 늘어나는 tradeoff도 구분한다. 수치는 권장안이며 승인·구현 상태를 변경하지 않는다.
+- 변경·검증: CURRENT_STATE/WORKLOG만 갱신하고 기존 사용자 변경과 과거 기록을 보존했다. 설명 작업이라 Gradle은 실행하지 않고 git diff --check와 marker 단일 포함을 확인한다. 계획·AGENTS·Jira·runtime·외부 API·운영 DB·배포·commit/push를 변경하지 않았고 Secret/Token을 기록하지 않았다.
+
+## 2026-09-08 — Reservation 복구 계획 추가 필독 사항 안내
+
+<!-- codex-turn:01a07f34-6300-7500-915c-e9f227130219 -->
+
+- 사용자 요청: 현재 계획에서 추가로 알아야 할 내용을 설명한다.
+- 확인: 계획서 사용자 영향·승인 정책·운영 미확인·migration 절을 재확인했다. 미확정 격리 시 새 시험과 UserMerged 차단, 취소/만료 예약 자동 부활 금지, 기존 데이터 dry-run/allowlist, 인증 오류 시 해당 복구 전송 차단, 완료 operation 최소7일/미해결 무TTL 및 worker OFF 배포·구버전 drain을 쉬운 언어로 안내한다.
+- 상태 구분: TMI-116·118·122·125 기반의 신규 복구 정책과 수치는 승인 대기다. 이번 질문을 정책 승인으로 해석하지 않았다. Billing 404/오래된 status 의미와 실제 배포 확인은 남는다. 신규 Jira·구현 착수·production 활성화는 수행하지 않는다.
+- 변경·검증: CURRENT_STATE/WORKLOG만 갱신하고 과거 기록과 사용자 변경을 보존했다. 문서 설명이므로 Gradle을 재실행하지 않고 git diff --check와 marker 단일 포함을 확인한다. 계획·AGENTS·API/AI 계약·runtime·AWS/DB·배포·commit/push는 변경하지 않았으며 Secret/Token을 기록하지 않았다.
+
+## 2026-09-08 — Reservation Sentry 경보 재사용과 무료 권리 해제 설명
+
+<!-- codex-turn:01a07f42-72cc-7bd0-ba59-c347b6f6dcba -->
+
+- 사용자 요청: 기존 Sentry에 경보를 추가할 수 있는지, 취소·만료된 예약을 Learning Core 실패로 정리하면 무료 시험권이 어떻게 되는지 설명한다.
+- 확인 근거: LC SentryUnexpectedExceptionReporter와 SentryEventSanitizer, Billing 로컬 서비스 계약 및 ReservationLifecycleService.cancelOnce/expireOnce/releaseInitial, EntitlementGrantRepository.releaseHeldOne을 읽었다. live Sentry Alert Rule·수신처·배포 상태는 조회하지 않았다.
+- 설명: 기존 Sentry SDK/프로젝트를 재사용할 수 있지만 worker가 처리·격리한 장애는 명시적 보고가 필요하다. 기존 HTTP용 capture source/500 태그를 그대로 쓰지 않고 고정 worker 사유와 sanitizer 최소 허용 확장, 상태 전이 기반 중복 제한, 알림 수신 테스트를 계획에 구체화할 필요가 있다. 매 poll/retry마다 경보하지 않는다.
+- 무료 권리: Billing INITIAL cancel/expiry는 예약 수량을 기존 grant의 available로 되돌리고 release ledger를 남긴다. LC는 확인된 원격 terminal에 맞춰 confirming Session/operation을 정리할 뿐 새 무료권을 지급하지 않는다. TrialClaim은 유지해 같은 번호의 중복 지급을 막는다. CONFIRMED는 일반 취소/expiry 불가하고 REPLACEMENT 취소는 기존 consumption을 바꾸지 않는다. 재시작은 기존 취소 key가 아닌 새 operation이며 현재 자격 조건을 따른다.
+- 범위·검증: 관련 기반 TMI-116·Billing TMI-113이며 신규 Jira/계획 승인·Sentry 설정·runtime·Billing 코드·AWS/DB·배포는 변경하지 않았다. CURRENT_STATE/WORKLOG만 갱신하고 사용자 변경·과거 기록을 보존했다. 설명 작업이라 Gradle은 실행하지 않았고 git diff --check와 marker 단일 포함을 확인한다. Secret/Token·commit/push는 기록/수행하지 않았다.
+
+## 2026-09-08 — Reservation 해제와 AttemptGroup 재시작 구분
+
+<!-- codex-turn:01a07f44-e9f3-7850-8f90-de4e0941d4be -->
+
+- 사용자 요청: 예약 해제와 Session 생성 후 이탈/오류에 따른 같은 그룹 재시작이 다른 흐름인지 확인한다.
+- 근거·설명: Billing 서비스 계약 §6.4~6.7을 재확인했다. INITIAL 예약 취소/만료는 held 수량을 반환하고, confirm 후 REPLACEMENT는 소비 이력을 유지하며 같은 group/mock으로 새 operation/examId를 만든다. transport retry는 동일 key/Session 수렴으로 별개다. Session 저장 이후에도 CONFIRMING일 수 있어 분기 기준은 confirm 여부임을 안내한다. GRADING은 무조건 재시작하지 않고 기존 채점 복구가 우선이다.
+- 범위: 기반 TMI-116·118·122 및 Billing TMI-113 계약 설명만 수행했다. 신규 정책 승인·계획/코드·Jira·Sentry·AWS/DB·배포 변경은 없으며 Secret/Token을 기록하지 않았다.
+- 기록·검증: CURRENT_STATE/WORKLOG만 갱신하고 과거 기록과 사용자 변경을 보존했다. 코드 변경이 없어 Gradle은 실행하지 않고 git diff --check와 신규 marker 단일 포함을 확인한다. commit/push는 수행하지 않았다.
+
+## 2026-09-08 — 예약 해제와 그룹 재시작 설명 종료 기록 동기화
+
+<!-- codex-turn:01a07f44-ce78-78c1-a8ba-7d4f447c0e33 -->
+
+- 현재 turn 설명 완료: INITIAL confirm 전 예약 해제는 held 무료 사용권 복원이고, confirm 후 REPLACEMENT는 같은 consumption/group/mock을 유지하는 새 Session 재시작이다. Session 저장만으로 사용 확정이 아니며 GRADING 복구와 RETAKE_AVAILABLE 재시작도 구분했다.
+- 관련 Jira: Learning Core TMI-116·118·122, Billing TMI-113. 상태 전환이나 신규 이슈 생성은 하지 않았다.
+- 종료 훅의 현재 marker를 새 항목에 기록하고 CURRENT_STATE를 갱신했다. 과거 기록·사용자 변경은 보존했으며 코드·계획·운영 환경 변경은 없다. 문서만 변경해 Gradle은 실행하지 않고 git diff --check와 marker 단일 포함을 확인한다. Secret/Token 기록·commit/push는 수행하지 않았다.
+
+## 2026-09-08 — Reservation 자동 복구 계획서 후속 논의 반영
+
+- 사용자 요청: 설명한 내용을 바탕으로 계획서를 작성한다. 기존 계획서가 있어 중복 문서를 만들지 않고 보완했다.
+- 변경: operation 진행표/기존 저장 문서의 의미, poll10초 후보 조회·다중 instance 부하/포화 제한, INITIAL 취소·만료의 held→available 복원과 REPLACEMENT 기존 consumption 유지/새 Session 구분을 추가했다. 기존 Billing TMI-113 lifecycle 코드를 근거로 Learning Core가 grant 수량을 직접 변경하지 않도록 명시했다.
+- Sentry: 기존 IHub/프로젝트 재사용을 기본 설계로 추가했다. worker 전용 reporter·고정 source/reason sanitizer 최소 확장, 상태 전이 경보·auth circuit grouping, 개인정보 없는 incident correlation, 같은 문서의 pending 경보 metadata와 crash 후 회수, SDK 접수와 실제 알림 수신 구분, Alert Rule/담당자 수신·privacy 회귀 테스트를 명시했다. 새 경보 인프라나 운영 Sentry 설정을 만들지 않았다.
+- 상태: 기반 TMI-116·118·122·125이며 Challenge TMI-126 변경은 없다. 신규 Jira·AGENTS 허용 절·runtime은 미착수다. 정체·retry·보존 수치와 격리 정책은 승인 대기로 유지했다. 실제 Sentry 채널/배포 상태와 Billing 오래된 status/404 의미는 후속 확인 대상이다.
+- 변경 파일·검증: BILLING_RESERVATION_RECONCILIATION_IMPLEMENTATION_PLAN, CURRENT_STATE, WORKLOG만 이번 요청으로 변경하고 사용자 기존 파일/과거 기록을 보존했다. 문서만 변경해 Gradle은 실행하지 않고 로컬 링크 존재·whitespace·git diff --check를 검증한다. API/AI/S3/Redis 계약·Billing 코드·AWS/DB·배포·commit/push·Secret/Token 기록은 변경/수행하지 않았다.
+
+## 2026-09-08 — Reservation 계획 보완 종료 기록 동기화
+
+<!-- codex-turn:01a07f45-c890-75b3-860f-1c00e0fade9e -->
+
+- 작업 결과: 기존 계획서에 Sentry worker 경보/정제/중복 제한·pending 회수, INITIAL 예약 해제와 REPLACEMENT 구분, operation 진행표·polling 부하 제한 및 추가 테스트를 반영했다. 문서 링크21개 존재와 whitespace 검증을 통과했다.
+- 관련 Jira: TMI-116·118·122·125 및 Billing TMI-113. 신규 Jira 생성·상태 변경은 없고 TMI-126은 범위 밖이다. 권장 수치·정책은 승인 대기로 유지한다.
+- 종료 훅의 현재 marker를 새 항목에 기록하고 CURRENT_STATE를 갱신했다. 과거 기록·사용자 변경은 보존했고 구현·AGENTS·운영 Sentry·AWS/DB·배포·commit/push는 변경/수행하지 않았다. 문서만 변경해 Gradle은 실행하지 않았고 git diff --check와 marker 단일 포함을 확인한다. Secret/Token은 기록하지 않았다.
+
+## 2026-09-08 — Reservation 권장안 승인 반영 및 TMI-128 생성
+
+<!-- codex-turn:01a07f4a-ee03-7072-9a29-8bcd224d856d -->
+
+- 사용자 요청: 권장안을 승인하고 Jira를 생성한다. 구현·production 활성화 요청으로 확대하지 않았다.
+- Jira: TMI 프로젝트의 관련 Reservation/reconciliation 이슈를 검색해 신규 과제 중복이 없음을 확인하고 작업 유형으로 TMI-128 `[Learning Core] Billing Reservation 장애 자동 복구 및 Sentry 경보 구현`을 생성했다. 재조회로 해야 할 일 상태와 본문을 확인했다. 기반 TMI-116·118·122·125 및 Billing TMI-113을 본문에 명시했고 기존 이슈를 재개/종료하거나 담당자를 임의 지정하지 않았다.
+- 확정: precommit정체2분 cleanup, poll10초/batch20/instance동시2/lease30초/attempt20초/HTTP2회, backoff5초→15초→1분→5분→15분 상한+jitter, 24시간/200회 먼저 도달 시 격리, auth15분 단일 probe, 기존 allowlist 편입, 로컬 복구 완료 후 최소7일 증거 보존 및 미해결 무TTL, Sentry 기존 프로젝트·worker reporter/pending 회수 설계다.
+- 문서: BILLING_RESERVATION_RECONCILIATION_IMPLEMENTATION_PLAN의 승인 대기 문구를 확정 상태로 바꾸고 TMI-128을 연결했다. AGENTS에 과제 한 건에만 묶지 않는 전용 허용 절을 추가하되 기존 범위 제외와 별개임을 명시했다. CURRENT_STATE를 갱신하고 WORKLOG EOF에 이번 항목만 추가했다.
+- 한계: Billing 오래된 status/404 보존 의미 fixture·운영 증빙, 실제 Sentry 담당자/Alert Rule·미제안 pending 경보 운영값과 수신 테스트는 여전히 확인 대상이다. 임의 수치를 승인으로 추정하지 않았다. 기존 공개 API/AI/S3/Redis·Billing 권리 계약과 TMI-126 Challenge는 유지한다.
+- 검증·범위: Jira 원격 재조회, git diff --check·신규 문서 whitespace·로컬 링크·marker 단일 포함을 확인한다. 문서/규칙/등록만 변경해 Gradle은 실행하지 않았다. 기존 dirty 문서·미추적 사용자 파일은 보존했으며 runtime·Billing 코드·운영 Sentry/AWS/DB·배포·commit/push를 변경/수행하지 않았다. Secret/Token을 기록하지 않았다.
+
+## 2026-09-08 — TMI-128 Reservation 자동 복구 구현 및 검증
+
+<!-- codex-turn:01a07f57-8f93-7ee0-8244-eab397304b66 -->
+
+- 요청·브랜치: 사용자 “구현 시작 해줘”에 따라 승인된 TMI-128 계획을 `feat/TMI-128-billing-reservation-reconciliation`에 구현했다. Jira 상태 전환/종료, commit/push/배포는 수행하지 않았다.
+- 변경 파일: 기존 BillingExamCreationSaga/TransactionService, ExamCreationOperation, BillingSagaConfiguration/IndexValidator, SentryEventSanitizer, application.yml을 수정했다. `billing/reconciliation` 패키지 12개 클래스, Mongo 준비 script/Node test, Java contract test와 replica-set integration test, RUNBOOK을 추가했다. 계획서 현재 상태와 CURRENT_STATE를 갱신하고 이 WORKLOG 항목만 EOF에 append했다.
+- 공통 실행: HTTP/worker operation lease·version CAS, reserve 전 MAY_HAVE_BEEN_SENT marker, cleanup intent·Session commit의 같은 Mongo Transaction fence를 구현했다. 원격 HTTP는 Transaction 밖이며 owner guard를 기존 body에 참여시킨다. cleanup 이후 HTTP replay의 reserve/Session 생성 재개를 차단한다.
+- 복구 상태표: PREPARED의 확실한 미전송만 원격 없이 종료, unknown 404는 bounded retry, 늦은 reserve는 status-first cancel, SESSION_COMMITTED는 원래 sessionCommittedAt과 같은 ID로 confirm/finalize, remote canceled/expired는 해당 CONFIRMING Session만 abandon한다. worker는 reserve/discovery/새 Session/Grant를 만들지 않는다.
+- 장애 안전성: Mongo unknown commit cause chain을 분류하고 fresh majority operation/Session 증거로 수렴한다. cleanup commit ack가 불명확한 pass에서는 cancel하지 않는다. abort된 Transaction을 재사용하거나 외부에서 변이한 entity를 그대로 callback replay하지 않고 다음 command/pass에서 reload한다. owner deny는 BLOCKED_OWNER, 모순/24시간·200회 소진은 NEEDS_REVIEW, activeGuard/미해결 증거는 보존한다.
+- 운영·관측: poll10초/batch20/동시2, lease30초/pass20초/HTTP최대2회, backoff+jitter/Retry-After, 전역 auth circuit의 15분 단일 status-only probe, ready/expired-lease 별도 scan index와 bounded executor/drain을 추가했다. terminalAt은 원격 시각을 유지하고 local resolvedAt 후 최소7일 보존한다. default OFF이며 OFF 상태의 첫 HTTP auth 실패가 probe 없는 circuit에 영구 정체되지 않도록 보호했다.
+- Sentry: 기존 IHub 재사용·고정 source/reason 및 opaque incident context, 기존 sanitizer privacy와 고정 fingerprint를 적용했다. operation/circuit에 pending을 원자 기록하고 제한 회수한다. SDK_ACCEPTED는 실제 수신 완료가 아니며 crash 중복을 허용한다. 미접수 예산 소진은 UNSUBMITTED로 보존한다. 미승인 경보 재시도 한도는 기본값을 추정하지 않고 enabled 기동의 필수 운영 설정으로 둔다.
+- migration: operation/Session 관계·UUID·phone/REPLACEMENT·guard/TTL·orphan CONFIRMING·index·legacy allowlist 사전검사를 추가했다. 기본 dry-run이고 apply는 drain 확인 및 정확한 UUID allowlist/CAS를 요구한다. legacy를 NOT_DISPATCHED로 추정하거나 기존 데이터 전체를 자동 편입/수선하지 않는다.
+- 계약 대조: Billing 로컬 status가 현재 AttemptGroup 상태를 반환하고 OPERATION_NOT_FOUND가 과거 전송 부재 증명이 아님을 확인했다. strict OPEN을 완화하지 않고 review/retry로 처리한다. INITIAL cancel/expire의 held→available, REPLACEMENT consumption 유지와 TrialClaim 보존은 Billing 소관으로 유지했다. 운영 Billing/무료권 원장을 직접 검증한 것은 아니다.
+- 최종 테스트: `./gradlew clean test` 538개, `JAVA_TOOL_OPTIONS=-Dapi.version=1.44 ./gradlew mongoIntegrationTest` 64개, `node --test scripts/mongodb/*.test.js` 104개 모두 성공·실패/skip 0. 신규 테스트는 단위9개·Mongo24개·Node14개다. 실제 claim 경합/write conflict·rollback·commit ack 유실·late reserve/confirm 응답 유실·same-key HTTP·lease 회수·budget/auth·Sentry pending/포화·privacy를 포함했다. 초기 테스트 fixture 구성/컴파일 오류를 수정한 뒤 전체 재실행했다. `git diff --check`와 신규 파일 whitespace도 확인한다.
+- 유지 계약: 공개 URL/Method/Request/Response/BaseResponse/Idempotency-Key 의미, AI user_id=examId/Callback, S3/Redis와 Challenge 계약 불변. 새 운영 의존성은 추가하지 않았다.
+- 잔여 위험·다음 단계: 코드 리뷰/PR 전 기존 사용자 dirty 문서와 이번 변경을 분리 확인한다. worker ON 전에 구버전 HTTP drain, Mongo migration/인덱스 explain·부하, 실제 Lattice/Billing expiry/권리 E2E, Sentry 운영 한도·Alert Rule/담당자·실제 수신과 모바일 staging 검증이 필요하다. 실제 DB timeout까지 보장하는 hard real-time pass deadline 또는 withdrawal marker 전체와의 강한 직렬화를 주장하지 않는다. 자세한 설정/한계는 RUNBOOK에 기록했다.
+- 범위 감사: 기존 AGENTS·범위/체크리스트/포트폴리오 및 미추적 사용자 문서/.DS_Store는 보존했다. 예상 밖의 runtime 파일 변경은 없고 Billing/Identity/웹 POC·운영 AWS/DB/Sentry 설정은 변경하지 않았다. Secret/Token을 기록하지 않았다.
+
+## 2026-09-08 — TMI-128 구현 코드 설명
+
+- 사용자 요청에 따라 기존 Saga/TransactionService와 reconciliation 패키지의 실제 코드를 재조회하고, operation/recovery 상태 구분·scheduler·공유 lease/CAS·dispatch/cleanup intent·status-first confirm/cancel·unknown commit·retry/격리·Sentry pending의 역할을 코드와 함께 설명했다.
+- lease가 원격 호출을 취소하지는 않는다는 점, 미확정 상태에서 activeGuard를 보존하는 이유, SDK_ACCEPTED와 실제 알림 수신의 차이, 기본 OFF 및 index/drain/Sentry 한도/staging 검증 경계를 명시했다. 공개 API/AI/S3/Redis/Challenge 계약은 그대로다.
+- 변경 파일은 CURRENT_STATE와 WORKLOG의 설명 기록뿐이다. runtime·사용자 기존 변경·운영 DB/AWS/Sentry·Jira·commit/push/배포는 변경하지 않았다. 설명 작업이므로 테스트는 재실행하지 않았고 직전 구현의 단위538/Mongo64/Node104 통과 기록과 구분했다. git diff --check로 문서 whitespace를 검증한다. Secret/Token은 기록하지 않았다.
+
+## 2026-09-08 — TMI-128 코드 설명 종료 기록 동기화
+
+<!-- codex-turn:01a07f79-bd70-7232-a7d6-f9f14eb805fa -->
+
+- 현재 turn의 TMI-128 코드 설명 완료 기록을 종료 훅의 식별자와 연결했다. operation/recovery, scheduler·lease/CAS, cleanup/confirm, unknown commit·재시도·격리, Sentry pending과 default-off 운영 경계를 실제 코드에 근거해 설명했다.
+- WORKLOG EOF에 이 항목을 추가하고 CURRENT_STATE를 갱신했다. 기존 기록과 사용자 변경은 보존했고 runtime·외부 API·운영 설정·Jira 상태·commit/push/배포는 변경하지 않았다.
+- 설명/문서 동기화 작업이므로 테스트는 재실행하지 않았다. git diff --check와 현재 marker 단일 포함을 확인한다. Secret과 Token은 기록하지 않았다.
+
+## 2026-09-08 — TMI-128 Session 조회와 예약 취소 경합 설명
+
+<!-- codex-turn:01a07f8d-3b01-78c1-a505-6c6b76c55e44 -->
+
+- 사용자 질문에 따라 Session 부재 조회가 미래의 Session 저장까지 막아주는 것은 아니라는 점을 설명했다. 안전장치가 없는 가정에서 기존 시험 생성 요청이 지연되는 동안 worker가 Session 부재를 읽고, 이후 기존 요청의 저장과 worker의 예약 취소가 엇갈리는 순서를 예로 들었다. 새 사용자 요청이 없어도 이미 진행 중인 요청과 worker가 겹칠 수 있음을 구분했다.
+- 현재 TMI-128의 공통 lease/fence 및 같은 operation 문서를 변경하는 cleanup/Session commit Transaction은 이러한 경합을 막기 위한 장치이며, 생성이 먼저 확정되면 cleanup이 거절되고 cleanup이 먼저 확정되면 Session 생성이 거절된다는 점을 설명했다.
+- CURRENT_STATE와 WORKLOG만 갱신했다. runtime·외부 계약·운영 설정·Jira·commit/push/배포는 변경하지 않았고 설명 작업이므로 테스트는 재실행하지 않았다. git diff --check와 marker 단일 포함을 검증한다. 과거 기록과 사용자 변경을 보존하고 Secret/Token은 기록하지 않았다.
+
+## 2026-09-08 — TMI-128 새 시험 예약과 동일 요청 복구 구분
+
+- Billing saga가 활성화된 흐름에서 새로운 생성 요청은 새 operation/key로 예약을 확보하고 Session 저장·confirm을 수행한다고 설명했다. 같은 key 재전송은 새 예약이 아니라 기존 요청 replay/복구이며, 이전 요청의 취소·만료 정리가 끝나지 않았거나 격리 상태면 새 시험 생성을 차단할 수 있음을 구분했다.
+- 허용된 REPLACEMENT도 새 생성 요청의 예약과 Session을 만들지만 기존 AttemptGroup/consumption을 재사용해 추가 무료권 지급·차감과 같지 않음을 설명했다. runtime·외부 계약·운영 설정·Jira는 변경하지 않았다.
+- CURRENT_STATE와 WORKLOG 설명 기록만 갱신했다. 설명 작업이므로 테스트는 재실행하지 않고 git diff --check를 확인한다. 과거 기록을 보존하고 Secret/Token은 기록하지 않았다.
+
+## 2026-09-08 — TMI-128 새 시험 예약 설명 종료 기록
+
+<!-- codex-turn:01a07f8f-1b39-73c3-9d88-dbe03a649942 -->
+
+- 새 시험 생성의 예약 확보·Session 저장·confirm 순서, 같은 key의 기존 요청 복구, REPLACEMENT의 기존 consumption 재사용과 미해결 guard 차단을 설명한 작업을 현재 turn 식별자에 연결했다. 관련 Jira는 TMI-128이다.
+- WORKLOG EOF에 새 항목을 추가하고 CURRENT_STATE를 갱신했다. 과거 기록·runtime·사용자 변경·외부 계약·운영 설정·Jira 상태·commit/push/배포는 변경하지 않았다.
+- 문서 기록만 변경해 테스트는 재실행하지 않았다. git diff --check와 marker 단일 포함을 확인한다. Secret/Token은 기록하지 않았다.
+
+## 2026-09-08 — TMI-128 신규 예약 차단 해제 조건 설명
+
+<!-- codex-turn:01a07f92-1eb4-7df2-985c-58b6a02f4089 -->
+
+- 사용자 질문에 따라 activeGuard와 recovery 한도를 실제 코드에서 재확인했다. 새 요청은 사용자별 activeGuard=true operation이 있으면 차단되고, 성공/취소/만료/확정적 실패를 로컬 terminal로 반영할 때 markTerminal이 activeGuard=false로 해제한다. 다른 권리·인증 검증까지 면제되는 의미는 아니다.
+- 일시 장애의 최초 복구부터 24시간 또는 200회는 자동 복구 예산이지 차단 자동 해제 시간은 아니라고 설명했다. 예산 소진 NEEDS_REVIEW 및 owner/auth 격리는 미해결 guard를 보존하며, 인증은 probe 복구 후 재개하고 운영 확인 대상은 증거에 따른 승인된 해결 절차가 필요하다. 차단에 고정된 자동 종료 상한이 없으므로 이전의 '잠시' 표현을 명확히 했다.
+- CURRENT_STATE와 WORKLOG만 갱신했다. runtime·정책·외부 계약·운영 DB/AWS/Sentry·Jira·commit/push/배포는 변경하지 않았고 테스트는 설명 작업이므로 재실행하지 않았다. 과거 기록·사용자 변경을 보존하고 Secret/Token은 기록하지 않았다. git diff --check와 marker 단일 포함을 검증한다.
+
+## 2026-09-08 — TMI-128 장기 생성 차단 대안 검토
+
+<!-- codex-turn:01a07f96-a669-7e31-a6fd-49a7b140e918 -->
+
+- 사용자 가용성 우려에 대해 현재 NEEDS_REVIEW가 자동 claim 대상에서 제외돼 일시 장애가 끝나도 운영 확인 전 차단이 남을 수 있음을 확인했다. Billing 서비스 계약의 RESERVED 5분 expiry, CONFIRMED cancel/expiry 금지와 불명 confirm의 새 operation 우회 금지도 대조했다.
+- 대안으로 일시 장애/재시도 소진에 한정한 제한된 저빈도 status probe 및 사용자 재시도 시 기존 operation 재확인, Billing authoritative 안전 재시작 계약(이전 operation의 늦은 reserve/confirm 차단·확정 결과 반환), 장애 중 제한적 예외 이용의 정책적 선택을 비교했다. owner/auth/무결성 오류를 단순 재시도 소진과 같이 자동 해제하지 않고 로컬 snapshot·fence·terminal 반영을 검증해야 함을 명시했다.
+- 우선 Learning Core의 일시 장애 격리 후 재확인과 bounded 요청 시 복구를 권장하되, Billing 장애 중 무조건 시험 허용은 보장하지 못한다고 설명했다. 안전 재시작 API/취소 fence는 기존 구현에 없으므로 Billing 계약·구현 협의가 필요하며, 시간만으로 activeGuard를 해제하거나 새 key를 우회 발급하는 안을 권장하지 않았다.
+- 이번 작업은 대안 설명/기록만 수행했다. 승인된 정책·runtime·외부 API·Billing 저장소·운영 설정·Jira 상태는 변경하지 않았고 테스트는 재실행하지 않았다. CURRENT_STATE와 WORKLOG를 갱신하고 git diff --check 및 marker 단일 포함을 확인한다. 과거 기록과 사용자 변경을 보존했으며 Secret/Token은 기록하지 않았다.
+
+## 2026-09-08 — TMI-128 Sentry 운영 대응 방향 유지
+
+- 사용자는 장기 차단 대안보다 Sentry로 운영자가 확인·해결하는 방향을 선호했다. 기존 안전 차단/격리 정책을 유지하고 직전 자동 재개·Billing 안전 재시작·장애 중 예외 이용 제안은 구현하지 않는다.
+- 현재 경보 대상 전이와 실제 알림 수신을 구분했다. 인증/정합성/owner 격리 시 경보 대상이 되지만 일반 일시 장애는 최대24시간/200회 복구 예산 소진 시 경보 대상이다. 최초 장애 즉시 담당자가 알게 되는 구현은 아니며 빠른 대응을 위한 정체 조기 경보 시간은 별도 승인 대상이다. 실제 Sentry Alert Rule/담당자/수신과 증거 기반 운영 해결을 확인해야 한다.
+- CURRENT_STATE와 WORKLOG의 결정 기록만 갱신했다. runtime·외부 API·Sentry/DB/AWS 운영 설정·Jira·commit/push/배포는 변경하지 않았다. 설명/결정 기록이므로 테스트는 재실행하지 않고 git diff --check를 확인한다. 과거 기록·사용자 변경을 보존하고 Secret/Token은 기록하지 않았다.
+
+## 2026-09-08 — TMI-128 Sentry 대응 결정 종료 기록
+
+<!-- codex-turn:01a07f98-c4ef-70a2-89f4-ebb92ed36935 -->
+
+- 기존 안전 차단·Sentry 경보·운영자 증거 확인 방향을 유지하는 사용자 의견을 현재 turn에 연결했다. 관련 Jira는 TMI-128이다. 사용자 차단 5분 지속 시 조기 경보는 추천안일 뿐 미승인·미구현 상태다.
+- WORKLOG EOF에 새 항목을 추가하고 CURRENT_STATE를 갱신했다. 과거 기록과 사용자 변경을 보존하며 runtime·외부 계약·Sentry/DB/AWS 운영 설정·Jira 상태·commit/push/배포는 변경하지 않았다.
+- 문서 동기화이므로 테스트는 재실행하지 않았다. git diff --check와 현재 marker 단일 포함을 검증한다. Secret/Token은 기록하지 않았다.
+
+## 2026-09-08 — 소마 개인 보고서용 개발 소재 10개 추천 순위
+
+<!-- codex-turn:01a07fd4-ba32-77e0-8154-faabc772a31a -->
+
+- 사용자 요청: 지금까지 한 작업 중 소마 보고서에 적합한 내용 약10개를 추려 순위를 매긴다.
+- 기준: 개인 개발·성장 보고서를 가정해 사용자 가치, 문제→개선→검증 서사, 본인 기여 근거, 비전문가도 이해 가능한 설명을 우선했다. 소마 공식 평가표나 정량 평가 점수로 주장하지 않는다.
+- 추천 순위: 1 AI 채점 완료 대기 비동기 분리, 2 실패 문항/Summary 선택적 복구, 3 구조화 로그/Sentry 관측성, 4 시험 생성 Reservation Saga 및 자동 복구, 5 웹 POC 재사용과 서비스 책임 분리, 6 Part 4 원본 표/API 통일, 7 문항/종합 결과 저장소 분리와 최신 조회, 8 최초 시험 점수 집계 오류 수정, 9 CI 동시성 flaky 테스트 개선, 10 신규 사용자 특정 시험지 S3 음성 누락 재현 사례.
+- 근거: 기존 TOSUNSAENG_PORTFOLIO_CONTENT_INVENTORY, DESIGN_EVOLUTION_CASEBOOK, TROUBLESHOOTING_CASEBOOK, TEAM_RETROSPECTIVE_BACKEND_SUPPLEMENT 및 TMI-128 구현 기록과 reconciliation runbook을 읽기 전용 확인했다. TMI-128 조기 경보 세부 정책은 동시 작업 문서와 과거 기록이 달라 이번 순위 성과에 포함하지 않았다.
+- 관련 Jira: TMI-10 완료 후 보완, TMI-25·31·61·77·116·128. 신규 Jira 생성·댓글·상태 변경은 수행하지 않았다. MSA·로그·점수/CI 일부 수정과 S3 팀 사건에 임의 Jira를 부여하지 않는다.
+- 사실 경계: TMI-128은 로컬 구현·검증이며 운영 활성화 성공과 다르다. 최초 스레드 고갈은 사용자 경험 진술과 당시 장애 증거를 구분하고, S3 사건은 팀원 보고로 본인 복구 기여·복구 결과 추가 확인이 필요해 낮은 우선순위로 두었다. 성능·비용 개선율은 만들어내지 않았다.
+- 변경: CURRENT_STATE와 WORKLOG EOF append만 수행했다. 작업 시작 전부터 있던 TMI-128 runtime·AGENTS·설정·미추적 파일·기존 포트폴리오 변경을 보존했고 과거 WORKLOG는 수정·삭제하지 않았다. 공개 API/DTO/BaseResponse·AI·S3/Redis 계약, 운영 DB/AWS/Sentry와 Git 이력을 변경하지 않았다.
+- 검증: 문서 diff whitespace, 이번 marker의 단일 포함과 EOF 기록을 확인한다. 코드 변경이 없어 Gradle 테스트는 실행하지 않았고 기존 테스트 수치를 이번 실행 결과로 사용하지 않았다. 이번 변경 자체의 서비스 배포는 필요 없다.
+- 다음 단계: 보고서 분량에 맞춰 상위3개 또는 상위5개를 선택하고, 실제 본인 역할·해당 보고 기간·운영 성과 근거를 붙인다. 보고서 제출·외부 발송·commit·push·배포는 수행하지 않았으며 Secret·Token을 기록하지 않았다.
+
+## 2026-09-08 — TMI-128 생성 차단 5분 조기 Sentry 경보 구현
+
+<!-- codex-turn:01a07f9c-5d05-72e2-bb2d-bcef2d0b7ef1 -->
+
+- 사용자 “5분 이상 지속 시 경보” 승인에 따라 최초 operation.createdAt 기준 미해결 차단 5분을 조기 경보 후보 기준으로 구현했다. schemaVersion=1·activeGuard=true·non-terminal·READY/IN_FLIGHT이며 업무 lease가 비어 있는 다음 poll에서 batch-size 이하로 원자 등록한다. poll·lease·대기열·SDK 지연 때문에 정확히 5분 정각의 담당자 수신을 보장하지 않는다. 기존 격리 사건/전역 auth circuit 차단 중에는 새 조기 incident를 억제한다.
+- ReservationRecovery에 독립 earlyAlert journal, ReservationReconciliationAlertReporter에 고정 reason creation_blocked_5m·원자 enqueue·별도 pending 회수 lane을 추가했다. operation당 한 조기 incident/eventId를 유지해 재시작/SDK 실패 시 같은 사건을 제한 재시도하고 후속 격리 경보가 덮어쓰지 않는다. poll당 circuit/격리/조기 각각 최대 1건(총 3건) SDK capture다. SDK_ACCEPTED는 실제 수신 완료가 아니며 crash 경계 중복 접수 가능성을 문서에 명시했다.
+- startup validator/migration에 early_due·early_pending non-TTL index 2개를 추가했다. 계약 테스트·Mongo replica-set 테스트·Node index 테스트와 계획서 §5.6/RUNBOOK/CURRENT_STATE를 갱신했다. 이전 WORKLOG 항목은 수정하지 않았다.
+- 전체 검증 성공: ./gradlew clean test 539개, JAVA_TOOL_OPTIONS=-Dapi.version=1.44 ./gradlew mongoIntegrationTest 71개, node --test scripts/mongodb/*.test.js 105개(실패/오류/skip 0). Gradle cache 권한 제한 후 승인된 실행으로 재검증했고 Docker 호환 값은 테스트 프로세스에만 적용했다. 4분59초/5분·단일 incident 경쟁·재시작·SDK 실패/소진·후속 격리·OFF/완료/legacy/auth 제외·batch/업무 lease·privacy를 확인했다. git diff --check도 통과했다.
+- 업무 상태/activeGuard·복구 스케줄/횟수·24시간/200회 격리와 공개 API/AI/Billing/S3/Redis/Challenge 계약은 유지했다. 자동 차단 해제·새 reserve·운영 repair는 추가하지 않았다. 기존 사용자 및 선행 구현 dirty 변경은 보존했고 이번 범위 밖 추가 변경은 없다.
+- 배포 전 신규 index·구버전 HTTP drain·기존 staging gate, alert-max-age/alert-max-attempts 운영값과 Sentry Alert Rule/담당자 실제 수신을 확인해야 한다. 기본 OFF다. Billing/Identity 저장소·운영 DB/AWS/Sentry 설정·Jira 상태·commit/push/배포는 변경하지 않았다. Secret/Token은 기록하지 않았다.
+
+## 2026-09-08 — 소마 보고서 정량 지표 근거 확인
+
+<!-- codex-turn:01a07fe6-74f1-7803-bd23-36eb6b1169ee -->
+
+- 사용자 요청: 보고서에 사용할 정량 지표가 있는지 확인한다. 실제 이용 지표·테스트 검증·구현 범위·설정 목표·비용 견적·미측정 개선율을 구분했다.
+- 확인 수치: build/test-results/test의81개 XML에 tests539/failures0/errors0/skipped0, mongoIntegrationTest의3개 XML에 tests71/failures0/errors0/skipped0을 읽기 전용 합산했다. 최신 TMI-128 조기 경보 구현 기록의 Node105 성공을 확인했다. 새 테스트 실행은 아니며 조기 경보 보강 전538/64/104와 시점을 구분한다. 서로 다른 테스트 종류의 총합715를 coverage나 운영 신뢰도100%로 표현하지 않는다.
+- 추가 근거: WORKLOG1667절의 CI 동시성 단일 테스트10회 반복10/10 성공, 팀원 회고의8월31일21시 웹+앱 전체시험 완료100회·앱17명/30회·8월 콘텐츠100세트를 확인했다. 회고 수치는 운영DB로 재집계하지 않았고 팀 성과와 개인 기여를 구분한다. Part4 세API 통일은 구현 범위 수치이지 정량 성능 개선율은 아니다.
+- 비용: 8월28일 월 인프라 견적79만원에서 staging월40시간/ALB·NAT 제거 가정49만원 또는 유지59만원으로 재산정한 기록이 있다. 실제 청구 절감·자동화 적용 성과가 아니고 외부 AI 호출료 등 제외항목이 있어 조건부 예상 비용으로만 소개한다.
+- 미확인·권장: API p95/처리량/스레드 점유와 운영 복구 성공률·AI비용의 전후 개선율은 기존 조사 자료에 없다. 동일 환경·부하/AI지연 조건 전후 비교, 실패 주입 시나리오별 복구 결과, 완료 문항 재전송0건/실패 대상만 호출 검증 같은 후속 측정을 제안하되 이번에 부하·운영 접근·구현을 수행하지 않는다. timeout/5분 경보 기준을 실제 복구시간이나 담당자 수신시간으로 쓰지 않는다.
+- 관련 Jira: TMI-25·77·128의 구현/검증 배경이며 신규 Jira·상태·댓글 변경은 없다. S3팀 장애/CI와 비용 견적에 임의 이슈를 부여하지 않는다.
+- 변경·검증: CURRENT_STATE와 이번 WORKLOG EOF append만 수행했다. 문서 diff whitespace·marker1개·EOF를 검사한다. 기존 dirty runtime·AGENTS·사용자 문서와 과거 WORKLOG를 보존했다. Gradle/Node 테스트를 재실행하지 않았다.
+- 유지 범위·다음 단계: 공개API/DTO/BaseResponse·AI/S3/Redis/Billing계약, AWS/운영DB/Sentry설정·Git이력·배포는 변경하지 않았다. 보고 기간과 본인 기여를 확인한 뒤 수치를 선택하고 성능 성과가 필요하면 별도 측정 범위를 정한다. 문서 작업 자체의 배포는 필요 없고 Secret·Token은 기록하지 않았다.
+
+## 2026-09-08 — 보고서용 선택적 재채점·Reservation 장애 복구 실제 로컬 검증
+
+<!-- codex-turn:01a07fe8-d57c-7271-8c98-be594a7106d4 -->
+
+- 사용자 요청: 완료/실패 문항 호출 수, API p95·요청 스레드 전후 비교, 장애별 복구 결과·시간을 지금 실제 테스트할 수 있는지 확인하고 안전한 로컬 검증을 실행한다. 관련 Jira TMI-25·128, Jira 변경 없음.
+- 변경 파일: `src/test/java/web/tosunsaeng/domain/exams/application/ExamGradingServiceTest.java`에 11문항 parameterized 4개 case를 추가하고 `docs/codex/LOCAL_RECOVERY_MEASUREMENT_RESULTS.md`·CURRENT_STATE·이번 WORKLOG EOF 기록을 작성했다. application runtime은 수정하지 않았다.
+- 검증 결과: 실패 문항 0/1/3/11개 fixture에서 문항 dispatch 호출 각각 0/1/3/11회, 완료 문항 재전송과 즉시 동일 복구 재요청의 추가 호출은 모두 0회다. 실제 service와 Mock dispatch/repository 기준이며 실제 AI HTTP·추론·비용 측정은 아니다. 8문항 회피/72.7%는 전체 재전송 가상 비교일 뿐 과거 구현 대비 실측 성과가 아니다.
+- 실행 테스트: `./gradlew test --tests web.tosunsaeng.domain.exams.application.ExamGradingServiceTest --rerun-tasks` 61개 통과; `JAVA_TOOL_OPTIONS=-Dapi.version=1.44 ./gradlew mongoIntegrationTest --tests web.tosunsaeng.domain.exams.billing.reconciliation.ReservationReconciliationMongoIntegrationTest --rerun-tasks` 31개 통과; `./gradlew test --rerun-tasks` 전체 543개 통과. 실패/오류/skip 모두 0. 61개는543개에 포함된다. 일반 전체81개 XML 합계와 대상 Mongo XML을 확인했다. 이번 Mongo 전체/Node 재실행은 없다.
+- 격리/제약: Mongo7.0.14 Testcontainers replica-set을 사용하며 Billing/Sentry는 Mock이다. 최초 Mongo 실행은 sandbox Gradle cache lock 접근 거부 뒤 승인된 실행으로 재시도했다. runtime 구현 변경이 없는 테스트 보강으로 clean 대신 전체 test 재실행을 사용했다. 외부 운영 서비스는 호출하지 않았다.
+- 남은 위험:31개는 응답 유실/경합 복구뿐 아니라 차단/격리/경보 명세 검증이므로 운영 복구율100%가 아니다. MutableClock의61초 전진이나 JUnit 시간을 실제 복구 소요 시간으로 보고하지 않는다. 현재 AI 접수 HTTP에는 blocking 호출이 남는다. API p95/스레드 전후 비교와 실제 scheduler/원격 지연을 포함한 복구 시간은 미측정이다.
+- 유지 계약: 공개 API/DTO/BaseResponse·retryCount·AI user_id=examId·Callback·S3/Redis/Billing 계약, AWS/운영 DB/Sentry 설정을 변경하지 않았다. Secret/Token은 기록하지 않았다.
+- diff/다음 확인: 위4개 파일 외 이번 수정은 없으며 기존 dirty AGENTS/runtime/사용자 문서/미추적 파일을 보존했다. 문서·테스트는 배포 불필요하다. Reservation 기본 OFF와 기존 rollout gate를 유지한다. 후속 성능 실험에는 변경 전 기준 버전·대표 API·부하/AI 지연·자원 조건·복구 완료 정의를 먼저 정한다. `git diff --check`와 marker 1개/EOF를 종료 전에 확인한다.
+
+## 2026-09-08 — 웹 POC와 앱 백엔드 성능 비교의 타당성 설명
+
+- 요청/결론: 웹 POC 대 앱 비교는 종합적인 발전 성과를 보여주는 데 적합하다. 다만 인증·DB·자원·기능 차이가 섞이므로 결과를 비동기 전환 단독 효과로 귀속하지 않는다. 관련 TMI-25 배경, Jira 변경 없음.
+- 권장 계획: 웹의 실제 장애 당시 동기 처리 버전을 확인하고 동일 11문항 workload·동일 자원·AI stub 처리 지연/실패 조건·동일 요청 도착률로 격리 실험한다. 결과 완료까지 기다리는 응답과 접수만 알리는 응답의 p95를 같은 의미로 비교하지 않는다. API별 접수/응답 시간, 시험 최종 완료 시간, busy request threads, 오류율 및 완료 시험 처리량을 함께 기록한다. 실제 운영 부하 실행 승인이 아니다.
+- 미확인: 웹 현재/과거 버전이 동기인지, 비교 가능한 기준 커밋과 실험 자원은 이번에 조사하지 않았다. 비동기 단독 인과 효과는 나머지 조건을 유지한 별도 대조 실험이 필요하다.
+- 변경/검증: CURRENT_STATE 및 이번 WORKLOG EOF append만 수행한다. 웹 저장소 조회·테스트/부하 실행·runtime 수정은 하지 않았으며 설명 작업이라 Gradle을 재실행하지 않는다. 문서 whitespace를 검사한다. 기존 dirty 변경과 외부 API/AI/S3/Redis/Billing 계약·운영 설정을 유지한다. 예상 밖의 작업 범위 확장 없음, 문서 배포 불필요. 다음 단계는 기준 버전과 측정 목적 확정이다.
+
+## 2026-09-08 — 웹 POC/앱 비교 설명 종료 기록 연결
+
+<!-- codex-turn:01a07fef-45ce-76e1-9775-92c61e699d58 -->
+
+- 이번 작업: 웹 POC와 앱 백엔드 비교의 적합성, 종합 개선과 비동기화 단독 효과의 구분, 동일 workload·자원·AI 지연 조건과 응답/최종 완료 시간 분리 원칙을 설명했다. 웹 기준 버전의 실제 동기 여부는 미확인이다.
+- 관련 Jira: TMI-25 배경이며 Jira 생성·변경 없음. 다음 단계는 기준 버전과 측정 목적 확정이다.
+- 종료 동기화: WORKLOG 끝에 현재 turn 기록을 추가하고 CURRENT_STATE를 갱신했다. 기존 기록/dirty 변경을 보존했으며 Secret·Token은 기록하지 않았다.
+- 검증/경계: 문서 whitespace·marker 단일 존재·EOF를 확인한다. 문서만 변경하므로 테스트 재실행과 배포는 불필요하며 웹 조회·부하 실험·runtime·외부 계약·운영 설정 변경은 없다. 예상 밖의 변경 없음.
+
+## 2026-09-08 — POC 대비 앱 백엔드 종합 안정성 비교 방향 권장
+
+- 요청: 기존 서비스 대비 전체 안정성·처리 능력 개선을 비교하는 방향에 대한 의견을 묻는다. 보고서 목적에 적합하다고 권장하되 아직 개선 성과가 입증된 것은 아니라고 구분한다.
+- 제안: 공통 11문항 제출/채점 결과 확인 흐름을 같은 총자원·입력·AI 처리/실패 조건으로 격리 실행한다. 동일 시험 시작률을 단계적으로 올리며 완료 시험 수/분, 실패·timeout, 최종 결과 완료 p95를 주지표로 삼고 API별 응답 p95/스레드 점유를 보조지표로 기록한다. 앱 polling 등 고유 부하를 포함하고 각 조건을 반복 측정한다. 서버별 자원을 각각 같게 해서 MSA 전체 자원이 증가하는 비교를 피하며 제외 기능과 전체 자원 예산을 공개한다.
+- 해석: 단일 비동기 기법의 효과가 아니라 POC→앱 백엔드 종합 변화의 효과로 보고한다. 접수 응답과 최종 채점 완료를 혼동하지 않는다. 비교 버전·실험 환경·성공/timeout 기준은 실행 전에 확정한다.
+- 변경/검증: CURRENT_STATE/WORKLOG만 갱신하고 whitespace 확인. 웹 저장소 조회·실험·테스트 실행·runtime/외부 계약/운영 설정 변경은 하지 않았다. 기존 dirty 변경을 보존하며 예상 밖의 수정 없음, 문서 배포 불필요. 관련 TMI-25 배경, Jira 변경과 Secret/Token 기록 없음.
+
+## 2026-09-08 — 종합 안정성 비교 권장 설명 종료 기록
+
+<!-- codex-turn:01a07ff0-e3c6-79f1-9c6c-e7028b58bff1 -->
+
+- 완료 내용: 웹 POC 대비 앱 백엔드의 공통 모의고사 흐름을 동일 총자원·부하·AI 조건으로 비교하는 방향을 권장했다. 완료 처리량·성공/실패율·최종 결과 p95를 주지표로 삼으며 비동기화 단독 효과나 미측정 개선율을 주장하지 않는다.
+- 관련 Jira: TMI-25 배경, Jira 변경 없음. 다음 단계는 비교 버전·실험 환경·성공/timeout 기준 확정이다.
+- 기록 변경: WORKLOG EOF에 현재 turn 항목을 추가하고 CURRENT_STATE를 동기화했다. 기존 기록과 dirty 변경을 보존했으며 Secret·Token은 기록하지 않았다.
+- 검증/경계: 문서 whitespace와 marker 1회/EOF를 확인한다. 문서만 변경하므로 테스트 재실행·배포는 불필요하다. 웹 조회·실험 실행·runtime·외부 계약·운영 설정 변경 및 예상 밖의 수정은 없다.
+
+## 2026-09-08 — 웹 POC와 앱 모의고사 처리 흐름 로컬 비교 실행
+
+<!-- codex-turn:01a07ff2-892a-7812-b32b-06d62325147e -->
+
+- 사용자 요청: 앞서 정한 종합 안정성·처리 능력 비교 실험을 실행한다. 관련 구현 배경 TMI-25, Jira 생성·변경 없음.
+- 기준/안전: 로컬 웹 `/Users/msde76/IdeaProjects/web-back-end` HEAD89c8f9d(2026-08-31)를 읽기만 하고 앱 HEADcb5f6ee+기존 미커밋 구현과 비교했다. 웹과 앱 모두 접수 HTTP는 blocking이고 최종 결과는 Callback/Polling으로 받는 코드이므로 과거 동기 장애 재현으로 표현하지 않는다. 웹 원본/기존 POC 배포는 수정하지 않았다.
+- 변경 파일/동작: `scripts/perf/comparison.init.gradle`, `scripts/perf/java/ComparisonServer.java`, `scripts/perf/run-comparison.mjs`, `scripts/perf/summarize-comparison.mjs`, `scripts/perf/README.md`, `docs/codex/POC_APP_COMPARISON_RESULTS.md`, `docs/codex/measurements/poc-comparison-2026-09-08.json` 및 `.summary.json`을 추가하고 CURRENT_STATE/이번 WORKLOG를 갱신했다. application runtime과 기존 테스트 파일은 이번에 수정하지 않았다.
+- 실험: 실제 Controller/Service·Spring Data repository, Mongo7.0.14/Redis7.2-alpine Testcontainers와 Node loopback AI/S3 fixture. 원본 product config·credential·component scan 대신 비교용 composition root를 사용했다. heap512MiB/ActiveProcessorCount2/Tomcat20worker, MongoCPU1/512MiB·RedisCPU0.5/128MiB, AI접수50ms·문항500ms·요약100ms, Poll200ms와11문항30ms 간격. 정상1/5/15시험/s·중복5시험/s·문항1 Callback2500ms 지연 조건을 각3회 실행했다. 순서 web→app/app→web/web→app, JVM마다4시험 warm-up 제외, 조건당8초 또는4초다.
+- 결과:30개 실행의 총1,272시험 최종 완료, HTTP/Callback 오류0·시험deadline초과0. 중복120시험/버전에서 AI문항 전송2,640→1,320(50%감소), Summary240→120. 순서 역전12시험/버전에서 조기COMPLETED 노출12→0. 중복 조건 평균worker 중앙값5.35→3.57. 정상15시험/s submit p95 중앙값55.16→61.43ms, 최종결과p95 1148.40→1163.37ms, 평균worker7.82→9.41로 앱 일반 성능 개선은 입증하지 못했다. raw와3회별통계/실험조건/source digest를 저장했다.
+- 검증/수정 이력: 최초 실행기 컴파일의 SDK builder·Tomcat 계측 API·Lombok classpath 오류를 실행기에서만 수정했다. smoke의 worker sample0을 발견해 계측 타입을 수정하고 빈 sample/오류 시 실패하도록 보강한 뒤 본 실험을 새로 실행했다. smoke는 본 실험 결과에 합산하지 않았다. `prepareComparison` 성공, 본실험exit0, Node syntax와30행/3반복/시험·요청 수/worker0~20 assert 통과. 일반 `./gradlew test --rerun-tasks`543개 통과(실패/오류/skip0). runtime 변경 없이 테스트/비교 도구 추가이므로 clean 대신 재실행을 사용했다. 기존 compiler warning은 범위 밖으로 유지했다.
+- 권한/정리: Gradle cache·Docker 및 잔존 프로세스 확인은 sandbox 거부 뒤 승인받아 수행했다. 실제 AWS/Atlas/AI/Sentry 접근·운영 부하는 없다. 실험 종료 시 생성한 테스트 컨테이너 정리 hook을 실행했고 별도 ps로 실험 Java/Node 잔존 없음 확인했다. 원시 측정JSON은 보존한다. Secret/Token 기록 없음.
+- 유지 계약/diff: 기존 API/DTO/BaseResponse·retryCount·AI user_id=examId·Callback·S3/Redis/Billing계약·운영 설정 유지. 기존 dirty AGENTS/runtime/이전 테스트 보강/사용자문서·미추적 파일을 보존했다. 웹 git status clean, 이번 범위 밖 제품 파일의 추가 수정 없음. 최종 `git diff --check`, 문서 링크·marker1회/EOF 검증을 수행한다.
+- 위험/다음 확인: 공통 시험 흐름의 짧은 탐색실험이지 production 전체 wiring/동시 사용자capacity·독립CPU hard limit·비동기 단독 효과·운영 오류율·AI 품질/비용 비교가 아니다. AI fixture는 모든 문항을 기다리지 않고 Summary 요청에 응하는 조건이며 real AI의 gate가 다르면 운영 증상도 다를 수 있다. 앱의 추가DB작업이 지연 증가 원인일 가능성은 코드 기반 추론이고 profiling하지 않았다. 보고서에는 중복 전송/완료 정합성을 우선 쓰며 최대 처리량은 독립 자원·SLO·긴warm-up과측정 구간을 정해 별도 실험한다. 도구/문서는 runtime 배포 불필요하며 웹 발견 동작을 임의로 수정하지 않았다.
+
+## 2026-09-08 — 역사적 AI 동기 응답 경로 확인과 비동기 접수 대조 실험
+
+<!-- codex-turn:01a0800a-35b0-7a33-916d-c2188d407a9a -->
+
+- 사용자 요청: AI가 응답을 주지 않고 채점을 동기 처리하던 시점을 찾아 그 동기/비동기 차이도 실험한다.
+- 역사 근거: GitHub read-only로 web-ai fd43a983c9b9의 create_evaluation→execute_evaluation_request→EvaluationPipeline.evaluate→기본 sync Callback→return을 확인했다. 2026-07-12의1134e1c5f454에 queue mode redis일 때 enqueue 후202와 별도 worker가 추가되고 compose 기본값redis가 설정됐다. API코드 기본값은sync였으므로 실제 운영 전환 날짜는 확정하지 않는다. 당시 serial_callback 기본값1과 웹7월13일7b62a29의Tomcat max20 이력도 확인했다. 웹/AI 원본과 운영은 수정/실행하지 않았다.
+- 실험 범위: 같은 웹89c8f9d·기존 격리JavaController/Service/Mongo/Redis를 고정하고 Node 모의AI의 응답 순서만 바꿨다. sync는2초 평가+Callback 응답 후200, async는50ms접수 후202를 반환하고 같은64worker/2초평가/Callback을 수행한다. 원래 Python serial lock/event loop·실제LLM·실제Redisqueue durability·당시배포환경은 재현하지 않는다. backendread5초/callback10초/driver10초/관찰15초·Tomcat20과부하조건은 실험값이다.
+- 실행/수치: `node scripts/perf/run-comparison.mjs --ai-timing --smoke` 및 별도출력 main 명령을 실행해 exit0. 0.25시험/s×8초와1시험/s×6초를각3회,2응답모드=12행/48시험/528submit(warm-up제외). 낮은부하 submit p95 중앙값2071.37→62.15ms(약97%감소)이나 최종결과2630.65→2624.90ms로 거의같다. 중첩부하 submit실패198/198→0/198, 동기는HTTP500120건+driverTimeout78건, worker p9520→2/포화sample비율78.9%→0%. 관찰내완료15/18→18/18이며동기3시험의마지막status는FAILED였다. 각군 AI문항264/Summary24,Callback오류0. HTTP실패를답안소실로동일시하지않는다.
+- 변경 파일: `scripts/perf/run-comparison.mjs`에 timing모드/AIworker상한/응답순서/실패응답 기록/deadline재확인/종료·drain보호를 추가하고 synthetic Summary part_number를0으로 보정했다. `scripts/perf/summarize-ai-timing.mjs`, `docs/codex/AI_SYNC_ASYNC_HISTORICAL_EVIDENCE.md`, `docs/codex/AI_SYNC_ASYNC_COMPARISON_RESULTS.md`, `docs/codex/measurements/ai-sync-async-2026-09-08.json` 및 `.summary.json`을 추가했다. 기존README·CURRENT_STATE·이번WORKLOG를갱신했다. 이전웹/앱측정JSON은보존했다.
+- 검증: main/smoke성공종료, Node syntax, 집계12행/군별3반복/시험·성공·실패submit수/worker0–20·AI상한 assert 통과. 로그에서SocketTimeoutException:Read timed out을확인했다. 문서링크존재·git diff --check를확인했고최종marker1회/EOF를검사한다. Java제품runtime을수정하지않아Gradle회귀테스트는재실행하지않았다. 직전543개통과를이번실행으로보고하지않는다.
+- 안전/정리: gh네트워크조회와실험Docker·잔존프로세스확인은필요한승인후실행했다. 실제AI/AWS/Atlas/Sentry는호출하지않았다. 실험JVM종료시임시컨테이너정리hook실행, 별도ps로이번Java/Node잔존없음확인. 원시JSON은보존한다. Secret/Token은기록하지않았다.
+- 유지계약/diff: applicationruntime·기존테스트·공개API/DTO/BaseResponse·retryCount·AI user_id=examId·Callback·S3/Redis/Billing계약과운영설정유지. 웹git status clean, 기존dirtyAGENTS/runtime/문서·테스트를보존하며이번예상밖제품파일변경없음. 실험도구/문서는배포불필요하다.
+- 해석/다음: 실제과거운영개선율이나AI계산속도향상으로주장하지않는다. 동기callback상호대기를포함한HTTP순서분리효과다. 단순일방향지연만의효과/실제배포재현에는별도대조군·당시환경근거가필요하다. TMI-25는기존구현설명배경이며실험전용/당시사건Jira는미확인, 신규Jira·상태변경없음.
+
+## 2026-09-08 — 기존 실험 성과의 소마 보고서용 정리
+
+<!-- codex-turn:01a08018-aae8-7832-a1ef-023997b4a347 -->
+
+- 사용자 요청: 지금까지의 실험을 예시와 같은 문제·조치·결과·남은 것 형식으로 정리한다. 관련 구현 배경은 TMI-25·TMI-128이며 신규 Jira 생성이나 변경은 없다.
+- 수행: LOCAL_RECOVERY_MEASUREMENT_RESULTS.md, POC_APP_COMPARISON_RESULTS.md, AI_SYNC_ASYNC_COMPARISON_RESULTS.md를 읽고 대화에 보고서용 5개 항목과 표·근거 링크를 제공했다. 비동기 접수, 중복 AI 전송 방지, 완료 상태 정합성, 실패 문항 선택 재시도, Reservation 복구 안전성을 분리했다.
+- 결과 인용: 기존 동기/비동기 12회·48시험·528submit, 중복 조건 문항 전송 2640→1320회·요약 240→120회, 순서 역전 조기 완료 12→0건, 실패 0/1/3/11개 fixture의 완료 문항 재전송 0회, Reservation 통합 테스트 31개 통과를 각각 해당 실험 범위와 함께 설명했다. 이번 턴에 새로 측정한 수치가 아니다.
+- 해석 경계: 접수 응답과 최종 채점 시간을 구분하고 운영 성능·실제 AI 비용 절감·답변 유실·운영 복구율로 확대하지 않았다. 정상 부하의 속도/최대 처리량 개선은 미입증이며 실제 복구 시간도 미측정이다. 사용자 제공 토큰 최적화 예시의 수치를 이번 백엔드 실험 성과로 혼합하지 않았다.
+- 변경/검증: CURRENT_STATE와 WORKLOG EOF 기록만 수정한다. 문서 작업이므로 Gradle/부하 실험은 재실행하지 않는다. 종료 전 두 문서의 git diff --check와 현재 marker 단일 존재·EOF를 확인한다. 기존 사용자 변경과 실험 원시 자료를 보존한다.
+- 유지 계약/다음: runtime·공개 API/DTO/BaseResponse·retryCount·AI user_id=examId·Callback·S3/Redis/Billing 계약 및 운영 설정 변경 없음. 웹/AI 원본·배포·외부 서비스 변경 없음. 문서 배포는 불필요하며 운영 성과 주장을 위한 staging E2E·장시간 부하·실제 복구 시간 검증은 남아 있다. Secret·Token은 기록하지 않았다.
+
+## 2026-09-08 — 문항별 선행 채점과 시험 종료 후 채점 비교 제안
+
+<!-- codex-turn:01a0801b-cfff-76d3-b6af-f0af436796dd -->
+
+- 요청/결론: 문항마다 채점하는 현재 방식과 11문항을 모두 푼 뒤 채점하는 방식의 비교 타당성을 설명했다. 시험 종료 후 결과 대기 시간을 보여주는 별도 실험으로 권장했으며 실행 요청으로 확대하지 않았다. 관련 TMI-25는 기존 채점 구현 배경이고 신규 Jira 생성·변경은 없다.
+- 근거: POC_APP_COMPARISON_RESULTS.md와 AI_SYNC_ASYNC_COMPARISON_RESULTS.md에서 기존 부하가 문항을 30ms 간격으로 압축 제출했음을 확인했다. 기존 수치로 실제 응시 중 선행 채점 효과를 주장하지 않는다.
+- 제안: 두 군 모두 비동기 접수를 유지하고 음성 업로드 시점·문항별 채점 로직·AI 처리 자원·요약 조건을 같게 한다. 실제 준비/응답 시간에 따른 동일 답변 준비 시각을 사용하고 채점 시작 시점만 변경한다. 종료 후 방식도 같은 동시성 한도 내 병렬 처리를 허용한다. 11문항을 하나의 LLM 요청으로 묶는 것은 별도 품질/프롬프트 비교다.
+- 측정 계획: 마지막 답변 제출부터 최종 결과까지 p50/p95, 시험 종료 시 채점 완료 문항 수, AI 대기 작업/최대 동시 실행, 제출·채점 오류, 중도 포기 시 이미 실행된 채점 수를 함께 측정한다. 선행 채점의 대기 시간 감소와 중도 포기 비용은 아직 미검증 가설이며 병렬 자원에 따라 차이가 작을 수 있다.
+- 변경/검증: CURRENT_STATE와 WORKLOG EOF만 갱신했다. 기존 사용자 변경과 원시 실험 결과를 보존한다. 문서 diff whitespace와 marker 단일 존재·EOF를 확인하며 신규 실험·Gradle 테스트는 실행하지 않는다.
+- 유지/다음: runtime·공개 API/DTO/BaseResponse·retryCount·AI user_id=examId·Callback·S3/Redis/Billing 계약, 웹/AI 원본과 운영 설정은 변경하지 않았다. 배포 불필요, Secret·Token 기록 없음. 후속 실행 시 응시 시간표·문항별 AI 지연/동시성·중도 포기 조건을 확정하고 격리 실험한다.
+
+## 2026-09-08 — 동기/비동기 보고서 조치 문구 수정
+
+- 요청: 실험 방법으로 작성된 ‘조치’를 기존 문제 구조를 어떻게 변경했는지 중심으로 다시 설명한다.
+- 내용/근거: AI_SYNC_ASYNC_HISTORICAL_EVIDENCE.md의 기존 평가·Callback 후 응답과 비동기 접수 경로를 재확인했다. 접수 응답을 먼저 반환하고 채점은 비동기로 수행하며 결과는 Callback으로 저장하고 앱은 Polling으로 확인하는 구조 변경을 보고서 문장으로 제공한다. 접수 응답 대기까지 제거한 완전 non-blocking이나 이번 턴 신규 구현으로 표현하지 않는다.
+- 경계: 당시 실제 배포 날짜는 미확인이다. 관련 TMI-25는 기존 구현 배경이며 신규 Jira나 상태 변경은 없다. 이번에는 CURRENT_STATE/WORKLOG 기록만 수정하고 제품 코드·외부 API/AI/S3/Redis/Billing 계약·운영 설정·웹/AI 원본은 변경하지 않는다. 기존 사용자 변경을 보존하고 Secret·Token은 기록하지 않는다.
+- 검증/다음: 문서 diff whitespace를 확인한다. 신규 실험·Gradle 재실행·배포는 하지 않는다. 실험 조건과 수치는 조치가 아닌 별도 검증 설명 또는 결과에 둔다.
+
+## 2026-09-08 — 보고서 조치 문구 수정 종료 기록
+
+<!-- codex-turn:01a0801d-3125-7e23-a206-a94def81eaef -->
+
+- 완료: 실험 절차 대신 기존 채점·Callback 완료 대기 구조에서 접수 응답과 비동기 채점·결과 전달을 분리한 구조 변경을 ‘조치’ 문구로 제공했다. 상세 근거와 해석 경계는 바로 앞 작업 항목에 기록했다.
+- 관련 Jira: TMI-25는 기존 구현 배경이며 신규 Jira 생성·상태 변경 없음. 과거 실제 배포 날짜는 미확인이다.
+- 기록/검증: CURRENT_STATE를 갱신하고 WORKLOG EOF에 현재 turn marker를 추가했다. 두 문서의 git diff --check와 marker 단일 존재·EOF를 확인한다. 문서 작업이므로 신규 실험·Gradle 테스트·배포는 수행하지 않는다.
+- 보존: 기존 사용자 변경, runtime·공개 API/AI/S3/Redis/Billing 계약, 웹/AI 원본과 운영 설정을 유지했다. Secret·Token은 기록하지 않았다.
+
+## 2026-09-08 — 보고서 5개 항목의 조치를 구조 변경 중심으로 재작성
+
+- 요청/수행: 앞서 제시한 5개 항목 모두 문제·조치·결과·남은 것 형식을 유지하면서 조치를 실험 절차 대신 구현 구조 변경으로 재작성한다. 비동기 접수 분리, Job/기존 결과 기반 중복 방지, 모든 필수 문항 완료 후 요약, 실패한 최초 응시 문항 선택 복구, Reservation 상태 우선 복구와 동시성 보호를 설명한다.
+- 근거/결과: 기존 AI_SYNC_ASYNC_HISTORICAL_EVIDENCE.md, AI_SYNC_ASYNC_COMPARISON_RESULTS.md, POC_APP_COMPARISON_RESULTS.md, LOCAL_RECOVERY_MEASUREMENT_RESULTS.md의 확인된 구현과 기존 실험값을 사용한다. 실험 조건은 결과에 배치하며 이번에 새 실험이나 테스트를 실행한 것으로 표현하지 않는다.
+- 한계: 접수 시간과 AI 계산 시간, 제출 실패와 데이터 유실, Mock HTTP 전송과 실제 과금, 테스트 통과와 운영 복구율을 구분한다. 정상 부하 속도/최대 처리량 개선 미입증, Reservation 기본 OFF·운영 활성화 미완료를 유지한다. 문항별 선행 채점 비교는 아직 미실행이므로 완료 성과에 포함하지 않는다.
+- 변경/검증: CURRENT_STATE/WORKLOG 기록만 수정하고 문서 diff whitespace를 확인한다. 기존 사용자 변경·원시 결과·runtime·외부 API/AI/S3/Redis/Billing 계약·운영 설정·웹/AI 원본은 보존한다. 관련 TMI-25·TMI-128은 기존 구현 배경, 신규 Jira/상태 변경 없음. Secret·Token 기록, 신규 실험·Gradle 실행·배포 없음.
+
+## 2026-09-08 — 보고서 5개 항목 수정 완료 기록
+
+<!-- codex-turn:01a0801f-b04d-76a3-81ef-9da1112873ff -->
+
+- 완료: 비동기 접수, 중복 채점 방지, 완료 정합성, 선택 재시도, Reservation 복구의 5개 보고서 항목을 모두 구조 변경 중심의 조치로 수정하여 대화에 제공했다. 실험 조건과 기존 수치는 결과에 두고 근거 링크와 미확인 사항을 유지했다.
+- 관련 Jira: TMI-25·TMI-128은 기존 구현 배경이며 신규 Jira 생성·상태 변경 없음. 상세 작업 내용과 해석 한계는 바로 앞 기록에 보존했다.
+- 기록/검증: WORKLOG EOF append와 CURRENT_STATE 갱신만 수행했다. 두 문서 git diff --check 및 지정 marker 1회·EOF를 확인한다. 신규 실험·Gradle 실행·배포는 하지 않는다.
+- 보존: 기존 사용자 변경과 원시 실험 자료, runtime·외부 API/AI/S3/Redis/Billing 계약·웹/AI 원본·운영 설정을 유지했다. Secret·Token은 기록하지 않았다.
+
+## 2026-09-08 — 문항별 선행 채점과 시험 종료 후 채점 대조 실험 완료
+
+<!-- codex-turn:01a08023-3362-7132-ac89-d7855e25e4ef -->
+
+- 사용자 요청: 문항마다 채점하는 현재 방식과11문항을 모두 푼 뒤 채점을 시작하는 대안을 비교 실행한다. 관련 TMI-25는 기존 채점 구현 배경, 실험 전용 Jira는 없으며 신규 Jira 생성·상태 변경 없음.
+- 변경 파일: scripts/perf/run-grading-schedule.mjs, grading-schedule-model.mjs, grading-schedule-model.test.mjs, summarize-grading-schedule.mjs를 추가했다. comparison.init.gradle에 웹 조회 없이 앱만 준비하는 prepareAppComparison task를 추가하고 README를 갱신했다. docs/codex/GRADING_START_COMPARISON_RESULTS.md, measurements/grading-schedule-2026-09-08.json 및 .summary.json, CURRENT_STATE와 이번 WORKLOG를 작성했다.
+- 구현 범위: 같은 앱 Controller/Service/Mongo repository와 기존 Java 비교 실행기를 사용한다. 양군 모두 문항별 submit과50ms AI 접수 응답을 유지하며, 모의 AI에서만 즉시 FIFO 투입 또는 종료+11문항 접수 후 투입 gate를 둔다. 실제 제품의 종료 API·일괄 submit·업로드·통합 LLM 프롬프트 변경이 아니다.
+- 실험 조건: 앱 HEADcb5f6ee0aa48c8c3b4288d01f91eeaea9d03578c+기존 dirty 코드, heap512MiB/ActiveProcessorCount2/Tomcat20, 격리 Mongo7.0.14 CPU1/512MiB와Redis7.2-alpine CPU0.5/128MiB. 준비/응답을 본뜬618초를20배 압축하여30.9초 실행, 문항 지연600/1000/1800/1300/800/1500/1100/2000/900/1600/2200ms·Summary300ms·Polling200ms·최종 답변 후60초 관찰. 단일/worker4, 6시험500ms간격/worker4, 단일/worker16, Q5직후 중단2시험/worker4를 양군3회 비교했다. JVM당2시험 warm-up과 smoke는 본집계에서 제외했고 양군 순서를 교차했다.
+- 실측:24실행·60흐름 중 완주 대상48시험 모두 완료, 의도적 중단12시험 별도.588submit·48Summary, 제출/Callback/관찰 오류0. 단일worker4 종료후5.444초→문항별2.843초(47.8%), 중첩6시험worker4 p95중앙값21.896→3.424초(84.4%). worker16단일2.801→2.821초로 단축 없음. 중첩 대기queue최대56→7, 문항별 완주 모든 시험에서 종료 시 앞선10문항 완료. 완주 군별 문항264회·Summary24회로 연산 수 동일. 중단6시험/군은 접수30회씩, 모의 연산 시작 문항별30/종료후0회; 문항별은 중단 전24회 시작하고 중단 후12개 Callback이 완료됐다. 실제 비용이나 데이터 유실 측정이 아니다.
+- 해석: 시간은3회별 p95의 중앙값이며 단일 표본 p95는 개별 관측값 자체다. 운영 성능/tail/사용자capacity를 입증하지 않는다. 실제 앱/공식 전체 시간표나 원격 AI를 실행한 것이 아니며 HTTP/DB/Polling은20배 축소하지 않아 결과를20배 곱해 운영 대기 시간으로 환산하지 않는다. 종료후는 과거 운영 구현이 아닌 가상 대안이다. 충분한 병렬 자원일 때 단축 없음과 중도 포기 시 선행 연산 비용 trade-off도 결과에 포함했다.
+- 검증: 최초 Gradle cache lock sandbox 거부 후 승인된 `./gradlew clean test -I scripts/perf/comparison.init.gradle prepareAppComparison` 성공. 일반 Java543개(81XML) failures/errors/skipped0. Node 모델/gate/pool/통계6개 통과. loopback listen sandbox 거부 후 승인된 smoke와main exit0, Node syntax·24행/군별3반복·정확한 문항/요약수·gate 시각·중복/처리시간/worker/완료/오류 assert 통과. 시작 시 핵심 소스5개 SHA-256이 종료 후 모두 일치했다. 문서링크/whitespace와 marker1회·EOF를 최종 확인한다. mongoIntegrationTest task는 이번에 재실행하지 않았다.
+- 안전/정리: 기존 사용자 dirty AGENTS/runtime/문서/이전 테스트를 보존했고 이번 제품 파일 수정은 없다. 공개 API/DTO/BaseResponse·retryCount·AI user_id=examId·Callback JSON·S3/Redis/Billing 계약·운영 설정·웹/AI 원본 유지. 실제 AWS/Atlas/AI/Sentry/사용자 음성은 사용하지 않았다. 종료 hook이 테스트 컨테이너를 정리했고 승인된 ps에서 실험 Java/Node 잔존 없음 확인. clean으로 기존 build 로그/임시 classpath/보고서를 재생성했으나 이전 docs 측정JSON은 보존했다. Secret·Token 기록 없음.
+- 다음/배포: 도구·문서는 runtime 배포 불필요하다. 실제 운영 수치에는 앱 답변 준비·업로드 시간, AI latency·동시성·rate limit과 중도 포기율/부분 결과 재사용 가치를 추가 확인한다. 종료후 제품 전환 시 보류 작업 영속화/재개·Job timeout/취소 계약을 별도 설계해야 하며 이번에는 구현하지 않았다.

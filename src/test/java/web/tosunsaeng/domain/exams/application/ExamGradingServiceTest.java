@@ -305,6 +305,34 @@ class ExamGradingServiceTest {
         verify(dispatchService).dispatchQuestion(any(QuestionDispatchClaim.class));
     }
 
+    @ParameterizedTest
+    @ValueSource(ints = {0, 1, 3, 11})
+    void elevenQuestionRecoveryDispatchesOnlyFailedQuestionsAndReplayDoesNotDuplicate(int failedCount) {
+        expectedQuestionNumbers = java.util.stream.IntStream.rangeClosed(1, 11).boxed().toList();
+        List<Integer> failedNumbers = expectedQuestionNumbers.subList(0, failedCount);
+        List<Integer> completedNumbers = expectedQuestionNumbers.subList(failedCount, 11);
+        putCompletedQuestions(completedNumbers);
+        failedNumbers.forEach(number ->
+                putQuestion(questionJob(number, 0, GradingJobStatus.FAILED, 1, NOW.minusSeconds(600))));
+
+        ExamResponseDTO.GradingRetryResult first = service.retryExam(EXAM_ID);
+        ExamResponseDTO.GradingRetryResult replay = service.retryExam(EXAM_ID);
+
+        assertEquals(failedNumbers, first.getRetriedQuestionNumbers());
+        assertTrue(replay.getRetriedQuestionNumbers().isEmpty());
+        assertEquals(failedNumbers, replay.getWaitingQuestionNumbers());
+        ArgumentCaptor<QuestionDispatchClaim> calls = ArgumentCaptor.forClass(QuestionDispatchClaim.class);
+        verify(dispatchService, times(failedCount)).dispatchQuestion(calls.capture());
+        assertEquals(failedNumbers, calls.getAllValues().stream()
+                .map(QuestionDispatchClaim::questionNumber).sorted().toList());
+        completedNumbers.forEach(number -> {
+            assertEquals(GradingJobStatus.COMPLETED, storedQuestion(number, 0).getStatus());
+            assertEquals(1, storedQuestion(number, 0).getDispatchAttempt());
+        });
+        failedNumbers.forEach(number -> assertEquals(2, storedQuestion(number, 0).getDispatchAttempt()));
+        verify(dispatchService, never()).dispatchSummary(any());
+    }
+
     @Test
     void abandonedExamRetryIsRejectedWithoutDispatch() {
         when(examSessionRepository.findById(EXAM_ID)).thenReturn(Optional.of(ExamSession.builder()

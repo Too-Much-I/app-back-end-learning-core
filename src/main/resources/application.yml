@@ -34,6 +34,16 @@ app:
   billing:
     creation-saga-enabled: ${BILLING_CREATION_SAGA_ENABLED:false}
     phone-continuation-enabled: ${BILLING_PHONE_CONTINUATION_ENABLED:false}
+    reconciliation:
+      enabled: ${BILLING_RECONCILIATION_ENABLED:false}
+      poll: ${BILLING_RECONCILIATION_POLL:PT10S}
+      batch-size: ${BILLING_RECONCILIATION_BATCH_SIZE:20}
+      concurrency: ${BILLING_RECONCILIATION_CONCURRENCY:2}
+      lease: ${BILLING_RECONCILIATION_LEASE:PT30S}
+      attempt-timeout: ${BILLING_RECONCILIATION_ATTEMPT_TIMEOUT:PT20S}
+      # Explicit operating values required only when enabled; no implicit alert retry policy.
+      alert-max-age: ${BILLING_RECONCILIATION_ALERT_MAX_AGE:}
+      alert-max-attempts: ${BILLING_RECONCILIATION_ALERT_MAX_ATTEMPTS:}
     base-url: ${BILLING_BASE_URL:}
     region: ${BILLING_AWS_REGION:ap-northeast-2}
     connect-timeout: ${BILLING_CONNECT_TIMEOUT:PT2S}
