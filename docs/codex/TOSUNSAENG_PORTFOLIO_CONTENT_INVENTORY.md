@@ -1,6 +1,10 @@
 # 토선생 프로젝트 포트폴리오 소재 전체 목록
 
 - 작성일: 2026-09-06
+- 2026-09-07 보강: [트러블슈팅 사례집](TOSUNSAENG_TROUBLESHOOTING_CASEBOOK.md)에 채팅·WORKLOG·수정 diff를 연결한 상세 사례 16개와 추가 진단 후보 6개를 정리했다. 아래 기술 목록과 함께 읽되 사례별 발생·리뷰·진단 상태를 따른다.
+- 2026-09-07 팀원 회고 보강: [회고 3편 백엔드 대조](TOSUNSAENG_TEAM_RETROSPECTIVE_BACKEND_SUPPLEMENT.md)에 운영 장애·협업·비용·콘텐츠 등 9개 소재를 추가했다. 사례집은 팀 보고 장애 TS-23·24를 포함해 총 24개 후보이며, 모두 본인이 해결한 독립 장애라는 뜻은 아니다.
+- 2026-09-07 변경 이유 보강: [구현 후 수정·설계 진화 사례집](TOSUNSAENG_DESIGN_EVOLUTION_CASEBOOK.md)에 이전 방식→변경 계기→이유→수정→대가·검증으로 18개 소재를 정리했다. 구현 변경·확장 15개, 구현 전 계약 보정 후 구현 2개, 상품 계획 변경 1개를 구분했다.
+- 시점 보정: 아래 저장소 기준은 최초 조사 snapshot이다. 후속 Learning Core `develop@cb5f6ee`에는 TMI-126 Challenge 구현이 포함되며, 09-07 검증 기록은 일반 Java 529개·Mongo 통합 40개·Node 90개 성공이다. 이번 보강에서 테스트를 재실행한 것은 아니다. 근거: [구현·검증 안내](TEN_SECOND_CHALLENGE_ROLLOUT.md).
 - 기준 저장소: 앱용 Learning Core `develop@88b46c6`, Identity `develop@fa9843e`, Billing `develop@7138810`
 - 범위: 앱·Identity·Learning Core·Billing·AI 연동과 AWS 운영 구조
 - 제외: 기존 웹 POC의 상세 구현을 현재 앱 서버가 직접 구현한 것처럼 주장하는 내용
@@ -14,6 +18,8 @@
 5. **[주의]** 포트폴리오는 기능 나열보다 `문제 → 원인 → 선택지 → 결정 → 구현 → 검증 → 한계` 구조로 쓰고, 처리량·응답시간·장애 감소율은 측정 자료가 생기기 전에는 숫자를 만들어 쓰지 않는다.
 
 ## 2. 내가 반드시 읽어야 하는 내용
+
+트러블슈팅부터 고르려면 [사례집](TOSUNSAENG_TROUBLESHOOTING_CASEBOOK.md)의 TS-01 빈 종합 피드백 복구, TS-08 Mongo 트랜잭션 hotfix, TS-05 CI 동시성 테스트 실패를 먼저 읽는다. TS-04 점수 집계 오류와 TS-06 환경변수 충돌은 원인을 짧고 명확하게 설명하기 좋은 후보다.
 
 ### 2.1 프로젝트를 한 문장으로 정의하는 후보
 
@@ -434,7 +440,7 @@ Billing reserve(hold)
 - `QuestionGradingJob`과 `SummaryGradingJob`에 상태·전송 횟수·시간 정보를 저장하고, 기본값으로 PENDING 1분·PROCESSING 3분 timeout과 최대 dispatch 3회를 둔다.
 - `POST /api/v1/exams/{examId}/grading/retry`가 예상 문항 전체를 판정하되 완료 문항은 건너뛰고, 실패·timeout 문항만 기존 S3 음성으로 재전송한다.
 - Job이 없을 때는 S3 object 존재 여부로 “제출됐지만 Job이 유실된 경우”와 “사용자가 제출하지 않은 경우”를 나눈다. 처리 중 문항은 재전송하지 않고 waiting으로 반환한다.
-- 문항 결과가 모두 완료된 경우에만 Summary를 별도로 재시도하고, `generationAttempt`를 증가시켜 이전 세대 Callback·실패 통지를 `stale_ignored`로 수렴시킨다.
+- 문항 결과가 모두 준비되면 Summary만 복구한다. `generationAttempt`는 `FAILED/FEEDBACK_GENERATION_FAILED`에 대한 사용자 retry에서만 증가하며, 같은 세대의 transport retry는 증가시키지 않는다. 과거 세대 Callback·실패 통지는 `stale_ignored`로 수렴시킨다. 근거: [복구 계약](FEEDBACK_GENERATION_RECOVERY_PLAN.md).
 - 결정적 Job ID와 AI `Idempotency-Key`, `dispatchAttempt`를 사용해 중복 요청과 응답 유실에도 같은 작업으로 수렴시킨다.
 - 사용자가 새로 녹음한 `retryCount>0` 문항은 최초 시험 전체 복구 대상에서 제외해 원 시험 결과와 새 응시를 섞지 않는다.
 
@@ -501,9 +507,20 @@ Billing reserve(hold)
 - 자동 유효성 검사 + 수동 검수
 - 학습 로드맵과 무료/유료 챗봇
 - 데일리 학습 콘텐츠
-- 10초 챌린지는 계약 문서가 있으나 현재 실제 구현 상태를 확인해 별도 표시한다.
+- 10초 챌린지는 09-07 TMI-126에서 구현·격리 통합 검증됐다. 기본 OFF이며 실제 프론트·AI·운영 연동은 별도다. 근거: [구현·검증 안내](TEN_SECOND_CHALLENGE_ROLLOUT.md).
 
 ### 5.5 문제 해결 사례 후보
+
+아래는 초기 아키텍처·문제 해결 후보 표다. 실제 트러블슈팅 서사는 [별도 사례집](TOSUNSAENG_TROUBLESHOOTING_CASEBOOK.md)에 증상·원인 분석·수정·검증·한계와 함께 추가했다. Saga·Outbox 같은 예방 설계 자체를 운영 장애 발생 경험으로 표현하지 않는다.
+
+| 우선 읽을 사례 | 확인된 출발점 | 설명할 핵심 |
+|---|---|---|
+| TS-01 빈 종합 피드백 | 채팅의 빈 partFeedback 처리 요구·코드 공백 | 실제 결과 검증, Summary 단독 재생성, generation |
+| TS-08 Summary 트랜잭션 | 병합 후 리뷰의 DuplicateKey 처리 결함 | 취소된 트랜잭션을 종료한 뒤 전체 작업 재시도 |
+| TS-05 CI flaky test | TooFewActualInvocations 실패 | 스케줄에 따라 달라지는 호출 횟수와 최종 불변식 분리 |
+| TS-04 파트 점수 누적 | 사용자의 재답변 점수 합산 문제 제기 | retryCount=0 집계와 회귀 fixture |
+| TS-06 CI 환경변수 충돌 | 테스트 step 실패 | Spring 설정 우선순위와 step별 환경 격리 |
+| TS-07·16 Mongo 스크립트 | NamespaceNotFound·실제 mongosh 조기 종료 | 비동기 예외와 실행 수명주기 검증 |
 
 | 우선순위 | 사례 | 문제 | 핵심 해결 | 포트폴리오 가치 |
 |---:|---|---|---|---|
@@ -534,7 +551,7 @@ Billing reserve(hold)
 
 ### 5.7 품질과 테스트로 쓸 수 있는 내용
 
-- 현재 로컬 `build/test-results/test` XML 기준 Java 테스트 496개, failures/errors/skipped 0.
+- 최초 조사인 09-06에는 Java 496개 성공 기록을 확인했다. 후속 09-07 기록은 Java 529개·Mongo 통합 40개·Node 90개 성공이다. 근거: [후속 검증 기록](TEN_SECOND_CHALLENGE_ROLLOUT.md).
 - API 계약: URL·Method·field·BaseResponse 회귀
 - Security integration: JWT 401/403/200, issuer/audience/sub, workload chain 격리
 - 멱등성: duplicate submit·Callback·event
@@ -542,7 +559,7 @@ Billing reserve(hold)
 - Transaction: rollback, unknown commit, owner migration
 - Migration: Node syntax/test, dry-run/apply, index 검증
 - 외부 의존성은 Mock/fake로 격리
-- 별도 `mongoIntegrationTest`는 Testcontainers replica-set을 대상으로 하지만 현재 로컬 결과에 Docker 환경 실패 기록이 있으므로 “모두 성공”으로 쓰면 안 된다.
+- 09-05 `mongoIntegrationTest`는 Docker 부재로 실패했지만, 09-07에는 Docker API 호환 설정 후 격리 Mongo suite 성공 기록이 있다. 테스트 당시 상태와 운영 배포 검증을 구분한다.
 
 ### 5.8 추천 포트폴리오 목차
 
@@ -575,7 +592,10 @@ Billing reserve(hold)
 - correlation ID, structured log, W3C trace와 Sentry sanitizer를 적용해 분산 장애 추적 가능성을 높이면서 Token·사용자 음성·전체 transcript의 관측 데이터 노출을 제한했습니다.
 - 요청별 correlation ID를 MDC에 저장해 비동기 executor까지 전파하고, 채점 로그를 `event/outcome/reason/stage/durationMs` 규격으로 통일해 S3 다운로드부터 AI Callback·Summary까지 실패 지점을 추적할 수 있게 했습니다.
 - AI 실패·timeout 문항만 기존 S3 음성으로 다시 전송하는 시험 단위 복구 API와 Summary `generationAttempt` 검증을 구현해, 완료 문항의 중복 채점과 늦은 Callback의 최신 결과 덮어쓰기를 방지했습니다.
-- unit·API contract·security integration·migration·Mongo transaction test를 구축했으며 현재 기본 Java test suite 496개가 실패 없이 통과하는 상태를 유지했습니다.
+- 병합 후 리뷰에서 발견한 Mongo DuplicateKey 이후 트랜잭션 재사용 결함을 수정하고, Summary·Job·Session·Outbox 전체 단위를 새 트랜잭션에서 재시도하도록 보강했습니다. 근거: [사례집 TS-08](TOSUNSAENG_TROUBLESHOOTING_CASEBOOK.md).
+- CI 동시성 테스트의 간헐적 실패를 스레드 스케줄별로 분석하고, 최종 불변식 검증과 결정적 충돌 테스트를 분리해 10회 반복 검증했습니다. 근거: [사례집 TS-05](TOSUNSAENG_TROUBLESHOOTING_CASEBOOK.md).
+- CI 환경변수가 Spring 테스트 설정을 덮어쓰는 원인을 확인하고 테스트 step에 설정을 격리했습니다. 근거: [사례집 TS-06](TOSUNSAENG_TROUBLESHOOTING_CASEBOOK.md).
+- unit·API contract·security integration·migration·Mongo transaction test를 구축했습니다. 09-07 작업 기록에는 Java 529개·Mongo 통합 40개·Node 90개 성공이 남아 있습니다. 근거: [검증 안내](TEN_SECOND_CHALLENGE_ROLLOUT.md).
 
 ### 5.10 면접에서 나올 질문과 답변 핵심
 
@@ -657,6 +677,41 @@ Billing reserve(hold)
 - 운영 Production 유사 환경의 부하·failure injection 수치가 아직 부족하다.
 - AI 품질 평가용 golden dataset과 사람 평가 일치율을 체계화할 필요가 있다.
 
+### 5.11 팀원 회고에서 추가한 운영·협업 소재
+
+원문 3편과 코드의 자세한 대조는 [회고 보강 문서](TOSUNSAENG_TEAM_RETROSPECTIVE_BACKEND_SUPPLEMENT.md)에 있다. 아래는 선택 안내다. **팀원이 보고한 사건, 현재 백엔드 구현, 본인 기여를 구분**하며 당시 장애 이후 현재 구현이 직접 도입됐다는 인과는 별도 확인한다.
+
+| 소재 | 백엔드 포트폴리오 연결 | 사용 조건 |
+|---|---|---|
+| 약 10분 피드백 대기 후 이탈 | 상태·timeout·제한된 재시도·선택적 복구 | TS-24; 스레드 고갈 사건과 동일시하지 않음 |
+| 신규 사용자 Q5 음성 로드 실패 | 시험지 배정·S3 참조 무결성·조건별 재현 | TS-23; 직접 복구 역할·성공 확인 필요 |
+| AI 필드 repair와 서버 작업 복구 분리 | 책임 경계·중복 호출·재시도 증폭 방지 | AI 내부 구현은 팀원 성과 |
+| 무음 STT 환각 | 무응답과 기술 오류의 구분·null 계약 | 후속 Challenge no_speech 구현과 연결, 모의고사 계약과 분리 |
+| 모바일 피드백 축약 | AI 출력→저장→API→앱 표시의 계약 협의 | 최대 5개 강제 등 본인 구현을 추정하지 않음 |
+| 100세트 콘텐츠·Part 4 표 품질 | catalog 배정·표/질문 전달·모범답안 노출 조건 | 콘텐츠 생성과 backend 전달 책임 구분 |
+| AI 비용·모델 교체 실험 | 완료 시험당 비용·지연·실패율·멱등 처리 | 실측 없는 절감률·운영 모델 전환 주장 금지 |
+| 반복 문항 이탈과 로그 추적 | 구조화 로그의 활용·사용자 흐름 관측 | 자동 funnel 경보는 개선 제안 |
+| 웹 검증 후 iOS 출시 | POC 재사용·앱 분리·세 파트 협업·실사용 | 출시/사용량은 팀 제품 성과 |
+
+프로젝트 소개 수치 후보는 **2026-08-31 21시 기준 웹+앱 전체 모의고사 누적 완료 100회**, 같은 회고의 **앱 17명·완료 30회**, **8월 제작 콘텐츠 100세트**다. 서로 다른 집계이며 팀원 보고값이다. 앱 사용자 100명이나 현재 운영 지표로 바꾸면 안 된다. [8월 회고](https://velog.io/@jinjinjara1022/일단-되게에서-제대로-되게로-토선생-개발-8월-회고).
+
+**역할 확인 후 사용할 문장:** “AI 담당자와 출력·실패 상태 계약을 조율하고, 백엔드에서는 완료 결과를 보존한 채 실패 문항과 종합 피드백을 선택적으로 복구하는 경로를 구현·검증했습니다.” 백엔드 근거는 [복구 서비스](../../src/main/java/web/tosunsaeng/domain/exams/application/ExamGradingService.java), [테스트](../../src/test/java/web/tosunsaeng/domain/exams/application/ExamGradingServiceTest.java)다. 직접 계약 조율에 참여했는지는 본인 확인이 필요하다.
+
+### 5.12 “처음에는 이렇게 만들었지만, 이런 이유로 바꿨다” 소재
+
+상세 원인·전후 코드·대가·검증은 [설계 진화 사례집](TOSUNSAENG_DESIGN_EVOLUTION_CASEBOOK.md)을 읽는다. 기존 TS는 결함 해결 중심, EV는 설계·요구사항 변화 중심이며 서로 독립 사건 수로 합산하지 않는다.
+
+| 추천 흐름 | 변경 이유 | 주의할 표현 |
+|---|---|---|
+| 세션 재사용 → 새 응시·폐기 → Billing command replay | 새 시작과 이어풀기, 다시 전송한 같은 요청을 구별 | 모든 요청이 항상 새 Session이라는 과거 정책을 현재 flag on에도 적용하지 않음 |
+| 문항·종합 혼합 → ExamSummary 별도 저장 | 종합 결과 책임과 최신 조회를 분리 | DB 성능 장애·속도 개선을 실측 없이 주장하지 않음 |
+| Part 4 이미지/고정 DTO → 원본 Map·세 API 통일 | API별 표현 불일치, 비정형 내부 키·값 보존 | 승인된 응답 삭제·대체가 있어 완전 무변경 계약이라고 하지 않음 |
+| Q11 Callback → 필수 최초 결과 전체 확인 | 도착 순서와 실제 완료는 다름 | 마지막 문항 번호를 전체 완료 evidence로 혼동하지 않음 |
+| 같은 Summary 재전송 → generation 분리 | 빈 결과 재사용·늦은 Callback 구별 | 사용자 새 생성과 transport retry가 다름 |
+| 로그 추가 → 중복 정리·상태 이벤트·Sentry 분리 | 진단 가능성과 민감정보 최소화 | 로그만으로 운영 자동 경보가 완성됐다고 하지 않음 |
+
+그 밖에 AWS Default Provider, JWT 운영 fail-closed, AI 주소 환경변수화, outbox, phone continuation, History 응답 보강을 포함했다. Challenge 집계·총 retry 예산은 **구현 전에 계약을 보정한 후 구현**한 사례이며, credit→기간제 pass는 **상품 계획 변경**이다. 본인이 이미 개발한 코드를 수정한 사례와 구분해서 고른다.
+
 ## 6. 부록: 상세 조사 근거와 전체 표
 
 ### 6.1 구현 상태별 포트폴리오 사용 가능성
@@ -678,7 +733,7 @@ Billing reserve(hold)
 | Identity SNS·Guest merge | Identity code/history | 본인 기여 확인 후 가능 | 구현 |
 | Billing 무료권·원장 | Billing code/history | 본인 기여 확인 후 가능 | 구현 |
 | 기간제 유료 결제 | Billing 계약 문서 | 본문 완성 기능으로 금지 | 계획/계약 |
-| 10초 챌린지 | API 계약 문서 | 설계 경험으로만 가능 | 계약/미구현 여부 확인 |
+| 10초 챌린지 | TMI-126 코드·격리 Mongo 검증·rollout 문서 | 구현 경험으로 가능 | 09-07 구현·검증, 기본 OFF·운영 gate 별도 |
 | 학습 로드맵·챗봇 | 제품 설명 | 설계/기획으로 가능 | 구현 상태 확인 필요 |
 | AI 콘텐츠 생성 pipeline | 사용자 설명 | 기획/AI 저장소 확인 후 가능 | 현재 저장소만으로 미확인 |
 
@@ -718,7 +773,7 @@ Billing reserve(hold)
 | S3 업로드 시 서버 ingress byte | 서버 경유 기준 필요 | direct upload | ALB/Container network metric |
 | Outbox p95 delivery age | 해당 없음 | 미측정 | outbox age metric |
 | 채점 복구 성공률 | 해당 없음 | 미측정 | retry API 운영 log |
-| 전체 기본 Java test | 과거 값 | 496 pass | JUnit XML |
+| 전체 기본 Java test | 09-06 기록 496 | 09-07 기록 529 pass | 날짜별 WORKLOG·검증 안내, 이번 재실행 아님 |
 | AI-human 평가 일치율 | 미측정 | 미측정 | golden dataset |
 
 ### 6.4 작성 원칙

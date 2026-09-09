@@ -1,5 +1,7 @@
 # 1차 업데이트 범위 — 5종 기간제 무제한 이용권
 
+> 2026-09-08 상태 공지: 이 문서의 30일·직접 Store 검증·StoreKit/Play 직접 연동 서술은 2026-09-05 시점의 역사적 초안이다. 최신 승인 계약은 Billing 저장소의 `docs/contracts/FIXED_TERM_PREMIUM_PAYMENT_CONTRACT.md`와 `docs/adr/ADR-004-fixed-term-premium-payment-contract.md`가 우선한다. 현재 상품은 `PREMIUM_1D/3D/7D/14D/28D`(24/72/168/336/672시간)인 양 Store consumable one-time이며 RevenueCat을 연동 계층으로 사용한다. 기술 계약은 승인됐지만 별도 결제 PLAN·Jira·runtime은 아직 없다.
+
 ## 1. 5줄 결론
 
 1. 1차 유료 상품은 자동 갱신이나 credit이 아닌 **1일·3일·7일·14일·30일 기간제 무제한 이용권**이다.

@@ -80,7 +80,9 @@ public class BillingSagaConfiguration {
     public MongoTransactionManager billingMongoTransactionManager(
             MongoDatabaseFactory databaseFactory
     ) {
-        return new MongoTransactionManager(databaseFactory);
+        return new MongoTransactionManager(databaseFactory, com.mongodb.TransactionOptions.builder()
+                .readConcern(com.mongodb.ReadConcern.SNAPSHOT)
+                .writeConcern(com.mongodb.WriteConcern.MAJORITY).build());
     }
 
     @Bean(name = "billingTransactionOperations")

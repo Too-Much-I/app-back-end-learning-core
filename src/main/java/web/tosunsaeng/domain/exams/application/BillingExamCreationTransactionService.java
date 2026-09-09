@@ -37,6 +37,9 @@ public class BillingExamCreationTransactionService {
     @Autowired(required = false)
     private UserOwnedTransactionExecutor userOwnedTransactionExecutor;
 
+    @Autowired(required = false)
+    private web.tosunsaeng.domain.exams.billing.reconciliation.ReservationOperationExecution execution;
+
     @Autowired
     public BillingExamCreationTransactionService(
             ExamCreationOperationRepository operationRepository,
@@ -75,6 +78,10 @@ public class BillingExamCreationTransactionService {
                     || operation.getState() == ExamCreationState.SUCCEEDED) {
                 return operation;
             }
+            if (execution != null && operation.getRecovery().getIntent()
+                    != web.tosunsaeng.domain.exams.billing.reconciliation.ReservationRecovery.Intent.CONTINUE) {
+                throw new IllegalStateException("Reservation cleanup already committed");
+            }
             if (operation.getState() != ExamCreationState.RESERVED) {
                 throw new IllegalStateException("Exam creation operation is not RESERVED");
             }
@@ -106,7 +113,7 @@ public class BillingExamCreationTransactionService {
                     .build();
             sessionRepository.insert(session);
             operation.markSessionCommitted(committedAt);
-            return operationRepository.save(operation);
+            return persist(operation);
         });
     }
 
@@ -120,6 +127,10 @@ public class BillingExamCreationTransactionService {
             if (operation.getState() != ExamCreationState.SESSION_COMMITTED) {
                 throw new IllegalStateException("Exam creation operation is not SESSION_COMMITTED");
             }
+            if (execution != null) {
+                var session = sessionRepository.findById(operation.getSessionId()).orElse(null);
+                web.tosunsaeng.domain.exams.billing.reconciliation.ReservationSnapshotValidator.session(operation, session);
+            }
             long updated = sessionRepository.confirmEntitlementIfConfirming(
                     operation.getSessionId(), confirmedAt);
             if (updated != 1) {
@@ -132,7 +143,7 @@ public class BillingExamCreationTransactionService {
                 }
             }
             operation.markSucceeded(confirmedAt, confirmedAt.plus(TERMINAL_RETENTION));
-            return operationRepository.save(operation);
+            return persist(operation);
         });
     }
 
@@ -143,8 +154,11 @@ public class BillingExamCreationTransactionService {
             if (operation.getState() == ExamCreationState.CANCEL_PENDING) {
                 return operation;
             }
+            if (execution != null) requireNoSession(operation);
+            if (operation.getRecovery() != null) operation.getRecovery().setIntent(
+                    web.tosunsaeng.domain.exams.billing.reconciliation.ReservationRecovery.Intent.CLEANUP_PRECOMMIT);
             operation.markCancelPending(now);
-            return operationRepository.save(operation);
+            return persist(operation);
         });
     }
 
@@ -155,11 +169,9 @@ public class BillingExamCreationTransactionService {
             if (operation.getState() == ExamCreationState.CANCELED) {
                 return operation;
             }
-            sessionRepository.findByUserIdAndCreationOperationId(
-                            operation.getUserId(), operation.getOperationId())
-                    .ifPresent(session -> sessionRepository.abandonIfEntitlementConfirming(session.getExamId()));
+            abandonConfirming(operation);
             operation.markCanceled(terminalAt, terminalAt.plus(TERMINAL_RETENTION));
-            return operationRepository.save(operation);
+            return persist(operation);
         });
     }
 
@@ -170,11 +182,9 @@ public class BillingExamCreationTransactionService {
             if (operation.getState() == ExamCreationState.EXPIRED) {
                 return operation;
             }
-            sessionRepository.findByUserIdAndCreationOperationId(
-                            operation.getUserId(), operation.getOperationId())
-                    .ifPresent(session -> sessionRepository.abandonIfEntitlementConfirming(session.getExamId()));
+            abandonConfirming(operation);
             operation.markExpired(terminalAt, terminalAt.plus(TERMINAL_RETENTION));
-            return operationRepository.save(operation);
+            return persist(operation);
         });
     }
 
@@ -189,29 +199,30 @@ public class BillingExamCreationTransactionService {
             if (operation.getState() == ExamCreationState.FAILED_TERMINAL) {
                 return operation;
             }
-            sessionRepository.findByUserIdAndCreationOperationId(
-                            operation.getUserId(), operation.getOperationId())
-                    .ifPresent(session -> sessionRepository.abandonIfEntitlementConfirming(session.getExamId()));
+            abandonConfirming(operation);
             operation.markFailedTerminal(
                     failureCategory,
                     terminalAt,
                     terminalAt.plus(TERMINAL_RETENTION)
             );
-            return operationRepository.save(operation);
+            return persist(operation);
         });
     }
 
     public ExamCreationOperation insertPrepared(ExamCreationOperation operation) {
         return inTransaction(() -> {
             touchOwner(operation.getUserId());
+            if (execution != null) execution.scheduleInitialProgress(operation);
             return operationRepository.insert(operation);
         });
     }
 
     public ExamCreationOperation saveOperation(ExamCreationOperation operation) {
         return inTransaction(() -> {
+            if (execution != null) operation.adoptExecutionMetadata(
+                    execution.fence(operation.getCommandId(), operation.getVersion()));
             touchOwner(operation.getUserId());
-            return operationRepository.save(operation);
+            return persist(operation);
         });
     }
 
@@ -220,12 +231,85 @@ public class BillingExamCreationTransactionService {
     }
 
     private void touchOwner(String userId) {
+        if (execution != null) execution.requireOwner(userId);
         if (userOwnedTransactionExecutor != null) {
             userOwnedTransactionExecutor.touchWithinExistingTransaction(userId);
         }
     }
 
+    public ExamCreationOperation beginCleanup(String commandId) {
+        return inTransaction(() -> {
+            ExamCreationOperation operation = required(commandId);
+            touchOwner(operation.getUserId());
+            requireNoSession(operation);
+            if (operation.getState() != ExamCreationState.PREPARED
+                    && operation.getState() != ExamCreationState.RESERVED
+                    && operation.getState() != ExamCreationState.CANCEL_PENDING) {
+                throw new IllegalStateException("Committed operation cannot enter cleanup");
+            }
+            operation.getRecovery().setIntent(
+                    web.tosunsaeng.domain.exams.billing.reconciliation.ReservationRecovery.Intent.CLEANUP_PRECOMMIT);
+            if (operation.getState() == ExamCreationState.RESERVED) operation.markCancelPending(execution.now());
+            return persist(operation);
+        });
+    }
+
+    public ExamCreationOperation markReserveDispatched(String commandId) {
+        return inTransaction(() -> {
+            ExamCreationOperation operation = required(commandId);
+            touchOwner(operation.getUserId());
+            if (operation.getState() != ExamCreationState.PREPARED
+                    || operation.getRecovery().getIntent()
+                    != web.tosunsaeng.domain.exams.billing.reconciliation.ReservationRecovery.Intent.CONTINUE) {
+                throw new IllegalStateException("Reservation cannot be dispatched");
+            }
+            operation.getRecovery().setDispatch(
+                    web.tosunsaeng.domain.exams.billing.reconciliation.ReservationRecovery.Dispatch.MAY_HAVE_BEEN_SENT);
+            return persist(operation);
+        });
+    }
+
+    private void abandonConfirming(ExamCreationOperation operation) {
+        if (execution != null) {
+            if (operation.getState() == ExamCreationState.SESSION_COMMITTED) {
+                ExamSession session = sessionRepository.findById(operation.getSessionId()).orElse(null);
+                web.tosunsaeng.domain.exams.billing.reconciliation.ReservationSnapshotValidator.session(operation, session);
+                web.tosunsaeng.domain.exams.billing.reconciliation.ReservationSnapshotValidator.require(
+                        session.getStatus() == ExamSessionStatus.ENTITLEMENT_CONFIRMING
+                                && session.getEntitlementState() == ExamEntitlementState.CONFIRMING);
+                if (sessionRepository.abandonIfEntitlementConfirming(session.getExamId()) != 1) {
+                    throw new IllegalStateException("Confirming Session changed concurrently");
+                }
+            } else {
+                requireNoSession(operation);
+            }
+        } else {
+            sessionRepository.findByUserIdAndCreationOperationId(operation.getUserId(), operation.getOperationId())
+                    .ifPresent(session -> sessionRepository.abandonIfEntitlementConfirming(session.getExamId()));
+        }
+    }
+
+    private void requireNoSession(ExamCreationOperation operation) {
+        if (sessionRepository.findById(operation.getSessionId()).isPresent()
+                || sessionRepository.findByUserIdAndCreationOperationId(
+                        operation.getUserId(), operation.getOperationId()).isPresent()) {
+            throw new IllegalStateException("Session evidence forbids reservation cleanup");
+        }
+    }
+
+    private ExamCreationOperation persist(ExamCreationOperation operation) {
+        if (execution != null) {
+            if (operation.isTerminal()) operation.completeRecovery(execution.now());
+            else if (operation.getRecovery() != null) {
+                operation.getRecovery().setLastProgressAt(operation.getUpdatedAt());
+                execution.scheduleInitialProgress(operation);
+            }
+        }
+        return operationRepository.save(operation);
+    }
+
     private ExamCreationOperation required(String commandId) {
+        if (execution != null) return execution.fence(commandId, null);
         return operationRepository.findById(commandId)
                 .orElseThrow(() -> new IllegalStateException("Exam creation operation is missing"));
     }
@@ -235,10 +319,21 @@ public class BillingExamCreationTransactionService {
         if (operations == null) {
             throw new IllegalStateException("Billing Mongo transaction manager is unavailable");
         }
-        T result = operations.execute(status -> work.get());
-        if (result == null) {
-            throw new IllegalStateException("Billing Mongo transaction returned no result");
+        try {
+            T result = operations.execute(status -> work.get());
+            if (result == null) throw new IllegalStateException("Billing Mongo transaction returned no result");
+            return result;
+        } catch (RuntimeException failure) {
+            Throwable cause = failure;
+            for (int depth = 0; cause != null && depth < 16; depth++, cause = cause.getCause()) {
+                if (cause instanceof com.mongodb.MongoException mongo
+                        && mongo.hasErrorLabel(com.mongodb.MongoException.UNKNOWN_TRANSACTION_COMMIT_RESULT_LABEL)) {
+                    throw new web.tosunsaeng.domain.exams.billing.reconciliation.ReservationCommitOutcomeUnknownException(failure);
+                }
+                if (cause == cause.getCause()) break;
+            }
+            // Retry at the command/pass boundary after fresh reload, never replay a mutated entity.
+            throw failure;
         }
-        return result;
     }
 }

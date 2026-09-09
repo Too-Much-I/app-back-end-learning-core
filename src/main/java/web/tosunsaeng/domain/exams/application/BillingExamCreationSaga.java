@@ -32,6 +32,9 @@ public class BillingExamCreationSaga {
 
     private static final int MAX_STATE_STEPS = 8;
 
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    private web.tosunsaeng.domain.exams.billing.reconciliation.ReservationOperationExecution execution;
+
     private final BillingSagaProperties properties;
     private final ExamCreationOperationRepository operationRepository;
     private final ExamSessionRepository sessionRepository;
@@ -61,6 +64,9 @@ public class BillingExamCreationSaga {
         this.clock = clock;
     }
 
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    private web.tosunsaeng.domain.exams.billing.reconciliation.ReservationAuthCircuit authCircuit;
+
     public ExamSessionManager.Assignment start(String userId, String rawOperationId) {
         if (!properties.isCreationSagaEnabled()) {
             throw new IllegalStateException("Billing exam creation saga is disabled");
@@ -79,8 +85,20 @@ public class BillingExamCreationSaga {
             operation = findOrPrepare(userId, operationId);
         }
 
+        ExamCreationOperation prepared = operation;
+        if (execution == null || operation.isTerminal()) return runOperation(prepared);
+        return execution.http(operation.getCommandId(), () -> runOperation(prepared));
+    }
+
+    private ExamSessionManager.Assignment runOperation(ExamCreationOperation operation) {
         for (int step = 0; step < MAX_STATE_STEPS; step++) {
             operation = reload(operation.getCommandId());
+            if (execution != null && operation.getRecovery() != null
+                    && operation.getRecovery().getIntent()
+                    == web.tosunsaeng.domain.exams.billing.reconciliation.ReservationRecovery.Intent.CLEANUP_PRECOMMIT
+                    && (operation.getState() == ExamCreationState.PREPARED || operation.getState() == ExamCreationState.RESERVED)) {
+                throw new ExamsException(ErrorStatus._EXAM_CREATION_PROCESSING, 1);
+            }
             switch (operation.getState()) {
                 case PREPARED -> reserve(operation);
                 case RESERVED -> commitSession(operation);
@@ -149,6 +167,11 @@ public class BillingExamCreationSaga {
 
     private void reserve(ExamCreationOperation operation) {
         validatePreparedOperation(operation);
+        if (execution != null) {
+            beforeRemote(operation);
+            operation = transactionService.markReserveDispatched(operation.getCommandId());
+            beforeRemote(operation);
+        }
         BillingReservationClient.ReservationSnapshot snapshot;
         try {
             snapshot = operation.isPhoneContinuation()
@@ -251,6 +274,7 @@ public class BillingExamCreationSaga {
     ) {
         BillingReservationClient.ReservationSnapshot status;
         try {
+            beforeRemote(operation);
             status = billingClient.status(operation.getUserId(), operation.getOperationId());
         } catch (BillingClientException statusFailure) {
             if (statusFailure.category() == BillingClientException.Category.OPERATION_NOT_FOUND) {
@@ -285,6 +309,7 @@ public class BillingExamCreationSaga {
     private void reconcileReserveContractMismatch(ExamCreationOperation operation) {
         BillingReservationClient.ReservationSnapshot status;
         try {
+            beforeRemote(operation);
             status = billingClient.status(operation.getUserId(), operation.getOperationId());
             if (status.reservationStatus()
                     == BillingReservationClient.ReservationStatus.RESERVED) {
@@ -322,6 +347,7 @@ public class BillingExamCreationSaga {
             BillingReservationClient.ReservationSnapshot snapshot
     ) {
         try {
+            if (execution != null) operation = transactionService.beginCleanup(operation.getCommandId());
             operation.markCancelPendingFromPrepared(
                     snapshot.reservationId(),
                     snapshot.reservationKind(),
@@ -367,6 +393,17 @@ public class BillingExamCreationSaga {
     }
 
     private CommitObservation observeCommitOutcome(ExamCreationOperation operation) {
+        if (execution != null) {
+            ExamCreationOperation fresh = execution.freshOperation(operation.getCommandId());
+            if (fresh != null && (fresh.getState() == ExamCreationState.SESSION_COMMITTED
+                    || fresh.getState() == ExamCreationState.SUCCEEDED)) {
+                web.tosunsaeng.domain.exams.billing.reconciliation.ReservationSnapshotValidator.session(
+                        fresh, execution.freshSession(fresh.getSessionId()));
+                return CommitObservation.ADVANCED;
+            }
+            return execution.freshSession(operation.getSessionId()) == null
+                    ? CommitObservation.NOT_VISIBLE : CommitObservation.SESSION_VISIBLE;
+        }
         ExamCreationOperation reloaded = operationRepository.findById(operation.getCommandId())
                 .orElse(null);
         if (reloaded != null
@@ -383,6 +420,18 @@ public class BillingExamCreationSaga {
 
     private void cancelAfterCommitFailure(ExamCreationOperation operation) {
         try {
+            if (execution != null) {
+                operation = transactionService.beginCleanup(operation.getCommandId());
+                beforeRemote(operation);
+                BillingReservationClient.ReservationSnapshot status =
+                        billingClient.status(operation.getUserId(), operation.getOperationId());
+                validateStatusSnapshot(operation, status);
+                if (status.reservationStatus() != BillingReservationClient.ReservationStatus.RESERVED) {
+                    reconcileCancel(operation);
+                    return;
+                }
+                beforeRemote(operation);
+            }
             BillingReservationClient.ReservationSnapshot canceled = billingClient.cancel(
                     operation.getOperationId(),
                     operation.getReservationId(),
@@ -406,6 +455,7 @@ public class BillingExamCreationSaga {
 
     private void confirmOrReconcile(ExamCreationOperation operation) {
         try {
+            beforeRemote(operation);
             BillingReservationClient.ReservationSnapshot confirmed = billingClient.confirm(
                     operation.getOperationId(),
                     operation.getReservationId(),
@@ -436,6 +486,7 @@ public class BillingExamCreationSaga {
     private void reconcileCommitted(ExamCreationOperation operation, Integer retryAfterSeconds) {
         BillingReservationClient.ReservationSnapshot status;
         try {
+            beforeRemote(operation);
             status = billingClient.status(operation.getUserId(), operation.getOperationId());
             validateStatusSnapshot(operation, status);
         } catch (BillingClientException statusFailure) {
@@ -470,6 +521,7 @@ public class BillingExamCreationSaga {
     private void reconcileCancel(ExamCreationOperation operation) {
         BillingReservationClient.ReservationSnapshot status;
         try {
+            beforeRemote(operation);
             status = billingClient.status(operation.getUserId(), operation.getOperationId());
             validateStatusSnapshot(operation, status);
         } catch (BillingClientException failure) {
@@ -484,6 +536,8 @@ public class BillingExamCreationSaga {
                     operation.getCommandId(), terminalTime(status));
             case RESERVED -> {
                 try {
+                    if (execution != null) operation = transactionService.beginCleanup(operation.getCommandId());
+                    beforeRemote(operation);
                     BillingReservationClient.ReservationSnapshot canceled = billingClient.cancel(
                             operation.getOperationId(), operation.getReservationId(), operation.getUserId());
                     validateCanceled(operation, canceled);
@@ -586,6 +640,14 @@ public class BillingExamCreationSaga {
             ExamCreationOperation operation,
             BillingReservationClient.ReservationSnapshot snapshot
     ) {
+        if (execution != null) {
+            try {
+                web.tosunsaeng.domain.exams.billing.reconciliation.ReservationSnapshotValidator.confirmed(operation, snapshot);
+                return;
+            } catch (web.tosunsaeng.domain.exams.billing.reconciliation.ReservationRecoveryException invalid) {
+                throw new IllegalStateException("Billing lifecycle snapshot is inconsistent");
+            }
+        }
         validateOperationAndReservation(operation, snapshot);
         if (snapshot.reservationStatus() != BillingReservationClient.ReservationStatus.CONFIRMED
                 || !Objects.equals(snapshot.sessionId(), operation.getSessionId())
@@ -618,6 +680,14 @@ public class BillingExamCreationSaga {
             ExamCreationOperation operation,
             BillingReservationClient.ReservationSnapshot snapshot
     ) {
+        if (execution != null) {
+            try {
+                web.tosunsaeng.domain.exams.billing.reconciliation.ReservationSnapshotValidator.status(operation, snapshot);
+                return;
+            } catch (web.tosunsaeng.domain.exams.billing.reconciliation.ReservationRecoveryException invalid) {
+                throw new IllegalStateException("Billing lifecycle snapshot is inconsistent");
+            }
+        }
         validateStatusIdentity(operation, snapshot);
         if (!Objects.equals(snapshot.reservationKind(), operation.getReservationKind())
                 || !Objects.equals(snapshot.attemptGroupId(), operation.getAttemptGroupId())
@@ -636,6 +706,14 @@ public class BillingExamCreationSaga {
             ExamCreationOperation operation,
             BillingReservationClient.ReservationSnapshot snapshot
     ) {
+        if (execution != null) {
+            try {
+                web.tosunsaeng.domain.exams.billing.reconciliation.ReservationSnapshotValidator.canceled(operation, snapshot);
+                return;
+            } catch (web.tosunsaeng.domain.exams.billing.reconciliation.ReservationRecoveryException invalid) {
+                throw new IllegalStateException("Billing lifecycle snapshot is inconsistent");
+            }
+        }
         validateOperationAndReservation(operation, snapshot);
         if (snapshot.reservationStatus()
                 != BillingReservationClient.ReservationStatus.CANCELED
@@ -699,6 +777,9 @@ public class BillingExamCreationSaga {
     }
 
     private ExamsException publicFailure(BillingClientException failure) {
+        if (failure.category() == BillingClientException.Category.AUTH_FAILURE && authCircuit != null) {
+            try { authCircuit.blockFromHttp(); } catch (RuntimeException ignored) { /* Preserve the original public failure. */ }
+        }
         return switch (failure.category()) {
             case ENTITLEMENT_INSUFFICIENT ->
                     new ExamsException(ErrorStatus._ENTITLEMENT_INSUFFICIENT);
@@ -731,7 +812,7 @@ public class BillingExamCreationSaga {
 
     private ExamCreationOperation insertPrepared(ExamCreationOperation operation) {
         try {
-            if (transactionService.userMergedWriterEnabled()) {
+            if (execution != null || transactionService.userMergedWriterEnabled()) {
                 return transactionService.insertPrepared(operation);
             }
             return operationRepository.insert(operation);
@@ -742,7 +823,7 @@ public class BillingExamCreationSaga {
 
     private ExamCreationOperation saveOperation(ExamCreationOperation operation) {
         try {
-            if (transactionService.userMergedWriterEnabled()) {
+            if (execution != null || transactionService.userMergedWriterEnabled()) {
                 return transactionService.saveOperation(operation);
             }
             return operationRepository.save(operation);
@@ -782,6 +863,10 @@ public class BillingExamCreationSaga {
                 mockExamCatalogService.getRequiredExam(session.getMockExamId()),
                 false
         );
+    }
+
+    private void beforeRemote(ExamCreationOperation operation) {
+        if (execution != null) execution.beforeRemote(operation.getCommandId());
     }
 
     private Instant now() {
