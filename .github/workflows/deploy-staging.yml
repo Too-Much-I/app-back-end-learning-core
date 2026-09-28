@@ -1,9 +1,10 @@
-name: Deploy Learning Core to Staging
+name: Deploy Learning Core (main / develop)
 
 on:
   push:
     branches:
       - main
+      - develop
   workflow_dispatch:
 
 permissions:
@@ -11,20 +12,18 @@ permissions:
   id-token: write
 
 concurrency:
-  group: learning-core-staging-deploy
+  group: ${{ github.ref == 'refs/heads/main' && 'learning-core-staging-deploy' || 'learning-core-test-deploy' }}
   cancel-in-progress: false
 
 env:
   AWS_REGION: ap-northeast-2
   ECR_REPOSITORY: tosunsaeng-learning-core
   ECS_CLUSTER: tosunsaeng-staging-cluster
-  ECS_SERVICE: tosunsaeng-learning-core-service
-  CONTAINER_NAME: tosunsaeng-learning-core
-  HEALTH_URL: https://api-staging.to-teacher.com/actuator/health
   SENTRY_RELEASE: app-back-end-learning-core@${{ github.sha }}
 
 jobs:
   deploy:
+    if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/develop'
     name: Test, build and deploy
     runs-on: ubuntu-latest
     timeout-minutes: 40
@@ -32,6 +31,15 @@ jobs:
     steps:
       - name: Checkout source
         uses: actions/checkout@v5
+
+      - name: Select branch-specific deployment target
+        env:
+          MAIN_ROLE_ARN: ${{ vars.AWS_ROLE_ARN }}
+          TEST_ROLE_ARN: ${{ vars.AWS_TEST_ROLE_ARN }}
+        run: bash scripts/deployment/select-target.sh >> "$GITHUB_ENV"
+
+      - name: Test deployment routing
+        run: node --test scripts/deployment/select-target.test.js
 
       - name: Set up Java
         uses: actions/setup-java@v5
@@ -54,37 +62,9 @@ jobs:
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:
-          role-to-assume: ${{ vars.AWS_ROLE_ARN }}
+          role-to-assume: ${{ env.AWS_DEPLOY_ROLE_ARN }}
           role-session-name: learning-core-${{ github.run_id }}
           aws-region: ${{ env.AWS_REGION }}
-
-      - name: Login to Amazon ECR
-        id: login-ecr
-        uses: aws-actions/amazon-ecr-login@v2
-
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
-
-      - name: Build and push image
-        uses: docker/build-push-action@v6
-        with:
-          context: .
-          platforms: linux/amd64
-          push: true
-          tags: |
-            ${{ steps.login-ecr.outputs.registry }}/${{ env.ECR_REPOSITORY }}:${{ github.sha }}
-            ${{ steps.login-ecr.outputs.registry }}/${{ env.ECR_REPOSITORY }}:staging
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
-
-      - name: Set image URI
-        id: image
-        env:
-          ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
-        run: |
-          IMAGE_URI="${ECR_REGISTRY}/${ECR_REPOSITORY}:${GITHUB_SHA}"
-          echo "image_uri=${IMAGE_URI}" >> "$GITHUB_OUTPUT"
-          echo "Deploying image: ${IMAGE_URI}"
 
       - name: Download current task definition
         run: |
@@ -109,6 +89,41 @@ jobs:
             --region "$AWS_REGION" \
             --query taskDefinition \
             > task-definition.json
+
+          # Never reuse the other environment's task family/container.
+          jq -e --arg family "$TASK_FAMILY" --arg container "$CONTAINER_NAME" \
+            '.family == $family and ([.containerDefinitions[] | select(.name == $container)] | length == 1)' \
+            task-definition.json > /dev/null
+
+      - name: Login to Amazon ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build and push image
+        id: build-image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          platforms: linux/amd64
+          push: true
+          tags: |
+            ${{ steps.login-ecr.outputs.registry }}/${{ env.ECR_REPOSITORY }}:${{ env.IMAGE_TAG }}
+            ${{ steps.login-ecr.outputs.registry }}/${{ env.ECR_REPOSITORY }}:${{ env.IMAGE_ALIAS }}
+          cache-from: type=gha,scope=${{ env.IMAGE_ALIAS }}
+          cache-to: type=gha,mode=max,scope=${{ env.IMAGE_ALIAS }}
+
+      - name: Set image URI
+        id: image
+        env:
+          ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+          IMAGE_DIGEST: ${{ steps.build-image.outputs.digest }}
+        run: |
+          IMAGE_URI="${ECR_REGISTRY}/${ECR_REPOSITORY}@${IMAGE_DIGEST}"
+          echo "image_uri=${IMAGE_URI}" >> "$GITHUB_OUTPUT"
+          echo "Deploying image: ${IMAGE_URI}"
 
       - name: Render new task definition
         id: render-task-definition
@@ -140,7 +155,7 @@ jobs:
 
       - name: Deployment summary
         run: |
-          echo "### Learning Core staging deployment" >> "$GITHUB_STEP_SUMMARY"
+          echo "### Learning Core ${DEPLOY_TARGET} deployment" >> "$GITHUB_STEP_SUMMARY"
           echo "- Commit: \`${GITHUB_SHA}\`" >> "$GITHUB_STEP_SUMMARY"
           echo "- Service: \`${ECS_SERVICE}\`" >> "$GITHUB_STEP_SUMMARY"
           echo "- Health: ${HEALTH_URL}" >> "$GITHUB_STEP_SUMMARY"

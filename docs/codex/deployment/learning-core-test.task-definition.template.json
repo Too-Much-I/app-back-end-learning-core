@@ -1,0 +1,56 @@
+{
+  "family": "tosunsaeng-learning-core-test",
+  "networkMode": "awsvpc",
+  "requiresCompatibilities": ["FARGATE"],
+  "cpu": "512",
+  "memory": "1024",
+  "runtimePlatform": {"cpuArchitecture": "X86_64", "operatingSystemFamily": "LINUX"},
+  "executionRoleArn": "arn:aws:iam::889384901776:role/tosunsaeng-learning-core-test-execution-role",
+  "taskRoleArn": "arn:aws:iam::889384901776:role/tosunsaeng-learning-core-test-task-role",
+  "containerDefinitions": [
+    {
+      "name": "tosunsaeng-learning-core-test",
+      "image": "REQUIRED_TEST_IMAGE_URI_WITH_DIGEST",
+      "essential": true,
+      "portMappings": [{"containerPort": 8080, "hostPort": 8080, "protocol": "tcp"}],
+      "stopTimeout": 30,
+      "environment": [
+        {"name": "SPRING_PROFILES_ACTIVE", "value": "staging"},
+        {"name": "APP_AUTH_MODE", "value": "jwt"},
+        {"name": "IDENTITY_ISSUER", "value": "https://identity-test.to-teacher.com"},
+        {"name": "IDENTITY_JWK_SET_URI", "value": "https://identity-test.to-teacher.com/.well-known/jwks.json"},
+        {"name": "IDENTITY_AUDIENCE", "value": "tosunsaeng-learning-core"},
+        {"name": "AWS_REGION", "value": "ap-northeast-2"},
+        {"name": "SERVER_PORT", "value": "8080"},
+        {"name": "MONGODB_DATABASE", "value": "to-teacher-learning-core-test"},
+        {"name": "REDIS_HOST", "value": "tosunsaeng-staging-redis.pzyca7.ng.0001.apn2.cache.amazonaws.com"},
+        {"name": "REDIS_PORT", "value": "6379"},
+        {"name": "SPRING_DATA_REDIS_DATABASE", "value": "2"},
+        {"name": "AWS_S3_BUCKET_NAME", "value": "tosunsaeng-test-audio"},
+        {"name": "AI_SERVER_URL", "value": "http://127.0.0.1:9"},
+        {"name": "CHALLENGE_ENABLED", "value": "false"},
+        {"name": "BILLING_CREATION_SAGA_ENABLED", "value": "false"},
+        {"name": "BILLING_PHONE_CONTINUATION_ENABLED", "value": "false"},
+        {"name": "BILLING_RECONCILIATION_ENABLED", "value": "false"},
+        {"name": "ATTEMPT_GROUP_EVENT_WRITER_ENABLED", "value": "false"},
+        {"name": "ATTEMPT_GROUP_EVENT_PUBLISHER_ENABLED", "value": "false"},
+        {"name": "USER_MERGED_WRITER_ENABLED", "value": "false"},
+        {"name": "USER_MERGED_CONSUMER_ENABLED", "value": "false"},
+        {"name": "USER_MERGED_SOURCE_DENY_ENABLED", "value": "false"},
+        {"name": "USER_WITHDRAWN_CONSUMER_ENABLED", "value": "false"},
+        {"name": "USER_WITHDRAWN_DENY_GATE_ENABLED", "value": "false"},
+        {"name": "SENTRY_DSN", "value": ""},
+        {"name": "SENTRY_ENVIRONMENT", "value": "learning-core-test"}
+      ],
+      "secrets": [{"name": "MONGODB_URI", "valueFrom": "arn:aws:secretsmanager:ap-northeast-2:889384901776:secret:tosunsaeng/test/learning-core/mongodb-NEcjAa"}],
+      "logConfiguration": {
+        "logDriver": "awslogs",
+        "options": {
+          "awslogs-group": "/ecs/tosunsaeng-learning-core-test",
+          "awslogs-region": "ap-northeast-2",
+          "awslogs-stream-prefix": "ecs"
+        }
+      }
+    }
+  ]
+}
