@@ -1,5 +1,6 @@
 # Learning Core 브랜치별 배포
 
+- 2026-09-28 적용 완료: 테스트 배포 역할 `arn:aws:iam::889384901776:role/tosunsaeng-github-learning-core-test-deploy-role` 및 inline policy `LearningCoreTestDeploy` 생성, GitHub repository variable `AWS_TEST_ROLE_ARN` 등록 확인. 기존 `AWS_ROLE_ARN` 유지. exact develop trust 재조회 및 단일 ARN별 UpdateService simulation은 테스트 allowed/운영 implicitDeny다. 실제 GitHub OIDC AssumeRole·배포 E2E는 아직 검증하지 않았다. 아래 설정 안내 중 이 두 항목은 완료됐으며 초기 서비스/HTTPS 준비는 별도다.
 ## 5줄 결론
 
 1. `main`은 기존 ECS 서비스·주소·AWS_ROLE_ARN을 유지한다. 리소스의 기존 `staging` 이름을 운영 이름으로 변경하지 않는다.
@@ -29,7 +30,7 @@ main의 이름 없는 SHA 태그를 develop이 덮어쓰지 않는다. 실행 �
 
 - GitHub Settings → Secrets and variables → Actions → Variables에 `AWS_TEST_ROLE_ARN`을 추가한다. 기존 `AWS_ROLE_ARN`은 유지한다. ARN은 credential 자체가 아니며 Access Key를 추가하지 않는다.
 - 테스트 배포용 OIDC 역할은 ECS task/execution 역할과 별개다. 기존 두 ECS 역할을 이 변수에 넣지 않는다.
-- 테스트 OIDC trust는 `aud=sts.amazonaws.com`, `sub=repo:Too-Much-I/app-back-end-learning-core:ref:refs/heads/develop`로 제한한다. main 역할도 main ref만 신뢰하는지 확인한다. 이번 코드 변경은 실제 IAM/GitHub 설정을 바꾸지 않는다.
+- 테스트 OIDC trust는 `aud=sts.amazonaws.com`과 develop 전용 exact sub로 제한한다. 2026-09-28 실제 main 역할 조회에서 조직/저장소 ID를 포함한 `repo:Too-Much-I@288205644/app-back-end-learning-core@1309522671:ref:refs/heads/main`을 확인했다. 따라서 테스트 후보 sub는 같은 형식의 `repo:Too-Much-I@288205644/app-back-end-learning-core@1309522671:ref:refs/heads/develop`이다. ID 없는 기본 형식을 그대로 적용하지 않는다. 최종 OIDC AssumeRole 성공은 실제 workflow에서 검증한다. main trust는 변경하지 않는다.
 - 테스트 배포 역할은 테스트 service의 Describe/Update, 필요한 task definition Describe/Register, LC ECR push, 그리고 **테스트 task/execution 역할만** PassRole 가능하게 제한한다. ECS RegisterTaskDefinition처럼 resource 제한이 지원되지 않는 권한은 AWS 지원 범위를 따르되 UpdateService/PassRole은 정확히 제한한다.
 - 별도 GitHub Environment는 추가하지 않았으므로 environment 기반 OIDC sub로 바꾸지 않는다. 향후 도입 시 trust와 승인 규칙을 함께 변경한다.
 

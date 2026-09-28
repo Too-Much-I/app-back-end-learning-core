@@ -42,7 +42,7 @@
         {"name": "SENTRY_DSN", "value": ""},
         {"name": "SENTRY_ENVIRONMENT", "value": "learning-core-test"}
       ],
-      "secrets": [{"name": "MONGODB_URI", "valueFrom": "arn:aws:secretsmanager:ap-northeast-2:889384901776:secret:tosunsaeng/test/learning-core/mongodb-NEcjAa"}],
+      "secrets": [{"name": "MONGODB_URI", "valueFrom": "arn:aws:secretsmanager:ap-northeast-2:889384901776:secret:tosunsaeng/test/learning-core/mongodb-NEcjAa:MONGODB_URI::"}],
       "logConfiguration": {
         "logDriver": "awslogs",
         "options": {

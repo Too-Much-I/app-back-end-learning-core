@@ -40,10 +40,12 @@ public class UserMergedIndexValidator implements ApplicationRunner {
 
     private void requireIdIndex(Class<?> entityType) {
         List<IndexInfo> indexes = mongoTemplate.indexOps(entityType).getIndexInfo();
+        // MongoDB's built-in _id_ index is implicitly unique. listIndexes omits
+        // unique, so Spring Data's IndexInfo.isUnique() can be false for it.
         boolean valid = indexes.stream().anyMatch(index -> "_id_".equals(index.getName())
-                && index.isUnique()
                 && index.getIndexFields().size() == 1
-                && "_id".equals(index.getIndexFields().getFirst().getKey()));
+                && "_id".equals(index.getIndexFields().getFirst().getKey())
+                && Sort.Direction.ASC == index.getIndexFields().getFirst().getDirection());
         if (!valid) {
             throw new IllegalStateException("Required UserMerged _id index is missing");
         }
