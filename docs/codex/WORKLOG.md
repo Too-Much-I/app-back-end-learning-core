@@ -11918,3 +11918,431 @@
 
 - 관련 TMI-126. 테스트 OIDC 배포 역할/GitHub 변수, 최초 이미지·ECS·HTTPS 구성, develop 자동 배포 검증 순서 안내를 현재 turn에 연결한다. 실제 AWS/GitHub 설정 및 배포는 미실행이다.
 - 과거 기록은 유지하고 WORKLOG EOF append 및 CURRENT_STATE 갱신만 수행했다. Secret/Token 기록과 코드 변경 없음. 문서 작업으로 테스트 재실행은 생략하고 whitespace 및 표식 단일 출현을 검사한다.
+
+## 2026-09-28 — GitHub 테스트 배포 역할 생성 전 확인
+
+<!-- codex-turn:01a0e5a4-e0f5-7103-ab92-a7f0ce20ba54 -->
+
+- 관련 TMI-126. 사용자가 연 Chrome AWS 계정에서 CloudShell read-only로 LC IAM 역할 목록과 GitHub OIDC provider/audience, 기존 main 역할 trust를 확인했다. 신규 테스트 deploy 역할은 목록에 없고 기존 test execution/task 역할은 존재한다. GitHub LC repository variables 화면에서 AWS_ROLE_ARN 존재 및 AWS_TEST_ROLE_ARN 부재를 확인했다.
+- main trust sub가 조직/저장소 ID 포함 형식임을 확인하고 BRANCH_DEPLOYMENT.md를 해당 exact develop 후보 형식으로 정정했다. main 설정은 변경하지 않았다. 새 tosunsaeng-github-learning-core-test-deploy-role은 develop 전용 trust, 테스트 ECS UpdateService/테스트 역할 PassRole, LC ECR push와 배포 필수 조회/Register 권한으로 제안한다. ECR은 기존 공유 repo여서 저장소 쓰기 권한이 태그별로 완전 격리되지 않는 점을 알리고 실행 직전 승인을 요청한다.
+- 아직 역할 생성/정책 저장/GitHub 변수 등록은 하지 않았다. 워크플로 재실행·서버 배포·commit/push 없음. 사용자 commit/push 작업과 별개로 문서/상태/로그만 수정했다. 코드 변경 없어 Gradle 생략, git diff --check 및 marker 단일 출현 검사. Secret/Token 조회·기록 없음.
+
+## 2026-09-28 — 운영·테스트 Task Definition revision 구분 설명
+
+- 관련 TMI-126. select-target.sh와 workflow를 읽고 main/test service·family 분기, describe-services의 현재 참조 revision 조회, family/container 검증, image digest 교체와 신규 revision 배포 동작을 설명했다. 숫자 revision은 family별 번호이며 최신 전체 revision을 임의 선택하지 않는다. 예시 번호는 실제 현재 배포값과 구분한다.
+- CURRENT_STATE/WORKLOG만 갱신. AWS/GitHub 조회·변경, 역할 생성/승인 해석·배포 없음. 테스트 역할 생성은 승인 대기 유지. 코드 불변으로 테스트 재실행 생략, git diff --check 수행. Secret/Token 기록 없음.
+
+## 2026-09-28 — Task Definition 구분 설명 턴 기록 보완
+
+<!-- codex-turn:01a0e5a9-bf92-7121-8ad7-a9c92b88854d -->
+
+- 관련 TMI-126. main/develop별 서비스·family와 해당 서비스의 현재 revision을 기준으로 배포한다는 설명을 현재 turn에 연결한다. 권한 생성 및 실제 배포는 미실행, 승인 대기 상태 유지.
+- 과거 기록은 변경하지 않고 WORKLOG 끝 append 및 CURRENT_STATE 갱신만 수행했다. Secret/Token 기록 없음. 문서 작업으로 테스트 재실행 생략, whitespace 및 표식 단일 출현 검증.
+
+## 2026-09-28 — develop 전용 배포 IAM 권한과 GitHub 변수 등록
+
+<!-- codex-turn:01a0e5ae-5391-7652-9224-70e41c960bc8 -->
+
+- 관련 TMI-126. 사용자 최종 권한 부여 승인 후 AWS CloudShell에서 tosunsaeng-github-learning-core-test-deploy-role 생성(최대 세션3600초), LearningCoreTestDeploy inline policy 저장/재조회 완료. 기존 GitHub OIDC provider의 aud sts.amazonaws.com 및 조직/저장소 ID를 포함한 exact develop sub만 신뢰한다.
+- 권한은 LC ECR repository push/pull, ECR login, 테스트 service Describe/Update, task definition Describe/Register, 테스트 execution/task 역할만 ecs-tasks.amazonaws.com으로 PassRole이다. Register/DescribeTaskDefinition과 ECR login은 Resource *이며 공유 ECR repo 권한의 태그별 격리 한계는 승인 범위대로 유지한다. 다른 AWS 권한/기존 main 역할 수정 없음.
+- GitHub LC repository variable AWS_TEST_ROLE_ARN에 생성된 ARN 등록 후 목록에서 값 및 기존 AWS_ROLE_ARN 유지를 확인했다. Secret/Access Key 발급·조회·기록 없음. 단일 ARN별 IAM simulation에서 테스트 UpdateService allowed, 기존 운영 UpdateService implicitDeny 확인. 최초 복수 ARN simulation은 placeholder resource 판정을 반환해 근거에서 제외하고 각각 다시 검증했다. 실제 OIDC AssumeRole/배포 성공 검증은 후속이다.
+- CURRENT_STATE/BRANCH_DEPLOYMENT/WORKLOG 갱신. 코드/API 불변으로 Gradle 생략, 저장 정책/trust/GitHub 목록/simulation과 git diff --check 및 marker 단일 출현 검증. workflow 재실행·ECS 배포·commit/push 없음. 최초 테스트 서비스·HTTPS 구성이 다음 작업이다.
+
+## 2026-09-28 — 테스트 ECS 서비스 구성 사전 확인
+
+- 관련 TMI-126. 사용자 서비스 구성 요청 후 AWS/GitHub read-only 조회. develop b2cd2b684eaeab0f8d01edc27295329bfcf43b74의 run 36366557693은 역할 변수 미설정으로 초기 실패했다. ECR 최신 목록에는 새 테스트 이미지가 없고 테스트 서비스는 MISSING이다. 기존 LC :20 및 Identity-test :3는 subnet-0fa638ca8effafa81/subnet-0dc3e0343bb98e3e3, public IP disabled 구성이다.
+- 기존 ALB tosunsaeng-staging-alb 및 SG sg-0e5462fa65a22ded8 확인, VPC 테스트 SG 검색에는 Identity-test만 있고 LC-test SG는 없다. ACM 목록에는 Identity용 인증서 두 개만 있어 api-test 인증서를 새로 준비해야 한다.
+- 최초 이미지 순환 의존은 desiredCount=0 서비스에 예정 test-commit image 참조를 등록하고 workflow가 이미지를 push/digest로 갱신한 뒤 1대로 켜는 방식으로 해결 제안한다. 미존재 이미지로 task를 실행하거나 운영 이미지를 재사용하지 않는다. 테스트 전용 SG/Redis 접근/ALB exact host 공개 및 0.5vCPU·1GiB 1대 비용은 실행 직전 승인 대기다. 아직 리소스 생성/워크플로 재실행/배포 없음.
+- CURRENT_STATE/WORKLOG만 갱신. 코드 변경 없어 Gradle 생략, 문서 whitespace 검사. Secret/Token 조회·기록 없음. 기존 사용자 변경 유지.
+
+## 2026-09-28 — 테스트 ECS 서비스 사전 확인 기록 보완
+
+<!-- codex-turn:01a0e5b1-2eba-7ae2-a20b-c2ea365840b8 -->
+
+- 관련 TMI-126. 직전 서비스 구성 사전 확인의 작업 표식을 EOF에 추가했다. 테스트 서비스 생성, 네트워크 접근 허용, HTTPS 공개 및 Fargate 실행 비용은 승인 대기 상태를 유지한다.
+- 이번 보완은 CURRENT_STATE/WORKLOG 기록만 변경한다. AWS/GitHub 변경·배포·워크플로 재실행·Secret 조회 없음. 코드 불변으로 Gradle 생략, whitespace 및 표식 단일 출현 검사.
+
+## 2026-09-28 — LC 테스트 ECS 서비스 생성과 최초 배포
+
+- 관련 TMI-126. 비용·네트워크·HTTPS 구성에 대한 사용자 실행 승인 후 테스트 SG sg-0245da61307f3e190, TG tosunsaeng-lc-test-tg, 로그 그룹7일, exact api-test host rule priority40 및 ECS service desired0 생성. 기존 ALB/NAT/Redis 재사용, 두 private subnet NAT public IP13.124.57.130 확인. 새 SG의 all-egress를 제거하고443/27017 및 Redis SG6379만 허용; inbound는 ALB SG8080만 허용. Redis에는 test SG6379 규칙만 추가했다.
+- 사용자가 요청한 CNAME 2개 등록 후 api-test ACM ISSUED와 DNS 연결 확인, 기존443 listener에 추가 인증서로 연결했다. 기존 기본 인증서·운영 rule/service 수정 없음. 최초 TLS 반영 지연 뒤 정상 검증 curl이503에 도달했으며 인증서 검증 우회 없음.
+- develop b2cd2b6 run36366557693 attempt2 재실행. routing/unit/migration/Mongo integration tests와 OIDC·ECR push·test:2 digest 배포 통과 확인. digest88444cb679d0caf41e1d6e816441a9c2278bb35c762cb0a5eda218a9cd79b41b 일치 후 desired1로 기동. task RUNNING/ALB 등록 뒤 exit1로 종료되어 workflow health 단계 최종 실패(6분28초).
+- Secret 원문 없이 정제된 CloudWatch 예외를 조회해 MongoDB connection string prefix 형식 오류 확인. JSON 저장인지 등 구체적 저장 형태는 미확정이며 사용자의 Secret 확인/수정이 필요하다. 반복 기동과 비용을 막기 위해 desired0 복귀 요청. health200·MEMBER 인증·앱 DB/Redis/S3 연결 검증은 완료되지 않았다. Challenge/AI 등 연동 OFF 유지.
+- bootstrap 현황 문서 신설, CURRENT_STATE/WORKLOG 갱신. runtime 코드·API/AI 계약 불변; 로컬 Gradle은 생략하고 CI 테스트와 AWS readback으로 검증했다. 문서 whitespace 검사 수행. 기존 사용자 파일 변경 보존, commit/push 없음. Secret/Token/URI 원문 기록 없음.
+
+- 종료 readback: 테스트 test:2 desired/running/pending=0/0/0, 기존 운영 LC:20=1/1/0 확인. 테스트 반복 기동 중단 완료.
+
+## 2026-09-28 — 테스트 서비스 생성 턴 기록 보완
+
+<!-- codex-turn:01a0e5b5-8d50-70d2-9213-2acda2a9d25e -->
+
+- 관련 TMI-126. 이번 턴의 테스트 ECS 서비스·네트워크·HTTPS 생성 및 develop 최초 배포 결과를 현재 작업 표식에 연결한다. CI 테스트와 이미지 배포는 통과했으나 MongoDB URI 형식 오류로 health 검증은 실패했다.
+- 테스트 서비스는 desired/running/pending=0/0/0으로 중지 완료, 기존 운영 LC:20은 1/1/0 유지. Secret 저장 형태와 JSON인 경우 키 이름만 사용자 확인 대기다. 실제 URI·Secret·Token은 기록하지 않았다.
+- 과거 기록은 변경하지 않고 EOF append와 CURRENT_STATE 갱신만 수행했다. 추가 AWS 변경·재배포 없음. 코드 변경이 없어 Gradle 재실행은 생략하고 git diff --check 및 표식 단일 출현을 검증한다.
+
+## 2026-09-28 — MongoDB JSON Secret 키 선택 수정
+
+- 관련 TMI-126. 사용자가 JSON Secret의 키 이름 MONGODB_URI를 확인했다. 기존 test:2 정의에서 Secret valueFrom에 `:MONGODB_URI::`만 추가한 test:3 등록 및 desired1 배포, 로컬 task-definition template 동일 수정. 이미지 digest와 기타 설정 유지, Secret 실제 값 조회·변경 없음.
+- URI 형식 오류는 해결됐으나 Tomcat8080/Application started 이후 필수 시험 배정 인덱스 확인 중 AtlasError8000으로 종료됐다. 거절 대상은 to-teacher-learning-core-test.exam_sessions의 listIndexes다. URI 사용자와 해당 DB readWrite 역할 확인이 필요하며 권한 확대나 startup 검사 우회는 하지 않았다.
+- 재시작 루프 방지를 위해 테스트 desired0 복귀 요청. 기존 운영 service 수정 없음, health200/MEMBER/DB·Redis·S3 통합 검증 미완료. GitHub 재실행 없음.
+- template·bootstrap 현황·CURRENT_STATE·WORKLOG만 수정, 공개 API/AI 계약 불변. 코드 불변으로 Gradle 재실행 생략, template JSON 파싱과 git diff --check 및 AWS 등록 결과/정제 로그 검증. 기존 사용자 변경 유지, commit/push 없음. Secret/Token/URI 원문 기록 없음.
+
+- 최종 readback에서 test:3 desired/running/pending=0/0/0 확인, 반복 실행 중단 완료.
+
+## 2026-09-28 — MongoDB 키 선택 수정 턴 기록 보완
+
+<!-- codex-turn:01a0e5c2-f805-7320-a1b0-75978f5ad6af -->
+
+- 관련 TMI-126. JSON Secret 키 선택 수정과 test:3 재기동 검증 결과를 현재 턴에 연결한다. URI 형식 오류는 해결됐으나 테스트 DB의 listIndexes 권한 거절로 정상 기동은 미완료다.
+- 테스트 서비스는 desired/running/pending=0/0/0으로 중지 완료했다. LC 전용 DB 사용자 및 해당 DB readWrite 권한 확인 대기를 유지하며 추가 권한 변경·재배포는 하지 않았다.
+- 과거 기록은 변경하지 않고 EOF append 및 CURRENT_STATE만 갱신했다. Secret·Token·URI 원문 기록 없음. 문서 작업으로 Gradle 재실행 생략, whitespace와 표식 단일 출현을 검증한다.
+
+## 2026-09-28 — MongoDB 테스트 사용자 권한 조회 시도
+
+- 관련 TMI-126. 사용자 요청에 따라 Chrome에서 tosunsaeng-test 프로젝트의 Database Users 화면으로 접근했으나 Atlas 로그인 화면으로 이동했다. 사용자/역할 설정은 아직 조회하지 못했다.
+- 기존 LC 로그의 listIndexes 권한 거절은 DB 접근 권한 문제의 증거이며, Identity 성공만으로 LC 사용자의 동일 DB 권한을 보장하지 않는다. 실제 사용자 불일치 또는 역할 누락 여부는 로그인 후 확인해야 한다.
+- 로그인 화면을 인계 상태로 유지했다. 권한 변경·Secret 조회·배포 없음, 테스트 서비스 중지 유지. CURRENT_STATE/WORKLOG만 갱신하고 코드 불변으로 테스트 재실행 생략, whitespace 검사 수행.
+
+## 2026-09-28 — MongoDB 권한 조회 턴 기록 보완
+
+<!-- codex-turn:01a0e5ca-8b7c-7e10-8298-0f9b73611d1f -->
+
+- 관련 TMI-126. tosunsaeng-test 사용자 권한 조회 시도를 현재 턴에 연결한다. Atlas 로그인이 만료돼 실제 DB 사용자·역할 조회는 미완료이며 로그인 인계 대기다.
+- 테스트 서비스 중지 상태를 유지하고 권한·Secret·배포 변경은 하지 않았다. 과거 WORKLOG 수정 없이 EOF append 및 CURRENT_STATE만 갱신했다. Secret·Token 기록 없음.
+- 문서 작업으로 테스트 재실행을 생략하고 git diff --check 및 표식 단일 출현을 검증한다.
+
+## 2026-09-28 — LC MongoDB 권한 거절 원인 확정
+
+- 관련 TMI-126. 사용자 로그인 후 tosunsaeng-test Database Users와 LC 사용자 편집창을 read-only로 확인했다. LC 전용 사용자는 해당 LC DB에 readWrite, 컬렉션 제한 없음, Cluster0 접근 허용이다. Identity 사용자는 Identity DB에만 readWrite다. 편집창은 Cancel로 닫고 변경하지 않았다.
+- AWS LC Secret은 CloudShell에서 조회 후 메모리 내 파싱하여 사용자명·호스트만 출력했다. URI 전체와 비밀번호는 화면·파일·문서에 출력/저장하지 않았다. 대조 결과 LC 연결이 Identity 전용 사용자를 사용하는 것이 권한 거절 원인이다. 과거 원문 미조회 기록과 달리 이번에는 진단을 위해 제한적 파싱 조회를 수행했다.
+- 권한 확대 대신 사용자가 LC Secret의 URI에 LC 전용 사용자와 해당 비밀번호를 입력하도록 인계한다. credential 변경·배포·DB 권한 변경은 하지 않았고 테스트는 기존 중지 상태다.
+- CURRENT_STATE 및 bootstrap 현황 문서 갱신. runtime/API/AI 계약 불변, 코드 변경 없어 Gradle 생략; UI 권한 대조와 제한적 Secret 파싱 및 git diff --check로 검증했다. 기존 사용자 변경 유지, commit/push 없음.
+
+## 2026-09-28 — LC 접속 문자열 사용자명 수정 안내
+
+- 관련 TMI-126. 사용자가 비밀번호를 직접 입력할 수 있도록 LC 전용 사용자명으로 바꾼 접속 문자열 형식을 안내한다. 기존 호스트와 옵션, Secret JSON 키는 유지하고 LC 계정의 비밀번호를 사용해야 한다. 특수문자는 URI percent-encoding이 필요함을 알린다.
+- 실제 URI·비밀번호·Token을 파일에 기록하지 않았다. Secret 변경과 재기동은 하지 않았으며 사용자 저장 완료 대기다. CURRENT_STATE/WORKLOG만 수정, 코드 불변으로 테스트 생략 및 whitespace 검사.
+
+## 2026-09-28 — LC 접속 문자열 안내 턴 기록 보완
+
+<!-- codex-turn:01a0e5cd-56f2-77e1-ad66-c8789d3dfb1d -->
+
+- 관련 TMI-126. LC 전용 사용자와 해당 비밀번호를 사용하는 접속 문자열 형식 안내를 현재 턴에 연결한다. 사용자의 Secret 저장 완료 대기이며 자격증명 변경·재기동은 수행하지 않았다.
+- 과거 기록은 유지하고 WORKLOG EOF append와 CURRENT_STATE 갱신만 수행했다. Secret·Token·실제 URI 기록 없음. 문서 작업으로 테스트 재실행 생략, whitespace와 표식 단일 출현 검증.
+
+## 2026-09-28 — 수정된 DB 계정 재기동 및 신규 DB 필수 인덱스 준비
+
+- 관련 TMI-126. 사용자 Secret 수정 완료 후 원문 조회 없이 test:3 desired1 재기동. DB 권한 오류 해소 뒤 필수 인덱스 누락 확인, 준비 중 desired0으로 내려 재시작 루프 중지.
+- tosunsaeng-test/Cluster0 Atlas 인벤토리에서 LC DB가 없는 것을 확인하고 신규 LC DB 및 빈 exam_sessions·mock_exams를 생성했다. Documents0 확인 후 validator/migration 정의 그대로 unique active-user partial 인덱스와 unique mock_exam_id 인덱스를 만들고 Ready 확인. 기존 데이터 backfill·변경·삭제 및 Identity/운영 DB 수정 없음. 비필수 완료 이력 인덱스와 문제 seed는 미준비.
+- 재기동 후 test:3 desired/running/pending1/1/0, rollout COMPLETED, HTTPS health200/UP 및 미인증 API401 확인. ALB는 마지막 조회 unhealthy여서 추가 수렴 검증 중이다. main LC:20은1대 유지. 이전 GitHub run 재실행·새 이미지 배포 없음.
+- bootstrap 현황·CURRENT_STATE·WORKLOG만 갱신, runtime/API/AI 계약 불변. 코드 불변으로 Gradle 생략, Atlas 인덱스/정제 기동 로그/AWS 및 HTTPS 검증과 whitespace 검사. Secret/Token 기록 및 commit/push 없음. 실제 MEMBER·음성/S3/AI E2E는 후속.
+
+- 최종 추가 조회에서 ALB healthy 대상1개와 이전 대상 draining1개, ECS running1/pending0 확인. 기동 및 기본 HTTPS/인증 차단 검증 완료로 정리하며 전체 기능 E2E 완료와 구분한다.
+
+## 2026-09-28 — 테스트 서버 정상 기동 턴 기록 보완
+
+<!-- codex-turn:01a0e5ce-8032-7db0-ace2-ce5f4ce07ac0 -->
+
+- 관련 TMI-126. 사용자 credential 수정 후 신규 LC 테스트 DB·필수 인덱스 2개 준비와 test:3 정상 기동 결과를 현재 턴에 연결한다. HTTPS health200/UP, 미인증 API401, ALB healthy 및 ECS running1/pending0 확인 완료다.
+- 기존 운영 서버와 API 계약은 유지한다. Challenge/AI는 OFF이며 실제 MEMBER 토큰·문제 seed·S3/AI E2E 검증은 후속이다. 이번 보완에서 추가 원격 변경이나 재배포는 하지 않았다.
+- 과거 기록을 변경하지 않고 WORKLOG EOF append와 CURRENT_STATE 갱신만 수행했다. Secret·Token 기록 없음. 문서 작업으로 테스트 재실행을 생략하고 whitespace 및 표식 단일 출현을 검증한다.
+
+## 2026-09-28 — 테스트 Swagger 접근 확인
+
+- 관련 TMI-126. 사용자 Swagger 허용 요청에 SecurityConfig의 기존 Swagger/OpenAPI permitAll 및 SwaggerConfig의 bearer 인증·상대 서버 URL을 확인했다. 실제 테스트 HTTPS에서 swagger-ui.html 리다이렉트 후 index.html200, v3/api-docs200, 미인증 일반 API401 확인.
+- Swagger는 이미 공개 허용되어 추가 코드·권한·배포 변경은 하지 않았다. 일반 API 인증 유지, 실제 토큰이나 업무 API mutation 없음. CURRENT_STATE/WORKLOG만 갱신, 코드 불변으로 Gradle 생략 및 HTTPS/whitespace 검증.
+
+## 2026-09-28 — Swagger 접근 확인 턴 기록 보완
+
+<!-- codex-turn:01a0e5da-44c5-7f33-85b8-994a2cc5f322 -->
+
+- 관련 TMI-126. 테스트 Swagger UI/OpenAPI200 및 미인증 일반 API401 확인 결과를 현재 턴에 연결한다. 기존 공개 설정으로 접근 가능하며 코드·권한·배포 변경은 없다.
+- 과거 WORKLOG는 유지하고 EOF append와 CURRENT_STATE 갱신만 수행했다. Secret·Token 기록 없음. 문서 작업으로 테스트 재실행 생략, whitespace 및 표식 단일 출현을 검증한다.
+
+## 2026-09-28 — 테스트 서버 주소 안내
+
+<!-- codex-turn:01a0e622-8fc8-7131-8b26-0bbb9fb4101f -->
+
+- 관련 TMI-126. 기존 확인된 LC 테스트 서버 기본 주소와 Swagger URL을 안내했다. 이번에는 원격 재조회·코드·배포 변경 없이 CURRENT_STATE/WORKLOG만 갱신했다.
+- Secret·Token 기록 없음. 문서 작업으로 테스트 재실행 생략, whitespace 및 표식 단일 출현 검증.
+
+## 2026-09-28 — 실행 테스트 서비스 Challenge 403 진단
+
+<!-- codex-turn:01a0e657-1b30-72a1-8b78-9b891a611769 -->
+
+- 관련 TMI-126. 사용자 보고: Identity 프로필 인증·재발급 성공 및 MEMBER/LC audience 확인, challenges/today403 COMMON403. 실제 토큰은 받거나 조회하지 않았다.
+- AWS read-only에서 서비스 test:3 running1/desired1, 실행 task도 동일 revision·기존 이미지 digest임을 확인했다. CHALLENGE_ENABLED=false이며 해당 flag의 task override·환경파일·command override는 없다.
+- 배포 commit b2cd2b6의 ChallengeController.today는 member() 후 service()를 호출한다. 정상 MEMBER 전제에서 service()의 enabled 검사(27행)가 ChallengeFailure.forbidden()을 던져403 COMMON403으로 매핑된다. 동일 코드를 member 검사도 반환하므로 개별 요청 trace를 직접 입증한 것은 아니지만 OFF 설정은 유효 MEMBER도 확실히 차단한다.
+- 요청은 진단 범위여서 flag 활성화·권한·배포·코드 변경 없음. Challenge 준비 전 OFF 유지라는 기존 결정과 일치한다. CURRENT_STATE/WORKLOG 갱신, 코드 불변으로 Gradle 생략, AWS 정의/실행 task·배포 commit 대조 및 whitespace 검증. Secret/Token 기록 없음.
+
+## 2026-09-28 — Challenge 활성화 배포 선행조건 점검
+
+- 관련 TMI-126. 사용자 활성화·재배포 요청 후 test:3 설정을 read-only로 확인했다. CHALLENGE_ENABLED=false이며 CHALLENGE_AI_ENDPOINT, CHALLENGE_AI_OUTBOUND_CREDENTIAL, CHALLENGE_AI_CALLBACK_CREDENTIAL 환경설정/Secret 참조가 없고 환경파일도 없다. 비밀값은 출력하지 않았다.
+- ChallengeConfiguration/Properties는 활성화 시 HTTPS 평가 endpoint와 서로 다른 양방향 credential을 검증하고 실패하면 ApplicationContext 기동을 막는다. 필수 collection/index·Transaction·catalog 검증도 추가로 필요하다. 현재 true만 설정하면 LC 전체 기동 실패가 예상돼 실행하지 않았다.
+- 정상 서비스와 OFF 설정을 유지했다. 실제 AI 주소·인증정보 Secret 참조 준비 여부를 사용자에게 요청하며 credential 원문은 요구하지 않는다. 코드·AWS·DB·배포 변경 없음. CURRENT_STATE/WORKLOG 갱신, 코드 불변으로 Gradle 생략, 설정/코드 대조 및 whitespace 검사.
+
+## 2026-09-28 — Challenge 활성화 선행조건 점검 턴 기록 보완
+
+<!-- codex-turn:01a0e658-f26a-7ff2-9a47-11659b01d242 -->
+
+- 관련 TMI-126. 활성화 요청에 대한 설정 점검 결과를 현재 턴에 연결한다. AI endpoint와 양방향 인증정보 참조가 없어 단순 활성화 시 startup 실패가 예상되므로 재배포는 수행하지 않았다.
+- 기존 테스트 서비스와 Challenge OFF를 유지하며 AI 주소·Secret 참조 준비 여부 확인 대기다. 이번 보완은 과거 기록 변경 없이 WORKLOG EOF append 및 CURRENT_STATE 갱신만 수행했다. Secret·Token 기록 없음.
+- 문서 작업으로 테스트 재실행 생략, git diff --check 및 표식 단일 출현 검증.
+
+## 2026-09-28 — app-ai-learning 테스트 배포 사전 검토
+
+<!-- codex-turn:01a0e660-44c2-7ae1-8995-45761623d0f0 -->
+
+- 관련 TMI-126. 사용자가 운영 문제 데이터 활용 및 app-ai-learning 서버 배포를 요청했다. 승인된 네트워크 접근으로 main HEAD2391a944010f816016c9263e507a2850c5b5c07a 확인 및 임시 clone, README/ECS 배포/계약 검토/Docker/compose/sample 설정을 읽었다. AI runtime 코드 수정·push 없음.
+- API8000과 별도 worker는 동일 이미지, callback 경로는 LC와 일치한다. OpenAI Secret·방향별 credential·private HTTPS·Redis/S3 준비가 필요하며 public ALB 경로로 임의 대체하지 않는다. API/worker 각0.5vCPU·1GiB 제안과 비용, Secret 위치, 운영 문제 DB/컬렉션을 질문했다. 실제 리소스 생성·이미지 push·기동 없음.
+- 운영 DB 직접 연결 대신 문제 데이터만 테스트 DB 복사를 제안했으며 범위/스키마 확인 전 복사하지 않았다. 개인정보/학습 이력/음성 복사 없음. 기존 LC 정상 서비스/Challenge OFF 유지.
+- 로컬 pytest는 모듈 미설치로 실패해 테스트 미검증이다. Python3.12 실행파일 미확인. 배포 준비 문서 신설 및 CURRENT_STATE/WORKLOG 갱신, whitespace 검사. 기존 사용자 변경 보존, commit/push 및 Secret/Token 기록 없음.
+
+## 2026-09-28 — AI API·worker 동일 ECS task 배치 설명
+
+- 관련 TMI-126. API와 worker는 별도 역할/process가 필요하지만 별도 ECS service/task가 필수는 아님을 설명했다. 테스트 비용 절감을 위해 같은 이미지의 API/worker 컨테이너2개를 ECS service1개/task1개에 배치하는 선택지를 권장한다. 기존 worker command와 Redis/S3 계약은 유지한다.
+- 동일 task는 CPU/메모리·task IAM role과 재배포/장애/scale 경계를 공유한다. 별도 서비스는 독립 확장과 권한 격리가 가능하다. 컨테이너 수가 아닌 task 자원/실행시간이 Fargate 과금 기준이며 같은 총 자원이면 단순 통합만으로 비용 절감이 보장되지 않는다. 작은 공용 task의 충분성은 부하 검증 필요.
+- 구성 설명만 수행, AI/LC 코드·AWS·배포 변경 없음. CURRENT_STATE/WORKLOG 갱신, 테스트 재실행 생략 및 whitespace 검사. Secret/Token 기록 없음.
+
+## Codex Stop Hook 안전 fallback
+
+<!-- codex-turn:01a0e664-2f71-7190-a994-721878180c68 -->
+
+- 날짜: `2026-09-28`
+- 브랜치:
+
+    develop
+
+- Jira 이슈 키: `TMI-31`
+- `git status --short`:
+
+    M .DS_Store
+     M docs/.DS_Store
+     M docs/codex/CURRENT_STATE.md
+     M docs/codex/WORKLOG.md
+     M docs/codex/deployment/BRANCH_DEPLOYMENT.md
+     M docs/codex/deployment/learning-core-test.task-definition.template.json
+    ?? docs/codex/deployment/AI_LEARNING_TEST_PREPARATION.md
+    ?? docs/codex/deployment/LEARNING_CORE_TEST_BOOTSTRAP_STATUS.md
+
+- `git diff --stat`:
+
+    .DS_Store                                          | Bin 8196 -> 10244 bytes
+     docs/.DS_Store                                     | Bin 6148 -> 6148 bytes
+     docs/codex/CURRENT_STATE.md                        |  28 ++++
+     docs/codex/WORKLOG.md                              | 185 +++++++++++++++++++++
+     docs/codex/deployment/BRANCH_DEPLOYMENT.md         |   3 +-
+     ...earning-core-test.task-definition.template.json |   2 +-
+     6 files changed, 216 insertions(+), 2 deletions(-)
+
+- 기록 누락 안내: 정상 WORKLOG 항목이 없어 Stop Hook이 최소 fallback 기록을 생성했다.
+
+## 2026-09-28 — AI 공용 task 승인 및 설정 대조
+
+- 관련 TMI-126. 동일 ECS task에 API/worker 컨테이너2개 배치를 사용자 승인했다. provider Secret 참조/키 이름 및 원본 문제 컬렉션 위치를 전달받았으며 실제 자격증명은 조회/기록하지 않았다.
+- main2391a94 최신 HEAD 재확인 및 Docker29.6.1 가동 확인, linux/amd64 공통 이미지 로컬 빌드를 시작했다. AWS 배포·리소스 변경·문제 복사는 수행하지 않았다.
+- 코드상 업로드2MiB 상한 및 LANGSMITH_TRACE_CONTENT 미지원/원문 차단 확인. 로컬 Redis hostname은 AWS endpoint/격리된 DB로 교체 필요. provider 모델 사용 가능성 및 task sizing/네트워크는 미검증이다.
+- 방향별 서버 인증키 추가를 요청했고 사용자 요청에 따라 로컬 openssl rand 명령을 안내한다. 실제 값은 사용자만 생성·등록하며 서로 다른 값을 사용한다. CURRENT_STATE와 준비 문서를 갱신하고 기존 사용자 변경을 보존했다.
+
+## 2026-09-28 — AI 이미지 빌드 완료 및 턴 기록 보완
+
+<!-- codex-turn:01a0e667-357e-7b01-a00f-115ac61a6aa1 -->
+
+- 관련 TMI-126. API/worker 공용 linux/amd64 이미지 app-ai-learning-test:2391a94의 로컬 Docker build가 exit0으로 완료됐다. ECR push, ECS 배포, 실제 provider/Callback 검증과 문제 데이터 복사는 미실행이다.
+- 서버 간 방향별 랜덤 인증값은 사용자가 로컬 openssl 명령으로 각각 생성해 Secret에 등록하도록 안내했으며 저장 완료 대기다. 실제 값은 조회하거나 기록하지 않았다.
+- CURRENT_STATE 및 배포 준비 문서에 빌드 상태를 반영했다. runtime 코드/API 변경은 없으며 단위 테스트는 재실행하지 않았다. whitespace와 턴 표식 개수 검증, 기존 사용자 변경 보존, commit/push 없음.
+
+## 2026-09-28 — AI Secret 등록 보고 후 AWS inventory
+
+- 관련 TMI-126. 사용자가 방향별 credential 등록 완료를 알렸다. CloudShell 재연결 후 describe-secret의 ARN/수정시간, ECR/ALB/IAM 역할/S3/Cloud Map/ECS service 목록만 읽었다. Secret 값은 조회/출력하지 않았다.
+- AI learning ECR 존재, 신규 test service·learning 전용 역할·AI 임시 bucket 부재, internet-facing ALB 한 개 및 HTTP namespace 확인. internal HTTPS 경로 비용과 정확한 권한/SG 추가 승인 필요로 원격 변경은 보류한다. 기존 서비스/LC Challenge OFF 불변, 이미지 push/배포/문제 복사 없음.
+- CURRENT_STATE 및 준비 문서 갱신. runtime/API 코드 변경 없이 inventory/기록 작업만 수행해 단위 테스트 생략, git diff --check 검증. 기존 사용자 변경 보존, commit/push 없음.
+
+## 2026-09-28 — AI 배포 승인 대기 턴 기록 보완
+
+<!-- codex-turn:01a0e66c-ac0b-7722-9d15-d94bbf0753f9 -->
+
+- 관련 TMI-126. 이번 AWS inventory 및 사용자 인증정보 등록 완료 보고에 대한 턴 표식을 WORKLOG EOF에 추가했다. 내부 HTTPS ALB 추가 비용과 AI 임시 S3·전용 IAM·제한적 네트워크 접근 생성 승인 대기다.
+- 로컬 공통 이미지 빌드 완료 상태를 유지한다. 추가 AWS 변경·배포·데이터 복사·runtime 코드 변경 없음. CURRENT_STATE 갱신, whitespace 및 표식1회 검증, 비밀값 기록 없음.
+
+## 2026-09-28 — ALB 재사용 가능성 설명 및 기존 연결 확인
+
+- 관련 TMI-126. 사용자 질문에 ECS describe-services와 기존 ALB rule을 읽기 전용 조회했다. LC-test는 공유 ALB의 전용 TG를 사용하고 기존 AI service는 LB 연결이 없으며 Service Connect 설정도 null이다. 기존 AI의 실제 호출 경로는 이 결과만으로 확정하지 않았다.
+- 신규 ALB는 API/worker 통합의 필수조건이 아니다. 공유 public ALB에 전용 host/TG를 추가할 수 있으나 private HTTPS와 동등하지 않으며 source-IP 제한 및 방향별 인증 등 보안 합의가 필요하다. 이전 내부 ALB 제안을 필수처럼 표현한 점을 정정하고 생성하지 않았다.
+- CURRENT_STATE 갱신, whitespace 검사. 원격 변경·코드/API 변경·배포 없음, 조회/문서 작업으로 단위 테스트 생략. 비밀값 미조회, 기존 사용자 변경 보존.
+
+## 2026-09-28 — ALB 재사용 검토 턴 기록 보완
+
+<!-- codex-turn:01a0e66e-b55e-76d3-93f4-85a2a8f8d973 -->
+
+- 관련 TMI-126. ALB 재사용 가능성 설명 및 기존 서비스 연결 조회의 현재 턴 표식을 EOF에 추가했다. 공유 공개 ALB 재사용은 기술적으로 가능하나 private 연결과 구분하며 접근 제한·보안 결정 전 적용하지 않는다.
+- CURRENT_STATE 갱신, whitespace와 표식1회 검증. 기록 외 추가 변경 및 신규 ALB 생성 없음. Secret/Token 기록 없음.
+
+## 2026-09-28 — AI 인증서 발급 확인 및 업로드 권한 대기
+
+<!-- codex-turn:01a0e67d-4575-7951-8414-020d15fbe6f7 -->
+
+- 관련 TMI-126. 앞선 중단 턴에서 공유 ALB 재사용 배포 승인 후 ai-test.to-teacher.com ACM 인증서를 요청했다. 이번 사용자 DNS 등록 완료 보고 후 인증서 dac51c42-a317-4b94-8f78-dff6fb7ba1ac의 ISSUED를 확인했다. 서비스 CNAME 조회는 CloudShell dig 미설치로 미완료이며 인증서 발급과 구분한다.
+- 앞선 격리 Docker Python3.12 테스트에서 133 passed/1 deprecation warning을 확인했다. 실제 provider/Redis/S3/Callback E2E는 미실행이다. 테스트 소스 포함 배포 archive를 임시 경로에 준비했으며 자격증명은 포함하지 않았다.
+- CloudShell 파일 업로드 재시도는 Chrome file URL 권한 Not allowed로 실패했다. 사용자에게 확장 프로그램의 파일 URL 접근 허용 설정을 요청했다. 우회 전송하지 않았으며 ECR push/ECS 배포/ALB rule·IAM·SG·S3 생성은 미실행이다. 기존 LC/운영 서비스 불변.
+- CURRENT_STATE 및 준비 문서 갱신, whitespace/턴 표식 개수 검증. 기존 사용자 변경 보존, commit/push 없음. Secret/Token 미조회·미기록.
+
+## 2026-09-28 — AI 테스트 공용 Task 배포 완료
+
+- 관련 TMI-126. 사용자 파일 접근 허용 후 재연결된 Chrome에서 소스 archive를 CloudShell로 업로드했고 SHA256 동일성을 확인했다. AWS에서 이미지 빌드·ECR test-2391a94 push, digest cf2ea719b9921cfeb6c32c54961447cf9a8d0a25cd1314809e77fc681003ca35 확인. ECR 로그인값은 pipe 전달 후 docker logout으로 제거했다.
+- 사용자 승인 범위의 전용 S3/private/SSE-S3, ECS 역할2개/최소 정책, SG/Redis ingress, 로그7일, TG 및 기존 ALB ai-test allow50/deny51 규칙·추가 인증서를 구성했다. 기존 규칙/기본 인증서·운영 서비스는 변경하지 않았다. NAT는 공유 신원이므로 방향별 인증 유지. S3 orphan lifecycle2일은 미적용이다.
+- 필수 Secret4개 nonempty와 방향별 credential 상이 여부를 메모리 내에서 boolean으로 검증했으며 원문 출력/파일 저장 없음. 사용자 모델 설정 적용, 원문 trace 차단 및2MiB 유지, 기존 Redis 테스트 DB2에 새 AI-test namespace를 사용했다.
+- tosunsaeng-ai-learning-test:1 및 새 service 배포: API/worker 컨테이너2개, Task1개0.5vCPU/1GiB, private subnet/public IP 없음. 최종1/1/0·COMPLETED·ALB healthy. 실제 service worker 시작과 API ready200 확인.
+- 별도 일회성 probe에서 Redis PING/S3 PutGetDelete/HTTPS health·ready200/미인증401, 외부 CloudShell403 확인. 검사 객체 삭제 완료, probe task STOPPED/검사 worker exit0 확인(대기 API 컨테이너 종료137). 기존 LC-test와 운영 LC 모두1/1/0·COMPLETED 유지.
+- Task JSON 및 bootstrap 상태 문서 추가, CURRENT_STATE/준비 문서 갱신. 기존133개 테스트 통과 결과 유지, JSON/whitespace 검증. 런타임 코드/외부 API 변경 없음, 기존 사용자 변경 보존, commit/push 없음. 실제 provider·음성·Callback E2E/문제 복사·index/LC 활성화는 남는다.
+
+## 2026-09-28 — AI 테스트 배포 완료 턴 기록 보완
+
+<!-- codex-turn:01a0e680-6a37-7de0-b219-2bb7d5fcd25c -->
+
+- 관련 TMI-126. API/worker 공용 Task 배포 완료 및 연결 검증 결과의 현재 턴 표식을 WORKLOG EOF에 추가했다. ECS1/1/0·COMPLETED·ALB healthy, Redis/S3/HTTPS/인증 차단 검증 완료 상태를 유지한다.
+- CURRENT_STATE 갱신 및 whitespace/표식1회 검증. 기록 외 추가 원격 변경 없음. LC Challenge OFF 및 실제 채점·Callback E2E/문제·인덱스 준비 후속 상태 유지. Secret/Token 기록 없음.
+
+## 2026-09-28 — Challenge 문제 복사·활성화 및 모델 변경 진행
+
+<!-- codex-turn:01a0e68a-7df6-7bc0-a8cc-191f09cc0d42 -->
+
+- 관련 TMI-126. 사용자 요청으로 운영 to-teacher-app.challenge_10s_questions를 Atlas read-only aggregation/JSON 복사로 읽고100일/300문제 및 중복·필수 필드 검증 후 테스트 to-teacher-learning-core-test에만 삽입했다. UI100문서 확인, 원본/사용자 데이터 변경 없음. dayNumber/questionNumber/difficulty는 명시적 BSON int로 입력했다. 전체 재조회 비교와 migration/활성화는 진행 중이다.
+- LC 실행 역할에 AI Secret 읽기 권한 추가를 사용자 승인했다. 파일 업로드 권한 오류 후 사용자 재설정 완료로 재시도 예정. 마이그레이션 Node 테스트7개 통과.
+- 추가 사용자 요청 gpt-6-luna를 OpenAI Docs 스킬로 공식 모델/마이그레이션 문서 확인했다. Responses와 none 지원에 따라 기존 요청/토큰 예산/전사 모델을 유지하고 LLM_MODEL만 변경한다. 로컬 Task template 변경, 실제 재배포는 후속 단계다. 비밀값 기록 없음.
+
+## 2026-09-28 — 문제·인덱스 및 AI 모델 변경 완료, LC 활성화 차단점
+
+- 관련 TMI-126. 복사된100일/300문제를 원본 read-only aggregation JSON과 전체 비교해 동일함을 확인했다. 기존 migration을 일회성 mongosh Fargate task로 dry-run/apply 실행해6컬렉션/9인덱스 검증 성공, 두 task STOPPED/exit0. 원본·사용자 데이터·음성 변경 없음.
+- AI test:2로 LLM_MODEL=gpt-6-luna만 변경하고1/1/0·COMPLETED·ALB healthy·실행 task HEALTHY 확인. reasoning none/출력10000/전사 gpt-transcribe 유지. 공식 문서 확인은 OpenAI Docs 스킬을 사용했고 실제 provider 계정 지원/채점 품질·Callback E2E는 미검증이다.
+- 승인된 LC test execution role에 해당 AI Secret GetSecretValue를 추가하고 test:4에 요청/콜백 키 두 개만 주입했다. IAM은 Secret 단위이며 키별 권한 격리는 아니다. 운영 역할/서비스 불변, 비밀값 미출력·미저장.
+- Challenge ON 배포는 UserOwnedTransactionExecutor bean 누락으로 exit1. ChallengeConfiguration의 필수 주입과 UserMergedConfiguration의 세 flag OR 조건 사이 구성 결함을 확인했다. UserMerged를 임의로 켜지 않고 test:3/OFF로 복구 요청, 실행1/health200·미인증401 확인. template도 OFF로 되돌렸다. 테스트 catalog_state0문서 확인으로 시작일은 아직 미생성이다.
+- 독립 활성화 구성 수정·회귀 테스트와 사용자 commit/push 후 새 이미지 재배포가 필요하다. 현재 runtime 수정 없음. migration Node7개 통과, 두 Task JSON 파싱 통과. CURRENT_STATE/배포 상태 문서 갱신, 기존 사용자 변경 보존, commit/push 없음.
+
+## 2026-09-28 — LC 최종 롤백 완료 확인
+
+- 관련 TMI-126. 정상 revision3으로 교체 중 새 task도 ELB health 실패를 보였고 grace120초/시작 로그만 확인돼 구체적인 health 실패 원인은 미확정이다. 기존 정상 task는 계속 healthy/HTTPS200이었다. 진행 중 교체 deployment를 명시적 ROLLBACK으로 중단해 마지막 성공 배포로 복귀했다.
+- 최종 LC test:3/OFF 1/1/0·COMPLETED, ALB healthy 대상1 및 실패 교체 대상 draining 확인. AI test:2도1/1/0·COMPLETED·healthy, 운영 LC:20 불변. 추가 runtime/접근 권한 변경 없음. 다음 배포는 챌린지 독립 활성화 구성 결함과 새 태스크 health를 함께 검증한다.
+- CURRENT_STATE와 배포 문서 보완, git diff --check 및 기존 턴 표식1회 확인. Secret/Token 미기록, commit/push 없음.
+
+## 2026-09-28 — Challenge 기동 오류 원인 및 수정 위치 검토
+
+- 관련 TMI-126. 사용자 요청은 진단/수정 위치 안내이므로 runtime 수정·배포 없이 소스와 이전에 확인한 로그를 대조했다. ChallengeConfiguration:20의 UserOwnedTransactionExecutor 필수 주입과 UserMergedConfiguration:42의 writer/consumer/source-deny OR 조건이 충돌한다. Challenge ON/UserMerged 전체 OFF이면 executor bean이 없어 기동이 종료되며 DB/AI 요청 이전의 Spring wiring 오류다.
+- 권장 수정 지점은 ChallengeConfiguration과 ChallengeTransactions다. optional provider와 독립적으로 확인 가능한 writer flag를 사용해 writer OFF일 때만 guard 생략을 허용하고, ON에서 executor 부재는 startup fail-closed로 검증한다. Mongo Transaction 자체와 unknown commit 비재실행, writer ON 동일 Transaction guard touch는 유지한다. UserMerged 기능을 임의 활성화하거나 해당 구성 전체의 조건을 제거하지 않는다.
+- ChallengeMongoIntegrationTest:64는 executor mock을 직접 주입하며 ON 검증도 실제 executor를 직접 생성한다. 이 테스트는 Spring 조건부 bean wiring 검증을 대체하지 못한다. 실제 configuration을 사용하는 ON/OFF context 조합 테스트, writer ON executor 누락 실패, OFF rollback과 ON guard 원자성 회귀가 필요하다.
+- 별도 복구 태스크의 ELB health 실패는 위 bean 오류와 동일 원인으로 단정하지 않는다. 현재 원인 미확정이며 다음 배포에서 health 응답/타깃 실패 사유를 분리 검증해야 한다. 이번 원격 조회/설정 변경·테스트 실행 없음. CURRENT_STATE 갱신, whitespace 검사, 사용자 변경 보존, commit/push 없음.
+
+## 2026-09-28 — Challenge 기동 오류 진단 턴 기록 보완
+
+<!-- codex-turn:01a0e6a5-53a1-7da0-adb0-783f84e050b3 -->
+
+- 관련 TMI-126. ChallengeConfiguration의 필수 executor 주입과 UserMergedConfiguration의 조건부 생성 충돌을 확인하고 ChallengeConfiguration/ChallengeTransactions 수정 방향 및 configuration 조합 회귀 테스트를 안내했다.
+- 진단만 수행했으며 runtime 코드·AWS·배포 변경은 없다. 기존 정상 LC/OFF 복구 상태를 유지하며 별도 ELB health 실패 원인은 미확정이다. CURRENT_STATE 갱신, whitespace 및 턴 표식1회 검증. Secret/Token 기록과 commit/push 없음.
+
+## 2026-09-28 — SNS 로그인·UserMerged·무료 시험 설정 경계 설명
+
+- 관련 TMI-126. 사용자 질문에 application.yml, UserMerged configuration/properties/index validator 및 ExamServiceImpl 시험 생성 분기를 조회했다. SNS 로그인은 Identity 인증 흐름이며 LC 회원 통합 writer/consumer/source-deny와 별개다. UserMerged writer ON으로 해당 executor 누락은 해소 가능하지만 단순 SNS 로그인 ON과 동일하지 않다.
+- UserMerged 활성화에는 guard/inbox 및 결과/요약 owner index, Mongo Transaction 준비가 추가된다. consumer는 writer/source-deny 및 별도 workload 설정을 요구하며 실제 이벤트 처리를 위해 Identity producer 연결과 rollout 검증이 필요하다. 이번 조회만으로 설정 변경 후 정상 기동을 보장하지 않는다.
+- Billing saga OFF는 ExamServiceImpl:217에서 기존 examSessionManager.startNew로 분기한다. 전화번호1회 권리 검증을 끄는 것과 모의고사 제공 자체를 차단하는 것은 다르므로 이를 명확히 안내한다. SNS 로그인만 필요하면 Challenge 독립 기동 수정안은 여전히 적절하며, UserMerged도 실제로 사용할 때는 사전 준비 후 설정 활성화 대안이 있다.
+- runtime·외부 설정·배포 변경과 테스트 실행 없음. CURRENT_STATE 갱신 및 whitespace 확인, 사용자 변경 보존, Secret/Token 기록·commit/push 없음.
+
+## 2026-09-28 — 기능 설정 경계 설명 턴 기록 보완
+
+<!-- codex-turn:01a0e6a8-6c59-7420-a972-dfd958ebe119 -->
+
+- 관련 TMI-126. SNS 로그인과 UserMerged의 차이, writer 활성화 시 executor 누락 오류 해소 가능성과 DB/인증/rollout 선행조건, Billing OFF가 시험 생성 차단이 아님을 설명했다.
+- 이번 작업은 조회·설명에 한정하며 코드·AWS·배포 변경은 없다. CURRENT_STATE 갱신, whitespace 및 턴 표식1회 검증. Secret/Token 기록과 commit/push 없음.
+
+## 2026-09-28 — 테스트 Billing OFF 및 UserMerged 활성화 방향 확정
+
+<!-- codex-turn:01a0e6ac-1e8a-7713-a48f-4e7bfab3b842 -->
+
+- 관련 TMI-126. 사용자가 전화번호당1회 무료 모의고사의 Billing 관련 기능은 OFF, SNS 로그인·UserMerged는 활성화하는 방향을 선택했다. Billing creation saga/phone continuation/reconciliation 및 AttemptGroup writer/publisher OFF 유지, JWT 로그인과 UserMerged writer/consumer/source-deny ON 목표로 범위를 명시한다. 관련 없는 기능을 일괄 활성화하지 않는다.
+- UserMerged consumer의 writer/source-deny 필수 조건과 workload HTTPS issuer/JWKS 요구, Billing OFF의 기존 startNew 분기를 코드로 재확인했다. writer ON은 이번 executor 누락을 해소할 수 있지만 전체 배포 성공 보장이 아니며 DB/index/Transaction·구버전 drain·Identity 이벤트/인증 연결 검증이 선행되어야 한다.
+- 결정과 설명만 기록했다. runtime·ECS template·AWS·Identity 설정·배포 변경 없음. 실제 SNS provider readiness와 UserMerged workload 계약을 확인하지 않은 상태에서 활성화 완료로 보고하지 않는다. CURRENT_STATE 갱신, whitespace/표식1회 확인. Secret/Token 기록·commit/push 없음.
+
+## 2026-09-28 — Billing OFF·UserMerged 활성화 결정 턴 표식 정정
+
+<!-- codex-turn:01a0e6ab-2ca3-7262-a674-9c46c2fc0c19 -->
+
+- 관련 TMI-126. 직전 항목의 턴 식별자는 잘못 기재했으며 이번 항목의 표식이 실제 현재 턴 식별자다. 과거 기록은 수정하지 않고 EOF에 정정을 추가한다.
+- 테스트 Billing/AttemptGroup 관련 기능 OFF 유지와 SNS 로그인·UserMerged 활성화 목표를 확정했다. UserMerged DB·인증·연결 사전 검증 후 적용하며 현재 runtime·AWS·Identity·배포 변경은 없다.
+- CURRENT_STATE 갱신, whitespace 및 정확한 현재 턴 표식1회 확인. Secret/Token 기록·commit/push 없음.
+
+## 2026-09-28 — UserMerged DB·인증·연결 활성화 체크리스트 조사
+
+- 관련 TMI-126/TMI-125. 사용자 요청에 UserMerged 준비 스크립트 전체, startup index/transaction validator, workload security, request/exception 계약, migration service와 rollout 문서를 확인했다. 이 턴은 로컬 코드/기존 배포 기록 기준 조사이며 AWS·Atlas·Identity 실제 현재 설정 재조회가 아니다.
+- DB 준비: user_ownership_guards/user_merged_inbox_events 및 기본 _id 인덱스, exam_results의 idx_exam_results_user·exam_summaries의 idx_exam_summaries_user({userId:1}, nonunique/nonpartial/nonsparse/nonhidden), 기존 owner ACTIVE guard backfill과 owner/활성 session/orphan/미완료 operation inventory, transaction rollback probe. staging runtime의 exact 이름 검증까지 필요하다. user_merged_transaction_probe는 사전 컬렉션 존재/쓰기 권한을 확인한다.
+- Identity 인계 필요: 별도 테스트 workload issuer/JWKS, RS256/kid/rotation, aud=learning-core-user-merged/sub=identity-service/iat=nbf/TTL최대2분/UUID jti/typ=JWT, LC endpoint https://api-test.to-teacher.com/internal/v1/events/user-merged에 schema v1 event 발행·204 ack·동일 eventId 재시도 계약. 일반 로그인 issuer/JWKS를 확인 없이 재사용하지 않는다. Identity SNS provider와 사용자 토큰 검증은 별도다.
+- rollout은 Identity publisher OFF 유지→DB inventory·writer 전환 및 구버전 drain/최종 backfill 검증→LC consumer/source deny와 workload/network 확인→합성 계정 canary 및 제한적 publisher/merge 활성화다. 첫 merge 후에는 source deny/guard/inbox를 모르는 기존 OFF 버전으로 rollback하지 않는다. Billing/AttemptGroup OFF 목표 유지.
+- 추가 경계: 현 migration service는 ExamSession/ExamResult/ExamSummary만 owner 이전한다. Challenge 기록 승계는 구현되지 않았으므로 SNS 로그인 뒤 게스트 챌린지 이력 승계를 요구하면 별도 계약/구현이 필요하다. 기능을 켜는 것만으로 해결됐다고 보고하지 않는다.
+- Node user-merged-prepare 테스트7개 통과. runtime 수정·DB apply·Identity/AWS 설정·배포 변경 없음. CURRENT_STATE 갱신 및 whitespace 확인. Secret/Token 기록·commit/push 없음.
+
+## 2026-09-28 — UserMerged 활성화 준비 조사 턴 기록 보완
+
+<!-- codex-turn:01a0e6ac-ba54-75e3-8ffe-d5bc26afb71e -->
+
+- 관련 TMI-126/TMI-125. DB 컬렉션·인덱스·guard 초기화와 Transaction 검증, Identity workload issuer/JWKS·이벤트 전송·재시도, 단계별 활성화 조건을 조사해 안내했다. Challenge 기록은 현재 ownership migration 대상이 아님을 명시했다.
+- 기존 준비 스크립트 Node 테스트7개 통과. 실제 원격 설정 재조회·DB 적용·코드 수정·배포는 수행하지 않았다. CURRENT_STATE 갱신, whitespace 및 현재 턴 표식1회 검증. Secret/Token 기록·commit/push 없음.
+
+## 2026-09-28 — UserMerged 테스트 DB 준비 적용 및 추가 startup 문제 확인
+
+- 관련 TMI-126/TMI-125. 사용자 DB 준비 승인에 따라 to-teacher-learning-core-test에만 수행했다. 원본 준비 스크립트 SHA256 대조·Node7개 통과 후 기존 execution role/Secret 참조/private subnet의 일회성 mongosh task로 dry-run을 실행했다. 최초 eval은 비동기 완료를 기다리지 않아 성공으로 인정하지 않았고, wrapper 보완 후 유효 dry-run STOPPED/exit0·owner0·정합성 오류0·누락 인덱스2개를 확인했다.
+- 테스트 LC desired0 후 기존 task STOPPED를 확인해 writer drain을 보장했다. 첫 apply는 mongosh에 없는 listCollections API에서 컬렉션 생성 전 실패했다. read-only 진단에서 getCollectionInfos 지원과 기존8컬렉션 불변을 확인했다. 실행 wrapper의 조회2개만 보완한 definition tosunsaeng-lc-test-user-merged-prepare:4로 재실행했다. 저장소 migration 원본/Java runtime은 변경하지 않았다.
+- 최종 apply ea3292b71c644c3395c20195451f34c8 STOPPED/exit0·성공 보고: guard/inbox/result/summary/probe 컬렉션5개 및 owner 인덱스2개 준비. 기존 owner0이므로 backfill0, 사용자 승인된 테스트 계정 생성은 필요하지 않아 수행하지 않았다. insert→abort canary 잔존0, 기존 Challenge 전체 EJSON 동일·시험 문서 건수 동일. 기존 계정·학습 데이터 삭제 없음, 운영/Identity DB 불변, 권한 확대 없음.
+- 추가 startup 결함 발견: 실제 기본 _id metadata에 unique 필드가 없다. Spring Data MongoDB4.4.2 소스와 로컬 JShell에서 IndexInfo.isUnique=false를 재현했다. UserMergedIndexValidator.requireIdIndex의 isUnique=true 요구가 정상 DB를 거절한다. DB 인덱스를 변조하거나 validator를 끄지 않았으며 별도 코드 수정/회귀 테스트가 필요하다. JShell은 최초 sandbox 로컬 소켓 제한 후 승인된 재실행으로 검증했고 DB 접속은 하지 않았다.
+- 기존 test:3/OFF desired1 복구 요청, 실행1·rollout COMPLETED 확인 및 최종 ALB/HTTPS 확인 진행. AI test:2/운영 LC:20 정상 유지. 준비 상태 문서 추가 및 CURRENT_STATE 갱신, Secret/Token 출력·기록 없음. commit/push 없음.
+
+## 2026-09-28 — UserMerged DB 준비 후 LC 복구 최종 확인
+
+- 관련 TMI-126/TMI-125. LC test:3/OFF1/1/0·COMPLETED, ALB healthy1개, HTTPS health200 및 미인증 Challenge401 확인. DB 준비 완료이며 UserMerged/Challenge 활성화는 별도 코드/인증 준비 전 OFF 유지한다.
+- DB 검증용 canary는 Transaction abort로 잔존0이며 사용자·학습 데이터 삭제 없음. 기존 운영 서비스와 Identity DB/설정 불변, 테스트 계정 생성 없음. CURRENT_STATE·준비 문서 최종 상태 갱신 및 whitespace 검사, commit/push 없음.
+
+## 2026-09-28 — UserMerged 테스트 DB 준비 턴 기록 보완
+
+<!-- codex-turn:01a0e6af-f8a7-7341-9b01-8014aef211fa -->
+
+- 관련 TMI-126/TMI-125. 테스트 DB 컬렉션5개·owner 인덱스2개 준비, 트랜잭션 롤백과 기존 데이터 보존 검증을 완료했다. 기존 owner0으로 backfill0이며 테스트 계정은 생성하지 않았다.
+- 최종 적용 task exit0 및 임시 작업5개 모두 STOPPED 확인. LC test:3/OFF1/1/0·COMPLETED·ALB healthy·HTTPS health200 복구 완료. UserMerged 활성화 전 기본 _id 인덱스 판정 코드 수정과 Identity workload 연결 준비가 남는다.
+- CURRENT_STATE 갱신 및 현재 턴 표식1회·whitespace 검증. 추가 원격 변경 없음, Secret/Token 기록·commit/push 없음.
+
+## 2026-09-28 — Identity workload 인증·publisher 인계 수신
+
+- 관련 TMI-126/TMI-125. 사용자 전달 Identity 확인 내용을 수신하고 LC principal/audience validator 및 schema v1 request/normalizer와 대조했다. MEMBER 로그인 검증과 Guest→회원 통합 검증을 분리했다. issuer/JWKS 예정값은 테스트 identity host이며 Identity 별도 WORKLOAD_JWT_ISSUER 설정이 필요하다. 사용자 토큰을 workload 인증에 사용하는 방식이 아니다.
+- Identity의 로그인/workload 서명 키·JWKS 공유 및 동일 issuer URL 제안은 기존 별도 issuer 설명과 구분해 배포 준비 문서에 명시했다. 현재 LC는 전용 audience/sub 및 TTL/header 검증을 요구한다. 실제 AWS 활성/발급·전송·키 상태와 양방향 토큰 오용 차단은 미검증이다.
+- 기존 UserMerged와 신규 OwnerEvent publisher 중 단일 경로 확정 필요, LC는 기존 exact endpoint/schema v1만 수용함을 기록했다. 키 overlap은 workload2분만이 아니라 실제 사용자 토큰 TTL·검증 여유·JWKS 캐시를 고려해야 한다.
+- 활성화 예정값과 후속 검증만 기록했으며 task template·코드·AWS·Identity·이벤트 전송 변경 없음. _id startup 검증 수정이 선행한다. CURRENT_STATE 갱신 및 whitespace 검사, Secret/Token 기록·commit/push 없음.
+
+## 2026-09-28 — Identity OFF 상태 확인 및 LC 우선 준비 인계
+
+<!-- codex-turn:01a0e6c3-1143-7530-9d46-8694ddd64bc9 -->
+
+- 관련 TMI-126/TMI-125. 사용자로부터 Identity 테스트의 회원 통합·workload 발급·이벤트 발행이 현재 OFF임을 전달받았다. 이 상태는 사용자 확인에 근거하며 이번에 AWS를 직접 재조회하지 않았다.
+- 예정 issuer는 https://identity-test.to-teacher.com, JWKS는 https://identity-test.to-teacher.com/.well-known/jwks.json이다. LC 수신 준비 후 Identity 전송 설정 적용과 E2E를 진행하는 순서를 확정했다. LC _id startup 판정 수정·테스트와 수신 인증 검증, 단일 publisher 경로 확인이 남는다.
+- CURRENT_STATE와 배포 준비 문서 갱신, whitespace 및 현재 턴 표식1회 검증. 코드·AWS·Identity 설정·이벤트 전송 변경 없음. Secret/Token 기록·commit/push 없음.
+
+## 2026-09-28 — Identity 회원 통합 후속 활성화 필요성 설명
+
+<!-- codex-turn:01a0e6c5-29dc-7493-8724-1b11a7b32259 -->
+
+- 관련 TMI-126/TMI-125. 회원 통합 테스트/사용을 위해 LC 수신 준비 후 Identity workload 발급·선택된 단일 publisher·회원 통합 기능을 단계적으로 활성화해야 함을 설명했다. 일반 SNS 로그인과 구분하며 무제한 외부 공개를 의미하지 않는다.
+- 테스트 Billing/AttemptGroup OFF 유지, 운영 활성화는 별도 검증·승인 범위다. 설명과 기록만 수행했고 코드·AWS·Identity 설정·이벤트 전송 변경 없음. CURRENT_STATE 갱신, whitespace/표식1회 확인, Secret/Token 기록·commit/push 없음.
+
+## 2026-09-28 — UserMerged 기본 인덱스 판정 수정 Jira 등록
+
+<!-- codex-turn:01a0e6c6-1f60-73c2-a193-6f8ef0a889a8 -->
+
+- 사용자 요청으로 TMI-136(sns 로그인) 에픽의 하위 작업 이슈 TMI-178을 생성했다. Jira 계층상 에픽 바로 아래의 `작업` 유형이며 제목은 `[Learning Core] UserMerged 기본 _id_ 인덱스 판정 오류 수정 및 회귀 테스트`다.
+- 기본 _id_ metadata의 unique 생략을 Spring Data가 false로 해석하는 원인, 엄격한 기본 인덱스 판정 유지, 실제 BSON 기반 단위 회귀/replica-set 통합 테스트 및 완료 기준을 등록했다. MEMBER 로그인과 별개의 통합 수신 준비임을 명시했다.
+- 코드 수정·테스트 실행·AWS 배포·Identity/Billing 활성화는 미실행이다. CURRENT_STATE 갱신 및 whitespace/현재 표식1회 확인, Secret/Token 기록·commit/push 없음.
+
+## 2026-09-28 — TMI-178 기본 _id_ 인덱스 판정 수정·회귀 검증
+
+<!-- codex-turn:01a0e6cb-c1ef-7ba2-a9c7-7c1121f34be3 -->
+
+- UserMergedIndexValidator의 기본 인덱스 isUnique 요구를 제거하고 MongoDB의 암묵적 고유성을 주석으로 명시했다. 이름 `_id_`·단일 `_id`·ASC 판정으로 제한하며 기존 owner 인덱스 검증은 수정하지 않았다.
+- UserMergedIndexValidatorTest 신규5개: 실제 BSON unique 생략/명시 허용, 양쪽 컬렉션 누락·이름·키·복합·방향 오류 거절, 양쪽 owner 인덱스 이름/unique/sparse/hidden/키/방향/복합 회귀. 수정 전5개 중2개 실패로 오판정 재현 후 수정했다.
+- UserMergedIndexValidatorIntegrationTest 추가: 격리된 Mongo7.0.14 replica-set의 실제 listIndexes unique 생략과 Spring 변환 결과 확인, owner 인덱스 누락 시 거절 및 필수 인덱스 준비 후 통과 검증.
+- ./gradlew clean test mongoIntegrationTest에서 단위548개(실패/skip0) 통과, 최초 Mongo 단계는 Docker29가 테스트 도구 API1.32를 거절하여 기동 실패했다. 저장소/의존성 변경 없이 실행 한정 JAVA_TOOL_OPTIONS=-Dapi.version=1.44 ./gradlew mongoIntegrationTest 재실행 성공. migration Node7개 통과 및 git diff --check 확인.
+- 공개 API/DTO/BaseResponse·인증·UserMerged schema·AI user_id=examId·Redis/S3 계약 불변. 이번 수정은 runtime1개/신규 테스트2개/작업 기록2개에 한정하며 기존 사용자 문서·배포 파일·DS_Store 변경은 보존했다. 예상 밖 추가 변경 없음.
+- 실제 Atlas/AWS·Identity/Billing flags 불변, Secret/Token 기록·commit/push 없음. 배포 전 사용자 커밋/푸시와 테스트 LC 기동 검증이 필요하며 Identity workload 인증·선택된 단일 publisher·E2E는 별도 후속이다. 로컬 Docker 실행 호환 옵션 필요성을 기록한다.
