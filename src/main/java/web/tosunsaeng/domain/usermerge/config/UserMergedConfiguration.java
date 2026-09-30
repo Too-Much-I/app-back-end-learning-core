@@ -36,12 +36,15 @@ import web.tosunsaeng.domain.withdrawal.repository.WithdrawnUserAccessDenyReposi
 import io.micrometer.core.instrument.MeterRegistry;
 
 import java.time.Clock;
+import org.springframework.context.annotation.Import;
+import web.tosunsaeng.global.config.ClockConfiguration;
 
 @Configuration(proxyBeanMethods = false)
 @EnableConfigurationProperties(UserMergedProperties.class)
 @ConditionalOnExpression("${app.user-merged.writer-enabled:false} || "
         + "${app.user-merged.consumer-enabled:false} || "
         + "${app.user-merged.source-deny-enabled:false}")
+@Import(ClockConfiguration.class)
 public class UserMergedConfiguration {
 
     private static final Profiles STAGING_OR_PROD = Profiles.of("staging", "prod");
@@ -55,11 +58,6 @@ public class UserMergedConfiguration {
                 properties,
                 environment.acceptsProfiles(STAGING_OR_PROD)
         );
-    }
-
-    @Bean(name = "userMergedClock")
-    public Clock userMergedClock() {
-        return Clock.systemUTC();
     }
 
     @Bean(name = "userOwnedMongoTransactionManager")

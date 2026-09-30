@@ -2,6 +2,10 @@
 
 ## 결론
 
+- 2026-09-30 최종 복구 확인: test:8/OFF 단일 COMPLETED·1/1/0·ALB healthy·HTTPS200/UP. test:9의 누락 연결 설정 보완은 보존됐으나 동시ON은 Clock 중복 주입으로 실패했다. DB 검증과 Repository14개 등록은 정상, 다음은 Clock 주입 및 전체 앱 기동 회귀 수정/새 이미지다. 실패 태스크 모두 STOPPED, 검사 running 없음. 활성화/회원 통합/채점 E2E는 미완료이며 Identity는 변경하지 않았다.
+- 2026-09-30 추가 활성화 시도: test:9에 UserMerged/Challenge 동시ON, workload issuer/JWKS·AI endpoint 및 기존 Secret의 방향별 key 참조를 추가했다. 기존 writer STOPPED 및 0대 상태 개정 전환 후 최종 DB 검증 성공(owner0·필수 인덱스·rollback/데이터 보존 정상). 하지만 전체 앱 기동에서 SummaryDispatchScheduler의 Clock 주입이 userMergedClock/gradingClock 두 bean과 충돌해 실패했다. Repository14개 등록은 정상이다. 정상 OFF test:8 복구 진행 중이며 기능 활성화 성공이 아니다. Identity는 사용자 재확인에 따라 변경하지 않았다.
+- 2026-09-30 실제 설정 확인: LC test:8 서비스1/1/0·ALB 정상1/비정상0. UserMerged writer/consumer/source-deny 및 Challenge 모두 OFF이며 UserMerged 전용 workload issuer/JWKS가 아직 없다. Challenge AI endpoint/인증키 참조도 없다. 일반 로그인 issuer/JWKS와 구분한다. Billing/AttemptGroup OFF 유지. DB 준비 이력과 별개로 최신 DB 검증·설정 보완·활성화 후 검증이 필요하며 이번에는 원격 변경하지 않았다.
+- 2026-09-30 11:24 KST 업데이트: TMI-187 PR33의 develop 배포36658994728이 ECS 및 최종 Verify health까지 성공했다. 아래 미배포/test:6 복구 기록은 과거 상태다. 실제 활성 flags와 UserMerged 수신·Identity E2E는 이번 조회에서 검증하지 않았으므로 별도 확인이 필요하다.
 - 2026-09-30 TMI-187 로컬 수정 완료: exams-only 및 withdrawal 별도 repository registrar를 정리해 Boot 자동 등록으로 통일했다. 단위549·Mongo83·Node105 통과. 실제 자동 구성에서14개 repository 등록 및 Challenge/UserMerged 동시ON 기동·guard transaction/index/probe 검증 성공. 아래 repository 누락은 배포 이미지의 실패 이력이며 새 코드의 원격 배포는 아직 없다. UserMerged flags/Identity E2E 완료로 해석하지 않는다.
 - 2026-09-30 최종: test:6/OFF 복구 완료, ECS 단일 COMPLETED·1/1/0·ALB healthy·HTTPS200/UP. DB 준비는 완료됐지만 UserMerged 수신 활성화는 아래 repository 등록 코드 차단점 때문에 미완료다.
 - 2026-09-30 최신 결과(TMI-125/TMI-136/TMI-178): 테스트 배포 예외 승인 후 재검증 성공. dry-run `03cd542bbd7543f3850f3542ed3bcb14`, 최종 apply `b549663b8fbd4acd8bd59dab75061cfe` 모두 STOPPED/exit0, owner0·정합성 오류0·누락 인덱스0, exact owner index2·rollback 잔여0·기존 문제/시험 데이터 보존 확인. 다만 flags ON인 test:7은 Repository bean 누락으로 기동 실패하여 정상 OFF test:6 복구 중이다. 수신 활성화/E2E 완료가 아니다.

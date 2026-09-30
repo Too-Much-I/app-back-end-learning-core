@@ -12702,3 +12702,113 @@
 
 - TMI-187 PR33 배포36658994728의 ECS 안정화 대기 및 ALB Healthy1/Unhealthy1 조회 결과에 현재 턴 표식을 추가했다. 마지막 조회11:23 KST 기준이며 최종 실패·근본 원인은 미확정이다.
 - CURRENT_STATE 갱신, 과거 기록 보존 및 git diff --check/표식 단일 출현 확인. 추가 원격 조회·설정 변경·배포·commit/push 없음. Secret/Token 기록 없음.
+
+## 2026-09-30 — 배포 성공 확인 및 후속 연동 순서 안내
+
+- TMI-187 PR33 배포36658994728의 최종 success를 GitHub에서 확인했다. ECS 단계11:24:38 KST 성공, Verify health11:24:39 성공, 전체11:24:52 완료. 직전 ALB 비정상 관측을 최종 배포 실패로 해석하지 않는다.
+- 배포 성공은 UserMerged/Challenge ON 검증과 별개다. 다음은 LC 실제 flags·DB/index 및 workload 수신 설정 확인 후 필요한 테스트 활성화, 기존 UserMerged 전용 Identity publisher/workload 연결, Guest→Member 시험 이력 이전·source 차단·중복 이벤트 E2E다. Challenge는 별도 실제 제출/AI callback 검증이 필요하고 Billing/AttemptGroup OFF를 유지한다.
+- 이번에는 조회와 안내·문서 갱신만 수행했고 기능 활성화/Identity 설정/배포 변경은 하지 않았다. Secret/Token 기록 없음, 기존 변경 보존 및 git diff --check 수행.
+
+## 2026-09-30 — 배포 성공 확인 턴 표식 보완
+
+<!-- codex-turn:01a0f021-9d80-7451-89b0-60cb21c39dfc -->
+
+- TMI-187 PR33 배포36658994728의 ECS·최종 health 성공 확인 및 후속 LC 설정 확인→Identity 연결→회원 통합/챌린지 E2E 안내에 현재 턴 표식을 추가했다. 기능 활성화 완료로 해석하지 않는다.
+- CURRENT_STATE 갱신, 과거 기록 보존 및 git diff --check/표식 단일 출현 확인. 추가 원격 변경·commit/push 없음, Secret/Token 기록 없음.
+
+## 2026-09-30 — LC 테스트 실제 기능 설정 및 수신 준비 확인
+
+- 관련 TMI-187/TMI-125/TMI-126. AWS 콘솔에서 현재 서비스 revision8, desired1/running1/pending0 및 ALB 정상1/비정상0을 확인했다. task definition8의 환경 변수27개와 환경 파일 없음 상태를 직접 확인했다.
+- USER_MERGED_WRITER_ENABLED/CONSUMER_ENABLED/SOURCE_DENY_ENABLED 및 CHALLENGE_ENABLED는 모두 false다. UserMerged 전용 workload issuer/JWKS 환경 변수는 없으며 일반 로그인 Identity issuer/JWKS만 설정돼 있다. 이 둘은 코드상 별도 설정이므로 수신 준비 완료가 아니다.
+- CHALLENGE_AI_ENDPOINT/OUTBOUND_CREDENTIAL/CALLBACK_CREDENTIAL도 현 revision에 없다. Secret 참조는 Mongo URI만 확인했고 값은 열지 않았다. AI_SERVER_URL은 http://127.0.0.1:9로 모의고사 AI용 비활성 목적지이며 Challenge 전용 주소와 혼동하지 않는다.
+- Billing saga/phone continuation/reconciliation 및 AttemptGroup writer/publisher는 모두 false로 요청 방향과 일치한다. DB 준비 성공 이력은 있으나 이번 DB 최신 inventory/index/guard 재검증과 workload 인증 요청/E2E는 수행하지 않았다.
+- 다음은 최신 DB 준비 확인과 LC 전용 workload/Challenge 연결 설정 보완 후 승인 범위 내 테스트 활성화·재배포다. 그 뒤 Identity 전용 UserMerged publisher 연결/E2E를 진행한다. 이번에는 읽기와 문서 기록만 수행, AWS/Identity/DB/기능 설정 변경·commit/push 없음. Secret/Token 기록 없이 git diff --check 검증.
+
+## 2026-09-30 — LC 수신 준비 점검 턴 표식 보완
+
+<!-- codex-turn:01a0f024-bf4f-75e3-9949-8e45a21ffe47 -->
+
+- 관련 TMI-187/TMI-125/TMI-126. LC test:8 정상 기동과 UserMerged·Challenge OFF, 전용 연결 설정 누락을 확인한 현재 턴 기록을 보완했다. 최신 DB 검증 및 설정 보완·활성화는 후속이며 이번 원격 변경은 없다.
+- CURRENT_STATE 갱신, 과거 기록 보존 및 git diff --check/표식 단일 출현 검증. Secret/Token 기록·commit/push 없음.
+
+## 2026-09-30 — 연결 설정 추가의 의미 설명
+
+- 관련 TMI-125/TMI-126. 연결 설정은 신규 서버/기능 개발이 아니라 LC ECS 환경 변수와 기존 Secret 참조로 상대 서버 주소·인증 검증 정보를 전달하는 작업임을 설명했다. 마지막 test:8 확인 결과를 근거로 하며 이번 AWS 재조회는 없다.
+- UserMerged는 일반 로그인과 별도인 USER_MERGED_WORKLOAD_ISSUER/JWK_SET_URI에 예정 Identity 테스트 URL을 명시해야 한다. Challenge는 CHALLENGE_AI_ENDPOINT와 요청/콜백 credential의 기존 AI Secret 참조가 필요하다. 키 신규 발급이나 값 공유를 요청하는 의미가 아니며 Identity publisher 설정은 이후 별도 단계다.
+- 설정 보완과 기능 ON은 구분하고 배포 시 적용해야 한다고 안내했다. 설명·문서 갱신만 수행, runtime/AWS/DB/Secret 값 변경 없음. git diff --check 검증.
+
+## 2026-09-30 — 연결 설정 설명 턴 표식 보완
+
+<!-- codex-turn:01a0f027-2ae9-7093-ad54-09706f286545 -->
+
+- 관련 TMI-125/TMI-126. LC에 Identity 회원 통합용 issuer/JWKS와 Challenge AI 주소·기존 Secret 참조를 주입한다는 설명의 현재 턴 표식을 추가했다. 신규 서버 생성이나 키 재발급 요청이 아니며 실제 설정은 변경하지 않았다.
+- CURRENT_STATE 갱신, 과거 기록 보존 및 git diff --check/표식 단일 출현 확인. Secret/Token 기록·commit/push 없음.
+
+## 2026-09-30 — 환경 변수 추가 의미 확인
+
+- 관련 TMI-125/TMI-126. 사용자 확인에 따라 연결 설정은 ECS 환경 변수 추가이며 주소는 일반 값, 인증키는 기존 Secrets Manager 참조로 주입한다는 의미임을 재안내했다. 적용에는 새 task revision 및 재배포가 필요하다.
+- 설명과 기록만 수행, 코드·서버 설정·Secret 값 변경 및 commit/push 없음. git diff --check 확인.
+
+## 2026-09-30 — 환경 변수 확인 턴 표식 보완
+
+<!-- codex-turn:01a0f028-e99e-7dc3-b5ee-226e460ae752 -->
+
+- 관련 TMI-125/TMI-126. ECS 환경 변수 및 기존 Secret 참조 추가의 의미를 설명한 현재 턴 표식을 보완했다. 실제 설정 추가·활성화·재배포는 수행하지 않았다.
+- CURRENT_STATE 갱신, 과거 기록 보존 및 git diff --check/표식 단일 출현 확인. Secret/Token 기록·commit/push 없음.
+
+## 2026-09-30 — LC 테스트 UserMerged·Challenge 활성화 실행
+
+<!-- codex-turn:01a0f029-c80c-7013-8543-9a14d1782179 -->
+
+- 사용자 요청으로 TMI-125/TMI-126 테스트 DB 재검증·연결 설정·동시 활성화를 진행한다. 운영/Identity 변경 없이 Billing/AttemptGroup OFF를 유지한다.
+- UserMerged 사전 dry-run b679f090411144e1afb0c962270beca3 STOPPED/exit0: owner0·정합성 오류0·미완료 operation0·누락 index0. Challenge check3d28d2ccbf9e4c28b6004ffca5d0a513은100일/300문제·6컬렉션/필수9인덱스 정상, 기준일 미초기화를 확인했다.
+- LC test:8 이미지 그대로 test:9 등록: UserMerged 세 flag/Challenge ON, workload issuer/JWKS 및 AI endpoint 추가, 기존 AI Secret의 방향별 두 key 참조 주입. 기존 IAM 읽기 권한 확인, 새 권한 추가나 Secret 값 출력 없음. Identity 공개 JWKS의 RSA/RS256/sig/kid 확인.
+- 기존 writer2907b34a042e41f3b4471ff0cd045cd3 drain을 위해 테스트 서비스 desired0으로 전환했다. ALB300초 종료 대기 동안 STOPPED assertion이 개정 전환을 차단했다. 아직 최종 DB 검증·새 revision 기동 전이며 CloudShell 만료 후 재연결하여 계속한다. 로컬 배포 템플릿 반영·JSON 검증 및 ./gradlew clean test 성공. 최종 결과는 후속 항목으로 기록한다.
+
+## 2026-09-30 — 최종 DB 검증 성공 및 Clock 주입 충돌 확인
+
+- 관련 TMI-125/TMI-126/TMI-187. 사용자 추가 답변으로 Identity 변경 제외·LC 준비까지만 범위를 재확인했다. 구 writer STOPPED, service0/0/0 및 revision9 단일 deployment 정리 후 최종 검증 태스크0374ce2fc5a94dadaa2abea66713b835 STOPPED/exit0을 확인했다. owner0·누락 index0·rollback true·문제 전체/시험 건수 보존·probe0·exact owner indexes2다.
+- test:9를 별도 scale-up해 기동했으나 태스크77d7857cc0464cc9961d3b6af061702a 로그에서 Repository14개 등록 후 APPLICATION FAILED TO START를 확인했다. SummaryDispatchScheduler 생성자 parameter5의 Clock에 userMergedClock과 gradingClock 두 후보가 있어 단일 주입 불가다. 로컬 소스에서도 무Qualifier Clock과 두 @Bean을 대조했다. DB·Secret·네트워크 실패로 분류하지 않는다.
+- 기존 feature configuration 위주 MongoRepositoryDiscoveryIntegrationTest는 전체 시험 서비스/GradingConfig 조합을 구성하지 않아 이 충돌을 검출하지 못했다. 후속은 Clock 주입 지정과 전체 앱 실제 구성 기동 회귀 검증이며 이번 runtime 코드는 변경하지 않는다. 로컬 전체 단위 테스트 및 migration Node105개 성공은 실제 동시ON 기동 성공과 구분한다.
+- 서비스가 만든 교체 태스크6a8f282f82d54e5bbde18866fc7c9460도 중단 대상으로 확인하고 desired0/test:8로 복구 요청했다. 준비한 test:9는 보존하되 로컬 활성화 템플릿은 정상 OFF 기준으로 되돌려 최종 diff가 없다. connection-check:1 태스크 정의는 준비했지만 실행하지 않았으므로 방향별 인증/AI 채점 검증 성공을 주장하지 않는다. Secret 원문·운영/Identity 변경·commit/push 없음. 정상 서비스 복구 확인을 계속한다.
+
+## 2026-09-30 — 활성화 실패 후 정상 테스트 서비스 복구 완료
+
+- 관련 TMI-125/TMI-126/TMI-187. 실패 컨테이너 두 개 모두 STOPPED/exit1 및 구 deployment 정리를 확인한 뒤 test:8/OFF를 별도 scale-up했다. 당시 한 task는 ENI DEPROVISIONING이었으나 컨테이너는 이미 STOPPED/exit1로 writer가 없었고, 최종 조회에서는 실패 task 둘 다 STOPPED다.
+- 복구 task8ce97e6d23514a84baf6f7ae0bcb571c, test:8 단일 COMPLETED·desired/running/pending1/1/0·ALB healthy·HTTPS200/UP 확인. ALB30초 간격/정상5회 정책 때문에 직접 HTTPS200 이후 정상 판정까지 대기했다. grace300초와 네트워크/권한 정책은 변경하지 않았다.
+- DB 사전/최종 검증과 설정 포함 test:9 등록은 완료했지만 UserMerged·Challenge 활성화는 Clock 주입 충돌로 미완료다. 두 기능 OFF로 복구했고 기준일 초기화 성공·회원 통합·AI 채점/E2E를 주장하지 않는다. Identity 설정 변경 제외라는 사용자 확인을 준수했다. 일회성 사전/Challenge 검사 startedBy의 running 목록은 모두 빈 배열, 최종 DB 검사 STOPPED/exit0 확인.
+- 후속은 gradingClock/userMergedClock 주입 명확화 및 기존 시험 서비스 포함 전체 앱 기동 회귀 테스트, 사용자 commit/push로 새 이미지 준비 후 test:9 연결 설정 재사용이다. runtime 수정·Jira 변경·commit/push 없음. WORKLOG/CURRENT_STATE/배포 상태 기록 갱신, git diff --check와 현재 표식 단일 출현 확인. Secret/Token 기록 없음.
+
+## 2026-09-30 — Clock 의존성 주입 충돌 원인 설명
+
+<!-- codex-turn:01a0f077-6a2a-73b0-b407-3e38c8cd7f49 -->
+
+- 관련 TMI-125/TMI-126/TMI-187. GradingConfig·UserMergedConfiguration·SummaryDispatchScheduler 소스를 재확인했다. UserMerged 활성화로 동일 Clock 타입 후보가 두 개가 되지만 기존 scheduler 생성자에는 Qualifier가 없어 단일 후보를 결정하지 못한다. 이름 충돌이나 DB 문제와 구분해 설명했다.
+- 채점 소비자의 gradingClock 명시와 다른 Clock 소비자 점검을 수정 방향으로 안내했으며 실제 runtime 수정·테스트 실행·AWS 변경·Jira 변경·commit/push는 수행하지 않았다. 마지막 확인된 test:8/OFF 복구 상태를 유지하며 이번 원격 재조회는 없다.
+- WORKLOG append 및 CURRENT_STATE 갱신, git diff --check와 턴 표식 단일 출현을 확인한다. Secret/Token 기록 없음.
+
+## 2026-09-30 — 채점·회원 통합 Clock 분리 의미 설명
+
+- 관련 TMI-125/TMI-126/TMI-187. 두 Clock bean 모두 Clock.systemUTC()이며 서로 다른 시간 기준이 아님을 소스로 확인했다. UserMerged는 guard touch·이벤트 처리 시간 등에 사용하며 단위 테스트는 Clock.fixed로 시간을 고정한다.
+- Clock 주입 자체의 테스트 이점과 기능별 bean 분리의 선택적 이점을 구분했다. 별도 시간 정책이 없는 현재 구성에서 두 bean이 필수는 아니며 공통 Clock으로 통일할 수도 있으나 최초 분리 의도는 단정하지 않는다. 설명 및 문서만 갱신, runtime·AWS 변경 없음.
+
+## 2026-09-30 — Clock 분리 설명 턴 기록 보완
+
+<!-- codex-turn:01a0f07a-e3fb-7342-aad4-06eeef37af4a -->
+
+- 관련 TMI-125/TMI-126/TMI-187. 채점용·회원 통합용 Clock 모두 시스템 UTC를 사용하며 공통 Clock 통일도 가능한 선택지임을 설명한 턴 표식을 보완했다. 구현·배포는 수행하지 않았으며 Secret/Token 기록 없음.
+- CURRENT_STATE 갱신 및 git diff --check, 현재 턴 표식 단일 출현 확인.
+
+## 2026-09-30 — 공용 UTC Clock 단일화 구현
+
+- 관련 TMI-125/TMI-126/TMI-187. 사용자 선택에 따라 ClockConfiguration에 applicationClock singleton을 만들고 기존 gradingClock/userMergedClock/userWithdrawnClock 이름은 동일 bean의 별칭으로 유지했다. Grading/UserMerged/UserWithdrawn 구성의 중복 Clock 생성은 제거하고 공통 설정을 import했다. Challenge의 직접 생성 4곳도 공용 Clock 주입으로 변경했다.
+- ClockConfigurationTest에서 단일 UTC bean·별칭 동일 인스턴스·실제 SummaryDispatchScheduler 무Qualifier 주입을 검증했다. MongoRepositoryDiscoveryIntegrationTest에 실제 GradingConfig/SummaryDispatchScheduler와 mock dispatch 의존성을 추가해 기존 feature 조합 및 Challenge/UserMerged 동시ON에서 단일 Clock을 검증했다. 전체 애플리케이션 모든 서비스를 구성하는 테스트나 원격 E2E 성공을 의미하지 않는다.
+- 최초 단위 테스트는 새 fixture의 필수 grading 설정 누락으로 실패하여 보완했다. 최종 ./gradlew clean test 550개 통과. Mongo 통합 테스트 최초 실행은 Docker API1.32/최소1.40 불일치로 실패했고 JAVA_TOOL_OPTIONS=-Dapi.version=1.44 ./gradlew mongoIntegrationTest 재실행에서83개 통과했다. git diff --check 통과, 기존 컴파일 경고는 유지했다.
+- 공개 API/AI JSON/시간 기준/업무 flag/DB 계약은 유지했다. 런타임5파일·테스트2파일과 작업 기록 변경이며 기존 배포 상태 문서의 선행 변경은 보존했다. 예상 밖 코드 변경 없음. AWS/Identity/운영 변경 및 commit/push 없음; 다음은 사용자 commit/push로 새 이미지 준비 후 테스트 재배포 및 실제 기동/수신 검증이다.
+
+## 2026-09-30 — 공용 Clock 구현 턴 표식 보완
+
+<!-- codex-turn:01a0f07c-54e8-7172-ac92-67f6324d1fd5 -->
+
+- 관련 TMI-125/TMI-126/TMI-187. 공용 UTC Clock 단일화 구현 및 단위550개/Mongo 통합83개 통과 기록의 현재 턴 표식을 보완했다. 새 이미지 배포와 실제 활성화 검증은 후속이며 추가 코드·원격 변경은 없다.
+- CURRENT_STATE 갱신, git diff --check 및 현재 턴 표식 단일 출현 확인. Secret/Token 기록과 commit/push 없음.

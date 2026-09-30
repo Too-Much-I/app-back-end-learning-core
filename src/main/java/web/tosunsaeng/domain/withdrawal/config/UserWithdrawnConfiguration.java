@@ -5,6 +5,7 @@ import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.context.annotation.Import;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnExpression;
 import org.springframework.core.env.Environment;
 import org.springframework.core.env.Profiles;
@@ -27,6 +28,7 @@ import web.tosunsaeng.domain.withdrawal.security.JwtClaimEqualsValidator;
 import web.tosunsaeng.domain.withdrawal.security.JwtMaximumLifetimeValidator;
 import web.tosunsaeng.domain.withdrawal.security.UserWithdrawnAccessGateFilter;
 import web.tosunsaeng.global.config.auth.AuthProperties;
+import web.tosunsaeng.global.config.ClockConfiguration;
 import web.tosunsaeng.global.config.security.JwtAudienceValidator;
 import web.tosunsaeng.global.config.security.SecurityErrorResponseHandler;
 
@@ -37,14 +39,10 @@ import io.micrometer.core.instrument.MeterRegistry;
 @EnableConfigurationProperties(UserWithdrawnConsumerProperties.class)
 @ConditionalOnExpression("${app.user-withdrawn.consumer-enabled:false} || "
         + "${app.user-withdrawn.deny-gate-enabled:false}")
+@Import(ClockConfiguration.class)
 public class UserWithdrawnConfiguration {
 
     private static final Profiles STAGING_OR_PROD = Profiles.of("staging", "prod");
-
-    @Bean
-    public Clock userWithdrawnClock() {
-        return Clock.systemUTC();
-    }
 
     @Bean
     public UserWithdrawnConfigurationValidator userWithdrawnConfigurationValidator(

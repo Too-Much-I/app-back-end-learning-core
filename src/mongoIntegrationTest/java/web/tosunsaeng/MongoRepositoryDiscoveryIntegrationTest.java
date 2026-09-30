@@ -39,7 +39,12 @@ import web.tosunsaeng.domain.withdrawal.config.UserWithdrawnConfiguration;
 import web.tosunsaeng.global.config.auth.AuthProperties;
 import web.tosunsaeng.global.config.security.SecurityErrorResponseHandler;
 
+import web.tosunsaeng.global.config.GradingConfig;
+import web.tosunsaeng.domain.exams.application.SummaryDispatchScheduler;
+import web.tosunsaeng.domain.exams.application.GradingDispatchService;
+
 import java.time.Instant;
+import java.time.Clock;
 import java.util.List;
 import java.util.UUID;
 
@@ -65,7 +70,12 @@ class MongoRepositoryDiscoveryIntegrationTest {
                         MongoDataAutoConfiguration.class, MongoRepositoriesAutoConfiguration.class,
                         RedisAutoConfiguration.class, RedisRepositoriesAutoConfiguration.class,
                         SecurityAutoConfiguration.class))
-                .withUserConfiguration(FeatureConfiguration.class)
+                .withUserConfiguration(FeatureConfiguration.class, GradingConfig.class, SummaryDispatchScheduler.class)
+                .withBean(GradingDispatchService.class, () -> mock(GradingDispatchService.class))
+                .withPropertyValues("app.grading.pending-timeout=PT1M", "app.grading.processing-timeout=PT3M",
+                        "app.grading.max-dispatch-attempts=3", "app.grading.ai-server-url=http://ai.example.test",
+                        "app.grading.ai-connect-timeout=PT4S", "app.grading.ai-read-timeout=PT30S",
+                        "app.grading.summary-dispatch-threads=1", "app.grading.summary-dispatch-queue-capacity=10")
                 .withPropertyValues(
                         "spring.data.mongodb.uri=" + MONGO.getReplicaSetUrl(),
                         "spring.data.mongodb.database=" + database,
@@ -108,6 +118,7 @@ class MongoRepositoryDiscoveryIntegrationTest {
                 "app.user-withdrawn.deny-gate-enabled=" + withdrawnDeny
         ).run(context -> {
             assertThat(context).hasNotFailed();
+            assertThat(context).hasSingleBean(Clock.class).hasSingleBean(SummaryDispatchScheduler.class);
             assertThat(context.getBeanNamesForType(org.springframework.data.mongodb.repository.MongoRepository.class))
                     .containsExactlyInAnyOrderElementsOf(REPOSITORIES);
             for (String name : REPOSITORIES) {
@@ -171,6 +182,7 @@ class MongoRepositoryDiscoveryIntegrationTest {
                         "spring.cloud.aws.s3.bucket=fixture-bucket")
                 .run(context -> {
                     assertThat(context).hasNotFailed();
+                    assertThat(context).hasSingleBean(Clock.class).hasSingleBean(SummaryDispatchScheduler.class);
                     // ContextRunner does not execute ApplicationRunner: explicitly exercise production probes.
                     context.getBean(UserMergedIndexValidator.class).run(null);
                     context.getBean(UserMergedTransactionCapabilityProbe.class).run(null);

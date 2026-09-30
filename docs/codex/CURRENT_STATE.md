@@ -2,6 +2,22 @@
 
 ## Last updated
 
+- 2026-09-30 — TMI-125/TMI-126/TMI-187 공용 Clock 구현의 현재 턴 표식을 WORKLOG EOF에 보완했다. 구현·로컬 테스트 완료, commit/push·테스트 서버 재배포 및 원격 활성화 검증 대기 상태다. 추가 runtime/원격 변경 없음.
+- 2026-09-30 — TMI-125/TMI-126/TMI-187 공용 UTC Clock 구현 완료: applicationClock 단일 bean에 기존 세 이름을 별칭으로 연결하고 채점·통합·탈퇴·Challenge에서 공유한다. 실제 scheduler 포함 주입 테스트 및 feature 조합 검증, 단위550/Mongo83 통과(Docker API1.44 실행 옵션 사용). 공개 계약/flags 불변, 배포·commit/push 미실행. 마지막 원격 상태 test:8/OFF이며 새 이미지 배포와 실제 기동/E2E 확인이 남았다.
+- 2026-09-30 — TMI-125/TMI-126/TMI-187 Clock 분리 설명의 현재 턴 표식을 WORKLOG EOF에 보완했다. 공통 Clock 통일은 설명한 선택지이며 아직 적용하지 않았다. 추가 코드·원격 변경 없음.
+- 2026-09-30 — TMI-125/TMI-126/TMI-187 두 Clock은 모두 시스템 UTC이며 별도 시간 기준이 아니다. 기능별 분리는 선택적 구성이고 고정 시간 테스트는 공통 Clock으로도 가능함을 설명했다. 코드·배포 변경 없이 Clock 주입 충돌 수정 대기 상태를 유지한다.
+- 2026-09-30 — TMI-125/TMI-126/TMI-187 Clock 주입 충돌 원인 설명: UserMerged ON 시 gradingClock/userMergedClock 두 후보가 생기지만 SummaryDispatchScheduler가 사용할 bean을 지정하지 않아 기동 실패한다. 소스 재확인 및 Qualifier 수정 방향 안내만 수행, runtime/배포 변경 없음. 마지막 원격 확인은 test:8/OFF 정상 복구이며 활성화/E2E는 미완료다.
+- 2026-09-30 — TMI-125/TMI-126/TMI-187 최종: test:8/OFF로 복구 완료(단일 COMPLETED·1/1/0·ALB healthy·HTTPS200/UP). DB 최신 검증 성공 및 연결 설정 포함 test:9 등록 완료지만 동시ON은 SummaryDispatchScheduler의 Clock 후보2개 충돌로 실패했다. 실패 task2개 STOPPED, 일회성 검사 running 없음. Identity/운영 변경 없음. 다음은 Clock 주입 명확화·전체 앱 기동 회귀 테스트와 새 이미지 준비이며 활성화/E2E는 미완료다.
+- 2026-09-30 — TMI-125/TMI-126 활성화 차단: test:9는 Repository14개 등록 후 SummaryDispatchScheduler 생성자의 Clock 후보2개(userMergedClock/gradingClock)로 기동 실패. DB 최종 검증0374ce2fc5a94dadaa2abea66713b835 STOPPED/exit0, rollback·기존 문제/시험 보존 정상. 실패 반복 중단 및 OFF test:8 복구 진행 중. 기능 활성화/AI 양방향 검증 미완료, Identity 변경 없음. 코드 주입 지정 및 전체 앱 기동 회귀 테스트가 후속이다.
+- 2026-09-30 — TMI-125/TMI-126 테스트 활성화 진행 중: UserMerged DB dry-run 및 Challenge100일/300문제·필수9인덱스 검사 성공. LC test:9에 동시ON/전용 연결 설정 등록, 기존 writer drain을 위해 서비스 desired0으로 전환했다. 아직 새 revision 기동 전이며 최종 DB 검증 후 복구 예정. Identity/운영/Billing 설정은 변경하지 않았다.
+- 2026-09-30 — TMI-125/TMI-126 환경 변수 추가 의미 확인의 현재 턴 표식을 WORKLOG EOF에 보완했다. 설명만 완료했으며 실제 환경 설정과 배포는 변경하지 않았다.
+- 2026-09-30 — TMI-125/TMI-126 연결 설정이 ECS 환경 변수와 기존 Secret 참조 추가를 의미함을 확인 안내했다. 실제 추가·재배포는 수행하지 않았다.
+- 2026-09-30 — TMI-125/TMI-126 연결 설정 설명의 현재 턴 표식을 WORKLOG EOF에 보완했다. 설명만 완료했으며 LC/Identity/AI 설정과 배포 상태는 변경하지 않았다.
+- 2026-09-30 — TMI-125/TMI-126 연결 설정의 의미 안내: LC ECS에 UserMerged 전용 issuer/JWKS 및 Challenge AI endpoint·기존 Secret 참조를 주입하는 배포 설정 작업이다. 신규 서버 생성/키 재발급 의미가 아니며 이번 실제 변경·원격 재조회 없음.
+- 2026-09-30 — TMI-187/TMI-125/TMI-126 LC 수신 준비 점검의 현재 턴 표식을 WORKLOG EOF에 보완했다. test:8 정상·기능 OFF 및 전용 설정 미비 확인 상태를 유지하며 추가 원격 변경은 없다.
+- 2026-09-30 — TMI-187/TMI-125/TMI-126 테스트 LC revision8 직접 점검: desired1/running1/pending0·ALB 정상1/비정상0. UserMerged 세 flag 및 Challenge 모두 OFF, UserMerged 전용 workload issuer/JWKS와 Challenge AI 주소/인증키 참조 미설정. 일반 Identity 로그인 설정만 존재하며 Billing/AttemptGroup OFF 유지. 수신 준비 미완료로 설정 보완·최신 DB 검증 후 활성화/재배포 필요. 이번 읽기 전용 확인이며 DB 최신 검증·실제 인증/E2E 미실행.
+- 2026-09-30 — TMI-187 배포 성공 확인 및 후속 안내의 현재 턴 표식을 WORKLOG EOF에 보완했다. 다음 작업은 LC 실제 활성 설정·수신 준비 확인이며 이번에는 추가 활성화나 원격 변경을 하지 않았다.
+- 2026-09-30 11:24 KST — TMI-187 PR33 배포36658994728 최종 success 확인(ECS11:24:38·Verify health11:24:39 성공). 다음은 LC 실제 UserMerged/Challenge flags 및 수신 준비 확인, 필요한 테스트 활성화 후 Identity 전용 publisher 연동/E2E다. 이번 조회는 기능 ON 또는 E2E 성공 증거가 아니며 원격 설정 변경 없음.
 - 2026-09-30 — TMI-187 배포 지연 조회의 현재 턴 표식을 WORKLOG EOF에 보완했다. 마지막 확인11:23 KST의 ECS 대기/ALB 비정상1 상태이며 이후 상태 재조회·변경은 수행하지 않았다.
 - 2026-09-30 11:23 KST — TMI-187 PR33 develop 배포36658994728은 테스트·이미지 업로드 성공 후 ECS 안정화 대기(11:19:37 시작), Verify health는 pending. 테스트 revision8/desired1/running2/pending0, grace300초, ALB Healthy1/Unhealthy1(Health checks failed) 확인. 최종 실패·상세 원인 미확정, 읽기 전용 조사로 설정 변경 없음.
 - 2026-09-30 — develop PR 병합 기반 배포 제한 작업의 현재 턴 표식을 WORKLOG EOF에 보완했다. 로컬 구현·테스트 완료, 사용자 commit/push 및 원격 배포 검증 대기 상태는 동일하다. TMI-187 상태 및 AWS 변경 없음.

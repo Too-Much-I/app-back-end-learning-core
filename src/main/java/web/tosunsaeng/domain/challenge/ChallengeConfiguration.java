@@ -11,23 +11,25 @@ import org.springframework.data.mongodb.core.MongoTemplate;
 import software.amazon.awssdk.services.s3.S3Client;
 import software.amazon.awssdk.services.s3.presigner.S3Presigner;
 import web.tosunsaeng.domain.usermerge.application.UserOwnedTransactionExecutor;
+import web.tosunsaeng.global.config.ClockConfiguration;
 import java.time.Clock;
 
 @Configuration
+@Import(ClockConfiguration.class)
 @ConditionalOnProperty(prefix = "app.challenge", name = "enabled", havingValue = "true")
 public class ChallengeConfiguration {
     @Bean public ChallengeStore challengeStore(MongoTemplate mongo) { return new ChallengeStore(mongo); }
     @Bean public ChallengeTransactions challengeTransactions(MongoDatabaseFactory factory, UserOwnedTransactionExecutor guards) { return new ChallengeTransactions(factory, guards); }
-    @Bean public ChallengeCatalog challengeCatalog(ChallengeStore store) { return new ChallengeCatalog(store.mongo, Clock.systemUTC()); }
+    @Bean public ChallengeCatalog challengeCatalog(ChallengeStore store, Clock clock) { return new ChallengeCatalog(store.mongo, clock); }
     @Bean public ChallengeAudioStorage challengeAudioStorage(S3Client s3, S3Presigner presigner, @Value("${spring.cloud.aws.s3.bucket}") String bucket) {
         return new ChallengeAudioStorage(s3, presigner, bucket);
     }
-    @Bean public ChallengeService challengeService(ChallengeStore store, ChallengeTransactions tx, ChallengeCatalog catalog, ChallengeAudioStorage audio) {
-        return new ChallengeService(store, tx, catalog, audio, Clock.systemUTC());
+    @Bean public ChallengeService challengeService(ChallengeStore store, ChallengeTransactions tx, ChallengeCatalog catalog, ChallengeAudioStorage audio, Clock clock) {
+        return new ChallengeService(store, tx, catalog, audio, clock);
     }
     @Bean public ChallengeMetrics challengeMetrics(MeterRegistry registry) { return new ChallengeMetrics(registry); }
-    @Bean public ChallengeCallbackService challengeCallbackService(ChallengeStore store, ChallengeTransactions tx, ChallengeMetrics metrics) {
-        return new ChallengeCallbackService(store, tx, Clock.systemUTC(), metrics);
+    @Bean public ChallengeCallbackService challengeCallbackService(ChallengeStore store, ChallengeTransactions tx, ChallengeMetrics metrics, Clock clock) {
+        return new ChallengeCallbackService(store, tx, clock, metrics);
     }
     @Bean public ChallengeAiClient challengeAiClient(ChallengeProperties properties, Environment environment) {
         properties.validate(environment.acceptsProfiles(Profiles.of("staging", "prod")));
@@ -41,8 +43,8 @@ public class ChallengeConfiguration {
     }
     @Bean @DependsOn("challengeStartupValidator")
     public ChallengeWorker challengeWorker(ChallengeStore store, ChallengeTransactions tx, ChallengeService service, ChallengeCallbackService callbacks,
-                                            ChallengeAudioStorage audio, ChallengeAiClient ai, ChallengeMetrics metrics) {
-        return new ChallengeWorker(store, tx, service, callbacks, audio, ai, Clock.systemUTC(), metrics);
+                                            ChallengeAudioStorage audio, ChallengeAiClient ai, ChallengeMetrics metrics, Clock clock) {
+        return new ChallengeWorker(store, tx, service, callbacks, audio, ai, clock, metrics);
     }
     @Bean
     public ChallengeScheduler challengeScheduler(ChallengeWorker worker, ChallengeProperties properties) {
