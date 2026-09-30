@@ -403,6 +403,7 @@ AI Callback에서는 examId로 ExamSession을 조회하여 실제 userId를 찾�
 
 ## UserMerged rollout과 테스트
 
+- 2026-09-30 사용자 승인 예외: LC 테스트 서버의 UserMerged 준비를 위한 테스트 DB 점검·guard/index 준비, 구 writer drain, workload issuer/JWKS 및 writer/source-deny/consumer 설정과 테스트 ECS 배포·검증을 허용한다. 위 실제 AWS 배포 금지는 이 범위에 한해 예외다. 운영 서비스·DB, Identity 발급/발행/merge 설정 및 Billing·AttemptGroup·Challenge 활성화는 포함하지 않으며 static credential 추가나 별도 IAM/네트워크 권한 확대를 허용하지 않는다.
 - consumer와 source deny feature flag는 기본 off다.
 - writer guard 전환과 구버전 instance drain, ACTIVE guard backfill·index 검증, Mongo replica-set Transaction, workload security, Identity retry와 staging 성능 gate를 완료하기 전에는 publisher와 merge 기능을 production에서 활성화하지 않는다.
 - direct gate 실패 시 publisher timeout만 늘리거나 direct 처리 중 timeout 뒤 background로 넘기는 hybrid를 사용하지 않는다. durable async 모델의 ack·source deny 시점·SLA·DLQ를 별도 계약으로 확정한다.

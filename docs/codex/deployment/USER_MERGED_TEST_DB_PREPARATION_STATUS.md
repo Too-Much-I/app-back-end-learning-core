@@ -2,6 +2,9 @@
 
 ## 결론
 
+- 2026-09-30 TMI-187 로컬 수정 완료: exams-only 및 withdrawal 별도 repository registrar를 정리해 Boot 자동 등록으로 통일했다. 단위549·Mongo83·Node105 통과. 실제 자동 구성에서14개 repository 등록 및 Challenge/UserMerged 동시ON 기동·guard transaction/index/probe 검증 성공. 아래 repository 누락은 배포 이미지의 실패 이력이며 새 코드의 원격 배포는 아직 없다. UserMerged flags/Identity E2E 완료로 해석하지 않는다.
+- 2026-09-30 최종: test:6/OFF 복구 완료, ECS 단일 COMPLETED·1/1/0·ALB healthy·HTTPS200/UP. DB 준비는 완료됐지만 UserMerged 수신 활성화는 아래 repository 등록 코드 차단점 때문에 미완료다.
+- 2026-09-30 최신 결과(TMI-125/TMI-136/TMI-178): 테스트 배포 예외 승인 후 재검증 성공. dry-run `03cd542bbd7543f3850f3542ed3bcb14`, 최종 apply `b549663b8fbd4acd8bd59dab75061cfe` 모두 STOPPED/exit0, owner0·정합성 오류0·누락 인덱스0, exact owner index2·rollback 잔여0·기존 문제/시험 데이터 보존 확인. 다만 flags ON인 test:7은 Repository bean 누락으로 기동 실패하여 정상 OFF test:6 복구 중이다. 수신 활성화/E2E 완료가 아니다.
 - 관련 TMI-126/TMI-125. 2026-09-28 사용자 승인으로 테스트 DB 준비·검증을 완료했다.
 - 대상은 `tosunsaeng-test/Cluster0/to-teacher-learning-core-test`뿐이다. Identity DB·운영 DB는 변경하지 않는다.
 - 원본 준비 스크립트 Node 테스트7개 통과, 실제 DB dry-run·apply/verify 성공. 기존 owner0·정합성 오류0·owner 인덱스2개 생성, 롤백·기존 데이터 보존 확인.
@@ -50,3 +53,24 @@
 - Identity 전송 목적지는 `POST https://api-test.to-teacher.com/internal/v1/events/user-merged`. LC는 schemaVersion1의 eventId/sourceUserId/targetUserId/occurredAt body를 처리한다. 기존 UserMerged publisher와 신규 OwnerEvent publisher 중 단일 경로를 확정해야 하며, 신규 경로의 envelope를 같은 것으로 가정하거나 둘 다 활성화하지 않는다.
 - 키 교체 시 공유 서명 키의 이전 공개키는 workload2분뿐 아니라 실제 사용자 토큰 최대 TTL, 검증 여유시간, JWKS 캐시를 고려해 유지한다. 구체적 기간은 Identity 운영값 확인 전 확정하지 않는다.
 - 남은 순서는 _id 검증 코드 수정·회귀 테스트/새 이미지 준비, DB inventory 재확인, LC workload 설정·consumer/source deny 검증, 단일 Identity publisher 활성화와 Guest→MEMBER canary다. 수정·활성화·이벤트 전송은 이번 인계 수신 작업에서 수행하지 않았다.
+
+## 후속 결정 및 다음 작업 (2026-09-28)
+
+- 사용자 결정: Identity의 **기존 UserMerged 전용 저장·발행 경로**를 사용한다. 신규 OwnerEvent publisher를 같은 통합 이벤트에 병행 활성화하지 않는다. Identity 구현/배포 변경은 이번 결정 기록에서 수행하지 않았다.
+- TMI-178 기본 `_id_` 판정 수정·회귀 테스트 및 수정 이미지 test:6 배포는 완료됐다. 테스트 서비스 grace300초·COMPLETED·HTTPS200/UP 확인 이력이 있다. 위 수정 필요 문구는 당시 이력이며 현재 남은 작업은 실제 UserMerged flags ON 상태의 검증이다.
+- 다음 LC 작업: 테스트 DB 최신 inventory 및 ACTIVE guard backfill 필요 여부 재확인, 구 writer 태스크 drain과 guard 전환 절차 이행, workload issuer/JWKS 설정·현재 kid 확인, writer/source-deny/consumer 활성화 및 기동/인증 검증. consumer는 writer와 source-deny가 모두 켜져야 한다. Identity 통합·publisher는 LC 준비 확인 전 OFF 유지한다.
+- 이후 Identity 작업: 별도 workload issuer 명시 및 발급 활성화, 기존 UserMerged publisher에 LC exact endpoint 연결, 테스트 회원 통합 활성화. MEMBER 로그인 토큰을 workload 토큰 대신 보내지 않는다.
+- E2E: 테스트 Guest 기록 생성→MEMBER 통합→204·target 기록 소유권 확인·source 기존 토큰 거절, 동일 eventId 재전송의 중복 이전 방지, 일시 장애 재시도 및 양방향 토큰 오용 거절 검증. 실제 테스트 계정/이벤트 전송은 별도 실행 단계다.
+- Billing/AttemptGroup 관련 flags OFF 유지. 이 consumer의 시험 기록 이전과 Challenge 기록 승계를 혼동하지 않으며 챌린지 활성화/AI 채점 E2E는 별도 후속이다.
+
+## 2026-09-30 테스트 활성화 시도와 신규 기동 차단점
+
+- 구 writer `1428e0149b864feaade08659f49edbdf` STOPPED, service0/0/0 확인 뒤 최종 apply를 실행했다. ALB deregistration delay300초 및 태스크 STOPPING 동안에는 안전 assertion으로 apply 실행을 막았고, 실제 종료 후에만 실행했다. guard/inbox `_id_` metadata 및 exact owner indexes2, `transactionRollback=true`, `catalogUnchanged=true`, `ownerCountsUnchanged=true`, `probeDocuments=0` 확인.
+- 공개 JWKS에서 kid `tosunsaeng-identity-test-rsa-1`, RSA/RS256/sig 확인. 실제 workload 토큰 발급/전송은 수행하지 않았다.
+- test:6을 복제한 test:7은 기존 digest `sha256:f13ff0711504794753ea79404f70d02f2729ce2d460a7e92917bf4387ad26f72` 유지, UserMerged 세 flag와 workload issuer/JWKS 5개 값만 변경했다. Billing/AttemptGroup/Challenge OFF 유지, 권한·네트워크·Secret 변경 없음.
+- 신규 `8fe7738493c34af4900201032db86c74` exit1: `mergedUserAccessGateFilter`에 필요한 `UserOwnershipGuardRepository` bean이 없다. `TosunsaengApplication`의 Mongo repository scan이 exams 패키지만 지정하며 UserMerged용 별도 등록이 없다. DB 권한/인덱스 문제나 ALB grace 부족으로 분류하지 않는다.
+- 추가 코드 점검: consumer는 `UserMergedInboxRepository`와 `WithdrawnUserAccessDenyRepository`도 필수다. 후자는 withdrawal flags만으로 등록되므로 UserMerged consumer ON/withdrawal OFF 조합도 함께 보완해야 한다. withdrawal 기능 자체를 켜서 우회하지 않는다.
+- 기존 security 테스트는 guard repository를 mock하고 Mongo 통합 테스트는 repository factory에서 직접 생성하므로 실제 feature 조합의 repository 등록 누락을 검출하지 못한다. 다음 수정은 명시적인 조건부 repository 등록과 실제 configuration 조합 회귀 테스트다. 이번에는 runtime 코드를 수정하지 않았다.
+- 배포 시 desired0→1과 revision 전환을 동시에 요청하자 기존 revision6 태스크 `710fb2ecc26a485a8bad2703430ade47`도 일시 생성됐다. 다음 활성화 시에는 desired0 상태에서 신규 revision으로 먼저 전환·이전 deployment 정리를 확인하고, writer 부재 상태의 최종 inventory 후 scale-up을 분리해야 한다. 실제 통합 이벤트는 전송하지 않았다.
+- 실패 반복을 막기 위해 desired0으로 내린 뒤 정상 test:6/OFF 복구를 요청했다. template도 OFF로 유지한다. 첫 merge 이후 deny-unaware rollback 금지 규칙은 유지하며 이번 실패는 consumer 기동 전이다.
+- 로컬 전체 단위 테스트548개 및 migration Node7개 통과. 이번 턴 Mongo 통합 suite는 재실행하지 않았으며 실제 테스트 DB의 준비/rollback canary로 배포 전 조건을 확인했다. 인증·204·멱등성/소유권/source deny·성능 E2E는 새 이미지 배포 후 남는다.
