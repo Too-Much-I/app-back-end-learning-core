@@ -12659,3 +12659,46 @@
 - 최종 JAVA_TOOL_OPTIONS=-Dapi.version=1.44 ./gradlew clean test mongoIntegrationTest 성공: 단위549·Mongo83, 실패/오류/skip0. node --test scripts/mongodb/*.test.js 105개 성공. 새 테스트는 단위1개·Mongo11개다. git diff --check 통과, 기존 컴파일 deprecation/unchecked 경고는 범위 밖으로 유지했다.
 - 이번 변경은 runtime3파일(2개 삭제), 테스트2파일 신규 및 WORKLOG/CURRENT_STATE/배포 상태2문서다. 기존 AGENTS와 문서의 타 작업 변경은 보존했고 예상 밖 runtime 변경 없음. 공개 API/DTO/BaseResponse/retryCount/AI user_id=examId/S3·Redis 계약 불변. Challenge ON/UserMerged 전체OFF executor 수정은 제외했으며 동시ON 전제는 유지한다.
 - 실제 환경 flag·DB·IAM·Secret·Jira 상태·AWS 배포 변경과 commit/push는 수행하지 않았다. 다음은 사용자 commit/push 및 새 이미지 확인 후 테스트 전용 rollout이다. 기존 test:6/OFF 확인 이력과 구분하며 구 writer drain·최신 DB guard/inventory·Challenge 설정/문제/index·방향별 인증정보·ECS/ALB/HTTPS 검증이 필요하다. Identity 발행/merge 및 회원 통합 E2E는 별도 단계다. Secret/Token 기록 없음.
+
+## 2026-09-30 — TMI-187 Jira 완료 처리
+
+<!-- codex-turn:01a0f019-0ee8-75a3-8603-5c407b250762 -->
+
+- 사용자 요청으로 TMI-138 하위 TMI-187을 완료로 전환했고 응답의 status=완료/statusCategory=done을 확인했다. 구현·로컬 검증 근거와 배포 경계를 댓글10118에 기록했다.
+- 기존 단위549·Mongo83·Node105 성공 결과를 인계했으며 이번 턴에 테스트를 재실행하지 않았다. 새 이미지 테스트 배포와 Identity 회원 통합 E2E는 후속이며 완료로 주장하지 않는다.
+- 이번 변경은 Jira 완료/댓글 및 WORKLOG·CURRENT_STATE 기록뿐이다. runtime·환경 flag·AWS·DB 변경과 commit/push 없음. 기존 변경 보존, Secret/Token 기록 없음. git diff --check 및 현재 표식 단일 출현을 검증한다.
+
+## 2026-09-30 — 구현 완료 Jira 상태 종료 처리
+
+<!-- codex-turn:01a0f019-27a0-7832-9946-b31d343ce5f4 -->
+
+- 사용자 승인에 따라 구현 완료 근거가 확인된 `TMI-126`과 `TMI-178`의 Jira 상태를 각각 `해야 할 일`에서 `완료`로 변경하고, 두 이슈의 개별 화면에서 `완료` 표시를 재확인했다.
+- `TMI-126`은 10초 챌린지 API·비동기 AI 채점 구현 병합 완료를 기준으로 닫았으며 production 활성화와 종단 E2E는 이슈 설명대로 별도 rollout gate로 유지한다. `TMI-178`은 UserMerged 기본 `_id_` 인덱스 판정 수정·회귀 테스트 병합 및 테스트 배포 정상 기동 확인을 기준으로 닫았다.
+- `TMI-125`와 `TMI-187`은 이번 상태 변경 대상에서 제외해 Jira 상태를 수정하지 않았다. 앱 runtime·DB·AWS·Git commit/push 변경 및 테스트 실행은 없고, Secret·Token을 기록하지 않았다.
+
+## 2026-09-30 — develop PR 머지 커밋만 테스트 자동 배포하도록 제한
+
+- 사용자 요청으로 기존 main/develop push 배포 앞에 deployment-gate를 추가했다. 현재 작업 브랜치가 develop이고 기존에는 develop 직접 push도 배포 대상이었다. 모든 feature branch가 배포된다는 근거는 없으며 기존 branch 제한은 유지한다.
+- develop push의 정확한 SHA에 연결된 PR을 GitHub API로 조회해 merged_at, merge_commit_sha, base develop 및 동일 저장소를 확인한 경우에만 배포한다. 미머지/단순 close/직접 push/다른 base는 차단하고 API 실패도 배포하지 않는다. merge/squash/rebase의 최종 병합 SHA 계약을 사용한다. 원격 GitHub 이벤트 검증은 아직 수행하지 않았다.
+- main push 및 main/develop의 명시적 workflow_dispatch는 유지한다. push 이벤트를 유지해 기존 브랜치 기반 AWS OIDC 인증을 변경하지 않는다. 직접 develop push 시 workflow 확인 job은 나타나지만 build/push/ECS deploy는 skip된다. API 조회 일시 실패 시 기존 수동 재배포로 복구 가능하다.
+- Node 배포 회귀16개 및 ./gradlew clean test 성공, git diff --check 검증. PR 검증 workflow에도 배포 조건 테스트를 포함했다. Java/API/AI 계약·AWS·IAM·실제 배포·Jira 상태 변경 없음. 기존 문서 변경 보존, commit/push는 사용자 수행, Secret/Token 기록 없음. TMI-187 완료 작업과 별개의 배포 정책 수정이다.
+
+## 2026-09-30 — develop 배포 제한 작업 턴 표식 보완
+
+<!-- codex-turn:01a0f01b-5c0a-7e70-b39c-70eab2c87360 -->
+
+- develop PR 병합 SHA만 테스트 자동 배포하도록 gate 및 회귀 테스트를 구현한 현재 턴 표식을 보완했다. main push/수동 배포 유지, 직접 develop push의 실제 배포는 차단한다. TMI-187 완료와 별개의 작업이며 Jira 변경 없음.
+- Node16개·전체 Gradle 단위 테스트 성공, 사용자 commit/push 및 원격 실행 검증은 후속이다. CURRENT_STATE 갱신 및 git diff --check/표식1회 검증. 과거 기록과 기존 변경 보존, Secret/Token 기록 없음.
+
+## 2026-09-30 — 현재 테스트 배포 지연 상태 조회
+
+- TMI-187 PR33 merge의 develop 실행36658994728(300233f)을 GitHub에서 조회했다. 단위/migration/Mongo 테스트와 이미지 build/push 성공, 11:19:37 KST부터 Deploy to Amazon ECS 진행 중이며 별도 Verify health는 아직 pending이다.
+- 11:22~11:23 KST AWS 콘솔에서 테스트 서비스 revision8/desired1/running2/pending0/배포 진행 중, health grace300초를 확인했다. ALB 대상2개 중 Healthy1·Unhealthy1이고 비정상 사유는 Health checks failed다. 최근 이벤트는 새 task 시작·대상 등록이며 아직 이번 배포 최종 실패나 rollback은 확인되지 않았다.
+- 현 시점 ECS 안정화 및 ALB health 미충족 대기로 판단한다. 해당 대상의 앱 기동 지연/코드/네트워크 상세 원인은 로그 미조회로 확정하지 않는다. 조회·문서 기록만 수행, AWS/코드/Jira/배포 변경 없음. 기존 dirty 변경 보존, Secret/Token 기록 없음, git diff --check 검증.
+
+## 2026-09-30 — 배포 지연 조회 턴 기록 보완
+
+<!-- codex-turn:01a0f01e-268f-7b00-9f6a-e476bea1509b -->
+
+- TMI-187 PR33 배포36658994728의 ECS 안정화 대기 및 ALB Healthy1/Unhealthy1 조회 결과에 현재 턴 표식을 추가했다. 마지막 조회11:23 KST 기준이며 최종 실패·근본 원인은 미확정이다.
+- CURRENT_STATE 갱신, 과거 기록 보존 및 git diff --check/표식 단일 출현 확인. 추가 원격 조회·설정 변경·배포·commit/push 없음. Secret/Token 기록 없음.

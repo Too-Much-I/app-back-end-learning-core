@@ -22,8 +22,30 @@ env:
   SENTRY_RELEASE: app-back-end-learning-core@${{ github.sha }}
 
 jobs:
+  deployment-gate:
+    name: Allow test deployment only after PR merge
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      pull-requests: read
+    outputs:
+      allowed: ${{ steps.gate.outputs.result }}
+    steps:
+      - uses: actions/checkout@v5
+      - name: Test deployment gate and routing
+        run: node --test scripts/deployment/*.test.js
+      - name: Check deployment event
+        id: gate
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const allowDeployment = require('./scripts/deployment/allow-deployment.cjs');
+            return await allowDeployment({ github, context, core });
+
   deploy:
-    if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/develop'
+    needs: deployment-gate
+    if: needs.deployment-gate.outputs.allowed == 'true' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/develop')
     name: Test, build and deploy
     runs-on: ubuntu-latest
     timeout-minutes: 40
@@ -39,7 +61,7 @@ jobs:
         run: bash scripts/deployment/select-target.sh >> "$GITHUB_ENV"
 
       - name: Test deployment routing
-        run: node --test scripts/deployment/select-target.test.js
+        run: node --test scripts/deployment/*.test.js
 
       - name: Set up Java
         uses: actions/setup-java@v5

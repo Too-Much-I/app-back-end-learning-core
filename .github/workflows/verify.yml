@@ -23,6 +23,9 @@ jobs:
       - name: Checkout source
         uses: actions/checkout@v5
 
+      - name: Test deployment gate and routing
+        run: node --test scripts/deployment/*.test.js
+
       - name: Set up Java
         uses: actions/setup-java@v5
         with:

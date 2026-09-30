@@ -2,6 +2,12 @@
 
 ## Last updated
 
+- 2026-09-30 — TMI-187 배포 지연 조회의 현재 턴 표식을 WORKLOG EOF에 보완했다. 마지막 확인11:23 KST의 ECS 대기/ALB 비정상1 상태이며 이후 상태 재조회·변경은 수행하지 않았다.
+- 2026-09-30 11:23 KST — TMI-187 PR33 develop 배포36658994728은 테스트·이미지 업로드 성공 후 ECS 안정화 대기(11:19:37 시작), Verify health는 pending. 테스트 revision8/desired1/running2/pending0, grace300초, ALB Healthy1/Unhealthy1(Health checks failed) 확인. 최종 실패·상세 원인 미확정, 읽기 전용 조사로 설정 변경 없음.
+- 2026-09-30 — develop PR 병합 기반 배포 제한 작업의 현재 턴 표식을 WORKLOG EOF에 보완했다. 로컬 구현·테스트 완료, 사용자 commit/push 및 원격 배포 검증 대기 상태는 동일하다. TMI-187 상태 및 AWS 변경 없음.
+- 2026-09-30 — develop 테스트 자동 배포를 동일 저장소/develop PR의 정확한 병합 SHA push로 제한하는 gate 구현. 직접 develop push는 배포 skip, main push·명시적 수동 재배포 유지. Node16개 및 전체 Gradle 단위 테스트 성공. 기존 AWS OIDC/서비스 대상 불변, 실제 GitHub 이벤트·AWS 배포는 미검증이며 사용자 commit/push 후 적용된다. TMI-187과 별개 배포 정책 변경.
+- 2026-09-30 — 사용자 요청으로 TMI-138 하위 TMI-187을 Jira 완료 처리(statusCategory=done 확인), 댓글10118에 구현·로컬 테스트 결과와 미배포 경계를 기록했다. 새 이미지 테스트 rollout 및 Identity E2E는 후속이다. 이번 runtime·AWS·DB 변경/테스트 재실행/commit/push 없음.
+- 2026-09-30 — 사용자 승인으로 구현 완료 근거가 확인된 `TMI-126`과 `TMI-178`의 Jira 상태를 `완료`로 변경하고 각 이슈 화면에서 반영을 재확인했다. `TMI-126`의 production 활성화·종단 E2E는 별도 rollout gate로 유지한다. `TMI-125`와 `TMI-187`은 이번 대상에서 제외해 상태를 변경하지 않았다. runtime·DB·AWS·Git commit/push 변경 없음.
 - 2026-09-30 — TMI-187(TMI-138 하위) 로컬 구현·검증 완료: exams-only 및 withdrawal 별도 Mongo registrar2개 제거, Boot 자동 등록14개와 실제 기능 조합 기동 회귀 테스트 추가. 단위549/Mongo83/Node105 모두 실패·skip0, Challenge/UserMerged 동시ON transaction 및 index/probe 검증 통과. 업무 flags/외부 계약 불변, Challenge 단독ON executor 수정 제외. 기존 타 작업 변경 보존, commit/push·Jira 상태·실제 배포 변경 없음. 새 이미지 테스트 rollout과 Identity E2E는 후속이다.
 - 2026-09-30 — Jira 미완료 56건을 현재 Learning Core `develop` 코드·merge 이력·WORKLOG와 대조했다. 완료 전환 후보는 `TMI-178`(기본 `_id_` 인덱스 판정 수정·회귀 테스트, PR 병합 및 테스트 배포 정상 기동 확인)과 `TMI-126`(10초 챌린지 API·비동기 AI 채점 runtime/테스트가 `develop`에 병합되고 production 활성화는 별도 gate로 명시) 두 건이다. `TMI-125`는 구현 merge에도 불구하고 UserMerged ON 기동의 Repository 등록 누락이 남아 `TMI-187`로 추적 중이고, `TMI-187`은 Jira 생성만 완료돼 구현하지 않았으므로 둘 다 완료 후보에서 제외했다. Jira 상태 변경은 외부 side effect 직전 사용자 확인 대기이며 아직 수행하지 않았다.
 - 2026-09-30 — TMI-138 하위 TMI-187 생성 턴의 현재 표식을 WORKLOG EOF에 보완했다. Jira 생성/부모 연결 검증 완료, 구현·배포는 미실행이며 기록 외 추가 변경 없음.

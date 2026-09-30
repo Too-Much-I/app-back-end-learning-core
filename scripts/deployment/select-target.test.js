@@ -67,7 +67,9 @@ test('develop rejects the configured main deployment role', () => {
 test('workflow uses selected target, preflights before push and deploys digest', () => {
   const workflow = readFileSync(path.join(__dirname, '../../.github/workflows/deploy-staging.yml'), 'utf8');
   assert.match(workflow, /- main\n\s+- develop/);
-  assert.match(workflow, /if: github.ref == 'refs\/heads\/main' \|\| github.ref == 'refs\/heads\/develop'/);
+  assert.match(workflow, /needs: deployment-gate/);
+  assert.match(workflow, /if: needs.deployment-gate.outputs.allowed == 'true'/);
+  assert.match(workflow, /require\('\.\/scripts\/deployment\/allow-deployment.cjs'\)/);
   assert.match(workflow, /role-to-assume: \$\{\{ env.AWS_DEPLOY_ROLE_ARN \}\}/);
   assert.match(workflow, /service: \$\{\{ env.ECS_SERVICE \}\}/);
   assert.match(workflow, /\.family == \$family/);
