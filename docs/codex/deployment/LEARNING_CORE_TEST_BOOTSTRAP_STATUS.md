@@ -2,6 +2,9 @@
 
 ## 결론
 
+- 2026-09-30 TMI-187 로컬 구현·검증 완료: Mongo Repository 자동 등록 통일, 실제 configuration의 동시ON 회귀 검증을 추가했다. 단위549/Mongo83/Node105 통과, API·업무 flags 불변. 원격 서비스·Task Definition 변경은 없으며 아래 test:6/OFF 복구 이력 이후 새 이미지 배포를 해야 한다. 배포 시 구 writer 완전 종료·최신 guard inventory, Challenge 설정/문제/index, workload 및 방향별 인증정보를 확인하고 ECS/ALB/HTTPS를 검증한다. Identity 발행/merge E2E는 별도다.
+- 2026-09-30 최종 복구 확인: test:6/OFF 단일 deployment COMPLETED, desired/running/pending1/1/0, ALB healthy, HTTPS200/UP. test:7 활성화 성공을 의미하지 않으며 다음 작업은 UserMerged 조건부 repository 등록 코드 수정이다.
+- 2026-09-30 UserMerged 후속(TMI-125/TMI-136/TMI-178): 테스트 배포 예외를 AGENTS.md에 반영하고 DB 최종 재검증 성공. 기존 이미지로 세 UserMerged flag와 issuer/JWKS만 설정한 test:7은 `UserOwnershipGuardRepository` bean 미등록으로 exit1이다. 정상 test:6/OFF로 복구 요청 후 HTTPS200/UP 확인, ALB/ECS 최종 수렴 대기 중. UserMerged 수신/E2E는 미완료이며 조건부 Mongo repository 등록 수정이 다음 차단점이다. 자세한 증거는 USER_MERGED_TEST_DB_PREPARATION_STATUS.md에 기록했다.
 - 2026-09-28 Challenge 후속: 문제 100일/300개를 테스트 DB에 복사하고 원본과 전체 JSON 일치 확인. migration dry-run/apply가 6컬렉션/9필수 인덱스로 성공했다. LC test:4 활성화는 `UserOwnedTransactionExecutor` bean 누락으로 실패하여 정상 test:3/OFF로 복구했다. 아래 초기 bootstrap 이력과 구분하며 독립 활성화 코드 수정 후 재배포가 필요하다.
 - 최신 결과: 사용자 credential 수정 후 DB 권한 오류는 해결됐다. 빈 LC 테스트 DB에 필수 인덱스 2개를 준비한 뒤 test:3이 1대 실행되고 HTTPS health 200/UP, 미인증 API401을 확인했다. 최종 ALB는 healthy 대상1개와 이전 대상 draining1개, ECS running1/pending0이다.
 - 후속 진단 확정: Atlas의 LC 전용 사용자 권한은 정상이다. LC Secret URI가 Identity 전용 사용자로 접속하고 있어 LC DB 권한이 거절됐다. 사용자가 LC 전용 credential로 Secret을 수정한 뒤 재기동해야 한다. 권한 확대는 필요하지 않다.
@@ -94,4 +97,12 @@ AWS Route53 hosted zone 목록은 비어 있어 외부 DNS 관리자의 등록�
 - test:4는 기존 이미지와 나머지 flags를 유지하고 Challenge ON, AI HTTPS endpoint 및 양방향 Secret 참조만 추가했다. 기동 실패 원인은 `ChallengeConfiguration.challengeTransactions`의 필수 `UserOwnedTransactionExecutor` 주입이다. 이를 만드는 `UserMergedConfiguration`은 세 UserMerged flag가 전부 OFF면 등록되지 않는다.
 - 다른 feature를 임의 활성화하지 않고 test:3/OFF로 복구했다. template도 정상 OFF 기준 유지. 시작일은 아직 생성되지 않았으며 사용자는 테스트에 한해 실제 활성화 성공일을 day1로 승인했다.
 - 다음 단계: UserMerged OFF에서도 Challenge 자체 Mongo Transaction을 유지하고, writer ON에서는 ownership guard를 반드시 적용하는 구성 수정 및 회귀 테스트, 사용자 commit/push, 새 이미지 배포 후 Challenge 재활성화. 실제 MEMBER today/음성 제출/provider/Callback E2E는 아직 미완료다.
-- 복구 중 같은 test:3의 교체 task bc75146c65554a5a8cbcab90aa0f017b는 시작 로그 후 ELB health 실패로 종료됐다. grace120초이며 정확한 health 실패 원인은 미확정이다. 진행 중 교체 deployment를 ECS StopServiceDeployment/ROLLBACK으로 중단하여 마지막 성공 deployment로 복귀했다. 최종 test:3 desired/running/pending=1/1/0·COMPLETED, ALB healthy 대상 유지(실패 대상 draining). 신규 배포 때 이 health 실패도 별도로 검증해야 한다.
+- 복구 중 같은 test:3의 교체 task bc75146c65554a5a8cbcab90aa0f017b는 시작 로그 후 ELB health 실패로 종료됐다. grace120초이며 정확한 health 실패 원인은 미확정이다. 진행 중 교체 deployment를 ECS StopServiceDeployment/ROLLBACK으로 중단하여 마지막 성공 deployment로 복귀했다. 당시 test:3 desired/running/pending=1/1/0·COMPLETED, ALB healthy 대상 유지(실패 대상 draining). 후속 결과는 아래 TMI-178 검증을 참고한다.
+
+### TMI-178 후속 배포 검증 (2026-09-28)
+
+- 현재 테스트 서비스: `tosunsaeng-learning-core-test:6`, 단일 deployment `COMPLETED`, desired/running/pending=1/1/0. HTTPS health200/UP.
+- 테스트 ECS health-check grace를 사용자 승인으로 **300초**로 변경했다. ALB interval30초/healthy threshold5/unhealthy2/timeout5초는 유지한다. 서버 기동약51초와 초기 unhealthy 복귀 시간을 고려해 신규 서비스 재구성 시에도 grace300초를 유지한다.
+- 동일test:6 이미지에서 기존120초는 실패했고 300초 적용 후 신규 태스크가 시작 약174초 시점에 healthy로 관측됐다. 코드 수정 없이 배포 정상화. 최초 health 요청의 개별 실패 원인은 직접 관측하지 못했다.
+- 진단용 테스트 ECS Exec 활성 및 `LearningCoreTestExecDiagnostics` 역할 정책 유지. 내부 health는200/UP·16~90ms였다. 진단 접근 정리는 별도 후속으로 관리한다.
+- UserMerged/Challenge 및 Billing 기능flags는 기존OFF 유지. `_id_` 수정 이미지 배포 성공과 UserMerged 실제 활성화/E2E 검증은 구분한다. 운영 변경 없음.

@@ -12346,3 +12346,316 @@
 - ./gradlew clean test mongoIntegrationTest에서 단위548개(실패/skip0) 통과, 최초 Mongo 단계는 Docker29가 테스트 도구 API1.32를 거절하여 기동 실패했다. 저장소/의존성 변경 없이 실행 한정 JAVA_TOOL_OPTIONS=-Dapi.version=1.44 ./gradlew mongoIntegrationTest 재실행 성공. migration Node7개 통과 및 git diff --check 확인.
 - 공개 API/DTO/BaseResponse·인증·UserMerged schema·AI user_id=examId·Redis/S3 계약 불변. 이번 수정은 runtime1개/신규 테스트2개/작업 기록2개에 한정하며 기존 사용자 문서·배포 파일·DS_Store 변경은 보존했다. 예상 밖 추가 변경 없음.
 - 실제 Atlas/AWS·Identity/Billing flags 불변, Secret/Token 기록·commit/push 없음. 배포 전 사용자 커밋/푸시와 테스트 LC 기동 검증이 필요하며 Identity workload 인증·선택된 단일 publisher·E2E는 별도 후속이다. 로컬 Docker 실행 호환 옵션 필요성을 기록한다.
+
+## 2026-09-28 — TMI-178 사용자 배포 확인과 실패 원인 조사
+
+<!-- codex-turn:01a0e71c-d4e4-72e0-85a0-8d9262258369 -->
+
+- 직전 중단된 배포 확인을 이어 조사했다. 로컬 merge7cf1a6b 및 GitHub Actions36389446270 실패 확인: 이미지 빌드 완료 후 ECS deployment ecs-svc/8265057451913276900 안정화 실패·circuit breaker rollback. Verify run36389426161은 성공 표시다.
+- ECS 서비스 조회에서 test:3으로 롤백 완료, desired/running/pending1/1/0 및 COMPLETED 확인. 공개 HTTPS actuator/health는200/UP. 실패 test:5의 태스크 a41e5210251d4ceba4d8b0c34a0644c1은 ELB health checks 실패·exit143. target8080, health /actuator/health, matcher200이다.
+- CloudWatch 해당 태스크에서 Tomcat8080 시작, 애플리케이션51.089초 기동, Mongo 연결 성공과 graceful shutdown 확인. 시험 완료 횟수용 owner 인덱스 누락 WARN은 있으나 이번 조회에서 치명적 기동 오류는 발견하지 못했다. ECS unhealthy 이벤트는 일반 Health checks failed만 제공해 실패 응답 코드/네트워크의 근본 원인은 미확정이다.
+- test:5의 USER_MERGED_WRITER/CONSUMER/SOURCE_DENY와 CHALLENGE_ENABLED는 모두false. 따라서 _id validator 활성화 상태의 실제 검증 성공으로 해석하지 않는다. 현재 서비스가 최신 수정 이미지로 교체된 상태도 아니다.
+- 조회와 작업 기록2개만 갱신, 코드/DB/AWS설정/재배포/이벤트 전송 변경 없음. Secret/Token 기록·commit/push 없음. 후속은 헬스체크 실패의 네트워크/응답 원인 규명 후 테스트 재배포이며 UserMerged 활성화·E2E는 별도다. git diff --check 및 현재 표식1회 확인.
+
+## 2026-09-28 — TMI-178 배포 브랜치·이미지 재사용 가설 검토
+
+- deploy-staging.yml, verify.yml, select-target.sh를 확인했다. 자동 배포는 main/develop push에만 반응하고 job if와 스크립트에서도 다른 ref를 거절한다. PR Verify는 단위/migration/Mongo 테스트와 whitespace 검사만 수행하며 배포하지 않는다.
+- 직전 확인된 실패 run36389446270은 develop merge7cf1a6b 실행이다. workflow는 빌드 결과 digest를 새 task definition에 넣으므로 가변 test 태그만으로 이전 이미지를 선택하는 구조가 아니다. 동일 이미지 재배포 자체는 정상 허용되며 이번 ALB health 실패의 원인이라는 근거는 없다.
+- 기존 서비스 task definition에서 이미지 항목만 교체하므로 UserMerged/Challenge OFF 같은 기존 설정은 승계된다. 배포와 기능 활성화를 구분해야 한다. routing 테스트10개 통과, git diff --check 확인. WORKLOG/CURRENT_STATE만 갱신, 코드·AWS·DB·배포 변경 및 Secret/Token 기록·commit/push 없음.
+
+## 2026-09-28 — TMI-178 배포 브랜치 가설 검토 턴 표식 보완
+
+<!-- codex-turn:01a0e71f-756b-7543-bf1a-943753406900 -->
+
+- 이번 턴의 배포 workflow·브랜치 분기 검토 기록에 현재 턴 표식을 보완한다. main/develop만 배포하고 PR은 검증만 수행하며 routing 테스트10개 통과를 확인했다. 이전 이미지 재배포가 이번 실패 원인이라는 근거는 없고 기존 OFF 설정 승계와 코드 배포를 구분했다.
+- ALB 헬스체크 실패의 근본 원인은 미확정이다. CURRENT_STATE 갱신 및 whitespace/현재 표식1회 검증. 기록 외 코드·원격 설정·배포 변경 없음, Secret/Token 기록·commit/push 없음.
+
+## 2026-09-28 — TMI-178 테스트 재배포 실행과 Verify 성공 의미 설명
+
+- 사용자 재배포 요청으로 GitHub run36389446270의 실패 job을 재실행해 attempt2 시작을 확인했다. 동일 develop7cf1a6b, 테스트·이미지 빌드 통과 후 test:6 ECS 배포가 진행 중이며 최종 성공은 아직 확인하지 못했다.
+- 신규 태스크7167a50f69454804836247616f2bf910은 50.887초 정상 기동 로그가 있으나 신규 ALB 대상은 Target.FailedHealthChecks, 기존 대상은 healthy다. HTTP8080/health timeout5초·interval30초·ECS grace120초 확인. 두 태스크는 동일 SG, 두 서브넷은 동일 allow ACL로 확인되며 근본 원인은 미확정이다. 기능 설정·보안그룹·DB 변경은 하지 않았다.
+- 사용자가 제시한 run36389426161은 성공한 Verify Learning Core PR 검증이다. verify.yml에 이미지 생성·push·ECS 배포 단계는 없으며 현재 재배포는 해당 PR이 머지된 develop 코드를 사용한다고 설명했다. 배포5분10초 시점에도 ECS 단계 진행 중이며 완료로 기록하지 않는다.
+- WORKLOG/CURRENT_STATE 갱신 및 git diff --check 확인. 코드 변경·commit/push·Secret/Token 기록 없음. AWS 변경은 승인된 테스트 배포 재시도에 한정한다.
+
+## 2026-09-28 — TMI-178 재배포·Verify 설명 턴 표식 보완
+
+<!-- codex-turn:01a0e720-9553-7b90-96a7-32d1fb222090 -->
+
+- 이번 턴의 테스트 재배포 실행 및 Verify 성공 의미 설명 기록에 현재 표식을 보완했다. run36389446270 attempt2는 마지막 조회에서 ECS 배포 진행 중이며 test:6 신규 대상의 unhealthy를 확인했다. 성공한 run36389426161은 PR 테스트 전용으로 배포 완료 증거가 아니다.
+- CURRENT_STATE 갱신 및 whitespace/표식1회 검증. 이번 보완은 기록만 변경하며 원격 재조회·추가 배포·설정 변경·Secret/Token 기록·commit/push 없음. 최종 배포 결과는 미확인 상태로 유지한다.
+
+## 2026-09-28 — TMI-178 수정 코드와 헬스체크 실패 인과 검토
+
+- b2cd2b6→7cf1a6b의 src/main/Dockerfile diff를 확인했다. runtime 변경은 UserMergedIndexValidator 기본 인덱스 판정뿐이며 health/security 변경은 없다. AWS test:6의 UserMerged writer/consumer/source-deny3개가 모두false이고 해당 bean은 조건부 생성이므로 이번 실행에서 변경된 validator가 직접 실패를 유발한다는 근거는 없다.
+- ALB SG outbound 전체 허용을 추가 확인했다. 앞서 동일 태스크SG 및 두 서브넷 동일 allow ACL 확인. 이것만으로 전체 네트워크 정상이나 애플리케이션 health 응답 정상을 확정하지 않는다. health endpoint는 코드상 permitAll이며 Mongo/Redis 등 dependency health 응답은 직접 확인하지 못했다.
+- 재배포 신규 태스크7167a50f69454804836247616f2bf910은 ELB health check 실패로 DEACTIVATING이며 ECS Exec=false/managed agent 없음으로 내부 localhost health를 즉시 조회할 수 없다. 기존 정상 태스크 유지, 서비스 배포는 직전 IN_PROGRESS였으며 최종 결과 미확정이다.
+- 원인 확정을 위해 새 태스크 내부 health 응답과 ALB 경로를 분리 검증해야 한다. 진단 접근 활성화·임시 리소스·권한 변경은 수행하지 않았다. WORKLOG/CURRENT_STATE만 갱신, git diff --check 확인, 코드·DB·AWS설정 변경·Secret/Token 기록·commit/push 없음.
+
+## 2026-09-28 — TMI-178 헬스체크 인과 검토 턴 표식 보완
+
+<!-- codex-turn:01a0e729-31a3-7f30-b3f2-6a1d0a71721d -->
+
+- 이번 턴의 코드·배포 설정 대조 및 헬스체크 진단 기록에 현재 표식을 보완했다. UserMerged flags OFF로 수정 validator가 실행되지 않는 점과 서버 기동 성공을 확인했으나 헬스체크 실패의 근본 원인은 미확정이다.
+- ECS Exec 비활성으로 내부 health 응답 검증은 미완료이며 재배포 최종 결과도 미확인이다. CURRENT_STATE 갱신 및 whitespace/표식1회 확인. 기록 외 추가 조회·설정 변경·배포·Secret/Token 기록·commit/push 없음.
+
+## 2026-09-28 — TMI-178 재배포 설정 비교와 내부 진단 접근 필요 확인
+
+- ECS/ALB 재조회에서 test:6 배포 IN_PROGRESS, 신규7167 태스크 중지 이벤트와 기존 healthy 대상1개 유지 확인. 배포 최종 성공/롤백 결과는 아직 미확인이다.
+- boto3 메모리 내 read-only 비교로 test:3과 test:6의 top-level 차이는 containerDefinitions 및 등록 metadata뿐이며 container 차이는 image 하나임을 확인했다. 양쪽 container healthCheck는 없음. 비밀 환경변수 값은 출력하지 않았다.
+- 새 이미지 digest는 f13ff0711504794753ea79404f70d02f2729ce2d460a7e92917bf4387ad26f72, 이전 이미지는88444cb679d0caf41e1d6e816441a9c2278bb35c762cb0a5eda218a9cd79b41b. 이미지 차이만으로 코드 결함을 확정할 수 없다. 현재 안전한 읽기 조회로 health 응답 내용은 확보하지 못했다.
+- 다음 진단은 테스트 ECS Exec 활성화 및 필요 최소 접근 권한 검토 후 새 컨테이너 내부 health 응답 확인이다. 보안 민감 접근 변경은 승인 없이 수행하지 않는다. CURRENT_STATE 갱신/whitespace 확인, 코드·DB·원격 설정 변경 및 Secret/Token 기록·commit/push 없음.
+
+## 2026-09-28 — TMI-178 내부 진단 승인 대기 턴 표식 보완
+
+<!-- codex-turn:01a0e72b-ade4-7200-97c4-930b981814f3 -->
+
+- 이번 턴의 Task Definition 비교 및 진단 접근 필요 확인 기록에 현재 표식을 보완했다. 기존·신규 container 설정은 image만 다르고 신규 태스크 health 실패의 근본 원인은 아직 미확정이다.
+- 테스트 한정 ECS Exec 및 필요 최소 권한 설정은 사용자 승인 대기이며 수행하지 않았다. CURRENT_STATE 갱신 및 whitespace/표식1회 검증. 기록 외 추가 원격 조회·설정 변경·배포·Secret/Token 기록·commit/push 없음.
+
+## 2026-09-28 — TMI-178 테스트 ECS Exec 활성화 및 내부 health 진단
+
+- 사용자 승인에 따라 테스트 task-role에 신규 inline LearningCoreTestExecDiagnostics를 추가했다. ssmmessages CreateControlChannel/CreateDataChannel/OpenControlChannel/OpenDataChannel4개만 Resource*로 허용(채널 API 범위), 기존 S3 정책 유지. 테스트 service에 enableExecuteCommand=true와 동일test:6 force deployment를 적용했다. 운영 역할/서비스·기능flags·공개 API 인증은 변경하지 않았다.
+- 신규 진단 태스크d4f650cbf3bc465081a627bb5933059a의 ExecuteCommandAgent RUNNING 확인 후 curl만 실행했다. localhost 및 자체IP8080 /actuator/health에 ELB-HealthChecker/2.0 User-Agent 요청 모두HTTP200/UP. 반복3회 응답시간0.015908/0.026173/0.089801초. 비밀환경 조회 없음.
+- 실제 ALB SG와 태스크 ingress source SG 일치, ALB outbound 허용, ALB HTTP1/HTTP8080 및 health path 정상 설정 확인. 기존 VPC flow logs는 없으며 패킷 캡처 도구도 없어 실제 ALB 요청별 실패 원인은 확인하지 못했다.
+- ALB interval30초/healthy threshold5/unhealthy2/timeout5초, ECS grace120초를 확인했다. 서버기동약51초이고 진단 태스크 started08:44:49.069UTC→stopping08:47:22.674UTC로 약154초 뒤 ELB health 실패 종료 결정. 내부 health 정상인 만큼 초기 unhealthy 뒤 연속5회 복귀 전에 ECS가 교체하는 타이밍 부족을 유력 가설로 제시하되 확정하지 않는다. 최초 실패/성공 카운트 직접 증거는 없다.
+- 테스트 grace300초로 늘린 동일이미지 재검증을 제안하며 아직 적용하지 않았다. 테스트 Exec 및 진단권한은 유지 상태로 명시한다. GitHub attempt2와 별도 진단 force deployment가 있으므로 기존 Actions 결과만으로 최신 서비스 상태를 판정하지 않는다. 진단 태스크는 DEACTIVATING, 최종 배포 성공 미확인.
+- WORKLOG/CURRENT_STATE 갱신 및 whitespace 확인. 코드·DB·운영 변경·Secret/Token 기록·commit/push 없음. 진단 접근 정리는 후속 검증 종료 시 검토한다.
+
+## 2026-09-28 — TMI-178 ECS Exec 진단 턴 표식 보완
+
+<!-- codex-turn:01a0e72d-5c0e-7bb1-baaf-0cfff711ed2f -->
+
+- 이번 턴의 승인된 테스트 ECS Exec 활성화 및 내부 health 진단 기록에 현재 표식을 보완했다. 내부200/UP·16~90ms 응답 확인, ALB 정상 복귀와 ECS 유예시간 간 타이밍 부족은 아직 가설이다.
+- 테스트 grace120→300초 변경은 승인 대기이며 미적용이다. 테스트 Exec/진단권한 유지 상태 및 운영 불변을 CURRENT_STATE에 반영했다. whitespace/표식1회 확인, 기록 외 추가 원격 작업·Secret/Token 기록·commit/push 없음.
+
+## 2026-09-28 — TMI-178 테스트 헬스체크 유예시간 확장 및 배포 완료
+
+- 사용자 승인으로 테스트 service의 healthCheckGracePeriodSeconds를120→300초로 변경하고 동일tosunsaeng-learning-core-test:6 force deployment를 실행했다. deployment ecs-svc/3823347819345518500, 기존 이미지와 ALB 설정·기능flags 유지, 운영 서비스는 변경하지 않았다.
+- 신규1428e0149b864feaade08659f49edbdf는08:51:53.170UTC RUNNING 시작 후 초기 unhealthy를 거쳐08:54:47UTC healthy 확인(시작 후 약174초, 정확한 전환 순간은 관측 간격 내). 같은 이미지에서 유예시간 확장만으로 정상화되어 기존120초 유예시간과 초기 ALB 회복 지연이 배포 실패를 유발했다는 근거를 확보했다. 최초 개별 health 요청 실패 사유까지 확정한 것은 아니다.
+- 최종 서비스 test:6 단일 deployment COMPLETED, desired/running/pending1/1/0 확인. 이전test:3 연결 정리 후 제거됨. 공개 HTTPS /actuator/health200/UP 확인. Github 재실행 결과와 별개로 AWS 진단 후속 deployment가 성공한 것이므로 구Actions를 성공으로 변경하거나 재실행하지 않았다.
+- 테스트 ECS Exec 및 전용 진단권한은 유지 중이며 정리는 별도 후속이다. UserMerged/Challenge flags OFF 유지로 실제 consumer 활성화 검증/E2E 완료를 의미하지 않는다. 코드·DB·운영·Secret 변경 없음. 배포 문서/CURRENT_STATE/WORKLOG 갱신 및 git diff --check 확인, Secret/Token 기록·commit/push 없음.
+
+## 2026-09-28 — TMI-178 유예시간 확장·배포 완료 턴 표식 보완
+
+<!-- codex-turn:01a0e735-234c-76e0-9b7e-fec465e3dee5 -->
+
+- 이번 턴의 테스트 grace120→300초 확장 및 동일test:6 재배포 완료 기록에 현재 표식을 보완했다. 최종 단일 deployment COMPLETED·desired/running/pending1/1/0, ALB healthy와 HTTPS200/UP 확인 결과를 유지한다.
+- CURRENT_STATE 갱신 및 whitespace/표식1회 검증. 테스트 Exec/진단권한 유지, 기능flags·운영 불변이며 기록 외 추가 원격 작업·Secret/Token 기록·commit/push 없음.
+
+## 2026-09-28 — 기존 UserMerged 전용 publisher 선택 및 후속 순서 확정
+
+- 관련 TMI-136/TMI-125/TMI-178. 사용자 결정으로 Identity 기존 UserMerged 이벤트 저장·LC 전송 경로를 사용한다. 신규 OwnerEvent publisher를 같은 이벤트에 병행 활성화하지 않는다.
+- 코드 UserMergedProperties의 consumer→writer/source-deny 필수 조건과 준비 문서를 대조했다. TMI-178 수정 이미지 배포 완료와 실제 flags ON 검증 미완료를 구분한다. 다음은 DB 최신 inventory/backfill 필요 여부·구 writer drain/guard 전환 확인, LC workload 설정과 수신 활성화·인증 검증이다.
+- LC 준비 뒤 Identity 별도 workload issuer/발급·기존 publisher 목적지 설정·merge 활성화와 Guest→MEMBER E2E를 진행한다.204/target 소유권/source 토큰 거절/동일eventId 멱등성/일시 장애 재시도/토큰 오용 거절을 검증하며 Billing·AttemptGroup OFF 유지, Challenge 기록 승계는 이 범위가 아님을 기록했다.
+- 준비 문서/CURRENT_STATE 갱신 및 git diff --check 확인. 이번 턴 실제 AWS·Identity 설정·코드·배포·테스트 계정 생성·이벤트 전송 없음, Secret/Token 기록·commit/push 없음.
+
+## 2026-09-28 — UserMerged 전용 방식 결정 턴 표식 보완
+
+<!-- codex-turn:01a0e73d-6bae-7721-b572-cc96a29b3b54 -->
+
+- 관련 TMI-136/TMI-125/TMI-178. 기존 Identity UserMerged 전용 저장·발행 경로 선택과 후속 순서 안내 기록에 현재 턴 표식을 보완했다. 다음 작업은 테스트 DB 최신 inventory/guard 재점검이며 LC 수신 준비 후 Identity 전송 활성화와 E2E를 진행한다.
+- CURRENT_STATE 갱신 및 whitespace/표식1회 검증. Billing OFF 유지, 기록 외 추가 설정·배포·이벤트 전송·Secret/Token 기록·commit/push 없음.
+
+## 2026-09-30 — UserMerged 배포 재개 점검 및 지침 충돌 확인
+
+<!-- codex-turn:01a0e73f-21ab-73d0-a7ca-32635b97a741 -->
+
+- 관련 TMI-125/TMI-136/TMI-178, DB 준비 이력 TMI-126. 인계된 기존 dry-run 태스크7de634883caa427c9ff9fd2fa9f236ee를 중복 실행하지 않고 CloudWatch 결과를 조회했다. 대상 to-teacher-learning-core-test, DRY-RUN 완료, owner0·invalid0·duplicate active0·orphan/mismatch0·MERGED0·withdrawal0·non-terminal creation0·missing migration index0이다. 이 결과는 이전 실행 시점의 inventory이며 배포 직전 재검증을 대신하지 않는다.
+- 현재 ECS 테스트 서비스는 tosunsaeng-learning-core-test:6, 단일 PRIMARY/COMPLETED, desired/running/pending1/1/0, health grace300초다. 이번 재개 구간에서는 ALB와 공개 health를 별도 재확인하지 않았다.
+- 최신 사용자 전달 AGENTS.md UserMerged 금지 범위의 실제 AWS ECS 리소스 생성·배포 금지와 배포 요청이 충돌한다. 테스트 한정 예외 확인 전 서비스 drain·DB apply·신규 revision·flags 변경을 보류했다. Identity 발행/merge·Billing·Challenge 및 운영 서비스 변경 없음. 수신 활성화/E2E 완료로 보고하지 않는다.
+- 이번 재개 구간 변경 파일은 WORKLOG/CURRENT_STATE뿐이며 기존 배포 문서 변경은 보존했다. runtime·외부 API·AI 계약 변경 없음. 문서만 변경하여 코드 테스트는 미실행, 기존 dry-run 로그/ECS read-only 조회와 git diff --check 및 표식1회 검증 수행. Secret/Token 기록·commit/push 없음.
+
+## 2026-09-30 — UserMerged 재개 점검 현재 턴 기록 보완
+
+<!-- codex-turn:01a0efd7-4834-71d1-87df-ebef5af6f045 -->
+
+- 관련 TMI-125/TMI-136/TMI-178 및 DB 준비 TMI-126. 이전 인계의 턴 표식과 현재 턴 식별자가 달라 현재 표식을 새 항목으로 보완했다. 과거 기록은 수정하지 않았다.
+- 기존 dry-run 완료·정합성 오류/누락 인덱스0, 현재 test:6 COMPLETED·1/1/0·grace300초 확인 결과를 유지한다. 테스트 AWS 배포 예외 승인 대기이며 UserMerged 활성화·재배포·E2E는 미완료다.
+- CURRENT_STATE 갱신 및 git diff --check/현재 표식1회 검증. 기록 외 추가 원격 조회·DB/설정/코드 변경·Secret/Token 기록·commit/push 없음.
+
+## 2026-09-30 — 테스트 배포 예외 승인 및 UserMerged 수신 활성화 시도
+
+- 관련 TMI-125/TMI-136/TMI-178 및 DB 준비 TMI-126. 사용자가 테스트 서버 예외를 승인하여 AGENTS.md에 이번 LC UserMerged DB 준비·drain·설정·배포·검증 범위를 명시했다. 운영·Identity·Billing/AttemptGroup/Challenge 활성화와 권한 확대/static credential은 예외에 포함하지 않았다.
+- 최신 dry-run03cd542bbd7543f3850f3542ed3bcb14 STOPPED/exit0·owner0·정합성 오류0·누락 인덱스0 확인. 기존1428 writer는 ALB deregistration delay300초 및 STOPPING을 거쳐 STOPPED 확인. 중간 apply 실행 시도는 종료 조건 assertion에서 멈춰 DB 변경이 없었고, 실제 service0/0/0·writer STOPPED 후 최종 apply b549663b8fbd4acd8bd59dab75061cfe를 실행했다.
+- 최종 apply STOPPED/exit0, exact owner indexes2·guard/inbox 기본 _id 정의 정상, rollback 잔여0·기존 문제 EJSON 및 시험 건수 보존 확인. owner/backfill0, 계정 생성·데이터 삭제 없음. 현재 공개 JWKS kid tosunsaeng-identity-test-rsa-1/RSA/RS256/sig 확인, 실제 workload 토큰 발급 없음.
+- 기존 test:6 digest를 유지한 test:7 등록: UserMerged writer/source-deny/consumer=true와 workload issuer/JWKS 5개 값만 변경. 배포 ecs-svc/2644881586399600291의 신규8fe7738493c34af4900201032db86c74는 exit1/Essential container exited. mergedUserAccessGateFilter의 UserOwnershipGuardRepository bean 누락이 로그상 직접 원인이다. 기존 _id 판정 수정이나 DB/IAM/ALB grace 문제로 분류하지 않는다.
+- 코드 근거: TosunsaengApplication은 exams repository만 scan하며 UserMerged repository 별도 등록이 없다. consumer 필수 UserMergedInboxRepository 및 withdrawal OFF일 때 미등록인 WithdrawnUserAccessDenyRepository도 함께 보완 필요. security 테스트 mock 및 Mongo 통합 factory 직접 생성은 실제 bean scan 누락을 검출하지 못한다. runtime 수정은 이번 설정 배포 범위를 넘어 수행하지 않았다.
+- desired0→1/revision 전환 동시 요청에서 기존test:6 태스크710fb2ecc26a485a8bad2703430ade47도 일시 생성됐다. 다음 활성화는 desired0 상태의 revision 전환과 이전 deployment 정리/최종 inventory, scale-up을 분리해야 한다. 실제 통합 이벤트는 전송하지 않았고 새 consumer는 기동 전 실패했다.
+- 반복 실패 중지 후 기존 test:6/OFF로 복구 요청, 신규001dc379e66c43dca5395d98b31aabec 및 HTTPS200/UP 확인. ALB/ECS 최종 수렴은 후속 확인 중이다. template 임시 ON 변경은 되돌려 기존 OFF 내용 그대로 유지했다. 테스트 Exec/기존 진단 권한 및 grace300초 유지, 운영/Identity/권한/Secret 변경 없음.
+- 변경 파일: AGENTS.md, WORKLOG, CURRENT_STATE, 두 배포 상태 문서. 기존 dirty 변경은 보존했으며 예상 밖 runtime/API/AI 계약 변경 없음. 전체 단위548개·migration Node7개 통과, JSON 파싱/git diff --check 통과. Mongo 통합 suite는 재실행하지 않고 실제 테스트 DB rollback canary 검증 수행. 새 이미지와 실제 feature 조합 회귀 테스트가 다음 배포 전 필수이며 204·멱등성/source deny·성능 E2E는 미완료다. commit/push·Secret/Token 기록 없음.
+
+- 복구 최종 확인: test:6/OFF 단일 deployment COMPLETED, desired/running/pending1/1/0, ALB healthy, 공개 HTTPS200/UP. 이전test:7 배포와 draining 대상은 최종 목록에서 제거됐다. CURRENT_STATE와 두 배포 상태 문서의 최신 결론을 갱신했다. UserMerged 활성화 성공이 아니라 기존 정상 기능 복구 완료다.
+
+## 2026-09-30 — 테스트 배포 승인·활성화 시도 현재 턴 표식 보완
+
+<!-- codex-turn:01a0efdb-fc3e-7801-9100-56a4f9d832eb -->
+
+- 관련 TMI-125/TMI-136/TMI-178 및 DB 준비 TMI-126. 이번 턴의 테스트 배포 예외 반영, DB 재검증 성공, test:7 repository bean 누락 기동 실패와 test:6/OFF 정상 복구 기록에 현재 턴 표식을 추가했다. 과거 항목은 수정하지 않았다.
+- 최종 ECS COMPLETED·1/1/0·ALB healthy·HTTPS200/UP, 단위548개·Node7개 통과 결과 유지. UserMerged 활성화/E2E는 미완료이며 repository 등록 설정·기동 회귀 테스트 수정 후 새 이미지 배포가 필요하다.
+- CURRENT_STATE 갱신 및 git diff --check/현재 표식1회 검증. 기록 외 추가 원격 조회·설정·runtime 수정·Secret/Token 기록·commit/push 없음.
+
+## 2026-09-30 — Repository 등록 설정·기동 회귀 테스트 의미 설명
+
+- 관련 TMI-125/TMI-136/TMI-178. TosunsaengApplication:8의 exams-only Mongo repository scan과 UserWithdrawnDenyRepositoryConfiguration:12의 withdrawal-only 등록 조건을 재확인했다.
+- Repository는 DB 읽기/쓰기 인터페이스이며 이번 수정안은 기존 UserMerged repository들을 필요한 feature 조합에서 Spring bean으로 등록하는 작업이다. DB 신규 생성·데이터 이전·권한 확대나 탈퇴/Billing 기능 활성화가 아니다.
+- 기동 회귀 테스트는 UserMerged ON/withdrawal OFF 등 실제 설정 조합에서 필요한 repository와 의존 bean이 등록되고, OFF 및 동시 ON 조합도 누락/중복 없이 구성되는지 검증하는 제안이다. repository mock/직접 생성만으로 이 등록 누락을 검출할 수 없음을 설명했다. 이 테스트는 실제 Identity E2E를 대체하지 않는다.
+- 설명 요청이므로 runtime 코드·AWS 변경과 테스트 실행 없음. WORKLOG/CURRENT_STATE 기록 및 git diff --check만 수행했다. 기존 변경 보존, Secret/Token 기록·commit/push 없음.
+
+## 2026-09-30 — Repository 등록 수정 설명 턴 표식 보완
+
+<!-- codex-turn:01a0efef-3b4f-7582-84f1-d058e832482e -->
+
+- 관련 TMI-125/TMI-136/TMI-178. Repository 조건부 등록 누락과 실제 기능 설정 조합의 기동 회귀 테스트 필요성을 설명한 이번 턴의 표식을 추가했다. 과거 기록은 변경하지 않았다.
+- 설명만 완료했으며 runtime 수정·배포·테스트 실행은 하지 않았다. UserMerged 미완료 및 기존 test:6/OFF 복구 상태 유지. CURRENT_STATE 갱신, git diff --check 및 현재 표식1회 검증. Secret/Token 기록·commit/push 없음.
+
+## 2026-09-30 — JPA와 Mongo Repository 자동 검색 차이 설명
+
+<!-- codex-turn:01a0eff3-5c07-7b02-bdb4-4dba83adcc38 -->
+
+- 관련 TMI-125/TMI-136/TMI-178. build.gradle의 Spring Data MongoDB/Redis 의존성, UserOwnershipGuardRepository의 MongoRepository 상속 및 TosunsaengApplication의 exams-only EnableMongoRepositories 설정을 재확인했다.
+- 일반적인 Spring Boot 프로젝트는 기본 검색 범위 안의 repository를 자동 등록하므로 별도 설정 없이 사용하는 경험이 정상임을 설명한다. 이 프로젝트는 MongoDB를 사용하며 명시적 검색 범위가 exams로 제한되어 sibling usermerge repository가 빠졌다. 구현 코드를 수동으로 작성하거나 DB를 재생성하는 문제가 아니라 검색/등록 범위 누락이다. JpaRepository는 이 MongoDB 저장소의 대체 수단이 아니다.
+- 사용자 질문에 대한 설명만 수행했다. runtime·AWS 변경 및 테스트 실행 없음. WORKLOG/CURRENT_STATE 갱신, git diff --check와 현재 표식1회 확인. 기존 변경 보존, Secret/Token 기록·commit/push 없음.
+
+## 2026-09-30 — Mongo Repository 검색 범위 제한의 도입 이력 확인
+
+<!-- codex-turn:01a0eff8-5391-7b93-a38d-961bc918f529 -->
+
+- 관련 TMI-125/TMI-136/TMI-178. 현재 저장소 git log/blame/show에서 exams-only EnableMongoRepositories가 2026-07-02 fcd70d4에서 추가됐음을 확인했다. 커밋 메시지와 해당 diff에 제한 이유가 명시되지 않아 최초 의도는 확정하지 않는다. 웹 저장소는 조회하지 않았다.
+- 해당 설정은 DB 접근 권한이 아니라 Spring repository 자동 검색 범위다. 기본 자동 등록으로 충분한 구성이라면 필수 설정이 아니며, 명시적 등록은 복수 저장소 구분이나 기능별 조건부 등록에 사용할 수 있으나 이것이 당시 도입 이유라는 증거는 없다.
+- UserMerged 패키지 추가라는 이해는 맞지만 현재 withdrawal repository의 별도 조건부 등록과 consumer 의존성이 있어 한 줄 추가만으로 전체 해결을 단정하지 않는다. 전체 패키지 검색으로 전환할 경우 기존 조건부 등록과 중복/비활성 기능 영향도 함께 정리해야 함을 설명한다.
+- 설명/이력 확인만 수행, runtime·AWS 수정·테스트 실행 없음. WORKLOG/CURRENT_STATE 갱신 및 git diff --check·현재 표식1회 확인. 기존 변경 보존, Secret/Token 기록·commit/push 없음.
+
+## 2026-09-30 — Repository 등록 방식 선택지와 권장안 비교
+
+- 관련 TMI-125/TMI-136/TMI-178. 기존 중앙 검색 범위에 패키지 추가, 기능별 조건부 등록 보완, 전체 Mongo repository 검색으로 통일하는 세 방식을 비교했다. 현재 withdrawal의 조건부 repository 설정과 UserMerged 의존성을 재확인했다.
+- 이번 복구에는 기능별 조건부 등록 보완을 권장한다. guard는 UserMerged writer/consumer/source-deny 필요 시, inbox는 consumer 필요 시, withdrawal deny repository는 기존 withdrawal 조건 또는 UserMerged consumer 필요 시 한 번만 등록하도록 설계하고 기능 ON/OFF 조합을 검증한다. 탈퇴/Billing 기능 자체 활성화는 필요하지 않다.
+- 전체 검색 통일은 신규 패키지 등록 누락 방지와 유지보수 단순화의 장점이 있으나 기존 조건부 설정/중복 등록, Mongo·Redis 구분과 비활성 기능 의존성 검증까지 포함하는 별도 정리 범위다. Repository 등록 자체가 업무 기능 활성화나 DB 접근 권한 부여는 아님을 구분했다.
+- 비교/권장만 수행, 구현 승인으로 간주하지 않았다. runtime·AWS 변경 및 테스트 실행 없음. WORKLOG/CURRENT_STATE 갱신과 git diff --check 수행, 기존 변경 보존. Secret/Token 기록·commit/push 없음.
+
+## 2026-09-30 — Repository 등록 선택지 비교 턴 표식 보완
+
+<!-- codex-turn:01a0eff9-d79d-7a13-9202-83522d8133ea -->
+
+- 관련 TMI-125/TMI-136/TMI-178. Repository 등록 세 방식의 장단점과 이번 복구에 기능별 조건부 등록을 권장한 설명 기록에 현재 턴 표식을 추가했다. 과거 기록은 수정하지 않았다.
+- 선택지 비교만 완료했으며 구현·배포는 수행하지 않았다. CURRENT_STATE 갱신, git diff --check 및 현재 표식1회 확인. 기록 외 추가 변경·Secret/Token 기록·commit/push 없음.
+
+## 2026-09-30 — 기능별 Repository 등록 방식 설명
+
+- 관련 TMI-125/TMI-136/TMI-178. UserMergedConfiguration의 feature 조건 및 consumer의 withdrawal repository 의존성, 기존 UserWithdrawnDenyRepositoryConfiguration의 조건부 scan을 재확인했다.
+- 기능별 등록은 서버 시작 시 feature 설정에 따라 필요한 Repository 객체를 Spring에 준비하는 방식이다. 요청마다 객체를 새로 생성하거나 DB/컬렉션을 켜고 끄는 방식이 아니며 현재 환경변수 기반 설정 변경은 재기동/재배포가 필요함을 설명한다.
+- 제안은 UserMerged writer/consumer/source-deny 중 하나라도 ON이면 ownership guard, consumer ON이면 inbox, 기존 withdrawal 필요 조건 또는 UserMerged consumer ON이면 공유 withdrawal deny repository를 한 번 등록하는 것이다. 필요한 조회용 repository 등록과 회원 탈퇴 처리 기능 활성화는 별개다.
+- 설명 요청만 처리, 구현·배포·테스트 실행 없음. WORKLOG/CURRENT_STATE 갱신 및 git diff --check 수행. 기존 변경 보존, Secret/Token 기록·commit/push 없음.
+
+## 2026-09-30 — 기능별 Repository 등록 설명 턴 표식 보완
+
+<!-- codex-turn:01a0effb-f027-7412-a6ab-91a7a05cb880 -->
+
+- 관련 TMI-125/TMI-136/TMI-178. 기능별 Repository 등록의 기동 시점·공유 저장소 조건·업무 기능 활성화와의 차이를 설명한 이번 턴의 표식을 추가했다. 과거 기록은 수정하지 않았다.
+- 설명만 완료했으며 구현·배포는 수행하지 않았다. CURRENT_STATE 갱신 및 git diff --check/현재 표식1회 확인. 기록 외 추가 변경·Secret/Token 기록·commit/push 없음.
+
+## 2026-09-30 — Repository 등록에 대한 사용자 이해 확인
+
+- 관련 TMI-125/TMI-136/TMI-178. 회원 통합 Repository 코드는 있으나 기존 exams-only 검색 범위 밖이어서 Spring 객체 등록이 누락됐다는 이해는 맞음을 설명했다.
+- 최초 설정의 목적이 자원 낭비 방지였다는 근거는 없으며, Repository 객체마다 별도 DB 연결이 생기는 구조도 아니므로 비용/메모리 절감이 주목적이라고 단정하지 않는다. 일반적인 전체 자동 등록도 정상적인 선택이며 기능별 등록은 의존성 구성과 활성화 범위를 명시적으로 관리하는 방식임을 보완했다.
+- 설명만 수행, 구현·배포·테스트 실행 없음. WORKLOG/CURRENT_STATE 갱신과 git diff --check 수행. Secret/Token 기록·commit/push 없음.
+
+## 2026-09-30 — Repository 등록 이해 확인 턴 표식 보완
+
+<!-- codex-turn:01a0effe-8dd0-7ee0-b1d3-957a11ad8718 -->
+
+- 관련 TMI-125/TMI-136/TMI-178. 사용자 이해 확인 및 자원 절약 목적을 단정할 수 없다는 설명에 현재 턴 표식을 추가했다. 과거 기록은 변경하지 않았다.
+- 설명만 완료했으며 구현·배포는 수행하지 않았다. CURRENT_STATE 갱신, git diff --check 및 현재 표식1회 확인. 기록 외 추가 변경·Secret/Token 기록·commit/push 없음.
+
+## 2026-09-30 — 장기 Repository 검색 구조 권장 방향 확인
+
+- 관련 TMI-125/TMI-136/TMI-178. 현재 LC 구성의 유지보수 관점에서는 exams-only 검색 제한을 없애고 Mongo Repository 등록을 통일하는 방향을 권장한다고 설명했다. 모든 프로젝트에서 명시적 검색 설정을 제거해야 한다는 일반화는 하지 않는다.
+- 해당 어노테이션 한 줄만 삭제하면 기존 withdrawal의 명시적 repository 설정이 남아 전체 자동 구성이 기대대로 적용되지 않을 수 있으므로 별도/조건부 등록 정리, Mongo·Redis 구분 및 기능 조합 검증까지 포함해야 한다. 업무 서비스/consumer feature flag는 유지한다.
+- 방향 확인 질문으로 처리하여 코드 삭제·구현·배포·테스트 실행은 하지 않았다. WORKLOG/CURRENT_STATE 갱신 및 git diff --check 수행. Secret/Token 기록·commit/push 없음.
+
+## 2026-09-30 — 제한된 자동 검색 방식의 실익 설명
+
+- 관련 TMI-125/TMI-136/TMI-178. 현재 EnableMongoRepositories 역시 지정 패키지 안에서 구현 객체를 자동 등록하는 방식이며 수동 객체 생성과 다름을 설명한다. exams-only 중앙 검색과 별도 기능별 조건부 등록은 구분해야 한다.
+- 명시적 검색 범위는 복수 MongoTemplate/DB별 repository 분리나 선택적 모듈 구성에 유용할 수 있으나 현재 exams-only 설정에 그런 이점이 필수라는 근거는 확인되지 않았다. 단일 LC MongoDB에서 신규 도메인마다 목록을 추가하는 방식은 누락 위험을 만든다.
+- 앞선 조건부 등록 권장은 이번 배포 복구의 변경 범위를 줄이는 관점이며 장기적으로 최선이라는 의미가 아님을 명확히 했다. 유지보수 단순화를 원하면 기존 조건부 repository 등록을 함께 정리하고 Mongo/Redis 구분·기능 flag 조합을 검증한 뒤 검색 범위를 통일하는 대안이 적절하다. Repository 등록과 업무 기능 실행은 별개다.
+- 설명만 수행, runtime·AWS 변경 및 테스트 실행 없음. WORKLOG/CURRENT_STATE 갱신과 git diff --check 수행, 기존 변경 보존. Secret/Token 기록·commit/push 없음.
+
+## 2026-09-30 — 제한된 자동 등록 방식 설명 턴 표식 보완
+
+<!-- codex-turn:01a0f000-8d4a-74b2-b96a-5c2590040284 -->
+
+- 관련 TMI-125/TMI-136/TMI-178. 현재 방식도 검색 범위를 제한한 자동 등록이라는 점과 명시적 등록의 실익·한계, 단기 복구와 장기 유지보수 관점의 차이를 설명한 이번 턴 표식을 추가했다. 과거 기록은 변경하지 않았다.
+- 설명만 완료했으며 구현·배포는 수행하지 않았다. CURRENT_STATE 갱신, git diff --check 및 현재 표식1회 확인. 기록 외 추가 변경·Secret/Token 기록·commit/push 없음.
+
+## 2026-09-30 — 장기 Repository 검색 구조 설명 턴 기록
+
+<!-- codex-turn:01a0f003-6068-7630-acd4-837e3db6ec71 -->
+
+- 관련 TMI-125/TMI-136/TMI-178. 현재 LC의 장기 유지보수에는 exams-only 검색 제한 제거와 Mongo Repository 등록 통일을 권장한다고 설명했다. 기존 withdrawal 별도 등록 정리, Mongo/Redis 구분 및 기능 ON/OFF 기동 검증을 포함해야 하며 한 줄 삭제만으로 끝내지 않는다. 서비스/consumer 기능 설정은 유지한다.
+- 방향 설명만 완료했으며 코드 삭제·구현·배포는 수행하지 않았다. CURRENT_STATE 갱신 및 git diff --check/현재 표식1회 확인. 기존 기록 보존, Secret/Token 기록·commit/push 없음.
+
+## 2026-09-30 — Mongo Repository 자동 등록 통일 수정 범위 조사
+
+- 관련 TMI-125/TMI-136/TMI-178. 전체 main source의 EnableMongoRepositories는 TosunsaengApplication과 withdrawal의 Inbox/DenyRepositoryConfiguration 두 곳으로 총3개다. Redis 전용 repository 인터페이스/@RedisHash/EnableRedisRepositories는 검색되지 않았고 RedisTemplate 사용을 확인했다.
+- MongoRepository 상속 인터페이스는 시험10·UserMerged2·withdrawal2로 총14개다. 별도 ExamRepository는 빈 일반 인터페이스라 Mongo repository 수에서 제외한다. 기존14개 repository와 query/domain을 수정하는 것은 계획 범위가 아니다.
+- 필수 runtime 변경 예상은 TosunsaengApplication의 exams-only annotation/import 제거와 withdrawal 두 repository-only configuration 제거/통합, 총3파일이다. 모든 명시적 Mongo repository 등록을 정리한 뒤 application root 기준 Boot 자동 구성을 검증한다. Mongo/Redis 구분 검증 결과에 따라 설정1파일 추가 변경 가능성은 열어두되 현재 필수로 단정하지 않는다.
+- 테스트는 실제 자동 구성을 사용하는 repository 등록 테스트 및 UserMerged/withdrawal 실제 configuration 의존성 조합 테스트 등2~3파일 신규/수정 예상이다. 모든14개 Mongo proxy 1회 등록, OFF에서도 업무 consumer/gate 비활성, UserMerged ON/withdrawal OFF 및 역조합/동시ON, writer-only/source-deny-only, local/test·staging/prod 검증을 포함한다. repository 자체를 mock으로 대체하거나 factory로만 직접 만드는 검증은 등록 누락 회귀를 막지 못한다.
+- 업무 서비스·consumer flags와 startup index/transaction 검증은 유지한다. DB migration/인덱스/권한/Secret/Identity·Billing 코드/API·DTO·AI/S3/Redis 계약 변경은 필요하지 않은 범위로 판단한다. Mongo 통합 테스트·전체 단위·실제 테스트 배포 검증은 구현 후 수행한다.
+- 별도 기존 문제: ChallengeConfiguration의 UserOwnedTransactionExecutor 필수 주입은 Repository 검색 통일로 해결되지 않는다. Challenge ON/UserMerged 전체 OFF 지원을 포함하면 별도 수정 범위가 추가되므로 이번 범위와 구분한다. 전체 flags OFF에 대한 정상 기동 주장은 Challenge OFF 조건을 포함해야 한다.
+- 추정 규모는 runtime3파일(+검증 결과에 따른 설정1파일 가능), 테스트2~3파일, 상태/배포 문서3~4파일로 총8~11파일 수준이다. 핵심 코드 변경은 작지만 공통 기동 설정이라 검증 범위는 중간이다. 실제 구현/테스트 결과에 따라 추가 차단점이 나올 수 있으며 확정 diff가 아니다.
+- 이번에는 읽기 조사와 기록만 수행했다. runtime 수정·AWS 조회/변경·테스트 실행 없음. 기존 dirty 변경 보존, git diff --check 수행. Secret/Token 기록·commit/push 없음.
+
+## 2026-09-30 — Repository 자동 등록 통일 범위 조사 턴 표식 보완
+
+<!-- codex-turn:01a0f004-9d96-76d1-9e63-a732cef07887 -->
+
+- 관련 TMI-125/TMI-136/TMI-178. 명시적 검색 설정3파일·Mongo Repository14개를 확인하고 코드/테스트5~7파일, 문서 포함8~11파일의 예상 수정 범위를 안내한 이번 턴 표식을 추가했다. 과거 기록은 변경하지 않았다.
+- 실제 수정 범위는 구현 검증 전 추정이며 Challenge의 executor 누락은 별도 문제다. 조사만 완료, runtime 수정·배포·테스트 실행 없음. CURRENT_STATE 갱신, git diff --check 및 현재 표식1회 확인. Secret/Token 기록·commit/push 없음.
+
+## 2026-09-30 — Challenge·UserMerged 동시 활성화 시 executor 수정 범위 확인
+
+- 관련 TMI-125/TMI-136/TMI-178 및 Challenge TMI-126. UserMergedConfiguration의 세 flag OR 조건과 executor bean 선언, ChallengeConfiguration의 필수 주입을 재확인했다. Repository 등록 및 나머지 기동 조건이 충족되고 Challenge와 UserMerged writer/consumer/source-deny를 모두 ON으로 유지한다면 전체 OFF에서 발생하는 executor 누락 수정은 이번 범위에서 보류할 수 있다.
+- 이는 ON/OFF 조합에 따른 잠재 결함이 해결됐다는 의미가 아니다. 향후 Challenge만 ON으로 운영하거나 UserMerged 전체 OFF 롤백을 지원하려면 별도 수정이 필요하다. 현재 Repository 등록 누락은 여전히 필수 수정이며 동시 ON 실제 기동/통합 검증을 생략할 수 없다.
+- 설정 방향 확인 질문으로 처리, 실제 기능 flag 변경·코드 수정·배포·테스트 실행 없음. 기존 test:6/OFF 복구 상태를 새로운 활성 상태로 오인하지 않는다. WORKLOG/CURRENT_STATE 갱신 및 git diff --check 수행, Secret/Token 기록·commit/push 없음.
+
+## 2026-09-30 — Challenge·UserMerged 동시 활성화 범위 확인 턴 표식 보완
+
+<!-- codex-turn:01a0f008-2e80-7921-9569-3bbbe727f139 -->
+
+- 관련 TMI-125/TMI-136/TMI-178/TMI-126. 두 기능 동시 ON 전제에서 executor 전체OFF 조합 수정은 보류 가능하지만 Repository 등록 수정과 동시ON 검증은 필요하다는 설명에 현재 턴 표식을 추가했다. 과거 기록은 변경하지 않았다.
+- 설명만 완료했으며 runtime·flags·배포는 변경하지 않았다. CURRENT_STATE 갱신, git diff --check 및 현재 표식1회 확인. Secret/Token 기록·commit/push 없음.
+
+## 2026-09-30 — TMI-138 하위 Repository 자동 등록 통일 작업 생성
+
+- 사용자 요청으로 에픽 TMI-138(10초 챌린지)의 기존 하위 목록을 조회한 뒤 작업 TMI-187 `[LC] Mongo Repository 자동 등록 통일 및 Challenge·UserMerged 동시 ON 기동 검증`을 생성했다. 생성 후 parent=TMI-138, 상태 해야 할 일을 재조회해 확인했다. URL: https://to-teacher.atlassian.net/browse/TMI-187
+- 범위는 exams-only 및 withdrawal 별도 등록 정리, Mongo Repository14개 자동 등록 통일, 실제 configuration 기반 회귀 테스트와 Challenge/UserMerged 세 flag 동시ON 검증이다. 기존 API·AI·DB 구조·권한·업무 flags 유지, Billing/AttemptGroup OFF를 명시했다.
+- Challenge ON/UserMerged 전체OFF의 executor 수정은 제외하고 독립 활성화 제약을 기록했다. 테스트 배포 검증과 Identity 발행/회원 통합 E2E를 구분했다. 예상 파일 범위 및 관련 TMI-125/TMI-126/TMI-136/TMI-178 근거를 본문에 포함했다.
+- 이번 작업은 Jira 생성·검증 및 WORKLOG/CURRENT_STATE 갱신뿐이며 runtime 코드·AWS·배포·테스트 실행 없음. git diff --check 확인, 기존 변경 보존. Secret/Token 기록·commit/push 없음.
+
+## 2026-09-30 — TMI-187 생성 턴 표식 보완
+
+<!-- codex-turn:01a0f00a-0ed0-7c72-a162-06b6fc1afd03 -->
+
+- TMI-138 하위 작업 TMI-187 생성·parent 및 해야 할 일 상태 검증 기록에 현재 턴 표식을 추가했다. 관련 TMI-125/TMI-126/TMI-136/TMI-178. 과거 기록은 변경하지 않았다.
+
+## 2026-09-30 — 구현 완료·Jira 미완료 상태 대조
+
+<!-- codex-turn:01a0f00f-7345-7f61-90db-f4eef55a1641 -->
+
+- 사용자 요청으로 TMI 프로젝트의 `statusCategory != Done` 56건을 Jira에서 조회하고 현재 Learning Core `develop`의 Git merge 이력, 코드·테스트, CURRENT_STATE/WORKLOG와 대조했다.
+- 완료 전환 후보는 `TMI-178`과 `TMI-126` 두 건이다. `TMI-178`은 기본 `_id_` 암묵적 고유성 판정 수정과 실제 BSON/replica-set 회귀 테스트가 PR #32로 병합됐고 테스트 배포의 정상 기동까지 확인됐다. `TMI-126`은 10초 챌린지 domain·API·비동기 AI 채점 구현이 PR #30으로 병합됐으며 단위·Mongo 통합·migration 검증 기록이 있고, 이 이슈 설명상 production 활성화와 종단 E2E는 구현 완료 상태와 분리된 rollout gate다.
+- `TMI-125`는 코드 merge와 다수 검증 기록이 있지만 UserMerged flag ON 기동에서 Repository bean 등록 누락이 재현됐고 해당 후속이 `TMI-187`로 분리됐다. `TMI-187`은 생성·parent 연결만 완료됐고 구현·동시 ON 검증은 미실행이므로 두 이슈 모두 완료 처리 대상에서 제외했다.
+- 다른 미완료 항목은 프론트·Identity·Billing·AI 또는 미래 기능 범위이거나 현재 저장소에서 완료 근거가 부족해 변경하지 않는다. Jira status 변경은 representational external action 직전 사용자 확인 대기이며 아직 수행하지 않았다.
+- 이번 턴은 Jira/저장소 읽기와 기록 문서 갱신만 수행했다. 앱 runtime·DB·AWS·Git commit/push는 변경하지 않았고 Secret·Token을 기록하지 않았다. 코드 무변경으로 Gradle은 생략하고 `git diff --check`와 marker 단일 출현을 검증한다.
+- Jira 등록만 완료했으며 구현·배포는 미실행이다. CURRENT_STATE 갱신, git diff --check 및 현재 표식1회 확인. 기록 외 추가 원격 변경·Secret/Token 기록·commit/push 없음.
+
+## 2026-09-30 — TMI-187 Mongo Repository 자동 등록 통일 구현
+
+<!-- codex-turn:01a0f00e-d585-7443-8fdf-ca918e064da5 -->
+
+- TMI-138 하위 TMI-187 구현 요청에 따라 TosunsaengApplication의 exams-only EnableMongoRepositories/import를 제거하고 UserWithdrawnInboxRepositoryConfiguration 및 UserWithdrawnDenyRepositoryConfiguration 두 repository-only 설정을 삭제했다. Boot 기본 root 검색으로 MongoRepository14개를 등록하며 query/entity/업무 feature flag는 변경하지 않았다. 삭제 파일은 Git 추적 파일로 이력에서 복구 가능하다.
+- RepositoryDiscoveryArchitectureTest는 main root의 명시적 Mongo registrar 재도입을 감지한다. MongoRepositoryDiscoveryIntegrationTest는 Boot Mongo/Redis auto-configuration과 실제 UserMerged/withdrawal configuration을 사용하며 repository mock/수동 factory 없이 14개 Mongo factory 및 proxy, 시험 조회와 guard 저장/조회를 검증한다. 9개 profile/flag 조합에서 업무 consumer/gate/executor의 조건을 확인하고 잘못된 consumer 단독ON 설정은 정확한 validation 원인으로 실패한다.
+- Challenge/UserMerged 동시ON은 격리 replica-set에 catalog·필수 index를 준비한 뒤 실제 ChallengeConfiguration을 구성한다. Challenge 시작 검증과 UserMerged index/probe를 실행하고 실제 Challenge transaction의 guard 생성 및 probe 잔존0을 확인했다. 외부 S3만 mock하고 실제 AWS/Identity/JWKS 요청·Redis 서버·AI 호출은 사용하지 않았다. ContextRunner는 ApplicationRunner를 자동 실행하지 않으므로 UserMerged 검증기를 명시적으로 호출했다. 이는 AWS 배포·Identity E2E 성공과 구분한다.
+- 최초 Docker 통합 실행은 API1.32/minimum1.40 호환 문제로 실패해 기존 이력과 같은 실행 한정 JAVA_TOOL_OPTIONS=-Dapi.version=1.44를 적용했다. 신규 테스트의 비웹 context에 HttpSecurity가 없어 실패한 부분은 WebApplicationContextRunner와 SecurityAutoConfiguration을 포함하도록 수정했다. 제품 보안 코드를 우회하거나 변경하지 않았다.
+- 최종 JAVA_TOOL_OPTIONS=-Dapi.version=1.44 ./gradlew clean test mongoIntegrationTest 성공: 단위549·Mongo83, 실패/오류/skip0. node --test scripts/mongodb/*.test.js 105개 성공. 새 테스트는 단위1개·Mongo11개다. git diff --check 통과, 기존 컴파일 deprecation/unchecked 경고는 범위 밖으로 유지했다.
+- 이번 변경은 runtime3파일(2개 삭제), 테스트2파일 신규 및 WORKLOG/CURRENT_STATE/배포 상태2문서다. 기존 AGENTS와 문서의 타 작업 변경은 보존했고 예상 밖 runtime 변경 없음. 공개 API/DTO/BaseResponse/retryCount/AI user_id=examId/S3·Redis 계약 불변. Challenge ON/UserMerged 전체OFF executor 수정은 제외했으며 동시ON 전제는 유지한다.
+- 실제 환경 flag·DB·IAM·Secret·Jira 상태·AWS 배포 변경과 commit/push는 수행하지 않았다. 다음은 사용자 commit/push 및 새 이미지 확인 후 테스트 전용 rollout이다. 기존 test:6/OFF 확인 이력과 구분하며 구 writer drain·최신 DB guard/inventory·Challenge 설정/문제/index·방향별 인증정보·ECS/ALB/HTTPS 검증이 필요하다. Identity 발행/merge 및 회원 통합 E2E는 별도 단계다. Secret/Token 기록 없음.
