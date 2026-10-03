@@ -21,7 +21,7 @@
 
 자동 승인/자동 DDL은 없다. 아래 manifest는 운영 검증 담당자가 **실제 확인한 경우에만** 별도 승인된 작업으로 작성한다. 미검증 상태에서 true를 넣어 기동을 우회하지 않는다.
 
-- `learning_record_deletion_rollout`, `_id=v1`: `writersDrained`, `inventoryApproved`, `writerPathsVerified`; command ON 전에는 `storageVerified`, `mobileContractVerified`도 true여야 한다.
+- `learning_record_deletion_rollout`, `_id=v1`: `writersDrained`, `inventoryApproved`, `writerPathsVerified`; command ON 전에는 `storageVerified`도 true여야 한다. 사용자 결정으로 `mobileContractVerified` 기동 조건은 제거했다. 기존 필드가 없거나 false여도 기동을 차단하지 않으며 DB 값을 변경할 필요가 없다. 앱 동작 확인은 별도 테스트 항목으로 유지한다.
 - 통계 ON 전 `learning_activity_collection_coverage`, `_id=v1`: `liveStartedAt`(실제 수집 시작 시각), `legacyPolicy=LEGACY_FIRST_EVENTS_UNCOVERED`. 최초 부분 KST 일자, 지표별 수집 coverage와 검증 범위를 부가 운영 문서에 남긴다. 사용자·시험 ID를 manifest에 넣지 않는다.
 - read-fence/writer-fence/billing-continuation은 함께 준비한다. command ON은 worker ON을 요구한다. aggregate는 원본 transaction과 같은 경계에서 기록한다.
 - 신규 접수 중단 시 command만 OFF로 내리고 기존 status/fence/worker는 유지한다. active 작업을 둔 채 전체 flags OFF나 구 binary로 rollback하지 않는다.

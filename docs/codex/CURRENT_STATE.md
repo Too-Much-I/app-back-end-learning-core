@@ -1,5 +1,21 @@
 # Learning Core Current State
 
+- 2026-10-03 — TMI-193 사용자 요청으로 mobileContractVerified 기동 검사를 모든 환경에서 제거했다. storageVerified 및 DB/index/JWT/writer 안전 조건은 유지. 모바일 승인 부재/false 허용과 저장소 검증 미충족 거절 회귀 추가, clean test 및 DeletionWiringMongoTest 통과. 로컬 수정만 완료, commit/push·재배포 미실행.
+
+- 2026-10-03 — TMI-193 mobileContractVerified 설명 턴의 식별 표식을 WORKLOG EOF에 보완했다. 실제 앱 검증 미완료 및 삭제 설정 미변경 상태 유지. 이번 보완은 문서만 변경했다.
+
+- 2026-10-03 — TMI-193 mobileContractVerified 의미 재확인: 앱 삭제 UI/재시도/늦은 응답·캐시 처리 검증에 대한 수동 승인 표시이며 자동 검사나 실제 검증 완료 증거가 아니다. 현재 실제 앱 검증 미완료, 이번 코드/설정 변경 없음.
+
+- 2026-10-03 — TMI-193 앱 검증 기동 조건 설명: 앱 자동 감지가 아닌 rollout.mobileContractVerified 수동 승인 gate이며 command ON 때 미충족이면 신규 서버 instance 기동을 거절한다. 서버 API 테스트의 기술적 필수조건은 아니므로 테스트/운영 출시 gate 분리를 권장. 이번에는 설명·문서만, 코드/설정/배포 변경 없음.
+
+- 2026-10-03 — TMI-193 테스트 삭제 활성화 점검 턴 표식을 WORKLOG EOF에 보완했다. 배포 성공/ECS 정상 확인, 삭제 OFF 및 테스트 한정 검증 방식 승인 대기 상태 유지. 추가 코드·원격 변경 없음.
+
+- 2026-10-03 — TMI-193 GitHub run37115287398 Success(da74e87), ECS test:12 실행1/정상1 확인. heartbeat lc 중지(PAUSED). 삭제 flags 기본 OFF 유지. 앱 미준비 상태에서 활성화 재요청이 있으나 command 기동의 mobileContractVerified 기준을 거짓 승인하지 않음. 테스트 한정 승인 기준 변경 여부 확인 필요. DB 점검은 CloudShell pymongo 미설치로 미완료, 실제 IAM/DB/설정 변경·재배포 없음.
+
+- 2026-10-03 — TMI-193 사용자가 LC 테스트 삭제 활성화 범위를 확정했다. AWS 콘솔 로그아웃으로 재로그인 대기, 앱 이중확인/재시도/캐시 계약 검증 여부 확인 대기. flags/manifest·권한·DB·재배포 미변경. read-only 배포 후속 확인 heartbeat `lc` 생성 성공(5분, 최종 결과 후 중지). run 37115287398 최종 성공은 아직 미확인.
+
+- 2026-10-03 — TMI-193 run 37115287398(develop da74e87) 배포 진행 중, merge gate 성공 확인. 이후 설정 변경 요청은 대상/값 확인 대기이며 LC 테스트 삭제 활성화 여부를 질문했다. DB/index/drain/storage/mobile 증거 없이 flags/manifest 변경하지 않음. 배포 최종 상태 5분 후속 확인 요청, 원격 설정 변경/재배포 미실행.
+
 - 2026-10-03 — TMI-193(상위 TMI-136) recoveryCycle 수정 턴의 WORKLOG 식별 표식을 EOF에 보완했다. 로컬 수정 및 단위580/Mongo116/Node114 통과 상태 유지, 추가 코드·배포 변경 없음.
 
 - 2026-10-03 — TMI-193(상위 TMI-136) recoveryCycle 수정 완료: custom repository + 일반 Update 빌더의 CAS successor 저장/version 증가로 BasicUpdate 결함을 우회했다. legacy missing/null, 동일 cycle 경합·stale failure claim, Boot 자동 fragment 등록, 삭제 fence·통계 once/rollback을 검증했다. ./gradlew clean test 단위580, 최종 Mongo116, Node114 모두 통과(실패/skip0), diff check 통과. 기존 API/AI 계약 유지, commit/push·배포 없음. 상세 RECOVERY_CYCLE_DIAGNOSIS.md.

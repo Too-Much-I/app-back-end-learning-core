@@ -28,7 +28,7 @@ public final class DeletionStartupValidator implements InitializingBean {
                 || !Boolean.TRUE.equals(manifest.get("inventoryApproved"))
                 || !Boolean.TRUE.equals(manifest.get("writerPathsVerified"))) fail();
         if (env.getProperty("app.learning-record-deletion.command-enabled", Boolean.class, false)
-                && (!Boolean.TRUE.equals(manifest.get("storageVerified")) || !Boolean.TRUE.equals(manifest.get("mobileContractVerified")))) fail();
+                && !Boolean.TRUE.equals(manifest.get("storageVerified"))) fail();
         index("learning_record_deletion_operations", new Document("userId", 1), true, new Document("activeGuard", true), false);
         index("learning_record_deletion_operations", new Document("activeGuard", 1).append("nextAttemptAt", 1).append("leaseUntil", 1), false, null, false);
         index("learning_record_deletion_operations", new Document("userId", 1).append("requestedAt", -1), false, null, false);

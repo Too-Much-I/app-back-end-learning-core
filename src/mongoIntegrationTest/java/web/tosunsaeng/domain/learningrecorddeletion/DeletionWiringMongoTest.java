@@ -70,6 +70,23 @@ class DeletionWiringMongoTest {
         runner.withPropertyValues("spring.profiles.active=prod", "app.auth.mode=legacy").run(c -> assertThat(c).hasFailed());
     }
 
+    @org.junit.jupiter.params.ParameterizedTest
+    @org.junit.jupiter.params.provider.ValueSource(strings = {"test", "staging", "prod"})
+    void commandStartupDoesNotRequireMobileApproval(String profile) {
+        var manifest = mongo.getCollection("learning_record_deletion_rollout");
+        manifest.updateOne(new Document("_id", "v1"), new Document("$set", new Document("storageVerified", true)));
+        var env = new org.springframework.mock.env.MockEnvironment()
+                .withProperty("app.auth.mode", "jwt")
+                .withProperty("app.learning-record-deletion.command-enabled", "true");
+        env.setActiveProfiles(profile);
+        assertThatCode(() -> new DeletionStartupValidator(mongo, env).afterPropertiesSet()).doesNotThrowAnyException();
+        manifest.updateOne(new Document("_id", "v1"), new Document("$set", new Document("mobileContractVerified", false)));
+        assertThatCode(() -> new DeletionStartupValidator(mongo, env).afterPropertiesSet()).doesNotThrowAnyException();
+        manifest.updateOne(new Document("_id", "v1"), new Document("$unset", new Document("storageVerified", "")));
+        assertThatThrownBy(() -> new DeletionStartupValidator(mongo, env).afterPropertiesSet())
+                .isInstanceOf(IllegalStateException.class);
+    }
+
     void prepare() {
         for (String c : List.of("user_ownership_guards", "withdrawn_user_access_denies", "learning_record_deletion_commands")) mongo.createCollection(c);
         mongo.getCollection("learning_record_deletion_operations").createIndex(new Document("userId", 1),
