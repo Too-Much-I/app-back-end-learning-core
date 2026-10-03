@@ -1,5 +1,7 @@
 # Learning Core Current State
 
+- 2026-10-03 — TMI-193(상위 TMI-136) recoveryCycle 수정 턴의 WORKLOG 식별 표식을 EOF에 보완했다. 로컬 수정 및 단위580/Mongo116/Node114 통과 상태 유지, 추가 코드·배포 변경 없음.
+
 - 2026-10-03 — TMI-193(상위 TMI-136) recoveryCycle 수정 완료: custom repository + 일반 Update 빌더의 CAS successor 저장/version 증가로 BasicUpdate 결함을 우회했다. legacy missing/null, 동일 cycle 경합·stale failure claim, Boot 자동 fragment 등록, 삭제 fence·통계 once/rollback을 검증했다. ./gradlew clean test 단위580, 최종 Mongo116, Node114 모두 통과(실패/skip0), diff check 통과. 기존 API/AI 계약 유지, commit/push·배포 없음. 상세 RECOVERY_CYCLE_DIAGNOSIS.md.
 
 - 2026-10-03 — TMI-193(상위 TMI-136) recoveryCycle 진단 완료: Spring Data MongoDB 4.4.2 BasicUpdate의 @Version 자동 증가가 기존 $inc를 덮어써 recoveryCycle 증가 명령이 유실됨을 callback/hook 없는 격리 Mongo wire로 확인했다. 일반 Update 빌더 대조는 정상 증가. 제품 수정/배포 없음, 상세 RECOVERY_CYCLE_DIAGNOSIS.md. 결과 누락 복구 waiting 및 stale claim fence 영향으로 별도 수정 필요. 전체 회귀 재실행 없음.

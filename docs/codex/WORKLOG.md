@@ -13177,3 +13177,11 @@
 - 실제 Mongo 회귀 추가: 0→1→2, missing/null→1, version/reset, CAS loser/missing ID, 동시 요청 한 winner, old failure claim 차단/current claim 허용, rollback. Boot 자동 repository discovery에서도 fragment 동작을 확인했다. 기존 통계 fixture에 cycle assertion, CAS loser count, 삭제 fence 거절과 통계 rollback을 추가했다.
 - 검증: ./gradlew clean test 단위580, JAVA_TOOL_OPTIONS=-Dapi.version=1.44 ./gradlew mongoIntegrationTest 최종116, node --test scripts/mongodb/*.test.js 114 통과. 실패/skip0. git diff --check 통과. sandbox Gradle cache 접근 제한은 승인된 실행으로 해결했다. 기존 compiler 경고 유지.
 - 수정 파일: QuestionGradingJobRepository/Recovery/RecoveryImpl, LearningActivityRepositoryHooks, QuestionGradingRecoveryMongoTest/LearningActivityMongoTest/MongoRepositoryDiscoveryIntegrationTest, 진단/진행/runbook/현재상태/작업기록 문서. 기존 사용자 변경 보존. 배포·원격 DB 변경·commit/push·실제 사용자 데이터 삭제·Secret/Token 기록 없음. 테스트 서버 실제 검증은 사용자 commit/push와 배포 뒤 후속이다.
+
+## 2026-10-03 — recoveryCycle 수정 턴 기록 표식 보완
+
+<!-- codex-turn:01a10132-83a3-7583-b56a-3037ac8544fd -->
+
+- TMI-193(상위 TMI-136): 이번 턴에서 recoveryCycle CAS 수정과 삭제 fence·통계 연결 보존을 완료했다. 상세 구현 및 검증 결과는 바로 앞 작업 항목에 기록했다.
+- 단위580/Mongo116/Node114 통과 상태 유지. 이번 보완은 WORKLOG append와 CURRENT_STATE 갱신만 수행하며 추가 runtime 변경이나 테스트 재실행은 없다. diff check 및 표식 단일 출현을 확인한다.
+- commit/push·배포·원격 DB 변경 없음. Secret/Token 기록 없음.
