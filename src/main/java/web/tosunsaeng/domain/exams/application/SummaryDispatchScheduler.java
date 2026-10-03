@@ -195,7 +195,7 @@ public class SummaryDispatchScheduler {
                 return null;
             }
             try {
-                return userOwnedTransactionExecutor.execute(observed.getUserId(), () -> {
+                return userOwnedTransactionExecutor.executeExamCoordination(observed.getUserId(), examId, () -> {
                     ExamSession current = examSessionRepository.findById(examId).orElse(null);
                     if (current == null
                             || !java.util.Objects.equals(current.getUserId(), observed.getUserId())) {

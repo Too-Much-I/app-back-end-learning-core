@@ -44,6 +44,9 @@ import java.util.function.Supplier;
 @RequiredArgsConstructor
 public class ExamServiceImpl implements ExamService {
 
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    private web.tosunsaeng.domain.learningrecorddeletion.application.DeletionAccess deletionAccess;
+
     private final RedisTemplate<String, Object> redisTemplate;
     private final software.amazon.awssdk.services.s3.presigner.S3Presigner s3Presigner;
     private final ExamGradingService gradingService;
@@ -143,6 +146,9 @@ public class ExamServiceImpl implements ExamService {
     private ExamSession requireOwnedSession(String examId) {
         ExamSession examSession = resolveSession(examId);
         String currentUserId = currentUserProvider.getCurrentUserId();
+        if (deletionAccess != null && deletionAccess.hidden(
+                web.tosunsaeng.domain.learningrecorddeletion.domain.DeletionTarget.Type.EXAM, examId, currentUserId))
+            throw new ExamsException(ErrorStatus._EXAM_NOT_FOUND);
 
         if (!Objects.equals(examSession.getUserId(), currentUserId)) {
             log.warn(
@@ -214,6 +220,7 @@ public class ExamServiceImpl implements ExamService {
     public ExamResponseDTO.CreateSessionResult createExamSession(String idempotencyKey) {
         long startedAt = System.nanoTime();
         String userId = currentUserProvider.getCurrentUserId();
+        if (deletionAccess != null) deletionAccess.requirePublicWrite(userId);
         ExamSessionManager.Assignment assignment = billingSagaProperties.isCreationSagaEnabled()
                 ? billingExamCreationSaga.start(userId, idempotencyKey)
                 : examSessionManager.startNew(userId);
@@ -221,6 +228,7 @@ public class ExamServiceImpl implements ExamService {
         String redisKey = "exam:status:" + examId;
 
         redisTemplate.opsForValue().set(redisKey, ExamStatus.PENDING.name(), 1, TimeUnit.HOURS);
+        if (deletionAccess != null && deletionAccess.freshSealedExam(examId)) redisTemplate.delete(redisKey);
 
         MockExam mockExam = assignment.mockExam();
         List<ExamResponseDTO.QuestionDTO> questionDTOs = mockExam.getQuestions().stream()
@@ -283,6 +291,7 @@ public class ExamServiceImpl implements ExamService {
     // 사용자가 가상으로 녹음 오디오 파일을 업로드할 수 있는 임시 S3 PutObject용 Presigned URL을 발급합니다.
     @Override
     public ExamResponseDTO.UploadUrlResult getPresignedUrl(String examId, Integer questionNumber, Integer retryCount) {
+        if (deletionAccess != null) deletionAccess.requirePublicWrite(currentUserProvider.getCurrentUserId());
         if (userOwnedTransactionExecutor == null || !userOwnedTransactionExecutor.enabled()) {
             return getPresignedUrlInTransaction(examId, questionNumber, retryCount);
         }
@@ -334,6 +343,7 @@ public class ExamServiceImpl implements ExamService {
     // 기존 submit 계약은 유지하고 결정적 Job을 생성한 최초 요청만 AI 채점을 시작합니다.
     @Override
     public ExamResponseDTO.SubmitResult submitAudio(String examId, Integer questionNumber, Integer retryCount) {
+        if (deletionAccess != null) deletionAccess.requirePublicWrite(currentUserProvider.getCurrentUserId());
         requireOwnedNotAbandonedSession(examId);
         ExamStatus status = gradingService.submitQuestion(examId, questionNumber, retryCount);
         if (GradingKeys.canonicalRetryCount(retryCount) == 0) {
@@ -344,6 +354,7 @@ public class ExamServiceImpl implements ExamService {
 
     @Override
     public ExamResponseDTO.GradingRetryResult retryGrading(String examId) {
+        if (deletionAccess != null) deletionAccess.requirePublicWrite(currentUserProvider.getCurrentUserId());
         requireOwnedInProgressSession(examId);
         return gradingService.retryExam(examId);
     }
@@ -360,6 +371,14 @@ public class ExamServiceImpl implements ExamService {
     // AI 서버 연산 완료 후 백엔드 웹훅 콜백을 통해 인입된 분석 스코어와 텍스트 피드백 데이터를 처리합니다.
     @Override
     public void updateExamResult(ExamRequestDTO.AiResultReq req) {
+        if (deletedCallback(req.getExamId())) return;
+        try { updateVisibleExamResult(req); }
+        catch (RuntimeException failure) {
+            if (!deletedCallback(req.getExamId())) throw failure;
+        }
+    }
+
+    private void updateVisibleExamResult(ExamRequestDTO.AiResultReq req) {
         if (userOwnedTransactionExecutor == null || !userOwnedTransactionExecutor.enabled()) {
             updateExamResultWithoutGuard(req);
             return;
@@ -404,6 +423,7 @@ public class ExamServiceImpl implements ExamService {
             gradingService.completeQuestion(examId, req.getQuestionNumber(), retryCount);
         });
 
+        if (deletedCallback(examId)) return;
         gradingService.ensureSummaryStartedIfReady(examId);
         if (retryCount == 0) {
             reconcileAttemptGroup(examId);
@@ -1053,19 +1073,28 @@ public class ExamServiceImpl implements ExamService {
     }
 
     private <T> T executeCallbackForCurrentOwner(String examId, Supplier<T> callbackCommand) {
+        if (userOwnedTransactionExecutor == null || !userOwnedTransactionExecutor.enabled()) return callbackCommand.get();
         RuntimeException lastFailure = null;
         for (int attempt = 0; attempt < 3; attempt++) {
-            ExamSession observed = resolveSession(examId);
+            if (deletionAccess != null && deletionAccess.sealed(
+                    web.tosunsaeng.domain.learningrecorddeletion.domain.DeletionTarget.Type.EXAM, examId)) return null;
             try {
-                return userOwnedTransactionExecutor.execute(observed.getUserId(), () -> {
+                ExamSession observed = resolveSession(examId);
+                return userOwnedTransactionExecutor.executeExamCoordination(observed.getUserId(), examId, () -> {
                     ExamSession current = resolveSession(examId);
                     if (!Objects.equals(current.getUserId(), observed.getUserId())) {
                         throw new CallbackOwnerChangedException();
                     }
                     return callbackCommand.get();
                 });
+            } catch (web.tosunsaeng.domain.learningrecorddeletion.application.DeletionFailure deletion) {
+                if (deletedCallback(examId)) return null;
+                throw deletion;
             } catch (UserOwnershipGuardException | CallbackOwnerChangedException race) {
                 lastFailure = race;
+            } catch (RuntimeException failure) {
+                if (deletedCallback(examId)) return null;
+                throw failure;
             }
         }
         throw lastFailure == null
@@ -1077,6 +1106,11 @@ public class ExamServiceImpl implements ExamService {
         NO_OP,
         FAILED,
         COMPLETED
+    }
+
+    private boolean deletedCallback(String examId) {
+        return deletionAccess != null && deletionAccess.sealed(
+                web.tosunsaeng.domain.learningrecorddeletion.domain.DeletionTarget.Type.EXAM, examId);
     }
 
     private static final class CallbackOwnerChangedException extends RuntimeException {

@@ -18,7 +18,17 @@ import java.time.Clock;
 @Import(ClockConfiguration.class)
 @ConditionalOnProperty(prefix = "app.challenge", name = "enabled", havingValue = "true")
 public class ChallengeConfiguration {
-    @Bean public ChallengeStore challengeStore(MongoTemplate mongo) { return new ChallengeStore(mongo); }
+    @Bean public ChallengeStore challengeStore(MongoTemplate mongo,
+            org.springframework.beans.factory.ObjectProvider<web.tosunsaeng.domain.learningrecorddeletion.application.DeletionAccess> access,
+            org.springframework.beans.factory.ObjectProvider<web.tosunsaeng.domain.learningrecorddeletion.infrastructure.DeletionPersistenceFence> fence,
+            org.springframework.beans.factory.ObjectProvider<web.tosunsaeng.domain.learningrecorddeletion.analytics.LearningActivityMongoCallback> metrics) {
+        ChallengeStore store = new ChallengeStore(mongo);
+        store.setDeletionAccess(access.getIfAvailable());
+        java.util.List<org.springframework.data.mapping.callback.EntityCallback<?>> callbacks = new java.util.ArrayList<>();
+        fence.ifAvailable(callbacks::add); metrics.ifAvailable(callbacks::add);
+        if (!callbacks.isEmpty()) store.setPersistenceCallbacks(callbacks.toArray(org.springframework.data.mapping.callback.EntityCallback<?>[]::new));
+        return store;
+    }
     @Bean public ChallengeTransactions challengeTransactions(MongoDatabaseFactory factory, UserOwnedTransactionExecutor guards) { return new ChallengeTransactions(factory, guards); }
     @Bean public ChallengeCatalog challengeCatalog(ChallengeStore store, Clock clock) { return new ChallengeCatalog(store.mongo, clock); }
     @Bean public ChallengeAudioStorage challengeAudioStorage(S3Client s3, S3Presigner presigner, @Value("${spring.cloud.aws.s3.bucket}") String bucket) {

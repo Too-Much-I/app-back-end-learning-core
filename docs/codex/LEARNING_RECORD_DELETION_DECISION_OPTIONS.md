@@ -1,8 +1,8 @@
 # 학습 기록 독립 삭제 기능 결정 선택지
 
 - 작성일: 2026-09-21
-- 상태: 2026-09-22 추가 정책 승인·리뷰 보완 반영, runtime 미구현
-- Jira: 없음
+- 상태: 제품 정책 유지, 2026-10-03 삭제 API·fence·worker·일별 집계 구현/로컬 검증 추가. 실제 rollout 검증 및 Billing 증거 retention 연결 전 기본 OFF 유지(IMPLEMENTATION_PROGRESS 참조)
+- Jira: [TMI-193](https://to-teacher.atlassian.net/browse/TMI-193), 상위 TMI-136
 - 대상: 로그아웃·회원 탈퇴와 독립적으로 현재 사용자의 Learning Core 학습 기록을 삭제하는 기능
 
 ## 권장 기본안

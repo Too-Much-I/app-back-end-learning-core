@@ -127,7 +127,8 @@ public class BillingExamCreationSaga {
         BillingReservationClient.PhoneContinuationSnapshot continuation = null;
         ExamSessionManager.PreparedAssignment prepared;
         if (properties.isPhoneContinuationEnabled()
-                && !sessionRepository.existsByUserId(userId)) {
+                && !sessionRepository.existsByUserId(userId)
+                && !sessionManager.hasDeletedBillingContinuation(userId)) {
             try {
                 continuation = billingClient.findPhoneContinuation(userId).orElse(null);
             } catch (BillingClientException failure) {
@@ -812,7 +813,7 @@ public class BillingExamCreationSaga {
 
     private ExamCreationOperation insertPrepared(ExamCreationOperation operation) {
         try {
-            if (execution != null || transactionService.userMergedWriterEnabled()) {
+            if (execution != null || transactionService.requiresCreationTransaction()) {
                 return transactionService.insertPrepared(operation);
             }
             return operationRepository.insert(operation);
@@ -823,7 +824,7 @@ public class BillingExamCreationSaga {
 
     private ExamCreationOperation saveOperation(ExamCreationOperation operation) {
         try {
-            if (execution != null || transactionService.userMergedWriterEnabled()) {
+            if (execution != null || transactionService.requiresCreationTransaction()) {
                 return transactionService.saveOperation(operation);
             }
             return operationRepository.save(operation);

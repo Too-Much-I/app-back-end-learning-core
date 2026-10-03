@@ -41,6 +41,7 @@ public class ChallengeWorker {
         } catch (RuntimeException failure) { metrics.record(Stage.expiry, Outcome.temporary_failure, start); }
     }
     public void dispatch(Job observed) {
+        if (store.deleted(observed.attemptId)) return;
         long started = System.nanoTime();
         Attempt observedAttempt = store.attempt(observed.attemptId);
         if (observedAttempt == null) return;
@@ -77,6 +78,7 @@ public class ChallengeWorker {
     }
     private Job claim(String id) {
         Job j = store.job(id); if (j == null) return null;
+        if (store.deleted(j.attemptId)) return null;
         Attempt a = store.attempt(j.attemptId); Instant now = clock.instant();
         if (a == null || a.generation != j.generation || a.gradingTerminal()) return null;
         if (j.state == JobState.WAITING_CALLBACK) {
@@ -93,7 +95,7 @@ public class ChallengeWorker {
         return store.save(j);
     }
     private boolean owned(Attempt a, Job j, Job claim) {
-        return a != null && j != null && !a.gradingTerminal() && a.generation == claim.generation
+        return a != null && j != null && !store.deleted(a.id) && !a.gradingTerminal() && a.generation == claim.generation
                 && j.state == JobState.DISPATCHING && claim.leaseToken.equals(j.leaseToken) && clock.instant().isBefore(j.leaseUntil);
     }
     private void finish(Attempt observed, Job claim, ChallengeAiClient.Reply reply, String failureCode, long start) {

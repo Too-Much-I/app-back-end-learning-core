@@ -149,6 +149,29 @@ class BillingExamCreationSagaTest {
     }
 
     @Test
+    void deletedLocalContinuationPrecedesPhoneDiscoveryAndUsesAtomicInsertion() {
+        properties.setPhoneContinuationEnabled(true);
+        when(sessionManager.hasDeletedBillingContinuation(USER_ID)).thenReturn(true);
+        when(sessionManager.prepareForBilling(USER_ID)).thenReturn(new ExamSessionManager.PreparedAssignment(
+                SESSION_ID, mockExam, 2, LocalDateTime.ofInstant(NOW, ZoneOffset.UTC),
+                "deleted-source", GROUP_ID, MOCK_EXAM_ID));
+        when(transactionService.requiresCreationTransaction()).thenReturn(true);
+        when(transactionService.insertPrepared(any())).thenAnswer(invocation -> {
+            ExamCreationOperation operation = invocation.getArgument(0);
+            assertEquals("deleted-source", operation.getReplacementSourceSessionId());
+            assertEquals(GROUP_ID, operation.getExpectedAttemptGroupId());
+            assertEquals(null, operation.getContinuationReason());
+            throw new IllegalStateException("fixture stops before remote reserve");
+        });
+
+        assertThrows(IllegalStateException.class, () -> saga.start(USER_ID, OPERATION_ID));
+
+        verifyNoInteractions(billingClient);
+        verify(operationRepository, never()).insert(any(ExamCreationOperation.class));
+        verify(transactionService).insertPrepared(any());
+    }
+
+    @Test
     void invalidPhoneContinuationGroupIsRejectedBeforePreparedOperationInsert() {
         properties.setPhoneContinuationEnabled(true);
         when(operationRepository.findByUserIdAndOperationId(USER_ID, OPERATION_ID))

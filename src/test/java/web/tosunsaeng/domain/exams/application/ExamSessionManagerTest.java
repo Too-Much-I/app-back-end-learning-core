@@ -88,6 +88,34 @@ class ExamSessionManagerTest {
     }
 
     @Test
+    void deletedSourceFeedsExistingReplacementContractWithoutRecreatingOldSession() {
+        var store = org.mockito.Mockito.mock(web.tosunsaeng.domain.learningrecorddeletion.infrastructure.DeletedExamContinuationStore.class);
+        org.springframework.test.util.ReflectionTestUtils.setField(manager, "deletedExamContinuations", store);
+        var deleted = web.tosunsaeng.domain.learningrecorddeletion.domain.DeletedExamContinuation.capture(
+                "139f345b-9be8-43a3-a63d-9108df972741", ExamSession.builder()
+                        .examId("deleted-source").userId(USER_ID).mockExamId("mock_exam_002").cycleNumber(3)
+                        .attemptGroupId("018f6f36-2f42-4bf5-8c17-0be35de4872e")
+                        .billingReservationId("reservation-old").creationOperationId("operation-old")
+                        .entitlementState(web.tosunsaeng.domain.exams.domain.enums.ExamEntitlementState.CONFIRMED)
+                        .status(ExamSessionStatus.IN_PROGRESS)
+                        .attemptGroupProjectionStatus(web.tosunsaeng.domain.exams.attemptgroup.domain.AttemptGroupProjectionStatus.OPEN)
+                        .build(), NOW);
+        when(store.findAvailable(USER_ID)).thenReturn(java.util.Optional.of(deleted));
+        when(examSessionRepository.findActiveOrLegacyCandidatesByUserId(USER_ID)).thenReturn(List.of());
+        when(examSessionRepository.findLatestRetakeAvailableByUserId(USER_ID)).thenReturn(java.util.Optional.empty());
+        when(mockExamCatalogService.getRequiredExam("mock_exam_002")).thenReturn(mockExam(2));
+
+        var prepared = manager.prepareForBilling(USER_ID);
+
+        assertEquals("deleted-source", prepared.replacementSourceSessionId());
+        assertEquals(deleted.getAttemptGroupId(), prepared.expectedAttemptGroupId());
+        assertEquals(3, prepared.cycleNumber());
+        assertNotEquals("deleted-source", prepared.sessionId());
+        verify(examSessionRepository, never()).insert(any(ExamSession.class));
+        verify(examSessionRepository, never()).abandonIfInProgress(any());
+    }
+
+    @Test
     void billingPreparationKeepsExistingAttemptGroupMockExamWithoutMutatingSessions() {
         ExamSession existing = ExamSession.builder()
                 .examId("exam_group_active")

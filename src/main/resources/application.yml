@@ -24,6 +24,13 @@ spring:
       max-request-size: 10MB
 
 app:
+  learning-record-deletion:
+    command-enabled: ${LEARNING_RECORD_DELETION_COMMAND_ENABLED:false}
+    read-fence-enabled: ${LEARNING_RECORD_DELETION_READ_FENCE_ENABLED:false}
+    writer-fence-enabled: ${LEARNING_RECORD_DELETION_WRITER_FENCE_ENABLED:false}
+    worker-enabled: ${LEARNING_RECORD_DELETION_WORKER_ENABLED:false}
+    billing-continuation-enabled: ${LEARNING_RECORD_DELETION_BILLING_CONTINUATION_ENABLED:false}
+    aggregate-enabled: ${LEARNING_RECORD_DELETION_AGGREGATE_ENABLED:false}
   challenge:
     enabled: ${CHALLENGE_ENABLED:false}
     ai-endpoint: ${CHALLENGE_AI_ENDPOINT:}

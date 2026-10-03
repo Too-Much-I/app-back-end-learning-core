@@ -20,6 +20,9 @@ import java.util.List;
 
 public class UserMergedTransactionService {
 
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    private web.tosunsaeng.domain.learningrecorddeletion.application.DeletionAccess deletionAccess;
+
     private final UserMergedInboxRepository inboxRepository;
     private final WithdrawnUserAccessDenyRepository withdrawalRepository;
     private final ExamCreationOperationRepository operationRepository;
@@ -85,6 +88,12 @@ public class UserMergedTransactionService {
                 .toList();
         for (String userId : guardOrder) {
             guardService.touchActive(userId, event.receivedAt());
+            if (deletionAccess != null) {
+                try { deletionAccess.requireNoActiveDeletion(userId); }
+                catch (web.tosunsaeng.domain.learningrecorddeletion.application.DeletionFailure activeDeletion) {
+                    throw new UserMergedEventException(UserMergedEventException.Reason.RETRYABLE_PRECONDITION);
+                }
+            }
         }
 
         List<ExamSession> sourceActive = findEffectiveActiveSessions(event.sourceUserId());

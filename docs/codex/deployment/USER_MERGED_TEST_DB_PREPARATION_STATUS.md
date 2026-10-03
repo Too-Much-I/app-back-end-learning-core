@@ -78,3 +78,12 @@
 - 배포 시 desired0→1과 revision 전환을 동시에 요청하자 기존 revision6 태스크 `710fb2ecc26a485a8bad2703430ade47`도 일시 생성됐다. 다음 활성화 시에는 desired0 상태에서 신규 revision으로 먼저 전환·이전 deployment 정리를 확인하고, writer 부재 상태의 최종 inventory 후 scale-up을 분리해야 한다. 실제 통합 이벤트는 전송하지 않았다.
 - 실패 반복을 막기 위해 desired0으로 내린 뒤 정상 test:6/OFF 복구를 요청했다. template도 OFF로 유지한다. 첫 merge 이후 deny-unaware rollback 금지 규칙은 유지하며 이번 실패는 consumer 기동 전이다.
 - 로컬 전체 단위 테스트548개 및 migration Node7개 통과. 이번 턴 Mongo 통합 suite는 재실행하지 않았으며 실제 테스트 DB의 준비/rollback canary로 배포 전 조건을 확인했다. 인증·204·멱등성/소유권/source deny·성능 E2E는 새 이미지 배포 후 남는다.
+
+## 2026-09-30 최종 업데이트: 공용 Clock 이미지 활성화 성공
+
+- 위 Repository/Clock 실패 및 OFF 복구 설명은 이전 이력이다. 현재 TMI-125/TMI-126/TMI-187 후속 공용 Clock 커밋3d72a597008dd5be9eaf5311b9013d86849ba556 배포 완료. 수동 Actions36668159711 성공 후 동일 이미지로 test:11 활성화, 단일 COMPLETED·1/1/0·ALB healthy·HTTPS200/UP 확인.
+- UserMerged writer/source-deny/consumer 및 Challenge ON. workload issuer/JWKS는 Identity 테스트 공개 주소, Challenge AI endpoint 및 기존 방향별 Secret 참조 적용. Billing/AttemptGroup/withdrawal OFF 유지, Identity/운영/권한 변경 없음.
+- 구 writer 실제 STOPPED 후 최종 DB 검증61998f88b2a145db8212dfc36543c4ef STOPPED/exit0: owner/정합성오류/누락인덱스0, rollback·기존 문제/시험 보존 성공. 새 앱의 transaction_capability verified, Clock 충돌 및 조회 로그ERROR 없음.
+- 사후 카탈로그 검사ee45e01165674ae1926a6295c2c2dfdd STOPPED/exit0,100일/300문제·9인덱스 및 최초 기준일2026-09-30(Asia/Seoul) 확인. 재배포 때 기준일을 초기화하지 않는다.
+- 연결 검사75b003d002d74905b0ced525f219e962 STOPPED/exit0: AI ready200·무인증401·정상 인증/빈 본문422, LC health200·콜백 무인증401·정상 인증/빈 본문400, UserMerged 무인증401. 진단용 이전 AI ECR pull403은 공개 Python 이미지 사용으로 해결했으며 IAM 확대 없음.
+- 남은 검증: Identity의 기존 UserMerged 전용 publisher/workload/merge 설정 후 실제204·멱등성·owner 이전/source deny·성능 E2E, MEMBER 챌린지 학습 및 실제 AI 채점. 이번에는 실제 이벤트·음성/Job 전송 없이 LC 준비 및 연결 검증까지만 수행했다. 첫 merge 이후 deny-unaware 버전/flags OFF로 롤백하지 않는다.
