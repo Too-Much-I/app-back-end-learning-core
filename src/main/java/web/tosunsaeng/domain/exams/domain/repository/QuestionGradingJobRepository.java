@@ -9,7 +9,7 @@ import java.time.Instant;
 import java.util.Collection;
 import java.util.List;
 
-public interface QuestionGradingJobRepository extends MongoRepository<QuestionGradingJob, String> {
+public interface QuestionGradingJobRepository extends MongoRepository<QuestionGradingJob, String>, QuestionGradingJobRecovery {
     List<QuestionGradingJob> findByExamIdAndRetryCount(String examId, Integer retryCount);
 
     @Query(
@@ -38,11 +38,4 @@ public interface QuestionGradingJobRepository extends MongoRepository<QuestionGr
             Instant failedAt,
             String failureReason);
 
-    @Query("{ '_id': ?0, 'status': 'COMPLETED', "
-            + "'$expr': { '$eq': [ { '$ifNull': [ '$recoveryCycle', 0 ] }, ?1 ] } }")
-    @Update("{ '$set': { 'status': 'PENDING', 'dispatchAttempt': 0, 'pendingAt': ?2, "
-            + "'processingStartedAt': null, 'lastDispatchedAt': null, 'completedAt': null, "
-            + "'failedAt': null, 'failureReason': null }, "
-            + "'$inc': { 'recoveryCycle': 1, 'version': 1 } }")
-    long reopenCompletedMissingResult(String jobId, int expectedRecoveryCycle, Instant pendingAt);
 }

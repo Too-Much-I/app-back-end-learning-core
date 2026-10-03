@@ -572,6 +572,15 @@ TMI-116에서 AttemptGroup outbox/publisher를 제외한 것은 해당 Jira의 �
 
 # Redis 및 S3 규칙
 
+## TMI-193 학습 기록 독립 삭제 구현 허용
+
+- 2026-10-03 사용자 구현 요청으로 `docs/codex/LEARNING_RECORD_DELETION_IMPLEMENTATION_PLAN.md`의 Learning Core 구현·로컬 테스트를 허용한다. 상위 이슈는 TMI-136이다.
+- 신규 삭제 command/status API, 전용 operation/command/target 및 최소 Billing coordination 증거, 기존 writer/read/Callback의 삭제 fence, bounded Mongo/S3/Redis cleanup과 비식별 일별 집계를 추가할 수 있다.
+- 기존 공개 API/DTO/BaseResponse, retryCount, AI `user_id=examId`, Callback JSON과 S3/Redis key 계약은 유지한다. 신규 삭제 전용 API/DTO/오류만 추가한다.
+- 삭제는 Identity 계정·Token, Billing 소비·무료 기회·outbox를 삭제하거나 복원하지 않는다. 집계에는 개인·시험 식별자를 넣지 않는다. 안전 checkpoint 뒤 cleanup은 sealed target ID만 사용한다.
+- 기존 UserMerged·AttemptGroup·Challenge의 제외 문구는 해당 과제 범위이며 이 삭제 전용 구현을 금지하지 않는다. 다른 저장소 수정, 운영 데이터 삭제, AWS/IAM 변경, 배포와 feature 활성화는 허용하지 않는다.
+- 모든 flag는 기본 OFF다. 전체 fence·coordination·cleanup 연결 전에는 활성화를 거절한다. Billing 실제 fixture·모바일 계약·S3 권한/보존과 staging E2E는 출시 전 별도 검증한다.
+
 기존 Redis 상태 및 Lock 흐름을 임의로 변경하지 않는다.
 
 application.yml에 app.redis.key-prefix 설정이 있더라도 명시적인 구현 요청이 있기 전에는 Redis 키 구조를 전면 변경하지 않는다.

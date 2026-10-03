@@ -15,12 +15,16 @@ public class ChallengeCallbackService {
     }
     public void accept(ChallengeCallback c) {
         long start = System.nanoTime();
+        CallbackReceipt previous = store.callback(c.callbackId());
+        if (previous != null) same(previous, c);
+        if (store.deleted(c.attemptId())) return;
         Attempt observed = store.attempt(c.attemptId());
         if (observed == null) throw new ChallengeFailure(404, "ATTEMPT_NOT_FOUND");
         try {
             Outcome outcome = tx.run(observed.userId, () -> apply(c));
             metrics.record(Stage.callback, outcome, start);
         } catch (RuntimeException failure) {
+            if (store.deleted(c.attemptId())) return;
             if (failure instanceof ChallengeFailure) { metrics.record(Stage.callback, Outcome.conflict, start); throw failure; }
             CallbackReceipt receipt = store.callback(c.callbackId());
             if (receipt != null) {
@@ -34,6 +38,7 @@ public class ChallengeCallbackService {
         }
     }
     private Outcome apply(ChallengeCallback c) {
+        if (store.deleted(c.attemptId())) return Outcome.stale;
         Attempt a = store.attempt(c.attemptId());
         if (a == null) throw new ChallengeFailure(404, "ATTEMPT_NOT_FOUND");
         Job j = store.job(c.jobId());

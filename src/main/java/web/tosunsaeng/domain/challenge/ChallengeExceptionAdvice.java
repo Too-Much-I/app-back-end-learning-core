@@ -17,6 +17,8 @@ import java.util.Map;
 public class ChallengeExceptionAdvice {
     @ExceptionHandler(Exception.class)
     public ResponseEntity<?> error(Exception exception, HttpServletRequest request) {
+        if (exception instanceof web.tosunsaeng.domain.learningrecorddeletion.application.DeletionFailure failure)
+            return ResponseEntity.status(failure.status()).body(new BaseResponse<>(false, failure.code(), "학습 기록 삭제 상태를 확인해 주세요.", null));
         boolean internal = request.getRequestURI().equals(ChallengeCallbackController.PATH);
         ChallengeFailure error;
         if (exception instanceof ChallengeFailure failure) error = failure;

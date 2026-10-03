@@ -63,6 +63,7 @@ public class ChallengeService {
                 a != null && a.terminal() ? "submitted" : "not_started", a == null ? "not_requested" : a.gradingStatus);
     }
     public Start start(String owner, int q, String date) {
+        store.requirePublicWrite(owner);
         ChallengeCatalog.number(q); catalog.requireToday(date);
         List<Question> questions = catalog.questions(LocalDate.parse(date));
         previous(range(owner, date, date), q);
@@ -83,6 +84,7 @@ public class ChallengeService {
                 return ChallengeViews.start(store.insert(Attempt.create(UUID.randomUUID().toString(), owner, date, questions.get(q - 1), now)));
             });
         } catch (RuntimeException failure) {
+            if (failure instanceof web.tosunsaeng.domain.learningrecorddeletion.application.DeletionFailure) throw failure;
             if (failure instanceof ChallengeFailure) throw failure;
             Attempt winner = store.question(owner, date, q);
             if (winner != null) {
@@ -92,10 +94,16 @@ public class ChallengeService {
         }
     }
     public UploadResponse upload(String owner, String id) {
+        store.requirePublicWrite(owner);
         Attempt a = expire(store.owned(ChallengeCatalog.uuid(id), owner)); requireSubmittable(a);
-        return new UploadResponse(a.id, a.submissionDeadlineAt, audio.upload(a, clock.instant()));
+        return tx.run(owner, () -> {
+            Attempt current = store.owned(a.id, owner); requireSubmittable(current);
+            if (!clock.instant().isBefore(current.submissionDeadlineAt)) throw expired();
+            return new UploadResponse(current.id, current.submissionDeadlineAt, audio.upload(current, clock.instant()));
+        });
     }
     public Submission submit(String owner, int q, String id, String key) {
+        store.requirePublicWrite(owner);
         ChallengeCatalog.number(q); String attemptId = ChallengeCatalog.uuid(id), normalizedKey = ChallengeCatalog.uuid(key);
         Attempt a = store.owned(attemptId, owner);
         if (a.questionNumber != q) throw ChallengeFailure.badRequest();
@@ -123,6 +131,7 @@ public class ChallengeService {
             });
             if (response == null) throw expired(); return response;
         } catch (RuntimeException failure) {
+            if (failure instanceof web.tosunsaeng.domain.learningrecorddeletion.application.DeletionFailure) throw failure;
             if (failure instanceof ChallengeFailure) throw failure;
             // A commit acknowledgement may be lost; only a complete durable success is replayable.
             Submission recovered = replay(owner, normalizedKey, attemptId, q);

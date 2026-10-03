@@ -4,8 +4,8 @@
 - 대상 저장소: `Too-Much-I/app-back-end-learning-core`
 - 기준 브랜치/리비전: `develop@16eb5de`
 - 제품 결정: `docs/codex/LEARNING_RECORD_DELETION_DECISION_OPTIONS.md`
-- 상태: 2026-09-22 추가 제품 정책 승인·리뷰 보완 반영, runtime 미구현
-- Jira: 없음
+- 상태: 2026-10-03 삭제 API·조회/쓰기/Callback fence·cleanup worker·일별 집계 코드와 로컬 테스트 추가. 기본 OFF, Billing 증거 최종 retention 및 실제 인프라/모바일 E2E·rollout 검증 전 활성화 금지
+- Jira: [TMI-193](https://to-teacher.atlassian.net/browse/TMI-193), 상위 TMI-136
 
 ## 0. 결론
 
@@ -15,7 +15,7 @@
 4. Billing 소비, 무료 기회 사용, AttemptGroup 전달, UserMerged/UserWithdrawn와 삭제 멱등성에 필요한 최소 증거는 삭제하지 않는다. 개인에게 재연결할 수 없는 서비스 집계 지표도 유지하되 사용자별 counter는 삭제한다. 삭제로 credit·무료 기회·응시권을 생성하거나 복원하지 않는다.
 5. 단순 물리 정리 지연은 `CLEANUP_DELAYED`로 두고 새 학습을 허용한다. target·ownership·Billing·commit outcome이 불확실한 경우만 `NEEDS_REVIEW`로 차단하며, 두 경우 모두 같은 operation을 복구해 `COMPLETED`로 수렴시킨다.
 
-이 문서는 구현 순서와 계약을 확정하는 계획서다. endpoint, collection, worker, mobile app 또는 운영 환경은 아직 변경되지 않았다.
+이 문서는 구현 순서와 계약을 확정하는 계획서다. 2026-10-03 로컬 부분 구현 현황은 `docs/codex/LEARNING_RECORD_DELETION_IMPLEMENTATION_PROGRESS.md`를 따른다. 공개 endpoint·worker·모바일 앱·원격 DB·운영 환경은 아직 변경하지 않았다.
 
 ### 0.1 반드시 읽을 추가 확정 사항 — 2026-09-22
 

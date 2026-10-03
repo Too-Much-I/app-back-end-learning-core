@@ -52,6 +52,14 @@ public class ExamReadService {
     private final ExamResultRepository examResultRepository;
     private final QuestionGradingJobRepository questionGradingJobRepository;
     private final CurrentUserProvider currentUserProvider;
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    private web.tosunsaeng.domain.learningrecorddeletion.application.DeletionAccess deletionAccess;
+
+    private boolean hidden(ExamSession session) {
+        return deletionAccess != null && deletionAccess.hidden(
+                web.tosunsaeng.domain.learningrecorddeletion.domain.DeletionTarget.Type.EXAM,
+                session.getExamId(), session.getUserId());
+    }
 
     public ExamResponseDTO.ExamHistoryResult getExamHistory() {
         String currentUserId = currentUserProvider.getCurrentUserId();
@@ -61,6 +69,7 @@ public class ExamReadService {
                 .filter(session -> session != null
                         && Objects.equals(session.getUserId(), currentUserId)
                         && session.getCompletedAt() != null)
+                .filter(session -> !hidden(session))
                 .sorted(HISTORY_ORDER)
                 .toList();
 
@@ -185,6 +194,7 @@ public class ExamReadService {
             );
             throw new ExamsException(ErrorStatus._FORBIDDEN);
         }
+        if (hidden(session)) throw new ExamsException(ErrorStatus._EXAM_NOT_FOUND);
         if (session.isEntitlementConfirming()) {
             throw new ExamsException(ErrorStatus._EXAM_CREATION_PROCESSING, 1);
         }

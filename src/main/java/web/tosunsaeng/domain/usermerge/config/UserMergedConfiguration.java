@@ -43,7 +43,7 @@ import web.tosunsaeng.global.config.ClockConfiguration;
 @EnableConfigurationProperties(UserMergedProperties.class)
 @ConditionalOnExpression("${app.user-merged.writer-enabled:false} || "
         + "${app.user-merged.consumer-enabled:false} || "
-        + "${app.user-merged.source-deny-enabled:false}")
+        + "${app.user-merged.source-deny-enabled:false} || ${app.learning-record-deletion.writer-fence-enabled:false}")
 @Import(ClockConfiguration.class)
 public class UserMergedConfiguration {
 
@@ -62,16 +62,18 @@ public class UserMergedConfiguration {
 
     @Bean(name = "userOwnedMongoTransactionManager")
     @ConditionalOnExpression("${app.user-merged.writer-enabled:false} || "
-            + "${app.user-merged.consumer-enabled:false}")
+            + "${app.user-merged.consumer-enabled:false} || ${app.learning-record-deletion.writer-fence-enabled:false}")
     public MongoTransactionManager userOwnedMongoTransactionManager(
             MongoDatabaseFactory databaseFactory
     ) {
-        return new MongoTransactionManager(databaseFactory);
+        return new MongoTransactionManager(databaseFactory, com.mongodb.TransactionOptions.builder()
+                .readConcern(com.mongodb.ReadConcern.SNAPSHOT).writeConcern(com.mongodb.WriteConcern.MAJORITY)
+                .readPreference(com.mongodb.ReadPreference.primary()).build());
     }
 
     @Bean(name = "userOwnedTransactionOperations")
     @ConditionalOnExpression("${app.user-merged.writer-enabled:false} || "
-            + "${app.user-merged.consumer-enabled:false}")
+            + "${app.user-merged.consumer-enabled:false} || ${app.learning-record-deletion.writer-fence-enabled:false}")
     public TransactionOperations userOwnedTransactionOperations(
             @Qualifier("userOwnedMongoTransactionManager") MongoTransactionManager transactionManager
     ) {

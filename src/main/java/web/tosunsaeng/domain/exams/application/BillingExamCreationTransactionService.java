@@ -15,6 +15,7 @@ import web.tosunsaeng.domain.exams.attemptgroup.infrastructure.AttemptGroupEvent
 import web.tosunsaeng.domain.exams.domain.repository.ExamCreationOperationRepository;
 import web.tosunsaeng.domain.exams.domain.repository.ExamSessionRepository;
 import web.tosunsaeng.domain.usermerge.application.UserOwnedTransactionExecutor;
+import web.tosunsaeng.domain.learningrecorddeletion.infrastructure.DeletedExamContinuationStore;
 
 import java.time.Duration;
 import java.time.Instant;
@@ -36,6 +37,9 @@ public class BillingExamCreationTransactionService {
 
     @Autowired(required = false)
     private UserOwnedTransactionExecutor userOwnedTransactionExecutor;
+
+    @Autowired(required = false)
+    private DeletedExamContinuationStore deletedExamContinuations;
 
     @Autowired(required = false)
     private web.tosunsaeng.domain.exams.billing.reconciliation.ReservationOperationExecution execution;
@@ -73,6 +77,7 @@ public class BillingExamCreationTransactionService {
     public ExamCreationOperation commitReservedSession(String commandId, Instant committedAt, ZoneId zone) {
         return inTransaction(() -> {
             ExamCreationOperation operation = required(commandId);
+            if (userOwnedTransactionExecutor != null) userOwnedTransactionExecutor.requirePublicWrite(operation.getUserId());
             touchOwner(operation.getUserId());
             if (operation.getState() == ExamCreationState.SESSION_COMMITTED
                     || operation.getState() == ExamCreationState.SUCCEEDED) {
@@ -113,6 +118,7 @@ public class BillingExamCreationTransactionService {
                     .build();
             sessionRepository.insert(session);
             operation.markSessionCommitted(committedAt);
+            if (deletedExamContinuations != null) deletedExamContinuations.transferForCommittedSession(operation);
             return persist(operation);
         });
     }
@@ -171,6 +177,7 @@ public class BillingExamCreationTransactionService {
             }
             abandonConfirming(operation);
             operation.markCanceled(terminalAt, terminalAt.plus(TERMINAL_RETENTION));
+            if (deletedExamContinuations != null) deletedExamContinuations.releaseCanceledClaim(operation);
             return persist(operation);
         });
     }
@@ -184,6 +191,7 @@ public class BillingExamCreationTransactionService {
             }
             abandonConfirming(operation);
             operation.markExpired(terminalAt, terminalAt.plus(TERMINAL_RETENTION));
+            if (deletedExamContinuations != null) deletedExamContinuations.releaseCanceledClaim(operation);
             return persist(operation);
         });
     }
@@ -211,8 +219,10 @@ public class BillingExamCreationTransactionService {
 
     public ExamCreationOperation insertPrepared(ExamCreationOperation operation) {
         return inTransaction(() -> {
+            if (userOwnedTransactionExecutor != null) userOwnedTransactionExecutor.requirePublicWrite(operation.getUserId());
             touchOwner(operation.getUserId());
             if (execution != null) execution.scheduleInitialProgress(operation);
+            if (deletedExamContinuations != null) deletedExamContinuations.claimForInsert(operation);
             return operationRepository.insert(operation);
         });
     }
@@ -230,10 +240,14 @@ public class BillingExamCreationTransactionService {
         return userOwnedTransactionExecutor != null && userOwnedTransactionExecutor.enabled();
     }
 
+    public boolean requiresCreationTransaction() {
+        return userMergedWriterEnabled() || deletedExamContinuations != null;
+    }
+
     private void touchOwner(String userId) {
         if (execution != null) execution.requireOwner(userId);
         if (userOwnedTransactionExecutor != null) {
-            userOwnedTransactionExecutor.touchWithinExistingTransaction(userId);
+            userOwnedTransactionExecutor.touchReservationCoordinationWithinExistingTransaction(userId);
         }
     }
 
@@ -257,6 +271,7 @@ public class BillingExamCreationTransactionService {
     public ExamCreationOperation markReserveDispatched(String commandId) {
         return inTransaction(() -> {
             ExamCreationOperation operation = required(commandId);
+            if (userOwnedTransactionExecutor != null) userOwnedTransactionExecutor.requirePublicWrite(operation.getUserId());
             touchOwner(operation.getUserId());
             if (operation.getState() != ExamCreationState.PREPARED
                     || operation.getRecovery().getIntent()

@@ -12812,3 +12812,368 @@
 
 - 관련 TMI-125/TMI-126/TMI-187. 공용 UTC Clock 단일화 구현 및 단위550개/Mongo 통합83개 통과 기록의 현재 턴 표식을 보완했다. 새 이미지 배포와 실제 활성화 검증은 후속이며 추가 코드·원격 변경은 없다.
 - CURRENT_STATE 갱신, git diff --check 및 현재 턴 표식 단일 출현 확인. Secret/Token 기록과 commit/push 없음.
+
+## 2026-09-30 — 공용 Clock 커밋 수동 테스트 배포 시작
+
+<!-- codex-turn:01a0f085-aa54-70b3-a384-5131976af731 -->
+
+- 관련 TMI-125/TMI-126/TMI-187. 사용자 배포 요청에 따라 develop 커밋3d72a597008dd5be9eaf5311b9013d86849ba556의 push 실행36667845028에서 배포 job skipped를 확인하고 기존 workflow_dispatch 경로로36668159711을 시작했다. 자동 PR merge gate·main 운영 경로·Identity는 변경하지 않는다.
+- 현재 test:8/OFF이며 기존 test:9의 차이는 승인된 UserMerged/Challenge flags·공개 endpoint와 기존 AI Secret 참조뿐임을 재확인했다. 기동 오류 재발 검증을 위해 새 이미지 배포 후 기존 활성화 절차를 이어간다. DB 사전 dry-run b630737a20f64de9a592fd391d58aa2e와 Challenge 검사ddcadc349c944ae4ad7dc274c7bd3917 실행, 최종 결과는 후속 append에 기록한다.
+
+## 2026-09-30 — 새 이미지 배포 성공 및 활성화 전 drain 진행
+
+- 관련 TMI-125/TMI-126/TMI-187. Actions36668159711 전체 성공 및 Verify health 성공. test:10 이미지sha256:4e1c42444b10436aa42e98be06b38d0ba3507b6f9234a4a367dd2357a283f7a8, task6534e2eec4fd4fc7ab5dbb6b96b2dc3b 기동56.401초·Repository14개·기동 로그ERROR0·ALB healthy 확인. 공개 HTTPS200/UP다. 이 단계는 기능OFF 기준이다.
+- 사전 DB 두 태스크 STOPPED/exit0: owner/정합성오류/누락인덱스0, Challenge100일/300문제·필수9인덱스 정상 및 기준일 미초기화. 새 이미지에 기존 test:9 활성화 설정만 결합한 test:11을 등록했다. 권한/Secret 값/Identity 변경 없음.
+- UserMerged 안전 전환을 위해 test서비스 desired0 후 별도로 test:11 리비전 전환. counts0/0/0이지만 이전 task8/test10 컨테이너가 DEACTIVATING/RUNNING인 상태를 확인했으므로 DB 최종 apply와 scale-up은 실제 STOPPED 이후에만 진행한다. 아직 기능 활성화 성공이나 E2E 성공을 주장하지 않는다.
+
+## 2026-09-30 — UserMerged·Challenge 활성화 배포 및 연결 점검 완료
+
+- 관련 TMI-125/TMI-126/TMI-187. 구 task8/test10 모두 STOPPED 및 단일 test:11 deployment·0/0/0을 확인한 뒤 최종 DB task61998f88b2a145db8212dfc36543c4ef 실행, STOPPED/exit0 확인. owner0·정합성오류0·누락인덱스0, rollback/catalogUnchanged/ownerCountsUnchanged true·probe0·exactOwnerIndexes2다. 이후 별도 scale-up했다.
+- 최종 서비스 tosunsaeng-learning-core-test-service는 test:11 단일 COMPLETED·desired/running/pending1/1/0, task251e89750b98462eba70b00967226954·ALB healthy·HTTPS200/UP다. 공용 Clock 커밋3d72a59 이미지로 UserMerged writer/source-deny/consumer 및 Challenge ON 확인. 기동62.39초·UserMerged transaction_capability verified·전체 조회55개 로그에서 ERROR0/Clock ambiguity 없음. Billing/AttemptGroup/withdrawal flags OFF, Identity/운영 불변이다.
+- 사후 카탈로그 taskee45e01165674ae1926a6295c2c2dfdd STOPPED/exit0:100일/300문제·필수9인덱스 정상, contentBaseDate=2026-09-30·Asia/Seoul·initializedAt=2026-09-30T04:36:26.551Z 확인.
+- 기존 진단 definition connection-check:1의 task783eb7d1522944a99ef8d07d0c42dfe7은 LC 실행 역할의 AI ECR 이미지 pull403으로 시작 전 실패했다. 역할 권한을 확대하지 않고 진단용 image만 공식 public.ecr.aws/docker/library/python:3.12-slim으로 바꾼 connection-check:2 등록 및 재실행. task75b003d002d74905b0ced525f219e962 STOPPED/exit0, passed=true: AI ready200/무인증401/정상 인증+빈 본문422, LC health200/콜백 무인증401/정상 인증+빈 본문400, UserMerged 무인증401. 예상400/422는 정상 payload 검증 거절이며 실제 Job/audio/merge 생성 없음.
+- 실제 MEMBER 챌린지 학습·AI 채점 및 Identity workload 발급/204·멱등성·소유권 이전/source deny·성능 E2E는 미실행이다. LC 수신 준비 완료 상태를 Identity에 인계하는 것이 다음 단계다. 첫 merge 후 deny-unaware/OFF rollback 금지 및 기준일 유지 주의.
+- 이번 소스/워크플로 변경·commit/push·Secret 값 조회/기록·IAM/SG/ALB 정책 변경 없음. WORKLOG/CURRENT_STATE/배포 상태 문서3개만 갱신, 예상 밖 파일 변경 없음. git diff --check 및 현재 턴 표식 단일 출현 확인. 자동 PR merge gate는 유지하며 workflow_dispatch로만 수동 배포했다.
+
+## 2026-09-30 — 배포 후 다음 검증 단계 설명
+
+<!-- codex-turn:01a0f0a0-8f1d-7e00-9313-1b875a49e150 -->
+
+- 관련 TMI-125/TMI-126/TMI-187. 마지막 배포 기록을 기준으로 MEMBER 챌린지 실제 녹음·제출·채점·결과 조회와 Identity 기존 UserMerged publisher/workload 설정 인계 후 Guest→MEMBER 통합 E2E를 구분해 안내한다. 연결 인증 성공은 실제 채점/회원 통합 성공과 다르며 두 검증은 독립적으로 진행 가능하다.
+- 최신 사용자 제공 AGENTS의 테스트 UserMerged 배포 예외는 Identity/Billing/AttemptGroup/Challenge 활성화 및 IAM/네트워크 확대를 포함하지 않음을 반영한다. 이번에는 설명과 문서 갱신만 수행하며 기존 Challenge ON은 직전 확인 이력이지 신규 활성화 승인이 아니다. 원격 상태 재조회·설정 변경·이벤트 전송·테스트 실행 없음.
+- WORKLOG append 및 CURRENT_STATE 갱신, git diff --check와 현재 턴 표식 단일 출현 확인. Secret/Token 기록·commit/push 없음.
+
+
+## 2026-10-02 — 전체 로컬 저장소 기준 8월 회고 소재 정리
+
+<!-- codex-turn:01a0fa4e-9879-7d62-9293-c74a42111522 -->
+
+- 사용자 요청에 따라 2026년 8월 작업과 troubleshooting/중요 결정 소재를 저장소별로 조사했다. Learning Core·Identity·Billing·웹 백엔드의 로컬 전체 ref Git log, 관련 diff와 WORKLOG·사례집을 대조했다. 웹은 명시적인 전체 저장소 요청에 따라 읽기만 했으며 수정하지 않았다.
+- 관련 Jira: Learning Core TMI-25/61/63/77/109/116; Identity TMI-75/88~98/103/104/107/108/111/114; Billing TMI-110/112/113/115/117. 이슈 생성/상태 변경 없음.
+- 산출물: AUGUST_2026_RETROSPECTIVE_MATERIALS.md에 저장소별 진행 내용·회고 추천·원인/수정/당시 검증 근거와 월 경계·운영 미확인 사항을 정리했다. CURRENT_STATE의 최신 분석 항목을 추가했다. 기존 dirty 두 기록 문서와 배포 상태 문서의 사용자/선행 변경을 보존했다.
+- 핵심: Summary 유효성·generation stale Callback과 HTTP ACK/저장 구분, CI 동시성 검증·재답변 점수 집계·Mongo dry-run, saga confirm 영구 정체/unknown commit 오취소 방어, Firebase canonical 사용자·Guest 승격/merge·전화 fingerprint·탈퇴/가입중단 cleanup, Billing 무료권 지급/소비와 CAS/inbox 원자성, 웹 조회수 $inc/tableContext 보존. 실제 장애와 정적 진단/설계상 위험 수정은 구분한다.
+- 조사 경계: Identity hotfix checkout은 동일 이력이며 TMI-116 제목의 Identity commit은 문서만 수정한 사실을 확인했다. Lambda 이미지 리사이즈 저장소 8월 commit 없음, Learning Lab/통합 테스트 폴더 .git 없음. 앱 프론트/Python AI 원본 저장소는 로컬 확인 범위에 없다. 9월 S3 장애·LC UserMerged migration/AttemptGroup publisher/Reservation worker·챌린지 runtime은 8월 완성 성과에 소급하지 않는다.
+- 검증: 코드 변경이 없어 Gradle 테스트 미실행. 과거 테스트 수치는 당시 기록이며 이번 재실행 결과가 아니다. git diff --check 및 현재 marker 단일 출현을 확인한다. runtime/공개 API/AI/S3/Redis/DB/외부 서비스·AWS·commit/push 변경 없음. Secret/Token 기록 없음.
+
+
+## 2026-10-02 — 저장소별 8월 회고 조사 종료 표식 보완
+
+<!-- codex-turn:01a0fa4e-d28b-7f72-b2aa-fdee231f13de -->
+
+- 사용자에게 Learning Core·Identity·Billing·웹 백엔드별 8월 진행 내용과 troubleshooting/설계 결정 소재를 전달했다. 상세 근거는 AUGUST_2026_RETROSPECTIVE_MATERIALS.md에 보존했다. 과거 WORKLOG를 수정하거나 삭제하지 않고 종료 훅의 현재 턴 표식을 새 항목으로 추가했다.
+- 관련 Jira: Learning Core TMI-25/61/63/77/109/116; Identity TMI-75/88~98/103/104/107/108/111/114; Billing TMI-110/112/113/115/117. Jira 변경 없음.
+- CURRENT_STATE에 종료 기록 보완을 반영했다. 추가 runtime/원격/배포 변경과 commit/push 없음. 문서 변경이므로 테스트 미실행, git diff --check와 현재 표식 단일 출현을 검증한다. 기존 변경 보존, Secret/Token 기록 없음.
+
+
+## 2026-10-02 — 출시 경험 중심의 짧은 8월 회고 초안
+
+<!-- codex-turn:01a0fa57-0cec-7aa1-b09f-1a5d7b93c77f -->
+
+- 사용자 요청에 따라 Learning Core·Identity를 중심으로, Google 출시 절차가 예상보다 많고 오래 걸렸다는 사용자 경험과 첫 iOS 출시·사용자 수용을 연결한 짧은 회고 초안을 AUGUST_2026_RETROSPECTIVE_DRAFT.md에 작성했다. Billing·웹 작업은 추가 기반으로 짧게 소개했다.
+- 관련 Jira: Learning Core TMI-25/61/63/77, Identity TMI-75/88~98/103/104/107/108/111/114, Billing TMI-110/112/113/115/117. Jira 변경 없음. Google 절차의 구체적인 정책·소요기간·거절 사유는 확인되지 않아 만들지 않았고, Identity 확장 기반과 모든 기능의 출시 활성화를 동일시하지 않았다. 출시·앱 사용자 수용은 팀 성과이며 개인 iOS 구현 기여로 단정하지 않는다.
+- 기존 조사 자료와 팀 회고의 iOS 출시 기록을 확인했다. CURRENT_STATE 최신 항목 추가, 기존 WORKLOG/사용자 변경 보존. 코드 변경이 없어 테스트 미실행, git diff --check와 현재 표식 단일 출현 검증. runtime/API/원격/배포/commit/push 변경 없음, Secret/Token 기록 없음.
+
+
+## 2026-10-02 — 벨로그용 8월 회고 초안 확장
+
+- 사용자의 벨로그 게시 목적에 맞춰 AUGUST_2026_RETROSPECTIVE_DRAFT.md를 출시 준비/첫 iOS 사용자, Learning Core, Identity, 추가 서버, 배운 점의 흐름으로 확장했다. Google 절차의 부담은 사용자 경험을 반영하고 확인되지 않은 세부 정책·심사 거절·소요기간은 추가하지 않았다. iOS 8/24 출시는 기존 팀 회고 기록을 기준으로 했다.
+- 관련 TMI-25/61/63/77, Identity TMI-75/88~98/103/104/107/108/111/114, Billing TMI-110/112/113/115/117. 기능 구현과 8월 출시 버전 전체 활성화를 구분하고 9월 장애·후속 완성을 소급하지 않았다. Jira 변경 없음.
+- CURRENT_STATE를 최신 편집 결과로 갱신했다. 기존 WORKLOG append-only, Secret/Token 기록 없음. 문서만 수정해 테스트 미실행; git diff --check 검증. 기존 runtime/외부 API/배포/사용자 변경 유지, commit/push 없음.
+
+
+## 2026-10-02 — 벨로그 회고 확장 결과 종료 기록
+
+<!-- codex-turn:01a0fa58-8539-76a2-ace7-75fea941ebba -->
+
+- 사용자 요청에 따라 출시 준비·첫 iOS 사용자 경험 중심의 8월 벨로그 초안을 확장해 전달하고 AUGUST_2026_RETROSPECTIVE_DRAFT.md에 반영했다. Learning Core의 채점/집계/CI 사례와 Identity의 승격/병합/탈퇴/가입 중단 사례를 중심으로, Billing·웹 작업은 짧게 소개했다.
+- 관련 TMI-25/61/63/77, Identity TMI-75/88~98/103/104/107/108/111/114, Billing TMI-110/112/113/115/117. Google 절차의 미확인 세부 사항·기간과 실제 production 활성화는 추가 주장하지 않았고 Jira 변경 없음.
+- 종료 훅의 현재 턴 표식을 append하고 CURRENT_STATE 최신 항목 갱신. 과거 기록/기존 변경 보존, 코드 변경이 없어 테스트 미실행. git diff --check와 표식 단일 출현 검증, runtime/원격/배포/commit/push 변경 없음. Secret/Token 기록 없음.
+
+
+## 2026-10-02 — 8월 회고 개인 경험 보강 질문 준비
+
+<!-- codex-turn:01a0fa5b-52aa-7912-b937-c47c1af01353 -->
+
+- 사용자가 출시 및 다른 작업의 직접 경험을 답변하겠다고 하여 Google 절차의 구체적 장애/대기, 첫 iOS 출시 준비와 담당 범위, 첫 사용자 경험, Learning Core·Identity에서 직접 겪은 문제와 해결/아쉬움을 질문한다. 기존 초안의 일반적 배운 점을 실제 사건과 당시 판단으로 보강하는 목적이다. 답변 전 새 일화·감정·정량 수치·심사 사유를 작성하지 않는다.
+- 기존 관련 Jira TMI-25/61/63/77, Identity TMI-75/88~98/103/104/107/108/111/114, Billing TMI-110/112/113/115/117. 신규 이슈나 변경 없음. 초안은 유지하고 사용자 답변 후 편집한다.
+- CURRENT_STATE에 경험 확인 대기 상태를 기록했다. 문서만 변경, 과거 WORKLOG/기존 변경 보존. 테스트 미실행, git diff --check와 턴 표식 단일 출현 검증. runtime/배포/외부 서비스/commit/push 변경 없음, Secret/Token 기록 없음.
+
+
+## 2026-10-02 — 사용자 직접 경험을 반영한 8월 벨로그 회고 수정
+
+<!-- codex-turn:01a0fa61-d62e-7ed0-892c-f54eecfa2d38 -->
+
+- 사용자 답변을 AUGUST_2026_RETROSPECTIVE_DRAFT.md에 반영했다. Google 긴 검토·팀원 명의 개발자 계정의 관련 서류 제출/리젝, Apple의 빠른 진행, 앱 검색 및 DB에서 첫 실제 사용자 확인의 신기함, 다음에는 출시 준비를 앞당기고 싶다는 경험을 담았다. 구체적 심사 사유·기간·사용자 수는 추가하지 않았다.
+- 채점 재시도와 Guest 승격/계정 통합을 사용자가 약20분간 들인 노력을 결과와 학습 기록으로 이어가게 하고 싶었다는 동기로 연결했다. Identity 승격/통합 구현과 LC 기록 migration 후속 계약을 구분했으며 9월 출시 후 수정 문제는 사용자 요청대로 제외했다. Billing·웹은 짧게 소개했다.
+- 관련 Jira: TMI-25/61/63/77, Identity TMI-75/88~98/103/104/107/108/111/114, Billing TMI-110/112/113/115/117. Jira mutation 없음. 초안과 CURRENT_STATE만 편집하고 WORKLOG append, 과거 기록/기존 사용자 변경 보존.
+- 문서만 변경해 Gradle 테스트 미실행, git diff --check와 표식 단일 출현 검증. runtime/외부 API/AI/DB/배포/commit/push 변경 없음. Secret/Token 기록 없음.
+
+
+## 2026-10-02 — 9월 저장소별 회고 소재 조사
+
+- 사용자 요청으로 Learning Core·Identity·Billing·웹·이미지 리사이즈의9월 로컬 전체ref Git log와 WORKLOG/계약/사례집을 조사하고 SEPTEMBER_2026_RETROSPECTIVE_MATERIALS.md에 정리했다. LC event/merge/Challenge/worker 및 월말 테스트 배포, Identity 응답 유실/Guest 복구·가입재개/운영관측, Billing owner rebind/continuation/무료권 reader가 핵심이다.
+- 관련 TMI-118/122/125/126/128/178/187, Identity TMI-123/127/129/130/131/134/169/176/188, Billing TMI-117/120. TMI-133은 문서상 미구현 취소로 성과에서 제외했다. S3 음성 누락은 팀 회고 근거로 개인 역할/복구결과 추가 확인 필요. Learning Lab/통합 도구는 Git 시점 미확정, 웹/이미지 리사이즈9월commit 없음.
+- CURRENT_STATE 최신 조사 항목 반영, 기존 dirty/8월 초안과 배포 상태 보존. 문서만 변경해 테스트 미실행; git diff --check 검증. 실제 E2E/production 활성화·취소된 설계와 코드 구현을 구분했고 원격/Jira/runtime/API/AI/DB/배포/commit/push 변경 없음. Secret/Token 비기록.
+
+
+## 2026-10-02 — 9월 회고 조사 종료 기록 보완
+
+<!-- codex-turn:01a0fa64-4a0d-72f3-af98-9b9958a7ee05 -->
+
+- 사용자에게 저장소별9월 작업과 회고 후보를 전달하고 SEPTEMBER_2026_RETROSPECTIVE_MATERIALS.md에 상세 근거를 저장했다. 출시후 문제, 기존 사용자/학습기록 보호, Challenge·자동복구 확장, 실제 기능조합 배포 문제를 중심으로 정리했다.
+- 관련 LC TMI-118/122/125/126/128/178/187, Identity TMI-123/127/129/130/131/134/169/176/188, Billing TMI-117/120. TMI-133 취소 계획은 구현 성과에서 제외. S3 장애 개인 역할과 Guest 실제 운영 복구, 모바일/회원통합 E2E는 추가 확인으로 구분했다. Jira 변경 없음.
+- 현재 턴 표식을 EOF에 추가하고 CURRENT_STATE 최신 항목 갱신. 과거 기록/기존 dirty 변경 보존, 문서만 수정해 테스트 미실행. git diff --check 및 표식 단일 출현 검증. 추가 코드/원격/배포/commit/push 변경 및 Secret/Token 기록 없음.
+
+
+## 2026-10-02 — 9월 벨로그 회고 초안 작성
+
+<!-- codex-turn:01a0fa72-4f74-79e2-acd1-0269e0d3b291 -->
+
+- 사용자의 작성 요청에 따라 SEPTEMBER_2026_RETROSPECTIVE_DRAFT.md를 생성했다. 출시후 신규/기존 계정 조건 차이의 팀 S3 장애, Identity 기존 Guest/Refresh 응답 유실·가입재개, LC 기록 ownership 이전/Reservation 자동복구/outbox, Challenge와 실제 테스트 배포 문제, 배운 점 순서다.
+- S3 사건은 팀 기록으로 기술하고 본인의 발견/복구 성과·사용자 피해 수를 만들지 않았다. 코드 구현과 production 활성화·모바일 E2E 완료를 구분하며9월말 테스트 연결 준비와 남은 전체검증을 반영했다. TMI-133 취소계획 제외.
+- 관련 LC TMI-118/122/125/126/128/178/187, Identity TMI-123/127/129/130/131/134/169/176/188, Billing TMI-117/120. Jira mutation 없음. 사용자 제공8월 동기인 약20분 시험 노력 보호를9월 기록/복구 확장과 연결했다.
+- CURRENT_STATE 최신 항목 반영, WORKLOG EOF append 및 과거기록/기존 dirty/8월 초안 보존. 문서만 변경하여 Gradle 테스트 미실행; git diff --check·현재표식1회 검증. runtime/API/AI/DB/원격/배포/commit/push 변경 없음, Secret/Token 기록 없음.
+
+
+## 2026-10-02 — 9월 회고에 기존 사용자 전환 협업 경험 추가
+
+- 사용자 제공 경험을 바탕으로 SEPTEMBER_2026_RETROSPECTIVE_DRAFT.md의 Identity 다음에 새 정책과 기존 사용자 사이에서 절을 추가했다. 인증 재시도 식별값 필수화/구버전 앱 미전송/강제업데이트 기능 부재, 프론트의 이용경험 우려와 백엔드의 향후 유료화·정책 전환 우려, 구·신서버 분리·웹뷰 피드백 진입전 안내·우선1주 유예/사용자수 관찰·응답값 안내 방안의 논의를 담았다.
+- 제공문 마지막 DB Inc. 지원 문장은 회고 문체의 협업 배움으로 바꿨다. 제안/정리와 실제 배포/유료화 성공을 구분하고 필수 재시도 값 자체가 유료권 통제라는 기술적 주장은 추가하지 않았다. 개인/팀원 이름·이용자수·기간 결과는 만들지 않았다.
+- 신규 Jira 없음. 관련 기존 인증/업데이트 범위 TMI-130/134/169/176이며 이 협업 사건과 특정이슈의1:1 매핑은 미확정이다. CURRENT_STATE 갱신, WORKLOG append-only/기존변경 보존. 문서만 편집해 테스트 미실행, git diff --check 검증. 코드/API/원격/배포/Jira/commit/push 변경 없음. Secret/Token 비기록.
+
+
+## 2026-10-02 — 기존 사용자 전환 협업 경험 종료 기록 보완
+
+<!-- codex-turn:01a0fa75-9402-7511-af6b-f01d384a3706 -->
+
+- 사용자 제공 기존 앱 전환 논의를 9월 회고 초안에 반영하고 전달했다. 인증 재시도 식별값 필수화와 구버전 호환, 새 정책과 사용자 경험의 관점 차이, 서버 분리·웹뷰 안내·우선1주 유예 및 사용자 수 관찰·응답값 안내 제안을 회고 문체로 정리했다. 제안과 실제 배포 성과를 구분했다.
+- 관련 기존 TMI-130/134/169/176이며 이 협업 사건의 특정 Jira 매핑은 미확정이다. 신규 Jira·상태 변경 없음.
+- 현재 표식을 EOF에 추가하고 CURRENT_STATE 갱신. 과거 기록·기존 변경 보존, 문서 변경으로 테스트 미실행. git diff --check·표식 단일 출현 검증. 코드/원격/배포/commit/push 변경 및 Secret/Token 기록 없음.
+
+## 2026-10-02 — 학습 기록 삭제 계획서 위치와 확정 상태 재확인
+
+<!-- codex-turn:01a0fb31-2ce4-7430-a699-4e03d3da8555 -->
+
+- 사용자 문의에 따라 LEARNING_RECORD_DELETION_IMPLEMENTATION_PLAN.md 및 DECISION_OPTIONS 문서 존재와 2026-09-21 작성/09-22 정책 승인·리뷰 보완 이력을 확인했다. 계정 유지·모의고사/Challenge 전체 삭제·이중 확인/멱등성·안전 checkpoint 뒤 신규 학습·비식별 일별 최대18개 집계 보존 방향을 요약 안내한다.
+- 계획서 상태는 runtime 미구현/Jira 없음이며 src/scripts에서 계획 API·집계 collection·대표 삭제 클래스 식별자 검색 결과 없음. 마지막 결정은 계획 유지 후 챌린지 서버 준비로 전환한 것이다. 이번 구현·배포·Jira 생성 없음. 문서만 갱신하여 runtime 테스트 생략, git diff --check 및 표식 단일 출현 확인. Secret/Token 기록 없음.
+
+## 2026-10-02 — 구현 전 학습 기록 삭제 계획 사용자 설명
+
+<!-- codex-turn:01a0fb3d-f345-78c3-8ece-eede4c6e313b -->
+
+- 사용자 요청은 구현 전 이해를 위한 설명으로 처리했다. 계정 유지/전체 기록 삭제, 즉시 숨김·초기 write 차단, 안전 checkpoint 후 신규 학습과 기존 데이터 정리 병행, 24시간 목표 및 지연/위험 격리 차이, 늦은 Callback 재생성 차단을 계획 기준으로 설명한다.
+- 원본 콘텐츠·사용자별 통계 삭제와 비식별 일별 집계 최대18문서 보존(쓰기18회 의미 아님), 이용권 무복원·진행중 Billing의 최소 coordination 증거, 당일 Challenge 재참여·진행중 추가 삭제 거절 및 앱 변경을 안내한다. 보존기간30/90일은 계획 정책이며 실제 운영 설정 검증과 구분한다.
+- visualize 스킬을 읽고 안전 확인 전후를 정적 Mermaid 흐름으로 설명한다. 별도 시각화 파일/제품 변경 없음. 구현 전에 기존 develop@16eb5de 계획과 현재 코드를 대조하고 전용 허용 범위·API/모바일·Billing 계약을 정리할 필요가 있다. Jira 없음, 생성하지 않음.
+- WORKLOG/CURRENT_STATE만 갱신. runtime·원격·배포·commit/push 및 Secret/Token 기록 없음. 설명 작업으로 테스트 미실행, git diff --check 및 현재 턴 표식 단일 출현 확인.
+
+## 2026-10-03 — 학습 기록 삭제 구현 Jira 등록
+
+<!-- codex-turn:01a1009e-8294-7af3-bcd5-863289868fc6 -->
+
+- 사용자 요청에 따라 TMI-136 에픽 아래 작업 TMI-193 `[Learning Core] 학습 기록 독립 삭제 및 비식별 일별 통계 구현`을 생성했다. 재조회로 parent=TMI-136, 상태=해야 할 일을 확인했다. Rovo 중복 검색은 403으로 불가했으며 성공으로 간주하지 않았다.
+- 승인 계획의 전체 기록 삭제·계정 유지·이중 확인/멱등성·안전 checkpoint·늦은 Callback 차단·Billing 최소 coordination·일별 비식별 최대18문서 집계, 검증 기준과 출시 전 의존성을 이슈에 포함했다. 구현 전 현 코드 대조 및 전용 허용 범위 정리가 필요하다.
+- 계획서/결정서 Jira 링크와 CURRENT_STATE를 갱신했다. runtime 구현·배포·활성화·commit/push 없음. 문서 작업으로 테스트 미실행, git diff --check와 현재 표식 단일 출현 검증. 기존 변경 보존, Secret/Token 기록 없음.
+
+## 2026-10-03 — TMI-193 구현 착수 및 사용자 중단
+
+<!-- codex-turn:01a100aa-2a87-7e91-a233-c9f624ab9b2e -->
+
+- TMI-193(상위 TMI-136) 승인 계획을 읽고 AGENTS에 전용 로컬 구현 허용 범위를 추가했다. learningrecorddeletion 아래 DeletionIdentifiers, DeletionOperation, DeletionCommand, DeletionTarget, DeletionView 초안을 추가했다.
+- 멱등 식별자·단계별 evidence·안전 checkpoint·지연/위험 상태·완료 조건·공개 projection의 기반 초안이며 Controller/bean/worker/기존 writer와 연결하지 않았다. 이용권 처리·실제 삭제·일별 집계 구현은 미완료다. 사용자 Billing 문의로 작업이 중단되어 컴파일/테스트 전이며 배포 가능한 완료본이 아니다. 기존 변경을 보존했고 원격 변경·commit/push·Secret/Token 기록 없음.
+
+## 2026-10-03 — Billing 부재 시 이용권 처리 설명
+
+<!-- codex-turn:01a100b1-35ce-7ac0-b76f-831622174d16 -->
+
+- 사용자 요청에 따라 TMI-193 구현을 멈추고 코드만 확인했다. ExamServiceImpl.createExamSession은 app.billing.creation-saga-enabled=false일 때 ExamSessionManager.startNew를 호출한다. 이 경로는 기존 활성 Session을 abandon하고 다음 문제를 선택해 새 Session을 저장하며 Billing 이용권 조회/reserve/confirm을 호출하지 않는다. application.yml 기본값은 OFF이며 이번 원격 설정 재확인은 하지 않았다.
+- 현재는 이용권을 임시 지급하거나 가짜 차감을 하는 것이 아니라 LC 비과금 시험 생성 경로다. 삭제 계획의 이용권 미복원·OPEN group 승계는 Billing-linked 기록을 위한 미래 연결 경계이며 새 모델의 billingResolved boolean은 실제 검증 구현이 아니다. flag OFF라도 과거 attemptGroup/reservation/creation operation 연결이 있으면 무시하거나 무과금으로 간주해 삭제하면 안 된다.
+- 이번에는 코드 추가 수정 없이 설명·WORKLOG/CURRENT_STATE 갱신만 수행했다. 이전 턴 초안은 미검증/미연결 상태로 보존한다. 테스트는 사용자 구현 중단에 따라 미실행, git diff --check와 현재 marker 단일 출현만 확인한다. 외부 API·AI·S3/Redis 계약 불변, 실제 삭제·배포·commit/push 없음. 후속 구현은 Billing 없는 정상 경로와 기존 Billing evidence 존재 경로를 구분해야 한다.
+
+## 2026-10-03 — 삭제 자체의 이용권 영향 명확화
+
+<!-- codex-turn:01a100b5-f9f7-72b3-b989-5cf4951de063 -->
+
+- TMI-193(상위 TMI-136) 사용자 질문은 시험 생성이 아니라 삭제 시 이용권 처리 여부였다. 삭제 자체는 이용권 잔액·기사용 권리·무료 기회를 차감/환불/복원/초기화하지 않는다고 정정 설명했다. Billing-linked 진행 중 기록의 최소 연결 증거 보존과 미확정 예약 coordination은 중복 차감/증거 유실 방지용이며 새 이용권 발급이 아니다.
+- 현재 삭제 실행과 Billing 연결은 미구현이며 앞선 모델 초안만 남아 있다. 구현 중단 상태를 유지하고 WORKLOG/CURRENT_STATE만 갱신했다. 설명 작업으로 테스트 미실행, git diff --check 및 marker 단일 출현 검증. 원격·배포·commit/push·Secret/Token 기록 없음.
+
+## 2026-10-03 — Billing 서버 없이 학습 기록 삭제 가능한 조건 설명
+
+<!-- codex-turn:01a100b7-5372-78a0-9f47-92e6b6d00310 -->
+
+- TMI-193(상위 TMI-136) 사용자 의도는 이용권 증감 정책이 아니라 Billing 서버 부재가 삭제 구현/실행을 막는지 여부였다. Billing과 연결 없이 생성한 기록만 대상으로 한다면 LC MongoDB/S3/Redis 삭제에 Billing 서버는 필요 없다고 설명했다.
+- 과거 Billing 연결 Session/예약 operation이 존재하면 별도 coordination evidence 확인이 필요하며, flag OFF/서버 부재만으로 이를 무시하면 안 된다. 이번에는 원격 데이터 inventory를 조회하지 않아 해당 데이터 부재를 확정하지 않았다.
+- 추가 구현·정책 변경·실제 삭제·배포 없이 중단 상태 유지. WORKLOG/CURRENT_STATE만 갱신, 설명 작업으로 테스트 생략하고 git diff --check·marker 단일 출현 확인. Secret/Token 기록 없음.
+
+## 2026-10-03 — 과거 Billing 연결 경고의 가정과 의미 설명
+
+- TMI-193(상위 TMI-136) 과거 Billing-linked 기록을 실제로 발견한 것이 아니라 가정한 예외라고 정정했다. 기사용 이용권과 진행 중 시험의 연결 증거까지 잃으면 이후 재시작 시 기존 사용을 식별하지 못할 수 있다는 의미이며 학습 내용 전체를 보존하라는 뜻이 아니다.
+- Billing을 한 번도 연동하지 않은 환경에는 이 예외가 해당하지 않는다. 원격 데이터 존재 여부를 확인한 것으로 주장하지 않았다. 구현 중단 유지, 문서만 갱신, 테스트 미실행/문서 diff 검사. 실제 삭제·배포·commit/push·Secret/Token 기록 없음.
+
+## 2026-10-03 — Billing 연결 설명 턴 기록 보완
+
+<!-- codex-turn:01a100b9-57fe-73d2-9152-25fdeb99d9e4 -->
+
+- TMI-193(상위 TMI-136) 설명 기록의 현재 턴 표식을 보완한다. 과거 Billing 연결은 확인 사실이 아니라 예외 상황을 가정한 설명이며, 학습 내용 삭제와 최소 거래 연결 증거 보존을 구분했다.
+- CURRENT_STATE에 설명 완료와 구현 중단 상태를 기록했다. 추가 구현·원격 조회·삭제·배포 없음. 문서만 변경하여 테스트 생략, git diff --check 및 표식 확인. Secret/Token 기록 없음.
+
+## Codex Stop Hook 안전 fallback
+
+<!-- codex-turn:01a100b9-57fe-73d2-9151-25fdeb99d9e4 -->
+
+- 날짜: `2026-10-03`
+- 브랜치:
+
+    feat/TMI-193-learning-record-deletion
+
+- Jira 이슈 키: `TMI-31`
+- `git status --short`:
+
+    M AGENTS.md
+     M docs/codex/CURRENT_STATE.md
+     M docs/codex/LEARNING_RECORD_DELETION_DECISION_OPTIONS.md
+     M docs/codex/LEARNING_RECORD_DELETION_IMPLEMENTATION_PLAN.md
+     M docs/codex/WORKLOG.md
+     M docs/codex/deployment/USER_MERGED_TEST_DB_PREPARATION_STATUS.md
+    ?? docs/codex/AUGUST_2026_RETROSPECTIVE_DRAFT.md
+    ?? docs/codex/AUGUST_2026_RETROSPECTIVE_MATERIALS.md
+    ?? docs/codex/SEPTEMBER_2026_RETROSPECTIVE_DRAFT.md
+    ?? docs/codex/SEPTEMBER_2026_RETROSPECTIVE_MATERIALS.md
+    ?? src/main/java/web/tosunsaeng/domain/learningrecorddeletion/
+
+- `git diff --stat`:
+
+    AGENTS.md                                          |   9 +
+     docs/codex/CURRENT_STATE.md                        |  24 +++
+     .../LEARNING_RECORD_DELETION_DECISION_OPTIONS.md   |   2 +-
+     ...LEARNING_RECORD_DELETION_IMPLEMENTATION_PLAN.md |   2 +-
+     docs/codex/WORKLOG.md                              | 203 +++++++++++++++++++++
+     .../USER_MERGED_TEST_DB_PREPARATION_STATUS.md      |   9 +
+     6 files changed, 247 insertions(+), 2 deletions(-)
+
+- 기록 누락 안내: 정상 WORKLOG 항목이 없어 Stop Hook이 최소 fallback 기록을 생성했다.
+
+## 2026-10-03 — Billing 후속 연동과 기록 삭제의 분리 확인
+
+<!-- codex-turn:01a100bb-46c3-76aa-8243-1b94c1aa77fd -->
+
+- 관련 이슈는 TMI-193(상위 TMI-136)이다. 현재 Billing 미연결 기록의 삭제는 Billing 준비를 기다릴 필요가 없고, 후속 연동 이후에도 이용권/사용 내역은 학습 기록 삭제 대상에서 제외한다는 방향을 확인했다.
+- 단, 이용권 원장 보존만으로 진행 중 시험의 무추가차감 재시작이 자동 보장되지는 않는다. Billing을 켜기 전 기존 사용과 시험의 최소 연결 증거/예약 정합성 처리가 필요하다. 이미 삭제한 비과금 기록을 이를 위해 복원할 필요는 없다.
+- 이번에는 설명과 WORKLOG/CURRENT_STATE 갱신만 수행했다. 구현 중단 상태 유지, 테스트 미실행(코드 변경 없음), git diff --check 및 현재 marker 단일 출현 확인. 원격·배포·실제 삭제·commit/push와 Secret/Token 기록 없음.
+
+## 2026-10-03 — Billing 분리 설명의 현재 턴 표식 보완
+
+<!-- codex-turn:01a100bb-316d-7022-a4fb-bbc98fa58f67 -->
+
+- TMI-193(상위 TMI-136): Billing 미연결 학습 기록 삭제는 현재 진행 가능하며, 향후 Billing 연동 시에도 이용권과 사용 내역은 삭제 대상에서 제외한다는 설명을 기록했다. 진행 중 시험의 무추가차감 연결은 Billing 활성화 전 별도 검증 사항이다.
+- 앞선 항목의 표식은 현재 턴과 일치하지 않아 과거 항목을 수정하지 않고 정확한 표식을 EOF에 추가했다. CURRENT_STATE도 보완했다. 구현 중단 상태 유지, 추가 코드·원격·배포 변경 없음. 문서 작업으로 테스트 생략, git diff --check와 정확한 표식 1회 출현 확인. Secret/Token 기록 없음.
+
+## 2026-10-03 — 진행 중 시험의 기존 이용권 사용 연결 설명
+
+<!-- codex-turn:01a100bc-cf18-749c-a456-2eac5dc0a0b6 -->
+
+- TMI-193(상위 TMI-136) 기존 계획의 Billing OPEN 시험 재시작을 설명했다. 잔액/사용 내역을 그대로 두는 것과 삭제 뒤 새 시험이 기존 사용 건을 잇는 것으로 식별하는 것은 별개다. 최소 연결 증거는 추가 차감 방지용이며 삭제한 답안/음성 복원이나 완료된 시험의 무료 재응시를 뜻하지 않는다.
+- 현재 Billing 없는 기록의 삭제에는 해당 연결이 필요 없으며 미래 연동 정책에 대한 설명임을 구분했다. 코드/정책 변경 없이 구현 중단 상태 유지, WORKLOG/CURRENT_STATE만 갱신. 테스트 미실행(설명 작업), git diff --check 및 표식 단일 출현 확인. 원격·배포·실제 삭제·commit/push·Secret/Token 기록 없음.
+
+## 2026-10-03 — 이용권 연결 설명의 턴 기록 보완
+
+<!-- codex-turn:01a100bc-8b8b-79e2-b1ed-16557317a430 -->
+
+- TMI-193(상위 TMI-136): 진행 중 시험 삭제 후 기존 이용권 사용 건을 이어 쓰는 연결과 이용권 잔액 보존의 차이를 설명했다. 현재 Billing 미연결 기록 삭제에는 적용되지 않으며 답안 복원이나 완료 시험 무료 재응시를 의미하지 않는다.
+- 과거 기록은 보존하고 현재 턴의 정확한 표식을 EOF에 추가했다. CURRENT_STATE 갱신, 구현 중단 유지. 문서만 변경해 테스트 생략, git diff --check와 정확한 표식 단일 출현 확인. 코드·원격·배포·실제 삭제·commit/push 변경 및 Secret/Token 기록 없음.
+
+## 2026-10-03 — 기존 AttemptGroup 승계 설계 재확인
+
+- TMI-193(상위 TMI-136) 계획 §5.4를 다시 읽어 사용자의 기억을 확인했다. attemptGroupId와 최소 source examId/mockExamId/승계 상태를 별도 tombstone에 저장하고 원본 Session은 삭제한 뒤, 새 Session을 같은 그룹의 REPLACEMENT로 연결하는 정책은 이미 확정된 계획이다.
+- 앞선 설명에서 추후 새로 설계해야 하는 것처럼 들릴 수 있었던 점을 정정했다. 정책 추가가 아니라 기존 계획대로 구현하고 실제 Billing 계약에서 검증할 사항이다. 완료된 그룹을 새 무료 응시로 재사용하는 의미는 아니다.
+- 현재 Billing tombstone/승계는 미구현이며 모델 초안만 존재한다. 설명·문서 갱신 외 코드·원격 변경 없이 중단 유지. 테스트 미실행(문서 작업), git diff --check 확인. 실제 삭제·배포·commit/push·Secret/Token 기록 없음.
+
+## 2026-10-03 — AttemptGroup 설계 확인 턴 기록 보완
+
+<!-- codex-turn:01a100be-764b-73b1-ad4d-5634aaa7aac5 -->
+
+- TMI-193(상위 TMI-136): attemptGroupId와 최소 승계 정보를 별도 보존하고 원본 시험 세션을 삭제한 뒤 새 세션을 동일 그룹에 연결하는 설계가 기존 계획 §5.4에 있음을 확인했다. 새 정책 결정이 아니라 구현·계약 검증이 남은 사항이다.
+- 과거 기록을 변경하지 않고 현재 턴 표식을 EOF에 추가하고 CURRENT_STATE를 갱신했다. 구현 중단/미검증 초안 상태 유지. 문서 작업으로 테스트 생략, git diff --check 및 정확한 표식 단일 출현 확인. 코드·원격·배포·삭제·commit/push 변경 및 Secret/Token 기록 없음.
+
+## 2026-10-03 — Billing 서버 배포 전후 구현과 검증 구분
+
+- TMI-193(상위 TMI-136) 계획 §16 및 §5.4를 근거로 현재 구현 가능 범위와 후속 실제 연동 검증을 설명했다. 현재는 비과금 기록의 command/status·멱등성·read/write fence·Callback 차단·안전 checkpoint·Mongo/S3/Redis cleanup·비식별 집계를 구현할 수 있다. Billing tombstone/승계 코드는 기존 계약 기반으로 feature OFF/모의 테스트 준비가 가능하나 실제 서버 검증과 구분한다.
+- Billing 기동 후 인증/설정, 동일 OPEN group REPLACEMENT와 이용권 무추가차감, 중복 요청/실패/unknown commit/coordination E2E를 검증하고 승인 뒤 활성화한다. 현재 미연결 기록에 가짜 group/이용권을 만들지 않으며 과거 연결 증거는 서버 부재만으로 무시하지 않는다. 별도 삭제 rollout의 DB/S3/모바일 검증도 여전히 필요하다.
+- 정책 재설계나 구현 재개 요청으로 해석하지 않고 설명·WORKLOG/CURRENT_STATE 갱신만 수행했다. 모델 초안 미검증/미연결 상태 유지. 문서 변경으로 테스트 생략, git diff --check 확인. 코드·원격·배포·실제 삭제·commit/push·Secret/Token 기록 없음.
+
+## 2026-10-03 — Billing 전후 작업 구분 설명의 턴 기록 보완
+
+<!-- codex-turn:01a100c0-5303-7542-ba7f-dbda726c731e -->
+
+- TMI-193(상위 TMI-136): Billing 없는 삭제 기능과 계약 기반 승계 코드·모의 테스트는 지금 준비하고, 실제 Billing 인증/동일 그룹 승계/무추가차감/장애 E2E는 서버 준비 후 검증·활성화하는 구분을 설명했다. 구현 완료로 보고하지 않았으며 모델 초안 미검증/미연결 상태를 유지한다.
+- 과거 WORKLOG를 수정하지 않고 정확한 현재 턴 표식을 EOF에 추가하고 CURRENT_STATE를 갱신했다. 문서 작업으로 테스트 생략, git diff --check 및 표식 단일 출현 확인. 추가 코드·원격·배포·실제 삭제·commit/push 변경 및 Secret/Token 기록 없음.
+
+## 2026-10-03 — 기존 그룹 승계 구현과 삭제 전용 확장 구분
+
+- TMI-193(상위 TMI-136) 코드 확인: ExamSessionManager.prepareForBilling은 기존 활성/RETAKE_AVAILABLE Session에서 source examId·expectedAttemptGroupId·mockExamId를 가져온다. BillingExamCreationSaga는 이를 별도 ExamCreationOperation에 저장하고 응답 그룹 일치를 검증하며 BillingExamCreationTransactionService는 새 Session에 그룹을 기록한다. ExamSessionManagerTest/BillingExamCreationSagaTest에 기존 경로의 모의 테스트가 있다. Phone continuation도 이미 구현돼 있다.
+- 별도 operation 저장이 없다는 의미가 아니며 승계 전체를 새로 만드는 것도 아니다. 삭제 전용 tombstone·원본 Session 원자 삭제·Session 부재 시 tombstone source 조회·일회 claim/transfer 연결은 현재 미구현이다. 생성 operation을 보존하는 것만으로 삭제 후 다음 생성이 이를 자동 source로 선택하지는 않는다.
+- 코드/테스트 소스를 읽어 확인했으며 테스트를 실행한 것으로 주장하지 않았다. 문서 기록만 갱신하고 git diff --check 수행, 구현 중단 유지. 원격·배포·실제 삭제·commit/push 변경 및 Secret/Token 기록 없음.
+
+## 2026-10-03 — 기존 그룹 승계 구현 확인 턴 기록 보완
+
+<!-- codex-turn:01a100c2-34da-7223-8907-237cfbda0a31 -->
+
+- TMI-193(상위 TMI-136): 기존 Session 기반 그룹 승계·생성 operation 별도 저장·새 Session 연결 및 모의 테스트는 이미 존재함을 확인했다. 남은 작업은 삭제 전용 최소 증거 보존과 기존 승계 경로 연결이며 전체 승계 재구현이 아니다.
+- 과거 WORKLOG를 변경하지 않고 현재 턴 표식을 EOF에 추가하고 CURRENT_STATE를 갱신했다. 구현 중단 상태 유지. 문서만 변경하여 테스트 생략, git diff --check 및 정확한 표식 단일 출현 확인. 추가 코드·원격·배포·실제 삭제·commit/push 변경 및 Secret/Token 기록 없음.
+
+## 2026-10-03 — 삭제 후 최소 승계 정보 연결의 현재 구현 범위 확인
+
+<!-- codex-turn:01a100c5-dc02-7543-a054-879ae70d0f97 -->
+
+- TMI-193(상위 TMI-136): 삭제 시 최소 그룹/원본 참조/승계 상태 보존, Session 부재 시 조회 및 기존 REPLACEMENT 경로 연결과 중복 승계 방지 코드·모의 테스트도 현재 구현 범위임을 설명했다. 실제 Billing 서버를 통한 무추가차감/장애 검증 및 활성화만 후속이다.
+- Billing 미연결 기록에는 가짜 그룹/이용권을 생성하지 않는다. 이번 질문은 범위 확인으로 처리하고 구현 재개·완료로 보고하지 않았다. WORKLOG/CURRENT_STATE만 갱신, 문서 작업으로 테스트 생략, git diff --check와 표식 단일 출현 검증. 추가 코드·원격·배포·실제 삭제·commit/push 변경 및 Secret/Token 기록 없음.
+
+## 2026-10-03 — Billing 서버 미기동 상태의 구현 범위 재확인
+
+- TMI-193(상위 TMI-136): Billing 서버를 지금 띄우지 않고도 기존 계약 기반 최소 연결 정보 보존/조회·승계 코드와 모의 테스트를 구현한다는 범위를 재확인했다. 실제 서버 연동 검증과 활성화는 서버 준비 후 별도 단계다.
+- 이번 응답은 확인 질문에 대한 설명이며 코드 구현 재개나 서버 기동을 수행하지 않았다. WORKLOG/CURRENT_STATE만 갱신, 문서 작업으로 테스트 생략 및 git diff --check 확인. Secret/Token 기록, 원격·배포·commit/push 변경 없음.
+
+## 2026-10-03 — TMI-193 삭제 상태 및 Billing 최소 증거/승계 기반 구현
+
+<!-- codex-turn:01a100c7-d8b0-7920-a7e9-051c3d712d66 -->
+
+- 사용자 구현 재개 요청에 따라 TMI-193(상위 TMI-136)을 이어 진행했다. Billing 서버 미기동·모의 테스트 경계를 유지했다. 이전 초안의 canonical owner UUID가 Legacy fixture UUID를 거절하던 문제를 수정하고 삭제 상태/command hash/target seal/공개 projection에 단위 테스트를 추가했다.
+- DeletedExamContinuation에 source/group/mockExam/cycleNumber/예약·생성 참조/승계 상태만 저장한다. 답안·점수·피드백·음성 key를 복사하지 않는다. 기존 cycleNumber 의미 보존을 위한 최소 coordination 필드 포함을 진행 문서에 명시했다.
+- DeletedExamContinuationStore는 기존 Mongo transaction에만 참여한다. owner guard/active withdrawal·삭제 stage/status·SEALED target/참조·non-terminal operation을 확인한 뒤 원본 Session delete와 최소 증거 insert를 원자 처리한다. NEEDS_REVIEW는 PREPARING_RESTART 단계가 남아 있어도 삭제하지 않는다.
+- 기존 ExamSessionManager/BillingExamCreationSaga/BillingExamCreationTransactionService에 선택적 연결 지점을 추가했다. 삭제 source를 phone discovery보다 먼저 사용하며 operation insert와 claim, 새 Session commit과 transfer, CANCELED/EXPIRED precommit claim 해제를 원자 처리한다. 미확정/CLAIMED/중복 소스를 INITIAL로 우회하지 않는다. 현재 Session과 미승계 source 공존은 안전 오류로 중단하고 TRANSFERRED source는 재사용하지 않는다.
+- 전체 기능은 미완료다. Store는 자동 bean 등록하지 않았고 DeletionActivationBarrier로 command/read/write/worker/continuation/aggregate 활성화를 거절한다. 현재 공개 endpoint 추가나 실제 삭제 동작은 없다. 전체 writer/read/Callback fence, durable API/worker/lease/unknown commit 복구, S3/Redis cleanup, 일별 집계, retention 전파/TTL과 운영 연결은 다음 구현 범위다. Jira를 완료 처리하지 않았다.
+- 신규 migration은 신규 4개 collection 기반 index만 다룬다. 기본 dry-run, 명시 DB·writer drain·중복/정의 preflight와 apply 후 검증을 추가했으며 원격 실행/기존 콘텐츠 변경/TTL 설치는 하지 않았다. 모든 flags는 OFF이며 배포 전에 완성된 validator/전체 migration/실제 Billing·모바일·S3 E2E가 필요하다.
+- 검증: ./gradlew compileJava, ./gradlew clean test 통과. 최종 보강 뒤 ./gradlew test 570개, JAVA_TOOL_OPTIONS=-Dapi.version=1.44 ./gradlew mongoIntegrationTest 96개, node --test scripts/mongodb/*.test.js 112개 통과. 실패/오류/skip0. 신규 Mongo13개는 실제 격리 replica-set에서 atomicity/rollback/단일 claim winner/신규 Session 그룹 연결/모순된 INITIAL rollback/격리 상태 차단을 검증한다. 실제 Billing/AWS/모바일 E2E와 네트워크 unknown-commit failure injection 완료를 주장하지 않는다.
+- Gradle cache sandbox 제한은 승인된 escalated 실행으로 해결했으며 Docker API 옵션은 테스트 프로세스에만 적용했다. 기존 compiler 경고는 작업 범위 밖으로 유지했다. git diff --check와 현재 표식 1회 출현 검증. 기존 공개 API/BaseResponse/retryCount/AI user_id=examId/Callback JSON/S3·Redis key 계약 불변.
+- 변경 파일/위험/후속은 LEARNING_RECORD_DELETION_IMPLEMENTATION_PROGRESS.md에 정리하고 계획/결정서 상태·CURRENT_STATE를 갱신했다. 기존 배포 상태/회고 문서 등 사용자 변경은 보존했고 예상 밖 런타임 변경은 없다. commit/push·원격 DDL·실제 데이터 삭제·배포·Secret/Token 기록 없음.
+
+## 2026-10-03 — TMI-193 삭제 API·보호·정리 worker·일별 통계 연결
+
+<!-- codex-turn:01a100e1-27a9-7040-b987-98294d2d803e -->
+
+- 사용자 요청으로 TMI-193(상위 TMI-136)의 나머지 LC 코드 경로를 추가했다. Billing 서버는 띄우지 않았고 기존 미완료 변경을 보존하면서 작업했다. 앱/웹/Identity/Billing 저장소·원격 인프라를 변경하지 않았다.
+- DELETE /api/v1/learning-records, GET /api/v1/learning-records/deletion을 추가했다. body/query 금지, 현재 사용자·UUIDv4 key 검증, hashed mapping/단일 active 작업, same-key replay 우선, unknown commit의 fresh primary-majority 복구, 공개 projection/ISO 날짜/고정 오류 및 command OFF에서도 status 유지 규칙을 연결했다.
+- Exam history/retry/result/status와 Challenge history/results/attempt 조회 숨김, 공개 start/upload/submit/retry 409 차단, GRADING coordination만 제한적 drain, SEALED 뒤 Callback no-op을 추가했다. synchronous Mongo BeforeSaveCallback과 repository CAS hook으로 transaction/owner·root·sealed target을 재검사한다. UserMerged와 active deletion 경합은 503으로 미룬다. 기존 예약 status/confirm/cancel은 진행하되 신규 reserve dispatch/Session 생성은 fence를 지킨다.
+- worker는 bounded inventory/대상 count·owner 검증, orphan 거절, Billing 최소 증거 보존/Session 제거와 Challenge slot 해제, 안전 checkpoint 뒤 sealed ID 전용 정리를 수행한다. partial Billing metadata는 미연결로 취급하지 않는다. Mongo batch100/S3 page1000, lease30초/API별5초, durable retry/backoff·24시간/200회 격리, S3 version/delete marker·partial 오류·PUT capability 후 final sweep, Redis exact key, 최종 Mongo/S3/Redis 검증과 완료 TTL 전파를 추가했다. 완료 retention은 active queue가 계속 있어도 진행하도록 별도 bounded 유지 단계를 둔다.
+- 일별 KST learning_activity_daily_aggregates에 승인된18개 조합만 sparse transactional $inc한다. 사용자/시험/event 식별자는 최종 문서에 넣지 않으며 원본 최초 marker·단조 retry sequence는 원본과 함께 삭제한다. synchronous save callback 및 raw repository CAS를 모두 연결했다. 신규 실제 submit은 내부 provenance로 legacy Job 복구와 구분한다. legacy 최초 event/완료 상태 복구는 coverage 미수집으로 보수적으로 처리하고 과거 count를 추정하지 않는다. 정상11문항25회 증가, 완료 재전이/중복/rollback 및 원본 삭제 후 aggregate 보존을 검증했다.
+- flag는 모두 기본 OFF이며 read/writer/continuation 조합·command/worker 의존성과 replica set/index/JWT/rollout/coverage manifest 검증을 추가했다. 기동 시 자동 DDL/승인은 없다. migration은 명시 DB/drained writer와 exact index/위험 TTL/child orphan/owner mismatch preflight를 요구하고 완료 operation/command/target TTL과 조회·worker·일별 unique index를 준비한다. 콘텐츠/원격 DB 삭제는 하지 않았다.
+- 기존 Billing continuation OPEN/unresolved 보존은 유지한다. authoritative group lifecycle 및 미전달 outbox retention 연동은 남았으므로 continuation 자동 TTL은 설치하지 않는다. 실제 Billing 무추가차감·AWS IAM/versioning·Redis timeout·모바일 캐시 세대·백업/로그 보존·성능/전체 네트워크 failure injection·운영 알림 수신은 출시 전 확인해야 한다. 기본 OFF 상태이며 Jira 완료 처리나 운영 활성화 준비 완료를 주장하지 않는다.
+- 추가 진단: 기존 QuestionGradingJobRepository.reopenCompletedMissingResult가 격리 Mongo fixture에서 recoveryCycle을 증가시키지 않는 현상을 새 hook 없는 repository로도 관측했다. 기존 repository/채점 복구 정책은 범위 밖으로 수정하지 않았고 후속 조사로 기록했다. 신규 통계는 해당 resettable counter 대신 durable 전이/별도 sequence를 사용한다. 임시 진단 실패는 최종 통과 테스트가 기존 복구 계약을 보증한다는 주장에 사용하지 않는다.
+- 검증: ./gradlew clean test 통과. 최종 보강 후 JAVA_TOOL_OPTIONS=-Dapi.version=1.44 ./gradlew test mongoIntegrationTest에서 단위580/Mongo111 통과, node --test scripts/mongodb/*.test.js 114 통과. 실패/오류/skip0. 신규 테스트는 command commit 응답 유실 주입·old-only 삭제/새 기록 보존·orphan/review·cleanup delayed·storage partial/version/prefix/Redis unknown·UserMerged OFF/삭제 ON 기동/transaction을 포함한다. 실제 AWS/Billing/모바일 호출 없음. Gradle sandbox/Docker API 제약은 승인된 로컬 테스트 실행으로 해결했으며 기존 compiler 경고는 유지했다.
+- 변경 파일: learningrecorddeletion 신규 패키지, Exam/Challenge/UserMerged 연결부·Question Job 내부 provenance, application.yml 기본 OFF, migration/tests, 진행/API 계약/runbook 및 계획/상태 문서. 기존 공개 API/DTO/BaseResponse, 시험 retryCount, AI user_id=examId/Callback JSON, S3/Redis key는 유지했다. 예상 밖 런타임 변경은 없으며 기존 회고/배포상태/이전 WORKLOG 사용자 변경은 보존했다. commit/push·배포·원격 DDL·실제 사용자 데이터 삭제·Secret/Token 기록 없음. 다음 작업은 남은 lifecycle/실제 staging 검증 및 별도 승인 후 rollout이다.
+
+## 2026-10-03 — recoveryCycle 증가 유실 원인 진단
+
+<!-- codex-turn:01a1012b-b720-7051-98be-3ee15b95d106 -->
+
+- TMI-193(상위 TMI-136): Spring Data MongoDB 4.4.2 문자열 @Update의 BasicUpdate가 version 변경 여부를 인식하지 못해 자동 version 증가를 추가하면서 $inc 전체를 교체한다. 실제 wire에서 recoveryCycle 증가가 제거되고 version만 남음을 확인했다.
+- callback/hook 없는 새 MongoTemplate/RepositoryFactory와 격리 Mongo 7.0.14에서 재현했다. 최초 증가 assertion은 실제0으로 실패, 일반 Update 빌더의 대조 테스트는 값1 확인으로 통과(1 test). 임시 진단 파일은 제거, runtime/기존 테스트는 변경하지 않았다. 전체 회귀는 재실행하지 않았다.
+- ExamGradingService의 cycle+1 검사에서 waiting으로 빠지는 영향과 오래된 실패 claim의 cycle 구분 약화를 확인했다. 실제 원격 발생 여부는 미확인. 새 통계와 무관한 repository 경로 결함으로 판단하며 custom Update 구현 및 hook/transaction 보존 회귀를 권장한다.
+- RECOVERY_CYCLE_DIAGNOSIS.md/CURRENT_STATE에 기록. git diff --check 통과. 기존 사용자 변경 보존, 원격 변경·배포·commit/push·실제 데이터 삭제·Secret/Token 기록 없음.
+
+## 2026-10-03 — recoveryCycle 복구 CAS 수정 및 회귀 검증
+
+- TMI-193(상위 TMI-136): 사용자 수정 승인에 따라 QuestionGradingJobRecovery custom fragment/Impl을 추가하고 기존 repository 메서드 계약을 유지했다. BasicQuery의 기존 CAS 조건과 일반 Update 빌더를 사용하여 BasicUpdate/@Version의 $inc 덮어쓰기를 우회한다. CAS로 검증한 expected+1 저장은 명시 null/missing도 0→1로 복구하며 version은 1 증가한다. 외부 API/AI 계약 불변.
+- 기존 owner transaction 안에서 updateFirst를 실행한다. LearningActivityRepositoryHooks가 fragment 메서드에도 삭제 fence와 통계 transition을 적용하도록 명시적으로 확장했다. 새 transaction 또는 운영 의존성은 추가하지 않았다.
+- 실제 Mongo 회귀 추가: 0→1→2, missing/null→1, version/reset, CAS loser/missing ID, 동시 요청 한 winner, old failure claim 차단/current claim 허용, rollback. Boot 자동 repository discovery에서도 fragment 동작을 확인했다. 기존 통계 fixture에 cycle assertion, CAS loser count, 삭제 fence 거절과 통계 rollback을 추가했다.
+- 검증: ./gradlew clean test 단위580, JAVA_TOOL_OPTIONS=-Dapi.version=1.44 ./gradlew mongoIntegrationTest 최종116, node --test scripts/mongodb/*.test.js 114 통과. 실패/skip0. git diff --check 통과. sandbox Gradle cache 접근 제한은 승인된 실행으로 해결했다. 기존 compiler 경고 유지.
+- 수정 파일: QuestionGradingJobRepository/Recovery/RecoveryImpl, LearningActivityRepositoryHooks, QuestionGradingRecoveryMongoTest/LearningActivityMongoTest/MongoRepositoryDiscoveryIntegrationTest, 진단/진행/runbook/현재상태/작업기록 문서. 기존 사용자 변경 보존. 배포·원격 DB 변경·commit/push·실제 사용자 데이터 삭제·Secret/Token 기록 없음. 테스트 서버 실제 검증은 사용자 commit/push와 배포 뒤 후속이다.

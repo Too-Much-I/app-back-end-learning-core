@@ -13,6 +13,7 @@ import web.tosunsaeng.domain.exams.domain.repository.ExamSessionRepository;
 import web.tosunsaeng.domain.exams.exception.ExamsException;
 import web.tosunsaeng.domain.usermerge.application.UserOwnedTransactionExecutor;
 import web.tosunsaeng.domain.usermerge.application.UserOwnershipGuardException;
+import web.tosunsaeng.domain.learningrecorddeletion.infrastructure.DeletedExamContinuationStore;
 import web.tosunsaeng.global.error.code.status.ErrorStatus;
 
 import java.time.Clock;
@@ -43,6 +44,13 @@ public class ExamSessionManager {
     @Autowired(required = false)
     private UserOwnedTransactionExecutor userOwnedTransactionExecutor;
 
+    @Autowired(required = false)
+    private DeletedExamContinuationStore deletedExamContinuations;
+
+    public boolean hasDeletedBillingContinuation(String userId) {
+        return deletedExamContinuations != null && deletedExamContinuations.findAvailable(userId).isPresent();
+    }
+
     public Assignment startNew(String userId) {
         return inUserOwnedTransaction(userId, () -> startNewAttempt(userId, 1));
     }
@@ -62,6 +70,19 @@ public class ExamSessionManager {
         if (replacement == null) {
             replacement = examSessionRepository.findLatestRetakeAvailableByUserId(userId)
                     .orElse(null);
+        }
+
+        var deletedSource = deletedExamContinuations == null ? null
+                : deletedExamContinuations.findAvailable(userId).orElse(null);
+        if (deletedSource != null) {
+            // Coexisting untransferred evidence and a current source must be reconciled, not charged anew.
+            if (replacement != null || !activeSessions.isEmpty()) {
+                throw new IllegalStateException("Current Session conflicts with deleted continuation evidence");
+            }
+            MockExam mockExam = mockExamCatalogService.getRequiredExam(deletedSource.getMockExamId());
+            LocalDateTime now = LocalDateTime.ofInstant(clock.instant(), clock.getZone());
+            return new PreparedAssignment(newExamId(now), mockExam, deletedSource.getCycleNumber(), now,
+                    deletedSource.getSourceExamId(), deletedSource.getAttemptGroupId(), deletedSource.getMockExamId());
         }
 
         if (replacement != null) {
@@ -102,6 +123,8 @@ public class ExamSessionManager {
     }
 
     private Assignment startNewAttempt(String userId, int attempt) {
+        if (deletedExamContinuations != null && deletedExamContinuations.findAvailable(userId).isPresent())
+            throw web.tosunsaeng.domain.learningrecorddeletion.application.DeletionFailure.temporary();
         List<String> abandonedExamIds = abandonInProgressSessions(userId);
 
         SelectedExam selected = selectExam(userId);

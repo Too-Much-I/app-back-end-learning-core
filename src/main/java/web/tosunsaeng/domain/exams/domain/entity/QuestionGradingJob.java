@@ -34,6 +34,10 @@ public class QuestionGradingJob {
     private Instant completedAt;
     private Instant failedAt;
     private String failureReason;
+    // Distinguishes a new public submission from reconstruction of a missing legacy Job.
+    private boolean activityUserSubmission;
+
+    public QuestionGradingJob markUserSubmission() { activityUserSubmission = true; return this; }
 
     @Version
     private Long version;

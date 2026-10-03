@@ -91,7 +91,7 @@ public class AttemptGroupStateCoordinator {
     String touchCurrentOwnerWithinTransaction(String examId) {
         ExamSession session = sessionRepository.findById(examId).orElse(null);
         if (session != null && userOwnedTransactionExecutor != null) {
-            userOwnedTransactionExecutor.touchWithinExistingTransaction(session.getUserId());
+            userOwnedTransactionExecutor.touchExamWithinExistingTransaction(session.getUserId(), examId);
         }
         return session == null ? null : session.getUserId();
     }
@@ -106,7 +106,7 @@ public class AttemptGroupStateCoordinator {
     private void reconcileInTransaction(String examId) {
         ExamSession session = sessionRepository.findById(examId).orElse(null);
         if (session != null && userOwnedTransactionExecutor != null) {
-            userOwnedTransactionExecutor.touchWithinExistingTransaction(session.getUserId());
+            userOwnedTransactionExecutor.touchExamWithinExistingTransaction(session.getUserId(), examId);
         }
         if (!eligible(session) || session.getTerminalEventId() != null) {
             return;

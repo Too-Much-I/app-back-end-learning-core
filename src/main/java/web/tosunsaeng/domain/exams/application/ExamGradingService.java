@@ -73,18 +73,22 @@ public class ExamGradingService {
 
     @Autowired(required = false)
     private UserOwnedTransactionExecutor userOwnedTransactionExecutor;
+    @Autowired(required = false)
+    private web.tosunsaeng.domain.learningrecorddeletion.application.DeletionAccess deletionAccess;
+    private final ThreadLocal<Boolean> publicMutation = new ThreadLocal<>();
 
     @Value("${spring.cloud.aws.s3.bucket}")
     private String bucketName;
 
     public ExamStatus submitQuestion(String examId, Integer questionNumber, Integer retryCount) {
+        requirePublicWrite(examId);
         if (userOwnedTransactionExecutor == null || !userOwnedTransactionExecutor.enabled()) {
             return submitQuestionWithoutGuard(examId, questionNumber, retryCount);
         }
         int canonicalRetryCount = GradingKeys.canonicalRetryCount(retryCount);
         SubmitPreparation preparation = inCurrentOwnerTransaction(
                 examId,
-                () -> prepareQuestionDispatch(examId, questionNumber, canonicalRetryCount)
+                () -> { requirePublicWrite(examId); return prepareQuestionDispatch(examId, questionNumber, canonicalRetryCount); }
         );
         if (preparation.claim() == null) {
             calculateAndCacheOverallStatus(examId);
@@ -128,6 +132,7 @@ public class ExamGradingService {
                 resolveMockExamId(examId),
                 now
         );
+        pending.markUserSubmission();
         QuestionGradingJob inserted = questionJobRepository.insert(pending);
         if (hasQuestionResult(examId, questionNumber, retryCount)) {
             completeQuestionWithoutGuard(examId, questionNumber, retryCount);
@@ -166,6 +171,7 @@ public class ExamGradingService {
 
         QuestionGradingJob inserted;
         try {
+            pending.markUserSubmission();
             inserted = questionJobRepository.insert(pending);
             log.debug(
                     "문항 채점 작업 생성 event=grading.question.job outcome=created "
@@ -223,7 +229,10 @@ public class ExamGradingService {
     }
 
     public ExamResponseDTO.GradingRetryResult retryExam(String examId) {
-        return retryExamWithoutGuard(examId);
+        requirePublicWrite(examId);
+        publicMutation.set(true);
+        try { return retryExamWithoutGuard(examId); }
+        finally { publicMutation.remove(); }
     }
 
     private ExamResponseDTO.GradingRetryResult retryExamWithoutGuard(String examId) {
@@ -996,7 +1005,8 @@ public class ExamGradingService {
             ExamSession observed = examSessionRepository.findById(examId)
                     .orElseThrow(() -> new ExamsException(ErrorStatus._EXAM_NOT_FOUND));
             try {
-                return userOwnedTransactionExecutor.execute(observed.getUserId(), () -> {
+                return userOwnedTransactionExecutor.executeExamCoordination(observed.getUserId(), examId, () -> {
+                    if (Boolean.TRUE.equals(publicMutation.get())) userOwnedTransactionExecutor.requirePublicWrite(observed.getUserId());
                     ExamSession current = examSessionRepository.findById(examId)
                             .orElseThrow(() -> new ExamsException(ErrorStatus._EXAM_NOT_FOUND));
                     if (!java.util.Objects.equals(current.getUserId(), observed.getUserId())) {
@@ -1011,6 +1021,14 @@ public class ExamGradingService {
         throw lastFailure == null
                 ? new IllegalStateException("Grading owner convergence failed")
                 : lastFailure;
+    }
+
+    private void requirePublicWrite(String examId) {
+        if (userOwnedTransactionExecutor != null && userOwnedTransactionExecutor.enabled()) {
+            ExamSession session = examSessionRepository.findById(examId)
+                    .orElseThrow(() -> new ExamsException(ErrorStatus._EXAM_NOT_FOUND));
+            userOwnedTransactionExecutor.requirePublicWrite(session.getUserId());
+        }
     }
 
     private static final class SessionOwnerChangedException extends RuntimeException {
@@ -1213,12 +1231,15 @@ public class ExamGradingService {
                     .orElse(ExamStatus.PROCESSING);
         }
 
+        if (deletionAccess != null && deletionAccess.freshSealedExam(examId)) return status;
         redisTemplate.opsForValue().set(
                 redisStatusKey(examId),
                 status.name(),
                 1,
                 TimeUnit.HOURS
         );
+        // Covers a deletion that sealed between the precheck and the external Redis write.
+        if (deletionAccess != null && deletionAccess.freshSealedExam(examId)) redisTemplate.delete(redisStatusKey(examId));
         return status;
     }
 

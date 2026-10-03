@@ -9,6 +9,16 @@ import static web.tosunsaeng.domain.challenge.ChallengeModels.*;
 
 public class ChallengeStore {
     final MongoTemplate mongo;
+    private web.tosunsaeng.domain.learningrecorddeletion.application.DeletionAccess deletionAccess;
+    public void setDeletionAccess(web.tosunsaeng.domain.learningrecorddeletion.application.DeletionAccess access) { this.deletionAccess = access; }
+    public void requirePublicWrite(String owner) { if (deletionAccess != null) deletionAccess.requirePublicWrite(owner); }
+    public void setPersistenceCallbacks(org.springframework.data.mapping.callback.EntityCallback<?>... callbacks) {
+        mongo.setEntityCallbacks(org.springframework.data.mapping.callback.EntityCallbacks.create(callbacks));
+    }
+    public boolean deleted(String id) { return deletionAccess != null && deletionAccess.sealed(
+            web.tosunsaeng.domain.learningrecorddeletion.domain.DeletionTarget.Type.CHALLENGE, id); }
+    private boolean hidden(Attempt a) { return deletionAccess != null && deletionAccess.hidden(
+            web.tosunsaeng.domain.learningrecorddeletion.domain.DeletionTarget.Type.CHALLENGE, a.id, a.userId); }
     public ChallengeStore(MongoTemplate mongo) {
         this.mongo = new MongoTemplate(mongo.getMongoDatabaseFactory(), mongo.getConverter());
         this.mongo.setReadPreference(com.mongodb.ReadPreference.primary());
@@ -19,14 +29,17 @@ public class ChallengeStore {
         Attempt a = attempt(id);
         if (a == null) throw new ChallengeFailure(404, "CHALLENGE_ATTEMPT_NOT_FOUND");
         if (!owner.equals(a.userId)) throw ChallengeFailure.forbidden();
+        if (hidden(a)) throw new ChallengeFailure(404, "CHALLENGE_ATTEMPT_NOT_FOUND");
         return a;
     }
     public List<Attempt> range(String owner, String from, String to) {
-        return mongo.find(Query.query(Criteria.where("userId").is(owner).and("challengeDate").gte(from).lte(to)), Attempt.class);
+        return mongo.find(Query.query(Criteria.where("userId").is(owner).and("challengeDate").gte(from).lte(to)), Attempt.class)
+                .stream().filter(a -> !hidden(a)).toList();
     }
     public Attempt question(String owner, String date, int q) {
-        return mongo.findOne(Query.query(Criteria.where("userId").is(owner).and("challengeDate").is(date)
+        Attempt a = mongo.findOne(Query.query(Criteria.where("userId").is(owner).and("challengeDate").is(date)
                 .and("questionNumber").is(q)), Attempt.class);
+        return a != null && hidden(a) ? null : a;
     }
     public SubmitReceipt receipt(String owner, String key) {
         return receiptById(owner + ":" + key, SubmitReceipt.class);

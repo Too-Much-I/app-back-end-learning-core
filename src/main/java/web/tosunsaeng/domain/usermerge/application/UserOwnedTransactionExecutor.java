@@ -20,6 +20,9 @@ public class UserOwnedTransactionExecutor {
     private final ObjectProvider<TransactionOperations> transactionProvider;
     private final Clock clock;
 
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    private web.tosunsaeng.domain.learningrecorddeletion.application.DeletionAccess deletionAccess;
+
     public UserOwnedTransactionExecutor(
             UserMergedProperties properties,
             UserOwnershipGuardService guardService,
@@ -33,7 +36,7 @@ public class UserOwnedTransactionExecutor {
     }
 
     public boolean enabled() {
-        return properties.isWriterEnabled();
+        return properties.isWriterEnabled() || deletionAccess != null;
     }
 
     public <T> T execute(String userId, Supplier<T> command) {
@@ -42,10 +45,12 @@ public class UserOwnedTransactionExecutor {
         }
         if (TransactionSynchronizationManager.isActualTransactionActive()) {
             guardService.touchActive(userId, clock.instant());
+            if (deletionAccess != null) deletionAccess.requireWriter(userId);
             return command.get();
         }
         return executeWithRetry(() -> {
             guardService.touchActive(userId, clock.instant());
+            if (deletionAccess != null) deletionAccess.requireWriter(userId);
             return command.get();
         });
     }
@@ -67,7 +72,27 @@ public class UserOwnedTransactionExecutor {
     public void touchWithinExistingTransaction(String userId) {
         if (enabled()) {
             guardService.touchActive(userId, clock.instant());
+            if (deletionAccess != null) deletionAccess.requireWriter(userId);
         }
+    }
+
+    /** Existing reservation status/confirm/cancel only; never Session creation or reserve dispatch. */
+    public void touchReservationCoordinationWithinExistingTransaction(String userId) {
+        if (enabled()) guardService.touchActive(userId, clock.instant());
+    }
+
+    public void requirePublicWrite(String userId) {
+        if (deletionAccess != null) deletionAccess.requirePublicWrite(userId);
+    }
+
+    public <T> T executeExamCoordination(String userId, String examId, Supplier<T> command) {
+        return deletionAccess == null ? execute(userId, command)
+                : deletionAccess.examCoordination(examId, () -> execute(userId, command));
+    }
+
+    public void touchExamWithinExistingTransaction(String userId, String examId) {
+        if (deletionAccess == null) touchWithinExistingTransaction(userId);
+        else deletionAccess.examCoordination(examId, () -> { touchWithinExistingTransaction(userId); return null; });
     }
 
     private <T> T executeWithRetry(Supplier<T> command) {

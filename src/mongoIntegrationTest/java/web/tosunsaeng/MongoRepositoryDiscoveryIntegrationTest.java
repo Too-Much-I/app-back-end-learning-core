@@ -124,6 +124,11 @@ class MongoRepositoryDiscoveryIntegrationTest {
             for (String name : REPOSITORIES) {
                 assertThat(context.getBean("&" + name)).isInstanceOf(MongoRepositoryFactoryBean.class);
             }
+            var recoveryRepository = context.getBean(web.tosunsaeng.domain.exams.domain.repository.QuestionGradingJobRepository.class);
+            recoveryRepository.insert(web.tosunsaeng.domain.exams.domain.entity.QuestionGradingJob.completed(
+                    "recovery-discovery", "fixture", 1, 0, "key", Instant.EPOCH));
+            assertThat(recoveryRepository.reopenCompletedMissingResult("recovery-discovery", 0, Instant.EPOCH)).isEqualTo(1);
+            assertThat(recoveryRepository.findById("recovery-discovery").orElseThrow().effectiveRecoveryCycle()).isEqualTo(1);
             assertThat(context.containsBean("userMergedConsumerService")).isEqualTo(consumer);
             assertThat(context.containsBean("userMergedWorkloadSecurityFilterChain")).isEqualTo(consumer);
             assertThat(context.containsBean("mergedUserAccessGateFilter")).isEqualTo(sourceDeny);
