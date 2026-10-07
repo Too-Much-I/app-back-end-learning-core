@@ -36,6 +36,14 @@ public class ChallengeStore {
         return mongo.find(Query.query(Criteria.where("userId").is(owner).and("challengeDate").gte(from).lte(to)), Attempt.class)
                 .stream().filter(a -> !hidden(a)).toList();
     }
+    /** Minimal projection retains identifiers needed by the existing deletion read fence. */
+    public java.util.Set<String> submittedDates(String owner, String from, String to) {
+        Query query = Query.query(Criteria.where("userId").is(owner).and("challengeDate").gte(from).lte(to)
+                .and("state").is(State.SUBMITTED));
+        query.fields().include("_id").include("userId").include("challengeDate");
+        return mongo.find(query, Attempt.class).stream().filter(a -> !hidden(a))
+                .map(a -> a.challengeDate).collect(java.util.stream.Collectors.toSet());
+    }
     public Attempt question(String owner, String date, int q) {
         Attempt a = mongo.findOne(Query.query(Criteria.where("userId").is(owner).and("challengeDate").is(date)
                 .and("questionNumber").is(q)), Attempt.class);

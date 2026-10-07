@@ -35,7 +35,7 @@ class DeletionFlowMongoTest {
         mongo.getDb().drop();
         clock = new MutableClock();
         for (String c : List.of("exam_sessions", "exam_creation_operations", "exam_results", "exam_summaries",
-                "question_grading_jobs", "summary_grading_jobs", "azure_results", "speechace_results", "challenge_10s_attempts",
+                "question_grading_jobs", "summary_grading_jobs", "azure_results", "speechace_results", "exam_submission_receipts", "challenge_10s_attempts",
                 "challenge_10s_grading_jobs", "challenge_10s_submit_receipts", "challenge_10s_callback_receipts",
                 "user_ownership_guards", "withdrawn_user_access_denies", "learning_record_deletion_operations",
                 "learning_record_deletion_commands", "learning_record_deletion_targets", "learning_record_billing_continuations")) mongo.createCollection(c);
@@ -79,6 +79,7 @@ class DeletionFlowMongoTest {
     @Test void completeDeletesOnlySealedOldTargetsAndKeepsAnonymousAggregateAndNewLearning() {
         mongo.insert(ExamSession.builder().examId("old").userId(OWNER).build());
         mongo.insert(new Document("_id", "old-result").append("examId", "old").append("userId", OWNER), "exam_results");
+        mongo.insert(new Document("_id", "old:1").append("examId", "old").append("questionNumber", 1), "exam_submission_receipts");
         mongo.insert(new Document("_id", "day-count").append("count", 120L), "learning_activity_daily_aggregates");
         commands.request(OWNER, KEY);
         assertThat(access.hidden(DeletionTarget.Type.EXAM, "old", OWNER)).isTrue();
@@ -86,12 +87,15 @@ class DeletionFlowMongoTest {
         assertThatCode(() -> access.requirePublicWrite(OWNER)).doesNotThrowAnyException();
         mongo.insert(ExamSession.builder().examId("new").userId(OWNER).build());
         mongo.insert(new Document("_id", "new-result").append("examId", "new").append("userId", OWNER), "exam_results");
+        mongo.insert(new Document("_id", "new:1").append("examId", "new").append("questionNumber", 1), "exam_submission_receipts");
         clock.now = clock.now.plusSeconds(360);
         for (int i = 0; i < 80 && commands.latest(OWNER).isActiveGuard(); i++) step();
         var completed = commands.latest(OWNER);
         assertThat(completed.getStatus()).isEqualTo(DeletionOperation.Status.COMPLETED);
         assertThat(mongo.findById("old", ExamSession.class)).isNull();
         assertThat(mongo.findById("old-result", Document.class, "exam_results")).isNull();
+        assertThat(mongo.findById("old:1", Document.class, "exam_submission_receipts")).isNull();
+        assertThat(mongo.findById("new:1", Document.class, "exam_submission_receipts")).isNotNull();
         assertThat(mongo.findById("new", ExamSession.class)).isNotNull();
         assertThat(mongo.findById("new-result", Document.class, "exam_results")).isNotNull();
         assertThat(mongo.findById("day-count", Document.class, "learning_activity_daily_aggregates").getLong("count")).isEqualTo(120);

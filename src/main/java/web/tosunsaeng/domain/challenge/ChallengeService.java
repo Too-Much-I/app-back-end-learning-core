@@ -148,22 +148,38 @@ public class ChallengeService {
         return receipt.response;
     }
     public History history(String owner, String value) {
+        LocalDate today = catalog.today(), base = catalog.baseDate();
         YearMonth month;
         try {
             if (value != null && !value.matches("[0-9]{4}-[0-9]{2}")) throw ChallengeFailure.badRequest();
-            month = value == null ? YearMonth.from(catalog.today()) : YearMonth.parse(value);
+            month = value == null ? YearMonth.from(today) : YearMonth.parse(value);
         } catch (DateTimeException e) { throw ChallengeFailure.badRequest(); }
-        LocalDate today = catalog.today(), base = catalog.baseDate();
         if (month.isAfter(YearMonth.from(today))) throw ChallengeFailure.badRequest();
+        int streak = currentStreak(owner, today, base);
         LocalDate from = month.atDay(1).isBefore(base) ? base : month.atDay(1);
         LocalDate to = month.atEndOfMonth().isAfter(today) ? today : month.atEndOfMonth();
-        if (from.isAfter(to)) return new History(month.toString(), List.of());
+        if (from.isAfter(to)) return new History(month.toString(), List.of(), streak);
         List<Attempt> attempts = range(owner, from.toString(), to.toString()); List<Day> dates = new ArrayList<>();
         for (LocalDate d = from; !d.isAfter(to); d = d.plusDays(1)) {
             String date = d.toString(); int count = solved(attempts.stream().filter(a -> date.equals(a.challengeDate)).toList());
             dates.add(new Day(date, count > 0, count));
         }
-        return new History(month.toString(), dates);
+        return new History(month.toString(), dates, streak);
+    }
+    private int currentStreak(String owner, LocalDate today, LocalDate base) {
+        int count = 0;
+        LocalDate cursor = today;
+        // Read at most 32 days per query; stop at the first gap rather than loading all history.
+        while (!cursor.isBefore(base)) {
+            LocalDate from = cursor.minusDays(31).isBefore(base) ? base : cursor.minusDays(31);
+            Set<String> submitted = store.submittedDates(owner, from.toString(), cursor.toString());
+            while (!cursor.isBefore(from)) {
+                if (submitted.contains(cursor.toString())) count++;
+                else if (!cursor.equals(today)) return count;
+                cursor = cursor.minusDays(1);
+            }
+        }
+        return count;
     }
     public Object results(String owner, String date, Integer q) {
         LocalDate requested = ChallengeCatalog.date(date);

@@ -279,10 +279,41 @@ class ChallengeMongoIntegrationTest {
         assertThat(store.attempt(first).state).isEqualTo(State.EXPIRED);
         assertThat(service.history(OWNER, "2026-09").dates()).containsExactly(new ChallengeViews.Day("2026-09-07", true, 1));
         assertThat(service.history(OWNER, "2026-08").dates()).isEmpty();
+        assertThat(service.history(OWNER, "2026-08").currentStreakDays()).isEqualTo(1);
         assertThatThrownBy(() -> service.history(OWNER, "2026-10")).isInstanceOf(ChallengeFailure.class);
         clock.at(Instant.parse("2026-10-03T00:00:00Z"));
         assertThat(service.history(OWNER, "2026-09").dates()).hasSize(24);
         assertThat(service.history(OWNER, "2026-10").dates()).hasSize(3);
+        assertThat(service.history(OWNER, "2026-10").currentStreakDays()).isZero();
+    }
+    @Test void streakUsesActualKstMidnightAndSubmissionDateRatherThanGradingDate() {
+        submitted();
+        clock.at(Instant.parse("2026-09-07T15:00:00Z")); // Sep 8 KST: yesterday's streak is retained.
+        assertThat(service.history(OWNER, null).currentStreakDays()).isEqualTo(1);
+        clock.at(Instant.parse("2026-09-08T14:59:59Z"));
+        assertThat(service.history(OWNER, null).currentStreakDays()).isEqualTo(1);
+        clock.at(Instant.parse("2026-09-08T15:00:00Z")); // Sep 9 KST: neither today nor yesterday.
+        assertThat(service.history(OWNER, null).currentStreakDays()).isZero();
+    }
+    @Test void streakProjectionFiltersOwnerStateAndDeletionWithoutLoadingResults() {
+        String id = submitted();
+        Attempt second = Attempt.create(UUID.randomUUID().toString(), OWNER, "2026-09-07",
+                new Question(1, 2, "Q2", "fixture", "answer", 1), NOW);
+        second.state = State.SUBMITTED; second.gradingStatus = "failed"; store.insert(second);
+        Attempt expired = Attempt.create(UUID.randomUUID().toString(), OWNER, "2026-09-06", second.question, NOW);
+        expired.state = State.EXPIRED; store.insert(expired);
+        Attempt other = Attempt.create(UUID.randomUUID().toString(), "other", "2026-09-06", second.question, NOW);
+        other.state = State.SUBMITTED; store.insert(other);
+        assertThat(store.submittedDates(OWNER, "2026-09-06", "2026-09-07")).containsExactly("2026-09-07");
+        assertThat(service.history(OWNER, null).currentStreakDays()).isEqualTo(1);
+        var access = mock(web.tosunsaeng.domain.learningrecorddeletion.application.DeletionAccess.class);
+        store.setDeletionAccess(access);
+        var type = web.tosunsaeng.domain.learningrecorddeletion.domain.DeletionTarget.Type.CHALLENGE;
+        when(access.hidden(type, id, OWNER)).thenReturn(true);
+        assertThat(service.history(OWNER, null).currentStreakDays()).isEqualTo(1);
+        when(access.hidden(type, second.id, OWNER)).thenReturn(true);
+        assertThat(service.history(OWNER, null).currentStreakDays()).isZero();
+        verify(access, atLeastOnce()).hidden(type, id, OWNER);
     }
     @Test void actualMongoshPreparationDryRunAndApplyPreserveBaseDateAndData() throws Exception {
         String id = submitted(); callbacks.accept(callback(id, 1, "no_speech"));

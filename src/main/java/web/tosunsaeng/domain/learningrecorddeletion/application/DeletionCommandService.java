@@ -11,6 +11,8 @@ import java.time.Clock;
 import java.util.UUID;
 
 public class DeletionCommandService {
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    private web.tosunsaeng.domain.notification.NotificationStore notificationStore;
     private final MongoTemplate mongo;
     private final DeletionTransactions transactions;
     private final UserOwnershipGuardService guards;
@@ -31,6 +33,7 @@ public class DeletionCommandService {
                 if (mongo.exists(Query.query(Criteria.where("userId").is(owner).and("activeGuard").is(true)), DeletionOperation.class))
                     throw new DeletionFailure(409, "LEARNING_RECORD_DELETION_ALREADY_ACTIVE");
                 var now = clock.instant();
+                if (notificationStore != null) notificationStore.suppress(owner, now, "LEARNING_RECORD_DELETION");
                 var operation = DeletionOperation.requested(UUID.randomUUID().toString(), owner, now);
                 mongo.insert(operation);
                 mongo.insert(DeletionCommand.create(owner, key, operation.getDeletionId(), now));

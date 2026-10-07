@@ -218,7 +218,7 @@ public class DeletionWorker {
     }
     private List<String> children(DeletionTarget target) {
         return target.getTargetType() == DeletionTarget.Type.EXAM
-                ? List.of("exam_results", "exam_summaries", "question_grading_jobs", "summary_grading_jobs", "azure_results", "speechace_results")
+                ? List.of("exam_results", "exam_summaries", "question_grading_jobs", "summary_grading_jobs", "azure_results", "speechace_results", "exam_submission_receipts")
                 : List.of("challenge_10s_grading_jobs", "challenge_10s_submit_receipts", "challenge_10s_callback_receipts");
     }
     private String rootCollection(DeletionTarget target) {

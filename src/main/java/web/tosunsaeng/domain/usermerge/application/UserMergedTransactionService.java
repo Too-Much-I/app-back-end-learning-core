@@ -21,6 +21,9 @@ import java.util.List;
 public class UserMergedTransactionService {
 
     @org.springframework.beans.factory.annotation.Autowired(required = false)
+    private web.tosunsaeng.domain.notification.NotificationStore notificationStore;
+
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
     private web.tosunsaeng.domain.learningrecorddeletion.application.DeletionAccess deletionAccess;
 
     private final UserMergedInboxRepository inboxRepository;
@@ -112,6 +115,7 @@ public class UserMergedTransactionService {
             );
         }
 
+        if (notificationStore != null) notificationStore.merged(event.sourceUserId(), event.targetUserId(), event.receivedAt());
         migrateOwner(ExamResult.class, event.sourceUserId(), event.targetUserId());
         migrateOwner(ExamSummary.class, event.sourceUserId(), event.targetUserId());
         migrateOwner(ExamSession.class, event.sourceUserId(), event.targetUserId());

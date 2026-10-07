@@ -32,7 +32,7 @@ public final class ChallengeViews {
     @JsonInclude(JsonInclude.Include.ALWAYS)
     public record Results(String challengeDate, int solvedQuestionCount, Detail question) {}
     public record Day(String challengeDate, boolean participated, int solvedQuestionCount) {}
-    public record History(String yearMonth, List<Day> dates) {}
+    public record History(String yearMonth, List<Day> dates, int currentStreakDays) {}
     public static Start start(Attempt a) { return new Start(a.id, a.challengeDate, a.questionNumber, "not_started", a.submissionDeadlineAt); }
     public static Submission submitted(Attempt a) {
         return new Submission(a.id, a.challengeDate, a.questionNumber, a.question.difficulty(), "submitted",
