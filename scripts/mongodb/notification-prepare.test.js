@@ -26,6 +26,13 @@ function fake(duplicate = false) {
         })};
     return {db, writes};
 }
+test('submission TTL uses explicit completion-relative expiresAt, not initial acceptedAt', () => {
+    const ttl = INDEXES.filter(s => s.collection === 'exam_submission_receipts' && s.ttl !== undefined);
+    assert.equal(ttl.length, 1);
+    assert.deepEqual(ttl[0].key, {expiresAt: 1});
+    assert.equal(ttl[0].ttl, 0);
+    assert.equal(INDEXES.some(s => s.collection === 'exam_sessions' && s.ttl !== undefined), false);
+});
 test('dry run does not write, apply verifies indexes, duplicates abort before writes', async () => {
     const a = fake(); await prepare(a.db, false); assert.equal(a.writes.length, 0);
     await prepare(a.db, true); assert.ok(a.writes.length > 0);

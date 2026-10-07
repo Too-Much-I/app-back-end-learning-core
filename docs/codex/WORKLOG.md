@@ -13926,3 +13926,121 @@
 - 검증: 최종 `./gradlew clean test`600개 통과; `JAVA_TOOL_OPTIONS=-Dapi.version=1.44 ./gradlew mongoIntegrationTest`134개 통과; `node --test scripts/mongodb/*.test.js`117개 통과(신규3개); `git diff --check` 통과. 최초 Mongo 실행은 Docker API1.32/min1.40 오류로 실패 후 실행환경 호환 옵션으로 해결했다. 테스트 JWT 인증/bean-provider fixture와 경합 테스트를 수정하고 전체 재검증했다. 신규 알림 Mongo13개에는 경쟁 제출·복수worker·marker crash·unknown commit·전송후 저장실패·토큰교체·권한/lifecycle/시간경계·무재발송 포함. loopback HTTP disconnect/redirect에서 실제 POST1회 확인. 실제 Firebase/APNs 전송은 하지 않았다.
 - 기존 사용자/직전 작업의 ChallengeService/Store/Views, ChallengeMongoIntegrationTest, ChallengeStreakTest, ten-second-challenge-frontend-api 변경은 수정하지 않았다. 이번 diff는 알림 및 승인된 연결 지점/테스트/문서이며 예상 밖의 범위 변경 없음. WORKLOG 과거 항목 보존, CURRENT_STATE 갱신. Jira 상태 변경, 운영 발송/배포, commit/push 없음.
 - 배포 전/다음 작업: 모바일 설치 credential·OS 보고·로그아웃·클릭 계약 연동, Firebase 프로젝트/APNs/secret mount·DB 암호화/RBAC, 야간 발송 요건, Mongo indexes·lifecycle gate·writer drain와 전체 KST일 추적, dry-run/실기기 E2E·운영 경보 연결을 확인한다. 모든 flag 기본OFF이며 이번 구현 완료가 활성화 승인은 아니다.
+
+## 2026-10-07 — TMI-198 머지 후 테스트 서버 활성화 요청 점검
+
+<!-- codex-turn:01a1149c-0eef-7c41-8ef5-7d3c28ecc59c -->
+
+- 사용자가 머지 후 알림 설정 활성화와 재배포를 요청했고, 확인 질문에 테스트 서버(develop/api-test)를 명시했다. 작업 시작 시 clean checkout, develop HEAD `8e910d8` 및 PR #35 merge를 확인했다.
+- GitHub Actions run37571325434는 해당 머지 SHA로 이미 실행 중이며 배포 gate 성공, 마지막 조회에서 Mongo replica-set integration test 단계였다. 중복 dispatch/취소하지 않았다. 현 workflow는 테스트 ECS의 현재 task definition을 가져와 이미지 digest만 교체하며 알림 flag를 자동 설정하지 않음을 확인했다.
+- ECS read-only 조회와 승인된 sandbox 밖 STS 로그인 확인이 NoCredentials로 실패했고 aws configure list-profiles 결과도 비어 있었다. AWS 로그인 세션 없이는 테스트 task 설정/인덱스/Firebase 준비를 검증·변경할 수 없어 사용자 환경 준비를 요청한다. Secret/Token을 조회·출력·문서화하지 않았다.
+- 설정/배포 활성화는 아직 수행하지 않았다. AWS 로그인 후 테스트 서비스만 대상으로 현 배포 완료·DB 인덱스·구 writer drain·tracking/API 선배포·readyAt·dry-run 및 실제 발송 전 Firebase/APNs/lifecycle/모바일 gate를 확인해야 한다. 운영 서비스, 관련 없는 flag, 기존 POC, DB 데이터 변경 없음.
+- 변경 파일은 WORKLOG append와 CURRENT_STATE뿐이다. runtime/API/테스트 코드 변경 없어 코드 테스트는 재실행하지 않았고 git diff --check를 수행했다. 예상 밖의 변경 없음. Jira TMI-198 상태 변경, Git commit/push, workflow dispatch, 실제 푸시 발송 없음.
+
+## 2026-10-07 — 앱 업데이트 안내만 main/develop 공통 적용 준비
+
+<!-- codex-turn:01a1149d-eeb0-77a3-bcf5-58ec269acd13 -->
+
+- 사용자 요청: 서버별 고정 업데이트 필요 응답 변경만 main과 develop에 반영할 수 있도록 분리. 신규 Jira 연결 없음(TMI-194/198과 별개). 시작 시 develop이며 CURRENT_STATE/WORKLOG의 기존 변경을 보존했다.
+- ExamRestController에 APP_UPDATE_REQUIRED(default false)를 주입하고 기존 summary 조회/소유권 검증 성공 후 toBuilder로 응답 사본에 appUpdateRequired를 설정한다. ExamResponseDTO.SummaryResult의 필드/Schema 및 toBuilder만 추가했다. DB 원본·공유 DTO를 변경하지 않으며 새 Request/header·버전 비교·강제 차단·스토어 연결은 추가하지 않았다. 기존 URL/Method/Query/성공 envelope·기존 필드/AI/S3/Redis 계약은 유지한다.
+- ExamAppUpdateTest 3케이스(unset/false/true)는 Spring property 주입과 실제 MVC JSON boolean/기존 결과 보존·원본 DTO 미변경을 검증한다. develop 전체 ./gradlew test 603개 통과 후 필드 선언 위치만 main 공통 context로 정리하고 최종 대상3 테스트 재통과. 로컬 main 및 origin/main은 afa686c이며 원격 fetch/최신 원격 확인은 하지 않았다.
+- main을 /private/tmp/lc-app-update-main.GUaVl5에 git archive로 격리 추출하고 동일 controller/DTO/테스트 변경만 적용했다. git apply --check로 main 호환 확인, 격리 main 전체 ./gradlew test 355개 통과. 원래 main 브랜치 참조는 변경하지 않았다. develop의 신규 기능·운영 알림·회원 통합 등은 main 사본에 들어가지 않았다. 임시 사본은 검증 산출물로 유지했다.
+- 변경 파일은 제품3개(ExamRestController/ExamResponseDTO/ExamAppUpdateTest)와 CURRENT_STATE/WORKLOG다. 기존 문서 변경 보존, 예상 밖 제품 변경 없음. git diff --check 통과. DB/worker 변경이 없어 Mongo 통합 suite는 재실행하지 않았다. Secret/Token 기록·커밋·push·배포·Jira 변경 없음.
+- 다음: 제품3파일만 선택한 독립 커밋을 사용자 생성 후 main/develop 간 cherry-pick 또는 각 대상 PR로 반영. develop 전체 merge 금지. 현재 main에 커밋됐다는 의미가 아니며 원격 main이 달라졌다면 재검증 필요. 구버전 서버 APP_UPDATE_REQUIRED=true/신버전false 설정은 실제 배포 때 적용한다. 구버전 앱의 필드 소비·안내 UI 지원과 서버 매핑 확인 필요.
+
+## 2026-10-07 — develop 미커밋 상태와 main 반영 절차 확인
+
+- 현재 브랜치 develop 및 제품3파일 미커밋 상태를 git status로 재확인했다. 사용자가 이해한 cherry-pick 방향은 맞지만 먼저 해당 변경만 독립 커밋해야 함을 명확히 안내했다. 로컬 파일 수정/커밋/원격 push/배포는 별개 단계다.
+- 신규 Jira 연결 없음. CURRENT_STATE/WORKLOG만 갱신, 기존 변경 보존. 코드 테스트는 설명·상태 확인만으로 생략, diff check 수행. 커밋·push·브랜치 전환·배포 및 Secret/Token 기록 없음.
+
+## 2026-10-07 — develop 상태 확인 턴 표식 보완
+
+<!-- codex-turn:01a114a2-a851-7680-b8a6-9dc062a1a09a -->
+
+- 앱 업데이트 안내 변경은 로컬 develop의 미커밋 상태이며 제품3파일 독립 커밋 후 main에 해당 커밋만 cherry-pick해야 함을 확인한 작업의 표식을 보완했다. 신규 Jira 연결 없음.
+- CURRENT_STATE 갱신과 WORKLOG EOF append만 수행했다. 추가 코드·Git·배포 변경 없이 diff check 및 표식 단일 출현을 확인했다. Secret/Token 기록 없음.
+
+## 2026-10-07 — 사용자 한정 승인으로 develop 커밋 및 main cherry-pick
+
+- 사용자가 이번 명령에 한해 직접 커밋/develop 반영/main cherry-pick을 명시 승인했다. 제품3파일(ExamRestController/ExamResponseDTO/ExamAppUpdateTest)만 stage하여 develop에 47631fb(feat: expose server app update requirement in exam summary) 커밋을 생성했다. 문서는 커밋하지 않았다.
+- 기존 미커밋 CURRENT_STATE/WORKLOG만 임시 stash하고 main으로 전환하여 해당 커밋만 cherry-pick했다. main 커밋89defb7, 충돌 없음. 두 커밋의 stable patch-id 일치 및 각3파일만 포함됨을 확인했다. develop 전체 기능은 main으로 병합하지 않았다.
+- main에서 ./gradlew test --tests '*ExamAppUpdateTest' 성공(3케이스). 앞선 전체 develop603/main355 검증에 더한 실제 cherry-pick 후 검증이며 이번 추가 제품 코드 변경 없음. API·AI 계약은 기존 승인된 appUpdateRequired 추가 외 유지, 예상 밖 파일 변경 없음.
+- develop으로 복귀하고 임시 stash 내용을 복원한 뒤 원본 stash와 문서 diff가 없음을 확인했다. 이번 임시 stash만 정리했으며 사용자 문서 데이터 손실 없음. 최종 로컬 작업 트리에는 문서 변경만 남는다. 신규 Jira 연결·원격 push·배포·환경변수 변경 없음. 다음은 필요 시 사용자 승인으로 원격 반영/배포 및 구버전true·신버전false 설정 확인. Secret/Token 기록 없음.
+
+## 2026-10-07 — 커밋·cherry-pick 작업 턴 표식 보완
+
+<!-- codex-turn:01a114a3-e205-7271-b36f-75670f220f51 -->
+
+- 이번 요청 한정 사용자 승인에 따라 코드·테스트3파일을 develop 47631fb에 커밋하고 main 89defb7로 cherry-pick한 작업의 표식을 보완했다. 두 커밋 patch-id 동일, main 대상3테스트 통과, 기존 문서 복원 및 develop 복귀 완료. 신규 Jira 연결 없음.
+- CURRENT_STATE와 WORKLOG EOF만 갱신했다. 추가 코드·Git·원격 push·배포 변경 없음. diff check와 표식 단일 출현을 확인했다. Secret/Token 기록 없음.
+
+## 2026-10-07 — main/develop push 및 배포 결과 설명
+
+<!-- codex-turn:01a114a6-a358-7501-9661-df8f68b2a37b -->
+
+- 사용자 후속 질문에 따라 실행 대신 로컬 두 브랜치 workflow와 develop gate/target 스크립트를 읽었다. main은 push 시 기존 tosunsaeng-learning-core-service 및 api-staging health 대상으로 자동 배포한다. develop은 PR merge HEAD만 자동 허용하므로 이번 직접 생성 커밋 push는 deploy skip, 수동 workflow_dispatch로 api-test 테스트 서비스를 배포할 수 있다.
+- 양쪽 workflow는 대상 서비스의 현재 task definition을 읽고 이미지를 교체하므로 APP_UPDATE_REQUIRED 설정을 새로 넣거나 branch에 따라true/false로 바꾸지 않는다. 코드 defaultfalse이며 구버전 서버true/신버전false를 실제 ECS에 별도 적용해야 원하는 안내가 된다. 런타임 환경값은 이번에 확인하지 않았다. 기존 결과·서비스와 앱의 필드 소비 필요성을 설명한다.
+- 신규 Jira 연결 없음. CURRENT_STATE/WORKLOG만 갱신, 기존 변경 보존. 앞선 짧은 동의 이후 push/배포 실행 없이 질문에 응답했다. 코드 테스트 생략(설정 읽기만), diff check 수행. 추가 커밋·push·배포·Secret/Token 기록 없음.
+
+## 2026-10-07 — 앱 업데이트 flag 미처리 클라이언트 영향 확인
+
+- ExamRestController/DTO를 재확인했다. appUpdateRequired는 결과의 부가 boolean이며 서버 강제 차단·이동 로직이 없다. 앱/웹뷰가 해당 필드를 사용하지 않고 추가 필드를 허용하면 기존 결과 표시가 유지되지만 업데이트 안내도 나타나지 않는다. 클라이언트의 엄격한 JSON/schema 검증 여부는 확인하지 않았음을 구분한다.
+- 신규 Jira 없음. CURRENT_STATE/WORKLOG만 갱신, 기존 변경 보존. 코드 변경 없이 설명·읽기 검증이므로 테스트 생략, diff check 수행. 커밋·push·배포·외부 앱 조회 및 Secret/Token 기록 없음.
+
+## 2026-10-07 — 업데이트 flag 영향 설명 턴 표식 보완
+
+<!-- codex-turn:01a114a8-5783-7e13-b5df-5e51d42aadc9 -->
+
+- appUpdateRequired 미처리 앱/웹뷰에서는 추가 필드를 허용하는 경우 기존 결과 표시가 유지되며 업데이트 안내·서버 강제 차단이 없음을 확인한 작업의 표식을 보완했다. 클라이언트의 엄격한 스키마 검증 여부는 미확인, 신규 Jira 연결 없음.
+- CURRENT_STATE 및 WORKLOG EOF만 갱신했다. 추가 코드·Git·배포 변경 없이 diff check와 표식 단일 출현을 확인했다. Secret/Token 기록 없음.
+
+## 2026-10-07 — TMI-198 테스트 알림 설정·APP_UPDATE_REQUIRED 적용 전 UI 점검과 설명
+
+<!-- codex-turn:01a114ab-946b-7762-a95f-eaec8acce645 -->
+
+- 사용자 요청은 열어 둔 AWS 탭으로 테스트 서버 알림 활성화/재배포 및 APP_UPDATE_REQUIRED=false 추가다. Chrome AWS 콘솔의 기존 로그인 CloudShell을 통해 대상 테스트 서비스만 read-only 확인했다. 로컬 AWS 자격증명 복사/생성이나 IAM 확대 없이 진행했다.
+- 테스트 ECS task definition `tosunsaeng-learning-core-test:15`, deployment COMPLETED, desired1/running1/pending0 확인. JWT와 UserMerged는 ON, UserWithdrawn consumer/deny는 OFF, notification 환경변수와 FCM 자격증명 mount/volume 없음. APP_UPDATE_REQUIRED도 환경변수 목록에 없다. 원문 Secret/Token/connection string을 읽거나 출력하지 않았다.
+- 기존 테스트 DB 준비용 Fargate definition의 image/role/secret 이름/log metadata만 확인했고 새 태스크를 등록·실행하지 않았다. GitHub develop의 notification-prepare.js를 읽어 저장소 준비 스크립트와 비교할 기반을 마련했다. 실제 DB 접속/collection/index 변경 없음.
+- 사용자에게 actual sender의 준비 부족과 API/tracking 선활성화 방향을 알리고, index apply 및 구 writer drain을 위한 테스트 서버 일시 중지 가능 여부를 질문했다. 사용자는 승인 대신 인덱스 준비/제출 추적 전환의 의미를 질문했다. 따라서 중지·설정·배포 변경 전 멈추고 중복 방지 인덱스, 실제 최초 제출 접수 시간 기록, 구/신 writer 공존을 피하는 전환 이유를 설명한다.
+- APP_UPDATE_REQUIRED=false 요청은 미완료로 유지한다. 서버/DB/config/task definition/FCM/IAM/운영 환경은 변경하지 않았으며 배포 완료로 보고하지 않는다. 후속은 설명에 대한 사용자 판단 뒤 테스트 환경만 단계적으로 준비·배포하고 상태/health를 확인하는 것이다.
+- 로컬 변경은 WORKLOG EOF append와 CURRENT_STATE 갱신뿐이며 기존 동시 작업 기록을 보존했다. 코드 변경 없어 단위/통합 테스트 생략, git diff --check 및 marker 단일 출현 확인. Jira TMI-198 상태 변경, commit/push 없음.
+
+## 2026-10-07 — TMI-198 제출 접수 기록 자동 삭제 여부 설명
+
+- NotificationSubmissionTracker, NotificationStartupValidator, notification-prepare.js와 DeletionWorker를 확인했다. 문항별 최초 제출 receipt와 Session 완료 시각에는 TTL/기간 자동 삭제가 없고 학습 기록 삭제의 sealed 시험 정리에 포함된다. 발송 이력30일 TTL과 구분해 설명했다.
+- DB 용량을 위한 receipt 보존 축소는 별도 설계 대상이다. 진행 중 시험의 receipt를 임의 만료시키면 나중에 제출을 끝내도 완료 판정이 누락될 수 있으므로 단순 TTL 추가를 실행하지 않았다. 활성화·재배포·APP_UPDATE_REQUIRED 설정은 이전 대기 상태를 유지한다.
+- CURRENT_STATE와 WORKLOG EOF만 갱신, 기존 표식 단일 출현 유지 및 git diff --check 수행. 코드 변경 없어 테스트 생략, Secret/Token 기록·DB/배포·Jira·commit/push 변경 없음.
+
+## 2026-10-07 — TMI-198 제출 기록 보존 설명 턴 표식 보완
+
+<!-- codex-turn:01a114af-665f-7030-9b46-3e90de38a58d -->
+
+- 최초 제출 receipt와 시험 제출 완료 시각에는 기간 자동 삭제가 없으며 학습 기록 삭제 시 함께 제거된다는 코드 확인 결과를 기록했다. 발송 이력30일 TTL과 구분했고, 완료 시험의 receipt만 정리하는 방식은 제안일 뿐 구현하지 않았다.
+- CURRENT_STATE를 갱신하고 과거 WORKLOG는 보존했다. 문서 기록만 변경하여 코드 테스트 생략, git diff --check와 이번 표식 단일 출현 확인. 서버 설정/DB/배포/Jira/commit/push 변경 및 Secret/Token 기록 없음.
+
+## 2026-10-07 — TMI-198 제출 receipt 3일 보존 기준 정리
+
+- 사용자가 약3일 후 삭제를 제안했다. 각 문항 접수 후3일이 아니라 시험 전체 최초 제출 완료 후72시간을 기준으로 완료 시험의 문항별 receipt만 정리하는 방식을 권장했다. Session submissionCompletedAt은 시험 기록과 유지하고, 미완료 시험의 증거를 임의 만료시키지 않으며 발송 이력30일 정책도 변경하지 않는다.
+- Mongo TTL을 구현하면72시간 경과 후 백그라운드 정리되며 정확히 그 초에 삭제되는 보장은 없음을 안내한다. 현재 런타임에는 이 TTL이 없고 이번에는 정책 설명/기록만 수행했다.
+- WORKLOG EOF append와 CURRENT_STATE 갱신, 코드 변경 없어 테스트 생략 및 git diff --check 수행. 과거 기록 보존, Secret/Token·DB/설정/배포·Jira·commit/push 변경 없음.
+
+## 2026-10-07 — TMI-198 제출 receipt 3일 보존 설명 턴 기록 보완
+
+<!-- codex-turn:01a114b0-6c6e-7e83-a92f-d920de29c16e -->
+
+- 사용자의 3일 보존 제안에 전체 최초 제출 완료 후72시간이 지난 시험의 문항별 receipt만 삭제하는 기준을 권장했다. 전체 제출 완료 시각과 미완료 시험 receipt는 유지하며 발송 이력30일 정책은 별개다. 구현·인덱스 적용은 아직 수행하지 않았다.
+- WORKLOG 끝에 현재 턴 표식을 추가하고 CURRENT_STATE를 갱신했다. 과거 기록 보존, 문서만 변경하여 코드 테스트 생략, git diff --check와 표식 단일 출현 확인. Secret/Token 기록 및 DB·배포·Jira·commit/push 변경 없음.
+
+## 2026-10-07 — TMI-198 완료된 시험의 제출 영수증 72시간 TTL 구현
+
+- 사용자 수정 승인에 따라 NotificationSubmissionTracker에서 전체 필수 최초 제출 완료와 같은 Transaction으로 해당 시험 모든 receipt의 expiresAt을 마지막 접수시각+72시간으로 설정했다. Session submissionCompletedAt은 유지하며 완료 후 호출은 반환해 TTL 삭제 후 재생성/보존 연장을 방지한다. 미완료에는 expiresAt을 설정하지 않는다.
+- NotificationStartupValidator와 notification-prepare.js에 submission_receipt_ttl(expiresAt, expireAfterSeconds=0)을 추가했다. Session 자체 TTL은 추가하지 않았다. 관련 구현 계획과 runbook에 보존 정책, TTL monitor 비동기 지연, 배포 전 신규 index 필요 및 과거 expiresAt 없는 데이터 backfill 미포함을 명시했다.
+- 검증: ./gradlew clean test 통과, JAVA_TOOL_OPTIONS=-Dapi.version=1.44 ./gradlew mongoIntegrationTest --tests 'web.tosunsaeng.domain.notification.*' 14개 통과, notification-prepare.test.js 4개 통과, git diff --check 통과. 10일 동안 진행 중인 시험 무만료, retry>0 제외, 완료 후72시간 통일, replay 만료 연장 없음, TTL 삭제를 모사한 뒤 receipt 재생성 없음/완료 판정 유지 테스트를 추가했다. 실제72시간 대기나 운영 TTL 삭제를 수행하지 않았다.
+- 기존 공개 API/BaseResponse/AI/S3/Redis 계약 변경 없음. 예상 밖의 코드 변경 없이 알림 추적/인덱스/테스트/문서만 변경했고 기존 작업 기록은 보존했다. Secret/Token 기록, 원격 DB/index 적용, 설정/배포, Jira 상태 변경, commit/push 없음. 다음 배포 전 신규 index 준비 및 구버전 완료 receipt inventory를 확인해야 하며 APP_UPDATE_REQUIRED=false 설정 요청도 여전히 미완료다.
+
+## 2026-10-07 — TMI-198 제출 영수증 72시간 TTL 구현 턴 기록 보완
+
+<!-- codex-turn:01a114b1-5e11-70e2-b831-8dd077dfa609 -->
+
+- 완료 시험의 문항별 제출 receipt에 완료시각+72시간 TTL을 설정하고, 미완료 receipt와 Session 완료 시각을 유지하는 구현 결과에 현재 턴 표식을 보완했다. 완료 후 replay는 만료 연장/영수증 재생성을 하지 않는다.
+- 최종 검증 수치는 전체 단위603개, 알림 Mongo integration14개, migration Node4개 통과다. CURRENT_STATE 갱신 및 과거 WORKLOG 보존, git diff --check와 표식 단일 출현 확인. 배포 전 새 TTL index 적용 및 과거 미설정 데이터 inventory가 필요하다. 추가 코드 수정·원격 DB/설정/배포·Jira·commit/push 변경 및 Secret/Token 기록 없음.

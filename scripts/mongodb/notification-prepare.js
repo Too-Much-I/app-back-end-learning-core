@@ -10,6 +10,7 @@ const INDEXES = [
     spec("notification_devices", "notification_owner", ["userId"]),
     spec("notification_devices", "notification_stale", ["active", "lastSeenAt"]),
     spec("exam_submission_receipts", "submission_question_unique", ["examId", "questionNumber"], true),
+    spec("exam_submission_receipts", "submission_receipt_ttl", ["expiresAt"], false, false, 0),
     spec("exam_sessions", "notification_submission_date", ["userId", "submissionCompletedAt", "createdAt"]),
     spec("daily_exam_reminder_deliveries", "reminder_daily_device_unique", ["userId", "dateKst", "type", "installationId"], true),
     spec("daily_exam_reminder_deliveries", "reminder_stale_sending", ["status", "attemptedAt"]),

@@ -53,6 +53,8 @@ API/sender는 `app.auth.mode=jwt`가 필수다. sender는 기존 `app.user-merge
 - 429/503의 Retry-After(초/HTTP-date)를1초~1일로 제한해 아직 미시도인 기기만 일시 정지한다. OAuth 일시 실패도60초 정지한다. 전역 circuit 저장이 실패하면 해당 sweep은 실패하고 marker가 남으므로 해당 기기는 재시도하지 않는다.
 - 상태 카운터 `notification.daily_reminder{outcome=...}`는 고정 값만 사용한다. AUTH_BLOCKED/SWEEP_FAILURE/LOCAL_FAILURE 증가를 운영 경보와 연결해야 한다. raw exception·token·user/exam ID를 metric/log에 넣지 않는다.
 - delivery 모든 상태: 해당 KST 날짜 종료+30일 TTL. suppression: 다음날 종료까지 유지(효력은 dateKst 당일만). 기기90일 미관측 시 토큰·owner 제거, proof tombstone 보존. API/sender가 켜져 있으면 bounded 유지 작업 실행. 모두OFF 동안 TTL 자체는 Mongo가 처리하지만 비활성 기기 정리는 scheduler 재활성화 때 수행한다.
+- 사용자 승인 보존 변경: 시험 전체 최초 제출 완료와 같은 Transaction에서 해당 시험의 모든 `exam_submission_receipts.expiresAt`을 `submissionCompletedAt + 72시간`으로 설정한다. `submission_receipt_ttl` 인덱스는 expiresAt의 absolute TTL(0초)이다. 미완료 시험은 expiresAt이 없어 만료되지 않고, Session의 완료 시각은 계속 남는다. 완료 이후 replay는 영수증을 재생성하거나 만료를 연장하지 않는다. Mongo TTL monitor가 비동기로 삭제하므로 정확히72시간에 즉시 삭제되는 보장은 없다.
+- 이 변경을 배포하기 전에 최신 notification-prepare 스크립트로 새 TTL 인덱스를 준비해야 한다. 기존 버전에서 이미 완료됐지만 expiresAt이 없는 영수증의 자동 backfill은 수행하지 않는다. 현재 테스트 환경 추적은 아직 비활성이지만 다른 환경에서 이전 버전 추적을 켰다면 배포 전 해당 데이터 inventory와 별도 backfill 검토가 필요하다. `exam_sessions`에 TTL을 추가하지 않는다.
 - 탈퇴는 token 제거+당일 억제, 병합은 source 기기 해제와 source 당일 완료/시도/억제의 target 억제, 학습 삭제는 요청 당일 억제와 sealed exam의 receipt 삭제를 포함한다. 기존 delivery payload/userId를 target으로 rewrite하지 않는다.
 
 ## 6. 검증과 남은 범위

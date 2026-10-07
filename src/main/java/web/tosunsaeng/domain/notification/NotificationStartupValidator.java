@@ -18,6 +18,7 @@ public class NotificationStartupValidator {
             index("notification_devices", "notification_owner", false, false, null, "userId"),
             index("notification_devices", "notification_stale", false, false, null, "active", "lastSeenAt"),
             index("exam_submission_receipts", "submission_question_unique", true, false, null, "examId", "questionNumber"),
+            index("exam_submission_receipts", "submission_receipt_ttl", false, false, 0L, "expiresAt"),
             index("exam_sessions", "notification_submission_date", false, false, null, "userId", "submissionCompletedAt", "createdAt"),
             index("daily_exam_reminder_deliveries", "reminder_daily_device_unique", true, false, null, "userId", "dateKst", "type", "installationId"),
             index("daily_exam_reminder_deliveries", "reminder_stale_sending", false, false, null, "status", "attemptedAt"),

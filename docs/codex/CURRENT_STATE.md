@@ -1,5 +1,37 @@
 # Learning Core Current State
 
+- 2026-10-07 — TMI-198 제출 receipt 72시간 TTL 구현 턴 기록 보완 완료. 최종 단위603개·알림 Mongo14개·migration Node4개 통과. 구현은 로컬 완료이며 원격 인덱스 적용·설정 활성화·재배포는 아직 수행하지 않았다.
+
+- 2026-10-07 — TMI-198 완료 시험 receipt 72시간 보존 구현 완료. 전체 최초 제출 완료와 같은 Transaction에서 해당 시험 영수증 expiresAt=완료시각+72시간을 설정하고 absolute TTL index를 추가했다. 미완료 시험은 무TTL, Session 완료 시각은 유지하며 완료 후 replay는 영수증 재생성/기한 연장 없이 반환한다. 전체 clean test, 알림 Mongo integration14개, migration Node4개와 diff check 통과. 기존 expiresAt 미설정 완료 영수증 backfill은 별도 검토 대상. 새 index 적용/배포와 APP_UPDATE_REQUIRED=false 설정은 미실행이며 기존 기록을 보존했다.
+
+- 2026-10-07 — TMI-198 제출 receipt 3일 보존 설명의 현재 턴 기록 보완 완료. 전체 제출 완료 후72시간 정리는 권장 정책이며 런타임/인덱스에는 아직 미적용이다. 제출 완료 시각·미완료 시험 증거·발송 이력30일 정책은 유지한다.
+
+- 2026-10-07 — TMI-198 사용자의 3일 보존 제안에 대해 완료 시험의 문항별 최초 제출 receipt만 전체 제출 완료 시각+72시간 뒤 정리하는 기준을 권장했다. Session 제출 완료 시각은 유지하고 미완료 시험 receipt와 기존 발송 이력30일 정책은 그대로 둔다. 이 단계는 정책 정리이며 TTL 코드/인덱스/DB/설정/배포 변경은 아직 없다.
+
+- 2026-10-07 — TMI-198 제출 기록 보존 설명의 턴 표식 보완 완료. 제출 receipt/완료 시각의 TTL 없음, 학습 기록 삭제 연계 및 발송 이력30일 TTL 구분을 유지한다. 보존 정책 변경·설정 활성화·재배포는 수행하지 않았다.
+
+- 2026-10-07 — TMI-198 제출 시각 기록 보존 정책 확인: exam_submission_receipts와 ExamSession.submissionCompletedAt에는 TTL이 없으며 학습 기록 삭제 시 함께 제거된다. 30일 자동 삭제는 알림 발송 이력에만 적용된다. 제출 추적 활성화/DB 준비/재배포는 여전히 미실행이다. 코드·외부 설정 변경 없이 설명만 수행했다.
+
+- 2026-10-07 — TMI-198 테스트 설정/재배포 UI 점검: 사용자 AWS 콘솔의 CloudShell에서 테스트 ECS `tosunsaeng-learning-core-test:15` rollout COMPLETED, desired/running1/pending0 확인. JWT/UserMerged 활성, UserWithdrawn consumer/deny OFF, 알림 설정 및 FCM credential mount 없음. 요청된 APP_UPDATE_REQUIRED=false 역시 아직 적용하지 않았다. 알림 API·tracking 선활성화는 index 준비가 필요하고 sender는 Firebase/withdrawal/추적 readiness gate 미충족이다. 인덱스 apply를 위한 테스트 서버 일시 중지를 질문했으나 사용자가 작업 의미 설명을 요청하여 변경 전 중단했다. 서버 scale/config/task definition/DB 변경 및 실제 발송 없음. 설명 후 사용자 판단을 받아 이어갈 단계이며 운영 환경은 미조회·미변경.
+
+- 2026-10-07 — 업데이트 flag 미처리 클라이언트 영향 확인 턴의 WORKLOG 표식을 보완했다. 서버 차단 없음/클라이언트 엄격한 스키마 검증 미확인 상태 유지, 추가 제품 변경 없음.
+
+- 2026-10-07 — 앱/웹뷰에서 appUpdateRequired 처리 미구현 시 동작 설명: 서버는 결과 응답에 boolean만 추가하고 차단하지 않는다. 클라이언트가 추가 필드를 무시하면 기존 화면 유지·업데이트 안내 없음. 엄격한 응답 스키마 검증 여부는 앱 코드 미조회로 미확인. 코드·배포 변경 없음.
+
+- 2026-10-07 — push/배포 동작 설명: 로컬 main workflow는 main push 시 기존 LC service(api-staging) 자동 배포, develop은 PR merge-only gate로 이번 직접 커밋 push 배포는 skip되며 수동 workflow_dispatch 필요. 양쪽 현재 task definition의 환경변수를 유지하므로 APP_UPDATE_REQUIRED는 자동 분기되지 않는다. 미설정 시false, 구버전true/신버전false는 별도 ECS 설정 필요. 이번 조회·설명만 수행, push/배포 없음.
+
+- 2026-10-07 — develop 47631fb/main 89defb7 반영 작업의 WORKLOG 턴 표식을 보완했다. 코드3파일 커밋·cherry-pick 완료, 현재 develop/문서만 미커밋/원격 push·배포 미수행 상태 유지. 추가 Git 변경 없음.
+
+- 2026-10-07 — 이번 요청 한정 사용자 명시 승인으로 앱 업데이트 안내 코드·테스트3파일을 develop 47631fb에 커밋하고 main에89defb7로 cherry-pick 완료. 두 커밋 patch-id 동일, main 관련3테스트 통과. 현재 develop이며 기존 작업 문서는 임시 stash 후 동일 내용 복원·임시 stash 정리 완료. 원격 push/배포·환경변수 변경 없음. 신규 Jira 없음.
+
+- 2026-10-07 — develop 미커밋 상태 확인 턴의 WORKLOG 표식을 보완했다. 업데이트 안내 3파일 독립 커밋 후 main cherry-pick 필요 상태 유지, 추가 코드·Git·배포 변경 없음.
+
+- 2026-10-07 — Git 상태 재확인: 앱 업데이트 안내 3파일은 로컬 develop의 미커밋 변경이다. 원격 develop/main 미반영이며 독립 커밋 생성 후 main에 해당 커밋만 cherry-pick하는 절차를 안내했다. 추가 코드·Git 변경 없음.
+
+- 2026-10-07 — 모의고사 앱 업데이트 안내 구현: GET /api/v1/exams/{examId}/summary result.appUpdateRequired boolean을 APP_UPDATE_REQUIRED(default false)에서 응답 시 조립한다. 현재 develop 작업 트리의 controller/DTO/신규 테스트 3파일만 제품 변경. 로컬 main(afa686c) 격리 사본에 동일 변경 적용·전체355 테스트 통과, develop 전체603 및 최종 대상3 테스트 통과. main 참조/커밋·push·배포는 변경하지 않았다. 해당3파일만 별도 커밋해 다른 브랜치에 cherry-pick해야 하며 develop 전체를 main에 merge하지 않는다. 구버전 서버true/신버전false 실제 환경 설정은 배포 시 별도 적용, 신규 Jira 없음.
+
+- 2026-10-07 — TMI-198 테스트 서버 설정 활성화/재배포 요청. 사용자가 develop/api-test 대상을 확정했다. 로컬 develop HEAD `8e910d8`(PR #35 merge) 및 해당 GitHub Actions run37571325434가 Mongo integration test 단계 실행 중임을 확인했다. 로컬 AWS CLI는 승인된 sandbox 밖 STS 조회에서도 NoCredentials이며 등록 profile도 없어 ECS 설정/DB 준비/Firebase 연결 상태를 확인하거나 변경하지 못했다. 기존 workflow는 현 task definition의 이미지 교체만 수행하므로 알림 flag를 자동 활성화하지 않는다. AWS 로그인/사용할 profile 제공 뒤 테스트 환경만 점검하고 index·writer drain·추적 준비·실제 발송 gate를 충족하는 범위로 활성화해야 한다. 이번 턴은 문서 기록만 변경, 설정/DB/재배포 dispatch/실제 발송/운영 환경 변경 없음.
+
 - 2026-10-07 — TMI-198 서버 구현/로컬 검증 완료, runtime flag 기본OFF. notification domain에 TMI-63 경로/body 기반 기기 PUT/DELETE(JWT owner·설치 proof·OS 관측), 최초 retry0 제출 receipt/Session 완료 Instant, KST21:00~21:15 MEMBER/이용권 무관 모든 적격 기기 sweep, durable SENDING/무재발송/30일 TTL, FCM HTTP v1 OAuth/무자동retry/TTL/quota/auth circuit, 탈퇴·병합·학습 삭제 연계를 추가했다. 기존 시험/AI/S3/Redis 공개 계약 유지. `./gradlew clean test`600개, Docker 호환 옵션 적용 전체 Mongo integration134개, migration Node117개, diff check 통과. 모바일 계약/운영 runbook 추가; TMI-58 모바일·TMI-63 신규 installation secret 반영, Firebase/APNs·야간 요건·index·writer drain/readyAt·실기기 검증은 출시 gate. 오래된 미확정 시험 owner는 보수적 제외. 기존 Challenge dirty 변경은 그대로 보존. Jira 상태/운영DB/FCM/배포/commit/push 변경 없음.
 
 - 2026-10-07 — TMI-198 구현 전 최종 동작 설명. 직전 구현 요청은 실행 시작 전 중단됐고 현재 코드 구현 미착수. 확정 정책·앱/LC/FCM 역할 및 출시 의존성 안내, 기록 외 runtime·Jira·외부 변경 없음.

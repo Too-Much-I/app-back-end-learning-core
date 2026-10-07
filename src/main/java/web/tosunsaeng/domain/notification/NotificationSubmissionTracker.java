@@ -27,6 +27,9 @@ public class NotificationSubmissionTracker {
         ExamSession session = mongo.findById(examId, ExamSession.class);
         if (session == null) throw new NotificationFailure(503);
         store.touchOwner(session.getUserId());
+        // Completion is durable even after Mongo TTL removes the supporting receipts.
+        // Replays must neither recreate receipts nor extend their retention.
+        if (session.getSubmissionCompletedAt() != null) return;
         // Serializes parallel last-question submissions even without the optional owner writer.
         mongo.updateFirst(Query.query(Criteria.where("_id").is(examId)), new Update().inc("version", 1L), ExamSession.class);
         mongo.upsert(Query.query(Criteria.where("_id").is(examId + ":" + question)), new Update()
@@ -38,5 +41,9 @@ public class NotificationSubmissionTracker {
         Instant last = receipts.stream().map(d -> d.getDate("acceptedAt").toInstant()).max(Comparator.naturalOrder()).orElseThrow();
         mongo.updateFirst(Query.query(Criteria.where("_id").is(examId).and("submissionCompletedAt").is(null)),
                 new Update().set("submissionCompletedAt", last).inc("version", 1L), ExamSession.class);
+        // The same transaction commits completion and expiry for every receipt of this exam.
+        // Incomplete exams never receive expiresAt, regardless of when they started.
+        mongo.updateMulti(Query.query(Criteria.where("examId").is(examId)),
+                Update.update("expiresAt", Date.from(last.plus(Duration.ofDays(3)))), "exam_submission_receipts");
     }
 }

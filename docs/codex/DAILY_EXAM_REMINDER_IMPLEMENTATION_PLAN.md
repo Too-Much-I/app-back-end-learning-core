@@ -98,7 +98,7 @@ userId는 JWT `sub`/CurrentUserProvider에서 얻고 클라이언트가 전달�
 | Collection / 내부 필드 | 목적 및 index |
 | --- | --- |
 | `notification_devices`: installationId, userId, platform, token, tokenHash, permission, permissionObservedAt, active, lastSeenAt, version | installation unique, tokenHash unique, active/permission/userId/installationId 조회 |
-| `exam_submission_receipts`: examId, questionNumber, acceptedAt | 최초 실제 retry0 submit만 기록, examId/questionNumber unique |
+| `exam_submission_receipts`: examId, questionNumber, acceptedAt, expiresAt | 최초 실제 retry0 submit만 기록, examId/questionNumber unique; 전체 제출 완료 후72시간 absolute TTL, 미완료에는 expiresAt 없음 |
 | ExamSession 내부 `submissionCompletedAt` | 전체 필수 retry0 접수 완료 Instant; 기존 공개 DTO에 노출하지 않음 |
 | `daily_exam_reminder_deliveries`: userId, dateKst, type, installationId, status, lease/version, attemptedAt, expiresAt | userId/dateKst/type/installationId unique, status/leaseUntil, expiresAt TTL; 당일 종료+30일 후 만료 |
 | `daily_reminder_suppressions`: userId, dateKst, fixed reason, expiresAt | 삭제/병합 등으로 당일 알림 억제; userId/dateKst unique 및 TTL |
@@ -109,7 +109,7 @@ FCM token은 전송에 필요하므로 hash만으로 대체할 수 없다. 제�
 
 1. 실제 사용자 submit이 접수되는 경계에서 최초 retry0 receipt를 `setOnInsert`한다. Job 복구, Callback, 재채점, 같은 submit replay로 acceptedAt을 바꾸지 않는다.
 2. Session/mock exam에서 얻은 비어 있지 않은 필수 문항 집합을 기준으로 receipt를 확인한다. 마지막 번호 제출만으로 완료를 판정하지 않는다.
-3. 모든 receipt가 있으면 `submissionCompletedAt=max(acceptedAt)`를 한 번 기록한다. 채점 Job 상태·점수·Summary는 필요하지 않다.
+3. 모든 receipt가 있으면 `submissionCompletedAt=max(acceptedAt)`를 한 번 기록한다. 채점 Job 상태·점수·Summary는 필요하지 않다. 사용자 후속 승인으로 같은 Transaction에서 해당 시험 receipt에 완료 시각+72시간의 expiresAt을 설정한다. Session 완료 시각은 유지하고, 완료 후 replay로 receipt를 재생성하거나 만료를 연장하지 않는다.
 4. 동시 마지막 문항 제출의 write-skew를 막도록 같은 Session/owner guard에 write conflict를 만들고 동일 Mongo Transaction에서 수렴한다. 기존 Transaction manager에 참여하고 외부 FCM/AI 호출을 그 안에 넣지 않는다.
 5. guard 없는 기존 submit 경로도 누락 없이 지원한다. 알림 제출 추적이 ON이면 Transaction 지원을 검증하고 Job/receipt/Session 기록의 원자성을 확보한다. feature OFF 경로를 회귀 검증한다.
 6. 도입 전 데이터의 정확한 제출 시각을 Job 복구/채점 시각에서 추정하지 않는다. 추적 writer를 먼저 배포하고 구 writer drain 후 KST 하루 전체의 기록이 확보된 다음 발송을 활성화한다. 기존 활성 시험에 대해서는 별도 inventory로 receipt 보완 근거를 검증하고, 시각을 확정할 수 없는 진행 시험의 사용자는 당일 보수적으로 제외한다.

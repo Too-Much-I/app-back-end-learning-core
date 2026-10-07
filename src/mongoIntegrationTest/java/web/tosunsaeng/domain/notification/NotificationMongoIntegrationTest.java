@@ -144,6 +144,31 @@ class NotificationMongoIntegrationTest {
         assertThat(store.completed(OWNER, LocalDate.of(2026, 10, 6))).isFalse();
         assertThat(store.completed(OWNER, LocalDate.of(2026, 10, 8))).isFalse();
     }
+
+    @Test void receiptsExpireSeventyTwoHoursAfterCompletionOnlyAndNeverReappear() {
+        session("retention");
+        accepted("retention", 1, 0);
+        clock.at(NOW.plus(Duration.ofDays(10)));
+        var first = mongo.findById("retention:1", Document.class, "exam_submission_receipts");
+        assertThat(first.containsKey("expiresAt")).isFalse();
+        accepted("retention", 2, 1);
+        assertThat(mongo.findById("retention:1", Document.class, "exam_submission_receipts").containsKey("expiresAt")).isFalse();
+        accepted("retention", 2, 0);
+        Instant completedAt = clock.instant();
+        var query = Query.query(Criteria.where("examId").is("retention"));
+        assertThat(mongo.find(query, Document.class, "exam_submission_receipts")).hasSize(2).allSatisfy(d ->
+                assertThat(d.getDate("expiresAt").toInstant()).isEqualTo(completedAt.plus(Duration.ofHours(72))));
+        clock.at(completedAt.plus(Duration.ofDays(1)));
+        accepted("retention", 1, 0);
+        assertThat(mongo.findById("retention:1", Document.class, "exam_submission_receipts").getDate("expiresAt").toInstant())
+                .isEqualTo(completedAt.plus(Duration.ofHours(72)));
+        // Model the TTL monitor without a real 72-hour wait; Session must survive and replay must be a no-op.
+        mongo.remove(query, "exam_submission_receipts");
+        accepted("retention", 1, 0);
+        assertThat(mongo.count(query, "exam_submission_receipts")).isZero();
+        assertThat(mongo.findById("retention", ExamSession.class).getSubmissionCompletedAt()).isEqualTo(completedAt);
+        assertThat(store.completed(OWNER, ReminderPolicy.day(completedAt))).isTrue();
+    }
     @Test void guestDeniedUnknownAndOutsideWindowNeverSend() {
         register(OWNER, "GUEST", "AUTHORIZED"); register(OWNER, "MEMBER", "DENIED"); register(OWNER, "MEMBER", "UNKNOWN");
         worker.tick(); assertThat(gateway.calls.get()).isZero();
