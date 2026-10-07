@@ -40,6 +40,9 @@ public class ExamSession {
 
     private LocalDateTime completedAt;
 
+    // Actual last required retry-0 submission, independent of grading completion.
+    private Instant submissionCompletedAt;
+
     private String creationOperationId;
 
     private String billingReservationId;

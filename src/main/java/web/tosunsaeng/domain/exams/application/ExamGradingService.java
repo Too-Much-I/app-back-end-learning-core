@@ -74,6 +74,8 @@ public class ExamGradingService {
     @Autowired(required = false)
     private UserOwnedTransactionExecutor userOwnedTransactionExecutor;
     @Autowired(required = false)
+    private web.tosunsaeng.domain.notification.NotificationSubmissionTracker notificationSubmissionTracker;
+    @Autowired(required = false)
     private web.tosunsaeng.domain.learningrecorddeletion.application.DeletionAccess deletionAccess;
     private final ThreadLocal<Boolean> publicMutation = new ThreadLocal<>();
 
@@ -82,14 +84,16 @@ public class ExamGradingService {
 
     public ExamStatus submitQuestion(String examId, Integer questionNumber, Integer retryCount) {
         requirePublicWrite(examId);
-        if (userOwnedTransactionExecutor == null || !userOwnedTransactionExecutor.enabled()) {
+        boolean trackSubmission = notificationSubmissionTracker != null && notificationSubmissionTracker.enabled();
+        if (!trackSubmission && (userOwnedTransactionExecutor == null || !userOwnedTransactionExecutor.enabled())) {
             return submitQuestionWithoutGuard(examId, questionNumber, retryCount);
         }
         int canonicalRetryCount = GradingKeys.canonicalRetryCount(retryCount);
-        SubmitPreparation preparation = inCurrentOwnerTransaction(
+        Supplier<SubmitPreparation> prepare = () -> inCurrentOwnerTransaction(
                 examId,
                 () -> { requirePublicWrite(examId); return prepareQuestionDispatch(examId, questionNumber, canonicalRetryCount); }
         );
+        SubmitPreparation preparation = trackSubmission ? notificationSubmissionTracker.transaction(prepare) : prepare.get();
         if (preparation.claim() == null) {
             calculateAndCacheOverallStatus(examId);
             return preparation.status();
@@ -134,6 +138,9 @@ public class ExamGradingService {
         );
         pending.markUserSubmission();
         QuestionGradingJob inserted = questionJobRepository.insert(pending);
+        if (notificationSubmissionTracker != null && notificationSubmissionTracker.enabled() && retryCount == 0) {
+            notificationSubmissionTracker.accepted(examId, questionNumber, retryCount, expectedQuestionNumbers(examId), now);
+        }
         if (hasQuestionResult(examId, questionNumber, retryCount)) {
             completeQuestionWithoutGuard(examId, questionNumber, retryCount);
             return new SubmitPreparation(ExamStatus.COMPLETED, null);

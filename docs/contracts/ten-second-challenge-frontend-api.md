@@ -431,6 +431,7 @@ Query Parameter:
   "message": "성공입니다.",
   "result": {
     "yearMonth": "2026-08",
+    "currentStreakDays": 2,
     "dates": [
       {
         "challengeDate": "2026-08-21",
@@ -452,7 +453,10 @@ Query Parameter:
 }
 ```
 
-- 요청한 월의 날짜별 참여 여부와 실제로 푼 문제 수만 반환한다.
+- 요청한 월의 날짜별 참여 여부와 실제로 푼 문제 수, 현재 연속 학습일 `currentStreakDays`(0 이상의 정수)를 반환한다.
+- `currentStreakDays`는 조회 `yearMonth`와 무관하게 현재 KST 날짜 기준이다. 오늘 참여했다면 오늘부터, 오늘 미참여면 어제부터 이어진 학습일을 센다. 오늘과 어제 모두 미참여면 0이며 월·연도 경계에서도 이어진다. 과거 월의 `dates=[]` 응답에도 현재 연속일을 반환한다.
+- 학습일은 기존 `participated`와 동일하게 실제 제출 접수 1건 이상인 `challengeDate`다. 같은 날 여러 문제·재시도는 하루로 센다. 자정 이후 제출이 허용된 기존 attempt는 기존 계약대로 생성 당시 `challengeDate`에 귀속한다. 삭제되어 숨겨진 기록은 포함하지 않는다.
+- 위 예시의 `currentStreakDays=2`는 현재 KST 날짜가 2026-08-23이고 22~23일 참여한 경우다. 24일 제출 전에도 2를 유지하고, 24일에도 미참여한 채 25일이 되면 0이 된다.
 - `participated=true`는 해당 날짜에 서버가 실제 audio 제출을 접수한 문제가 하나 이상 있다는 뜻이다(`solvedQuestionCount>0`).
 - `solvedQuestionCount`는 실제 audio 제출이 접수된 문제 수이며 `0`~`3`이다. 서버는 내부 `SUBMITTED`를 기준으로 계산하고 `EXPIRED`는 제외한다.
 - 제출이 접수됐다면 AI 처리 중·정상 완료·무음·최종 채점 실패 모두 풀이 수에 포함한다. 미제출 1시간 만료, 시작만 한 attempt, S3 업로드만 하고 제출 API가 접수하지 않은 문제는 포함하지 않는다. 같은 제출의 재시도는 중복 계산하지 않는다.

@@ -203,6 +203,21 @@ class ExamGradingServiceTest {
     }
 
     @Test
+    void reminderTrackingWrapsUnguardedSubmitButNotReplayOrRetry() {
+        var tracker = org.mockito.Mockito.mock(web.tosunsaeng.domain.notification.NotificationSubmissionTracker.class);
+        when(tracker.enabled()).thenReturn(true);
+        when(tracker.transaction(any())).thenAnswer(invocation -> ((java.util.function.Supplier<?>) invocation.getArgument(0)).get());
+        ReflectionTestUtils.setField(service, "notificationSubmissionTracker", tracker);
+        service.submitQuestion(EXAM_ID, 1, 0);
+        service.submitQuestion(EXAM_ID, 1, 0);
+        service.submitQuestion(EXAM_ID, 1, 1);
+        verify(tracker, times(3)).transaction(any());
+        verify(tracker, times(1)).accepted(eq(EXAM_ID), eq(1), eq(0), eq(List.of(1)), eq(NOW));
+        verify(tracker, never()).accepted(anyString(), anyInt(), eq(1), any(), any());
+        verify(dispatchService, times(2)).dispatchQuestion(any(QuestionDispatchClaim.class));
+    }
+
+    @Test
     void submitStoresAndDispatchesSessionMockExamId() {
         stubSelectedPaper("mock_exam_002", List.of(1));
 

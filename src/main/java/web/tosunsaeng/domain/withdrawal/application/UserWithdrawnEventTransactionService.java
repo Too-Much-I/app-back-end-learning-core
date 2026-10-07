@@ -9,6 +9,9 @@ import web.tosunsaeng.domain.withdrawal.repository.WithdrawnUserAccessDenyReposi
 
 public class UserWithdrawnEventTransactionService {
 
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    private web.tosunsaeng.domain.notification.NotificationStore notificationStore;
+
     private final UserWithdrawnEventInboxRepository inboxRepository;
     private final WithdrawnUserAccessDenyRepository denyRepository;
 
@@ -33,6 +36,7 @@ public class UserWithdrawnEventTransactionService {
             throw conflict();
         }
 
+        if (notificationStore != null) notificationStore.withdrawn(event.userId(), event.receivedAt());
         if (event.blockedUntil().isAfter(event.receivedAt())) {
             denyRepository.save(new WithdrawnUserAccessDeny(
                     event.userId(),

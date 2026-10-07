@@ -10791,6 +10791,15 @@
 - 현재 구조에서는 서비스별 도메인이 ALB routing key 역할을 하므로 프론트가 요청 성격에 맞는 base URL을 선택한다. 하나의 base URL도 가능하지만 DNS/certificate와 ALB path rule, 겹치는 API path 분류, 프론트 환경 설정과 계약 변경을 명시적으로 설계해야 하며 자동으로 합쳐지지 않는다.
 - 설명 및 문서 기록만 수행. AWS·프론트·백엔드·공개 API·배포 변경 없음. `git diff --check` 검증, Gradle·commit/push 미실행. Secret/Token 미기록.
 
+## 2026-10-07 — 광고 유입·앱 설치 측정 SDK 검토
+<!-- codex-turn:01a1142d-1a8b-7531-ae66-983a8c742b4f -->
+
+- 사용자 질문에 따라 Google Ads·Firebase·Apple 공식 문서를 기준으로 앱 설치·전환 attribution 구성을 검토. 신규 Jira 없음.
+- Android의 Google Play 설치 수만 Google Ads로 측정하는 경우 Google Play 연동 기반 codeless conversion이 가능해 SDK가 절대 필수는 아니다. 다만 최초 실행, 가입, 시험 시작, 구독·결제와 광고별 품질을 측정하려면 모바일 앱에 Firebase Analytics SDK 또는 MMP SDK가 필요하다.
+- Google 광고 우선 출시에는 Firebase Analytics SDK를 Android/iOS 앱에 넣고 Firebase/GA4와 Google Ads를 연결해 `first_open`과 핵심 in-app event를 conversion으로 import하는 구성을 권장. 여러 광고 채널의 통합 attribution·deep link·중복 제거가 필요하면 AppsFlyer/Adjust/Airbridge 같은 MMP를 별도 비교한다.
+- iOS는 Apple의 privacy-preserving attribution 체계와 플랫폼 제한 때문에 개인 단위로 항상 완전한 광고→설치 연결을 보장하지 않으며 집계·모델링된 결과가 포함될 수 있다. 개인정보를 event parameter로 전송하지 않고 동의·ATT·개인정보처리방침을 앱 정책에 맞게 설계해야 한다.
+- 설명과 공식 문서 조사만 수행. 앱 저장소 부재로 현재 모바일 SDK 설치 여부는 확인하지 못했다. Learning Core·Identity·AWS·광고 계정·코드·배포 변경 없음. `git diff --check` 검증, Gradle·commit/push 미실행. Secret/Token 미기록.
+
 ## 2026-09-18 — DB 근거 5년 매출 구조와 성장 목표 분석
 <!-- codex-turn:01a0b2e8-cabc-7d32-9d97-608daae37b04 -->
 
@@ -13615,3 +13624,305 @@
 - command ON의 storageVerified, writer/inventory manifest, replica-set/index/JWT 및 나머지 서버 안전 조건은 유지했다. 앱 동작 확인은 별도 테스트 체크리스트로 남기고 runbook을 수정했다.
 - DeletionWiringMongoTest에 test/staging/prod별 모바일 승인값 부재/false 허용과 storageVerified 부재 거절 회귀를 추가했다. ./gradlew clean test 및 격리 Mongo DeletionWiringMongoTest 통과, git diff --check 통과. 전체 Mongo suite는 이번에 재실행하지 않았다.
 - 변경은 validator/통합 테스트/runbook/작업 문서에 한정. 기존 사용자 문서 변경 보존, commit/push·배포·원격 DB/설정 변경 없음. Secret/Token 기록 없음.
+
+## 2026-10-03 — 모바일 승인 기동 조건 제거 턴 표식 보완
+
+<!-- codex-turn:01a1014d-cf10-7f53-8712-ed092a936d77 -->
+
+- TMI-193(상위 TMI-136): mobileContractVerified 기동 검사 제거와 서버 안전 검증 유지 작업의 턴 표식을 보완했다. 상세 변경은 직전 항목을 따른다.
+- 단위580/관련 Mongo 통합7 통과(실패/skip0). 이번 보완은 문서만 갱신하고 테스트 재실행 없이 diff check 및 표식 단일 출현을 확인했다. commit/push·배포·원격 변경 없음. Secret/Token 기록 없음.
+
+## 2026-10-03 — 모바일 기동 조건 제거 push의 배포 여부 확인
+
+- TMI-193(상위 TMI-136): develop 377b043 push에 대한 GitHub run 37116620776을 확인했다. 전체 표시는 Success이나 Test, build and deploy는 skipped/0초이며 사유는 develop HEAD가 merged PR commit이 아니라는 gate 메시지다.
+- 따라서 이번 workflow는 새 코드를 배포하지 않았다. 기존 PR merge-only 자동 배포 정책에 따른 정상 skip이며 실제 배포 실패/성공과 혼동하지 않도록 안내한다. 수동 workflow_dispatch 또는 PR merge가 필요하다.
+- 읽기 전용 Git/GitHub 확인과 문서 갱신만 수행했다. 직접 commit/push·workflow 실행·AWS 설정 변경·삭제 활성화 없음. 코드 테스트 생략, Secret/Token 기록 없음.
+
+## 2026-10-03 — push 배포 확인 턴 표식 보완
+
+<!-- codex-turn:01a10150-ab66-7773-8603-c9efe6ae4385 -->
+
+- TMI-193(상위 TMI-136): develop 377b043의 run 37116620776에서 실제 배포 단계가 PR merge-only gate로 skipped임을 확인한 작업의 표식을 보완했다. 수동 workflow_dispatch 또는 PR merge 필요 상태 유지.
+- WORKLOG EOF append와 CURRENT_STATE 갱신만 수행했다. 추가 코드·원격 설정 변경·배포·테스트 재실행 없음. Secret/Token 기록 없음. diff check 및 표식 단일 출현 확인.
+
+## 2026-10-03 — 수동 테스트 배포 완료와 활성화 미완료 상태 확인
+
+<!-- codex-turn:01a10171-86b7-7370-808a-026183599d25 -->
+
+- TMI-193(상위 TMI-136): 앞선 사용자 승인으로 develop 수동 workflow를 실행했으며 run 37117453670 / 377b043ab0e632e6d5316cc03f9db4a361c48ac4의 실제 Test, build and deploy Success(8분28초)를 이번에 확인했다. 대상 서비스는 tosunsaeng-learning-core-test-service다.
+- 삭제 활성화 설정/DB index·manifest 준비/IAM 변경은 실행하지 않았다. 직전 작업은 CloudShell pymongo 설치와 Python 점검 세션 진입 뒤 중단되었으며 실제 DB 검증은 미완료다. 코드 배포 성공과 삭제 기능 활성화를 구분해 안내했다.
+- 이번 턴은 읽기 전용 배포 상태 확인과 문서 갱신만 수행했다. 추가 배포·코드 테스트·원격 데이터 변경 없음. Secret/Token 기록 없음.
+
+## 2026-10-03 — 테스트 삭제 S3 권한 준비와 Atlas 접속 점검
+
+<!-- codex-turn:01a10172-9274-7b21-97d4-e3c285e0c7ab -->
+
+- TMI-193(상위 TMI-136): LC 테스트 서비스 revision13, running1/배포 COMPLETED 및 삭제 env 부재(default OFF)를 확인했다. 테스트 오디오 버킷 versioning Disabled를 확인했다.
+- 사용자 action-time 승인으로 tosunsaeng-learning-core-test-task-role에 LearningCoreTestDeletion inline policy를 추가하고 read-back 일치를 확인했다. tosunsaeng-test-audio의 GetBucketVersioning, temp/* prefix ListBucket/ListBucketVersions 및 temp/* 객체 DeleteObject/DeleteObjectVersion만 추가했다. 기존 policy·운영 역할·다른 버킷 변경 및 실제 객체 삭제 없음.
+- CloudShell에 pymongo4.10.1 설치/import 성공. 기존 Secret을 메모리에서 참조한 테스트 DB 접속은 ServerSelectionTimeoutError/AutoReconnect(SSL 관련)로 실패했다. 원인은 미확정이며 TLS 검증 우회나 IP 허용 확장 없이 Atlas 확인을 진행했다. Atlas 페이지 새로고침에서 로그인 만료가 확인돼 사용자 재로그인이 필요하다.
+- DB DDL/index·rollout manifest·feature flag·서비스 재배포는 아직 미수행. 코드/외부 API 계약 변경 없음. 코드 테스트는 코드 변경이 없어 생략하고 AWS read-back 및 문서 diff check 수행. 변경 문서는 CURRENT_STATE/WORKLOG이며 기존 문서 변경을 보존했다. Secret/Token 기록·commit/push 없음. 다음은 Atlas 로그인 후 접속 경로 확인, DB 준비·스토리지 검증 후 테스트만 활성화다.
+
+## 2026-10-03 — Atlas 재로그인 후 CloudShell 접속 경로 확인
+
+- TMI-193(상위 TMI-136): Atlas tosunsaeng-test의 로그인 정상 및 Network Access에서 staging NAT 13.124.57.130/32만 Active임을 확인했다. AWS 공식 checkip 응답의 현재 CloudShell egress는 3.38.163.97로 허용 목록에 없다. 기존 DB 연결 실패의 네트워크 원인 후보가 확인됐으며 연결 성공 검증은 아직이다.
+- 테스트 DB 준비를 위해 CloudShell 단일 /32를 최대6시간 임시 허용하는 사용자 승인을 요청한다. 기존 NAT/IP·운영 프로젝트는 변경하지 않았으며 네트워크 변경/DB DDL/manifest/활성화/배포/실제 삭제는 수행하지 않았다.
+- CURRENT_STATE/WORKLOG만 갱신, 기존 변경 보존. 코드 및 외부 API 계약 변경 없음, 코드 테스트는 해당 변경이 없어 생략. 문서 diff check 수행. Secret/Token 기록·commit/push 없음. 승인 뒤 IP 재확인과 접속 검증부터 재개한다.
+
+## 2026-10-03 — Atlas 접속 확인 턴 표식 보완
+
+<!-- codex-turn:01a1017a-95b6-7ba0-955e-c57aa1153d6e -->
+
+- TMI-193(상위 TMI-136): 이번 턴은 Atlas 재로그인과 테스트 프로젝트의 IP 허용 목록, CloudShell egress 불일치를 확인했다. 상세 근거는 직전 항목을 따른다. 단일 /32의 6시간 임시 허용은 승인 대기이며 네트워크 변경·DB 준비·삭제 활성화·배포는 수행하지 않았다.
+- CURRENT_STATE 갱신 및 WORKLOG EOF 표식 보완만 수행했다. 코드 테스트 재실행 없이 diff check와 표식 단일 출현을 확인한다. Secret/Token 기록 없음.
+
+## 2026-10-03 — LC 테스트 학습 기록 삭제 활성화 및 정상 배포 확인
+
+<!-- codex-turn:01a10185-95d1-7f90-8a6f-ca4fec729cfc -->
+
+- TMI-193(상위 TMI-136): 사용자 승인에 따라 tosunsaeng-test에 CloudShell 3.38.163.97/32를 6시간 임시 허용 후 Mongo ping 성공. 기존 staging NAT 허용은 유지했다. 작업 종료 전 임시 항목 제거를 Atlas UI에서 확인했다. TLS 우회/전역 IP 허용 없음.
+- 테스트 DB to-teacher-learning-core-test의 exam_sessions/challenge_10s_attempts 및9종 child가0건, orphan/owner mismatch0임을 확인했다. 테스트 LC desiredCount를1→0으로 내려 실행 writer 부재를 확인하고, 삭제 관련24개 collection/index 범위의 기존 문서0 및 index conflict/위험 TTL 부재를 재검증했다. 저장소 migration의 INDEXES와 동일한24개 정의를 pymongo로 생성·read-back 검증했다. 기존 데이터/인덱스 삭제·수정 없음. replica-set snapshot read transaction과 majority manifest write transaction 성공.
+- 별도 action-time 사용자 승인으로 disposable S3 파일과 Redis 키만 생성·삭제했다. 기존 LC 테스트 task/execution role·동일 VPC/SG·Redis 설정을 사용한 일회 Fargate python:3.12-slim 진단 task(a0faa951bc6c4b2585dd6600992aa7f0)가 S3_PROBE_OK/REDIS_PROBE_OK를 기록했다. temp/tmi193-storage-probe/ 아래 랜덤 파일 및 정확한 exam:status:랜덤UUID 키만 사용, Redis TTL300초 안전장치와 삭제 후 부재 검증 포함. bucket versioning Disabled/Object Lock 미설정 확인. 실제 사용자 데이터나 공용 음성은 삭제하지 않았다. 진단 task STOPPED, tosunsaeng-learning-core-test-storage-probe 정의는 INACTIVE로 해제했다. 검증용 파일/키는 제거되어 복구 대상으로 남지 않는다.
+- 실제 drain·빈 inventory·저장소 검증과 기존 writer/fence 회귀 테스트 근거로 learning_record_deletion_rollout v1의 writersDrained/inventoryApproved/writerPathsVerified/storageVerified를 테스트 한정 승인 기록했다. 모바일 검증 필드는 추가하지 않았다. learning_activity_collection_coverage v1의 liveStartedAt=2026-10-03T11:35:28.311738Z/legacyPolicy=LEGACY_FIRST_EVENTS_UNCOVERED를 기록했다. 해당 시각은 writer 중지 상태에서 새 활성화 배포를 시작한 수집 경계이며 실제 처리는 새 서버 기동 후 시작한다. 첫 KST 일자는 부분 coverage이고 과거 이벤트를0으로 간주하지 않는다.
+- revision13의 이미지377b043·Secret·기타 설정을 보존하여 tosunsaeng-learning-core-test:14를 등록했다. LEARNING_RECORD_DELETION_COMMAND_ENABLED/READ_FENCE_ENABLED/WRITER_FENCE_ENABLED/WORKER_ENABLED/BILLING_CONTINUATION_ENABLED/AGGREGATE_ENABLED를 true로 설정하고 desiredCount1로 복구·배포했다. billing-continuation은 삭제 후 최소 증거 보존이며 실제 Billing 연결 활성화가 아니다. Billing creation saga/phone continuation/reconciliation 및 AttemptGroup writer/publisher는 기존false 유지. Identity/운영 서비스·DB·역할은 미변경.
+- 배포 COMPLETED, running1/pending0, ALB healthy 확인. HTTPS /actuator/health200/UP, 기동 성공/기동 검증 실패 없음/확인 시점 ERROR0. 공개 OpenAPI에 DELETE /api/v1/learning-records 및 GET /api/v1/learning-records/deletion 등록 확인, 무토큰 GET401 확인. 실제 회원 삭제 command는 실행하지 않았다. 기존 CI가 현재 서비스 task definition을 기반으로 배포하므로 이후 이미지 배포에서도 이 설정을 승계한다.
+- 변경 파일은 CURRENT_STATE/WORKLOG뿐이며 기존 사용자 문서 변경을 보존했다. 코드/외부 API·AI 계약 변경·commit/push 없음. 코드 테스트는 변경이 없어 재실행하지 않았고 실제 DB/저장소/기동/API smoke 및 문서 diff check를 수행했다. 이번 추가 범위는 승인된 테스트 DB·임시 IP·진단 fixture·ECS 활성화이며 예상 밖 제품 코드 변경 없음. Secret/Token 기록 없음.
+- 남은 검증: 실제 MEMBER 삭제 접수→worker 완료→새 학습/재시도·모바일 캐시 E2E, 버전/재업로드·부분 실패·경합/성능·경보 수신, 실제 Billing 연동과 continuation terminal retention. 테스트 활성화가 운영 출시/Jira 완료를 의미하지 않으며 운영 배포 전 해당 검증과 운영별 승인 필요.
+
+## 2026-10-05 — 월별 챌린지 학습 이력 API 안내
+
+<!-- codex-turn:01a10b0f-1065-76e1-97af-63b427a3a856 -->
+
+- ChallengeController.history, ChallengeService.history 및 ten-second-challenge-frontend-api.md §6.7에서 GET /api/v1/challenges/history?yearMonth=YYYY-MM을 확인했다. 생략 시 현재 KST 월, MEMBER 인증 필요, 날짜별 participated/solvedQuestionCount 반환. 월 풀이 합계는 solvedQuestionCount 합산, 참여 일수는 participated=true 날짜 개수다. 실제 음성 제출 접수 기준이며 채점 성공 건수와 다르다.
+- 이번 API 확인에 신규 Jira 연결 없음. CURRENT_STATE/WORKLOG만 갱신, 기존 변경 보존. 코드/외부 API 계약·배포 변경 및 원격 호출 없음. 읽기 전용 확인이므로 코드 테스트 생략, git diff --check 수행. Secret/Token 기록 없음.
+
+## 2026-10-05 — 챌린지 현재 연속 학습일 추가 기준 제안
+
+<!-- codex-turn:01a10b14-7d65-7bf0-b600-a5ae6ab25170 -->
+
+- 사용자의 현재 연속 학습일 추가 요청에 따라 ChallengeViews.History(yearMonth, dates)와 history 구현 위치를 확인했다. result.currentStreakDays 추가를 제안하며 아직 DTO/계약/구현은 수정하지 않았다.
+- 권장 기준: KST 날짜, 기존 참여와 동일한 음성 제출 접수1건 이상, 오늘 참여 시 오늘부터 역산, 오늘 미참여 시 어제까지 이어온 일수 유지, 오늘/어제 모두 미참여면0. 월 경계를 넘어 계산하고 조회 yearMonth와 무관한 현재 기준 값을 반환하도록 명시한다. 오늘 미참여 처리 기준 사용자 확정 후 구현한다.
+- 신규 Jira 연결 없음. CURRENT_STATE/WORKLOG만 갱신하며 기존 변경 보존. 분석만으로 코드 테스트 생략, diff check 수행. 코드/API·배포·원격 데이터 변경 및 Secret/Token 기록 없음.
+
+## 2026-10-05 — 챌린지 연속 학습일 Jira 등록
+
+<!-- codex-turn:01a10b17-789d-7030-8a91-853afba89643 -->
+
+- 사용자 확정 기준으로 TMI-194([Learning Core] 10초 챌린지 현재 연속 학습일 조회 추가)를 생성했다. https://to-teacher.atlassian.net/browse/TMI-194, 유형 작업/상태 해야 할 일. 사용자 상위 지정이 없어 별도 parent 없이 등록했다.
+- currentStreakDays 추가 계약, KST/오늘 미참여 시 어제까지 유지/월·연도 경계 및 조회 월과 무관한 현재 기준, 기존 제출 접수 참여 정의를 기록했다. 삭제 read fence·소유권 보존, 계약 문서 갱신 및 날짜 경계·중복·격리 테스트를 완료 조건에 포함했다.
+- Jira 생성 응답에서 키·제목·설명·상태를 확인했다. CURRENT_STATE/WORKLOG 갱신 외 제품 코드·API·배포 변경 없음. 등록만 수행하여 코드 테스트 생략, diff check 수행. 기존 문서 변경 보존, Secret/Token 기록·commit/push 없음. 구현은 후속 사용자 요청 시 진행한다.
+
+## 2026-10-05 — TMI-194 상위 에픽 연결
+
+- 사용자 요청에 따라 TMI-136이 에픽(sns 로그인)임을 확인하고 기존 TMI-194의 parent를 TMI-136으로 설정했다. 재조회에서 parent=TMI-136, 상태 해야 할 일을 확인했다. 이슈 키·제목·기존 설명은 유지하며 중복 생성하지 않았다.
+- CURRENT_STATE/WORKLOG만 갱신, 기존 변경 보존. 코드·외부 API·배포 변경 없음. Jira 관계 변경만 수행하여 코드 테스트 생략, diff check 수행. Secret/Token 기록 없음.
+
+## 2026-10-05 — 상위 에픽 연결 턴 표식 보완
+
+<!-- codex-turn:01a10b19-5e97-70e3-9677-8ecde3adc9f0 -->
+
+- TMI-194의 상위 에픽을 TMI-136으로 변경하고 재조회 확인한 이번 작업의 표식을 보완했다. 기존 이슈 번호·내용·해야 할 일 상태 유지, 중복 생성 없음.
+- CURRENT_STATE 및 WORKLOG EOF만 갱신했다. 추가 Jira·코드·배포 변경 없이 diff check와 표식 단일 출현을 확인했다. Secret/Token 기록 없음.
+
+## 2026-10-05 — TMI-194 현재 연속 학습일 구현
+
+- TMI-194(상위 TMI-136): 사용자 확정 계약에 따라 ChallengeViews.History에 int currentStreakDays를 추가했다. ChallengeService.history가 KST 오늘을 한 번만 읽고, 오늘 참여면 오늘/미참여면 어제부터 역산한다. 조회 yearMonth·월/연도 경계와 독립적이며 빈 dates 응답에도 현재 값을 포함한다. 미래 month 거절은 유지한다.
+- ChallengeStore.submittedDates는 userId/date/state=SUBMITTED 조건과 _id/userId/challengeDate만 읽는 projection을 사용한다. 날짜 Set으로 하루 중복을 제거하고 기존 DeletionAccess.hidden을 동일 적용한다. 최대32일 범위씩 조회해 첫 미참여 날짜에서 중지하며 원본 결과·음성 snapshot을 로딩하지 않는다. 기존 owner/date index를 활용하며 신규 DDL은 없다. 자정 뒤 유효 제출도 기존 challengeDate 귀속을 유지한다.
+- 변경 파일: ChallengeService/ChallengeStore/ChallengeViews, 신규 ChallengeStreakTest, ChallengeMongoIntegrationTest, 프론트 계약 §6.7 및 CURRENT_STATE/WORKLOG. 기존 작업 문서 변경 보존, 예상 밖 코드 변경 없음. 기존 API URL/Method/Query/yearMonth/dates/BaseResponse·인증/AI/S3/Redis 계약 유지, 이번 승인된 응답 필드 하나만 추가했다.
+- 검증: ./gradlew clean test 성공, 전체 Mongo suite 성공 후 추가 JSON/KST 테스트를 포함한 JAVA_TOOL_OPTIONS=-Dapi.version=1.44 ./gradlew test mongoIntegrationTest 최종 성공(단위591/Mongo121). 기록 없음/오늘·어제 grace/공백, 32일 chunk·월/연도/윤년, 단일 today snapshot, 실제 KST 자정, 응답 JSON, owner/state 및 hidden target별 필터를 검증했다. git diff --check 통과. 실제 외부 서비스 호출 없이 격리 Mongo fixture 사용.
+- 구현 완료이며 commit/push·배포·Jira 완료 변경 없음. 다음은 사용자 commit/push 후 앱/테스트 서버 표시 검증이다. 긴 연속 기록에서는 chunk/기존 per-attempt 삭제 fence 조회 횟수가 증가하므로 운영 부하 점검 필요. Secret/Token 기록 없음.
+
+## 2026-10-05 — TMI-194 구현 턴 표식 보완
+
+<!-- codex-turn:01a10b1c-ea4c-7380-be9a-f47b8c67439f -->
+
+- TMI-194(상위 TMI-136) currentStreakDays 구현과 테스트 결과의 턴 표식을 보완했다. 상세 구현·계약·검증 범위는 직전 항목을 따른다. 최종 단위591/Mongo121 통과(실패/오류/skip0), 미커밋·미배포 상태다.
+- CURRENT_STATE 갱신 및 WORKLOG EOF append만 수행했다. 추가 코드·Jira·배포 변경 없이 diff check와 표식 단일 출현을 확인했다. Secret/Token 기록 없음.
+
+## 2026-10-05 — 시험 결과 업데이트 필요 여부 요청 확인
+
+<!-- codex-turn:01a10b3a-4616-7df3-8bba-a3e6ad1c516b -->
+
+- 시험 result 응답에 업데이트 필요 여부를 포함하려는 요청에서 업데이트의 대상(앱 버전/채점 결과 재조회·갱신)이 불명확하여 사용자 확인을 요청했다. 기존 TMI-194 연속 학습일 작업과 연결된 요구라고 추정하지 않았다. 신규 Jira 연결 없음.
+- CURRENT_STATE/WORKLOG만 갱신, 기존 변경 보존. 구현·API 계약·배포·Jira 변경 없음. 의미 확인 단계로 코드 테스트 생략, diff check 수행. Secret/Token 기록 없음.
+
+## 2026-10-05 — 모의고사 결과의 앱 업데이트 안내 설계 확인
+
+<!-- codex-turn:01a10b3b-8396-71e0-8995-a832b9991b45 -->
+
+- 사용자 확인으로 업데이트 대상은 앱 버전, 적용 대상은 모의고사임을 확정했다. ExamController의 summary endpoint 및 ExamResponseDTO.SummaryResult를 확인하고 src/main/docs/contracts에서 기존 앱 버전 판정 계약이 없음을 확인했다.
+- summary result에 appUpdate 안내 객체를 추가하고 앱이 플랫폼/버전을 header로 전달, 서버가 플랫폼별 실제 출시 버전·스토어 URL 정책으로 비교하는 방식을 제안한다. 결과 데이터에 고정 저장하지 않고 조회 시 판정하며 기존 앱의 header 부재는 알 수 없음으로 처리해 결과를 차단하지 않는 방향이다. 선택 안내부터 적용할지 사용자 결정 필요, 강제 차단은 별도 정책이다.
+- 신규 Jira 연결 없음. CURRENT_STATE/WORKLOG만 갱신, 기존 TMI-194 및 사용자 변경 보존. 제품 코드/API 계약·배포 변경 없음. 설계 확인 단계로 코드 테스트 생략, diff check 수행. Secret/Token 기록 없음.
+
+## 2026-10-05 — 서버별 고정 앱 업데이트 안내 정책 정리
+
+<!-- codex-turn:01a10b41-4f09-7343-8778-d957a7f6c0fd -->
+
+- 사용자는 구버전/새버전 앱 서버를 분리하고 구버전은 업데이트 필요, 새버전은 불필요로 반환할 예정이라고 설명했다. 앞서 제안한 플랫폼/버전 header 비교 대신 summary result.appUpdateRequired boolean을 서버별 APP_UPDATE_REQUIRED 설정(default false)에서 응답 시 조립하는 방식을 제안했다. 이는 앱 버전 자동 판정이나 강제 차단 구현이 아니다.
+- 앱에서 해당 필드를 읽고 안내하는 UI 지원이 필요하다. 구버전 서버의 정확한 저장소·배포 대상은 확인되지 않았고 기존 웹 POC를 변경 대상으로 추정하지 않았다. 이번에는 설계 정리만 수행, 신규 Jira 연결/제품 코드·API·배포 변경 없음.
+- CURRENT_STATE/WORKLOG 갱신, 기존 변경 보존. 코드 테스트는 코드 변경이 없어 생략, diff check 수행. Secret/Token 기록 없음.
+
+## 2026-10-07 — 모의고사 미제출 사용자 푸시 알림 초기 검토
+
+<!-- codex-turn:01a1142a-4286-76d0-a1b0-5f0345d25914 -->
+
+- 사용자 제시 흐름을 바탕으로 Learning Core 예약 작업과 FCM 구성 범위를 검토했다. 현재 src/main 및 build.gradle 검색에서 FCM 발송·기기 토큰·알림 설정 구현은 확인되지 않았다. AttemptGroupEvidenceEvaluator에는 필수 문항 retryCount=0 Job/결과 기반 제출 증거와 채점 완료를 구분하는 판정이 있다. 일별 알림에는 제출 완료 시각의 내구성 있는 기록과 KST 날짜 기준을 별도로 설계해야 한다.
+- 앱의 기기 토큰 등록/갱신·로그아웃 연결 해제, 알림 동의 설정과 서버의 발송 직전 재확인·다중 인스턴스 원자 claim·발송 이력이 필요하다. 사용자/날짜/알림 유형 unique 기록은 서버 중복 요청을 줄이지만 FCM 접수 후 응답 유실의 재시도까지 정확히 한 번 전달을 보장하지 않는다.
+- 밤 9시/10시 중 한 번인지 두 번인지, 모든 미완료 사용자 또는 시작 후 미완료 사용자만인지 정책 확인이 필요하다. 학습 권한이 없는 사용자와 탈퇴/병합/기록 삭제 처리도 발송 대상 설계에 반영해야 한다. 신규 Jira 없음, runtime 구현·외부 발송·배포 없음. 기존 다른 작업 변경 보존, 문서만 갱신하여 테스트 생략 및 git diff --check 수행. Secret/Token 기록 없음.
+
+## 2026-10-07 — 모의고사 알림 대상에 미시작 사용자 포함 확정
+
+<!-- codex-turn:01a1142d-aff8-7912-bc6b-84047ff828ff -->
+
+- 사용자 결정으로 오늘 시험을 아예 시작하지 않은 사용자도 알림 대상에 포함한다. 알림 허용 및 유효 기기 등록 사용자 목록을 출발점으로 오늘 제출 완료 사용자를 제외하는 설계가 필요하며, 오늘 ExamSession이 있는 사용자만 조회해서는 요구를 충족하지 못한다.
+- 미시작·일부 제출 사용자는 후보, 필수 최초 제출 완료 사용자는 채점 대기 여부와 무관하게 제외하는 방향을 유지한다. 발송 시각/횟수는 아직 확정되지 않았으며 KST 밤9시 하루1회는 권장안이다. 신규 Jira 없음, 이번에는 정책 기록만 수행하고 runtime·API·외부 발송·배포 변경 없음. 문서 변경만으로 테스트 생략, git diff --check 및 marker 단일 출현 확인. Secret/Token 기록 없음.
+
+## 2026-10-07 — 일일 모의고사 알림 구현 계획 작성
+
+- 사용자가 KST 밤9시 하루1회 및 미시작 사용자 포함 방향을 승인하고 우선 계획서를 요청했다. `docs/codex/DAILY_EXAM_REMINDER_IMPLEMENTATION_PLAN.md`에 확정 정책과 권장 세부안을 구분하여 기록했다.
+- 기기/동의 API 초안, 실제 최초 제출 receipt와 Session 완료 시각, candidate 조회, 원자 claim과 발송 전 SENDING, FCM 결과 불명 UNKNOWN 재발송 금지 제안, 기기/계정 lifecycle와 기록 삭제, 단계별 구현·테스트·rollout을 포함했다. MEMBER/이용권 source·다중 기기·보존·문구는 추가 확정 대상으로 명시했다.
+- ExamSession/QuestionGradingJob/submit 경로와 기존 제출 증거 판정의 코드 근거를 대조했다. 다른 저장소·실제 Firebase는 조사하지 않았다. 신규 Jira 없음, runtime/API/DB/FCM/배포 변경 없음. 기존 dirty 작업 보존, 문서만 변경해 코드 테스트 생략 및 git diff --check 수행. Secret/Token 기록 없음.
+
+## 2026-10-07 — 일일 모의고사 알림 계획 작성 턴 기록 보완
+
+<!-- codex-turn:01a1142f-44b4-7b12-9ed0-db3b33468147 -->
+
+- KST 밤9시 하루1회·오늘 미시작 사용자 포함 기준의 `DAILY_EXAM_REMINDER_IMPLEMENTATION_PLAN.md` 작성 완료 기록에 현재 턴 표식을 보완했다. 계획에는 기기/동의·제출 완료 판정·중복 방지·lifecycle·검증과 rollout을 포함한다.
+- 신규 Jira 없음. 과거 WORKLOG는 보존하고 CURRENT_STATE를 갱신했다. 문서 변경만으로 코드 테스트 생략, git diff --check 및 표식 단일 출현 확인. runtime·실제 발송·배포 변경과 Secret/Token 기록 없음.
+
+## 2026-10-07 — 일일 모의고사 알림 계획 설명
+
+<!-- codex-turn:01a11465-e89b-7901-90ea-fa4570b16280 -->
+
+- 계획서를 재확인하고 앱의 동의/기기 등록 → KST21시 대상 조회 → 당일 제출 완료 제외 → 발송 직전 재확인 → FCM 접수 및 이력 저장 흐름을 설명했다. 미시작 사용자 포함과 채점 대기 제외, 제출 시각 별도 기록의 이유를 정리했다.
+- 하루1회·21시·미시작 포함은 확정이고 최근 활성 기기1대/15분 발송 창/불명 결과 재발송 금지/보존기간은 제안임을 구분했다. MEMBER/GUEST 및 이용권 없는 사용자 정책과 모바일 연동이 남는다. 신규 Jira 없음, 계획서/runtime/API/외부 시스템 변경 없음. 상태/작업 기록만 갱신하여 코드 테스트 생략, git diff --check 및 표식1회 확인. Secret/Token 기록 없음.
+
+## 2026-10-07 — 모의고사 알림 미확정 정책 선택지 비교
+
+<!-- codex-turn:01a11469-d85a-75f1-a3c3-b028cce237ba -->
+
+- 회원/게스트, 현재 응시 가능 여부, 기기 수, 완료 날짜, 발송 결과 불명 재시도, 지연 발송, 보존기간, 동의 UI/문구의 선택지와 장단점을 정리했다. 권장 조합은 회원부터·응시 가능한 사용자·최근 기기1대·제출 완료일·불명 재전송 없음·15분 발송 창·30일 이력·명시적 학습 알림 설정이다.
+- 진행 시험의 제출 가능 여부와 새 시험 이용권을 구분하며 잔여 이용권0만으로 일괄 제외하지 않도록 설명한다. 전날 시작/오늘 완료는 오늘 완료로 간주하는 안을 권장한다. 동의는 OS 권한과 서비스 설정을 구분하고 실제 야간 발송 동의 요건을 출시 전에 확인한다.
+- 선택지 설명이며 사용자 확정이나 계획 변경으로 취급하지 않는다. 신규 Jira·runtime·외부 변경 없음. WORKLOG/CURRENT_STATE만 갱신, 문서 작업으로 코드 테스트 생략 및 git diff --check/marker1회 확인. Secret/Token 기록 없음.
+
+## 2026-10-07 — 모의고사 알림 8개 정책 확정 반영
+
+<!-- codex-turn:01a1146f-81fc-7801-a624-774dddeb283b -->
+
+- 사용자 선택인 회원만·이용권 무관·등록된 모든 적격 기기·제출 완료일·재발송 없음·21시부터15분·발송 이력30일·OS 권한만을 DAILY_EXAM_REMINDER_IMPLEMENTATION_PLAN.md 전체에 반영했다.
+- 앱 내 preferences API/collection과 Billing 권리 조회를 계획에서 제거했다. 기기별 unique 발송 이력, 모든 결과 최대1회 전송 시도 및 SDK 자동 재시도 금지, 부분 성공 재전송 금지, OS 권한 보고와 lifecycle, 테스트 기준을 정합화했다. 15분 창은 미시도 대상 최초 전송 회수이며 재발송 허용이 아니다. 최종 문구·설치 소유권·OS 상태 매핑·실제 야간 발송 요건은 후속 확인이다.
+- 신규 Jira 없음. 계획/상태/작업 기록만 수정, 기존 runtime·외부 API·DB·FCM·배포 및 타 작업 변경은 보존했다. 문서 변경으로 코드 테스트 생략, git diff --check와 marker 단일 출현 확인. Secret/Token 기록 없음.
+
+## 2026-10-07 — 모의고사 알림 잔여 결정 사항 안내
+
+- 8개 핵심 정책은 확정됐으며 추가 제품 선택은 최종 푸시 문구와 클릭 목적지(현재 모의고사 홈 초안)로 정리했다. 기기 소유권·OS 상태 매핑·토큰 정리는 모바일 계약과 구현에서 구체화할 기술 항목이다.
+- 실제 Firebase/APNs 설정과 모바일 연동 검증, 21시 알림의 실제 성격에 따른 야간 발송 요건 확인은 출시 전 준비 사항으로 구분했다. OS 권한만으로 모든 동의 요건이 충족된다고 단정하지 않았다. 신규 Jira·정책 변경·runtime 구현·외부 변경 없음. 상태/기록만 갱신, 코드 테스트 생략 및 git diff --check 수행. Secret/Token 기록 없음.
+
+## 2026-10-07 — 알림 잔여 결정 안내 턴 표식 보완
+
+<!-- codex-turn:01a11471-ff40-7d51-974b-27ded747b647 -->
+
+- 핵심8개 정책 확정 및 최종 문구/클릭 목적지 초안 안내 기록에 현재 턴 표식을 추가했다. 기술 계약 구체화와 야간 발송 요건 등 출시 준비는 후속으로 유지한다.
+- 신규 Jira 없음. 과거 기록 보존, CURRENT_STATE 갱신, git diff --check 및 표식 단일 출현 확인. 문서만 변경하여 코드 테스트 생략. runtime·외부 변경 및 Secret/Token 기록 없음.
+
+## 2026-10-07 — 알림 문구 및 클릭 목적지 확정
+
+- 사용자 승인으로 제목 `오늘의 모의고사`, 본문 `오늘 모의고사로 영어 연습을 이어가 볼까요?`, 클릭 시 모의고사 홈 이동을 계획서의 확정 정책에 반영했다. 기존 8개 정책과 함께 제품 방향을 확정했으며 기술 계약 구체화와 출시 전 확인은 유지한다.
+- 신규 Jira 없음. 계획서/WORKLOG/CURRENT_STATE만 갱신하고 runtime 구현·외부 발송·배포는 수행하지 않았다. 기존 변경 보존, 문서 변경으로 코드 테스트 생략 및 git diff --check 수행. Secret/Token 기록 없음.
+
+## 2026-10-07 — 알림 문구 확정 턴 기록 보완
+
+<!-- codex-turn:01a11474-011f-7901-a572-64206a20c90f -->
+
+- 사용자 승인에 따른 알림 제목/본문 및 모의고사 홈 이동 확정 기록에 현재 턴 표식을 추가했다. 계획서의 확정 상태를 유지한다.
+- 신규 Jira 없음. 과거 기록 보존, CURRENT_STATE 갱신 및 git diff --check/표식 단일 출현 확인. 문서만 변경하여 코드 테스트 생략, runtime·외부 발송·배포 변경 및 Secret/Token 기록 없음.
+
+## 2026-10-07 — 가입과 OS 알림 권한 요청 관계 설명
+
+<!-- codex-turn:01a11477-df98-7fc3-917a-d9bc2f2b7b18 -->
+
+- OS 알림 권한만 사용하는 확정 정책에서는 회원가입 필수 약관/동의 항목 추가가 필수는 아님을 설명한다. 가입 완료 후 알림 목적을 안내하고 OS 권한을 요청하며, 거부해도 가입/앱 이용은 유지하는 흐름을 권장한다. 기존 회원도 앱 진입 시 같은 안내/등록 흐름을 적용할 수 있다.
+- 기기별 OS 권한 상태와 FCM 토큰을 인증된 회원에 연결해 LC에 등록한다. 가입 화면 체크박스가 OS 권한을 대체하지 않으며 별도 광고/야간 수신 동의 필요 여부는 출시 전 확인 사항이다. 신규 Jira·정책 확정 추가·runtime/API/외부 변경 없음. WORKLOG/CURRENT_STATE 갱신, 코드 테스트 생략 및 git diff --check/marker1회 확인. Secret/Token 기록 없음.
+
+## 2026-10-07 — 가입 시 학습 알림 수신 동의 계획 추가
+
+- 사용자 요청으로 기존 OS 권한만 정책을 가입 시 수신 동의와 기기별 OS 권한을 모두 확인하는 방향으로 계획서에 변경했다. 선택/기본 미체크·거부해도 가입 허용·가입 완료 후 인증된 동의 저장·설정에서 철회 흐름을 제안했다.
+- preferences API/동의 원본·변경 이력 초안, 전체 기기 철회/계정 통합/기존 회원/실패 및 경합 테스트를 반영했다. Identity 범용 동의 계약 확인 후 단일 source를 정하며 타 저장소나 signup 계약은 수정하지 않았다. 신규 Jira 없음. 문서만 수정, runtime 구현·발송·배포 없음. 코드 테스트 생략 및 git diff --check 수행. Secret/Token 기록 없음.
+
+## 2026-10-07 — 가입 시 알림 동의 계획 변경 턴 기록 보완
+
+<!-- codex-turn:01a11479-c9db-7833-af9a-e0439f55c269 -->
+
+- 가입 시 학습 알림 수신 동의와 기기별 OS 권한을 모두 확인하도록 계획을 변경한 이번 턴의 표식을 추가했다. 선택 동의·철회·기존 회원 opt-in 및 동의 source 계약 검토 계획을 유지한다.
+- 신규 Jira 없음. 과거 WORKLOG 보존, CURRENT_STATE 갱신, git diff --check 및 표식 단일 출현 확인. 문서만 변경하여 코드 테스트 생략, runtime·외부 발송·배포 변경 및 Secret/Token 기록 없음.
+
+## 2026-10-07 — OS 권한과 가입 수신 동의 필요성 구분
+
+- 사용자의 재확인 질문에 OS 권한은 기기 표시 허용이며 기술적으로 가입 체크박스 없이 푸시 구현이 가능하다고 설명했다. 별도 수신 동의가 필요한 알림인지와 이를 가입 시 받아야 하는지는 별개이며, 동의가 필요해도 가입 후 받을 수 있다.
+- 이용권 무관 매일21시 학습 권유의 광고성/야간 요건은 미확인으로 OS 권한만으로 충분하다고 단정하지 않는다. 질문만으로 가입 동의 계획을 취소하지 않았다. 신규 Jira·계획서/runtime·외부 변경 없음. 상태/기록만 갱신, 문서 변경으로 코드 테스트 생략 및 git diff --check 수행. Secret/Token 기록 없음.
+
+## 2026-10-07 — OS 권한과 수신 동의 설명 턴 기록 보완
+
+<!-- codex-turn:01a1147b-c202-7131-897f-bbe08cb9769d -->
+
+- OS 권한의 기술적 역할과 별도 수신 동의 필요성·가입 시점의 구분을 설명한 이번 턴의 표식을 추가했다. 가입 동의 계획은 유지하며 광고성/야간 요건은 미확인이다.
+- 신규 Jira 없음. 과거 기록 보존, CURRENT_STATE 갱신, git diff --check 및 표식 단일 출현 확인. 문서만 변경하여 코드 테스트 생략, runtime·외부 변경 및 Secret/Token 기록 없음.
+
+## 2026-10-07 — OS 알림 권한만 사용하는 범위로 재확정
+
+- 사용자 결정으로 가입 시 별도 수신 동의 계획을 철회하고 OS 알림 권한만 사용하는 범위로 계획서를 갱신했다. 가입 체크박스·앱 내 알림 토글·preferences API/collection·동의 이력과 Identity 동의 source 연계를 계획에서 제거했다. 기존 구현이나 실제 동의 데이터를 삭제한 작업은 아니다.
+- 기기별 권한 보고/재허용·서로 다른 기기의 허용 상태와 테스트를 정합화했다. 기존 회원/이용권 무관/모든 적격 기기/21시15분 창/재발송 없음/이력30일 정책은 유지한다. 야간 발송 요건 확인은 출시 전 항목으로 유지한다.
+- 신규 Jira 없음. 계획/상태/작업 기록만 변경, runtime/API·외부 발송·배포 변경 없음. 문서 변경으로 코드 테스트 생략, git diff --check 수행. Secret/Token 기록 없음.
+
+## 2026-10-07 — OS 권한만 사용 재확정 턴 기록 보완
+
+<!-- codex-turn:01a1147c-ecdb-71c3-b07d-286be73efc79 -->
+
+- 사용자 요청으로 OS 알림 권한만 사용하는 범위로 계획서를 정합화한 이번 턴의 표식을 추가했다. 가입 동의·앱 토글 제외 및 출시 전 야간 발송 요건 확인 상태를 유지한다.
+- 신규 Jira 없음. 과거 기록 보존, CURRENT_STATE 갱신, git diff --check 및 표식 단일 출현 확인. 문서만 변경하여 코드 테스트 생략, runtime·외부 변경 및 Secret/Token 기록 없음.
+
+## 2026-10-07 — OS 알림 권한 저장 위치 설명
+
+- OS 권한 원본은 휴대폰 운영체제가 앱별로 관리하고, LC에는 앱이 보고한 기기별 권한 상태와 관측 시각·발송용 토큰을 notification_devices에 저장하는 계획임을 구분했다. 서버에 자동 동기화되지 않으며 앱 등록/복귀 시 보고가 필요하다.
+- src/main 및 build.gradle 검색에서 해당 기기 등록/FCM 구현은 확인되지 않았다. 현재는 계획 단계로 실제 LC DB 저장을 구현한 상태가 아니며 모바일 구현/운영 DB는 조회하지 않았다. 신규 Jira 없음. 상태/작업 기록만 갱신, runtime·외부 변경 없음. 코드 테스트 생략 및 git diff --check 수행. Secret/Token 기록 없음.
+
+## 2026-10-07 — OS 권한 저장 위치 설명 턴 기록 보완
+
+<!-- codex-turn:01a1147e-512a-79d1-bc7c-aaa9d3059ebd -->
+
+- OS 권한 원본은 휴대폰 OS가 관리하고 LC는 앱이 보고한 기기별 상태를 저장할 계획이라는 설명에 현재 턴 표식을 추가했다. 서버 저장 기능은 아직 미구현이다.
+- 신규 Jira 없음. 과거 WORKLOG 보존, CURRENT_STATE 갱신, git diff --check 및 표식 단일 출현 확인. 문서만 변경하여 코드 테스트 생략, runtime·외부 변경 및 Secret/Token 기록 없음.
+
+## 2026-10-07 — 일일 모의고사 알림 Jira 등록
+
+- 사용자 요청으로 TMI-198 `[Learning Core] 일일 모의고사 미제출 회원 FCM 알림 구현`을 작업 유형으로 생성했다. 생성 결과에서 해야 할 일/담당자 미지정 및 본문 정책을 확인했다. URL: https://to-teacher.atlassian.net/browse/TMI-198
+- 확정 정책·LC 구현 범위·모바일 연계·완료 기준·출시 gate를 기록했다. Rovo 검색이 앱 미설치 오류여서 Jira JQL로 관련 이슈를 확인했다. TMI-63은 채점 완료 알림으로 별도 목적이며 기기 PUT 경로/필드·Guest·재시도 정책 차이를 구현 전 정합화 항목으로 명시했다. TMI-58은 설명이 없어 범위 미확인, 기존 이슈 변경 없음.
+- 계획서에 TMI-198 연결 및 기존 계약 차이를 반영하고 CURRENT_STATE 갱신. runtime·DB·FCM·배포·Git commit/push 변경 없음. 문서/이슈 등록만으로 코드 테스트 생략, git diff --check 수행. Secret/Token 기록 없음.
+
+## 2026-10-07 — TMI-198 생성 턴 기록 보완
+
+<!-- codex-turn:01a1147f-647e-7151-a264-cc252e7c786a -->
+
+- TMI-198 일일 모의고사 미제출 회원 FCM 알림 구현 이슈 생성 및 계획서 연결 기록에 현재 턴 표식을 추가했다. 해야 할 일 상태 유지, TMI-63 기기 계약 정합화와 TMI-58 범위 확인은 후속이다.
+- 과거 WORKLOG 보존, CURRENT_STATE 갱신, git diff --check 및 표식 단일 출현 확인. 문서만 변경하여 코드 테스트 생략. 추가 Jira 변경·runtime·외부 발송·배포 및 Secret/Token 기록 없음.
+
+## 2026-10-07 — TMI-198 구현 전 최종 동작 설명
+
+<!-- codex-turn:01a11482-67d7-79b2-8a8c-bd558c89d72a -->
+
+- 사용자 중단 후 최종 설명 요청에 따라 TMI-198의 확정 정책과 앱 OS 권한/기기 등록 → LC 저장 → KST21시 제출 완료 제외 → 기기별 FCM 최초 전송 → 이력30일 정리 흐름을 재확인했다. 직전 구현 요청에서는 코드 변경이나 실행이 시작되지 않았다.
+- MEMBER/이용권 무관/모든 적격 기기/최초 제출 완료일/15분 창/재발송 없음/OS 권한만 정책 및 고정 문구·모의고사 홈 이동을 설명했다. TMI-63 기기 API 정합화와 모바일 연동·Firebase/APNs·출시 전 야간 발송 요건은 후속으로 유지한다.
+- 설명과 WORKLOG/CURRENT_STATE만 갱신, runtime·Jira·실제 발송·배포 변경 없음. 코드 테스트 생략 및 git diff --check/marker 단일 출현 확인. Secret/Token 기록 없음.
+
+## 2026-10-07 — TMI-198 일일 모의고사 미제출 회원 알림 서버 구현
+
+<!-- codex-turn:01a11484-0175-7a30-96c4-8c7331ae0851 -->
+
+- 사용자 구현 승인에 따라 `domain/notification`에 기기 API/저장·설치 proof·권한 관측·등록 제한, 트랜잭션·제출 추적, 일일 worker, FCM HTTP v1 adapter, exact index/startup gate를 추가했다. 새 direct dependency는 무자동재시도 HTTP client이며 provider SDK의 숨은 retry를 사용하지 않는다. 운영 Secret/Token을 조회하거나 기록하지 않았다.
+- TMI-63의 `PUT /api/v1/notifications/devices` + body installationId/platform/pushToken을 유지하고 필수 `X-Installation-Secret` 및 optional permission/permissionObservedAt을 기술 계약으로 문서화했다. 공동 기기 API는 MEMBER/GUEST를 허용하지만 TMI-198 발송은 MEMBER만이다. TMI-63 채점 완료 Push/재시도와 TMI-58 모바일 구현은 포함하지 않았다. 별도 가입 동의·토글·동의 API 없음.
+- ExamGradingService에서 tracking ON일 때 기존 guarded/unguarded 준비 경로를 같은 Mongo Transaction으로 감싸고 새 실제 retry0 Job insert 시에만 receipt를 기록한다. Session submissionCompletedAt은 모든 필수 영수증의 마지막 접수 시각으로 한 번만 저장한다. owner/Session write conflict와 bounded transient retry를 적용하고 unknown commit은 재실행하지 않는다. replay·retry>0·Job 복구로 날짜를 바꾸지 않는다. AI 전송은 Transaction 밖이며 기존 외부 계약 유지.
+- KST21:00~21:15, 등록된 모든 적격 기기, 시험 미시작 포함·당일 제출완료 제외·이용권 미조회 정책 구현. 일일 device unique marker를 HTTP 전 SENDING으로 저장하고 성공/실패/불명/제외 뒤 재발송하지 않는다. 기기 version·owner·OS 권한·제출·억제·withdrawn/merged·삭제 상태를 확인한다. 전송 전 crash와 unknown commit은 누락을 수용하며 SENDING60초는 UNKNOWN으로 수렴한다. TTL30일, 단기 suppression, 오래된 토큰 제거, quota 대기와 auth 전역 차단을 추가했다.
+- UserMergedTransactionService, UserWithdrawnEventTransactionService, DeletionCommandService에 같은 Transaction의 optional lifecycle hook을 연결했다. DeletionWorker의 sealed exam 자식 정리에 exam_submission_receipts를 추가하고 새 시험 receipt가 삭제되지 않는 회귀를 추가했다. Session 내부 필드 외 기존 Request/Response/BaseResponse·retryCount·AI user_id=examId·S3/Redis key·submit/Polling 계약 변경 없음.
+- 신규 `notification-device-api.md`, `DAILY_EXAM_REMINDER_RUNBOOK.md`, `notification-prepare.js`/test 및 계획 상태 갱신. apply는 별도 명시/drain이 필요하며 이 turn에서는 운영 DB/index/migration을 실행하지 않았다. 기존 생성일/최초 제출 증거가 미확정인 시험의 owner는 보수적 제외, 운영 allowlist는 미구현이므로 실제 검증은 테스트 기기만 있는 staging에서 수행한다.
+- 검증: 최종 `./gradlew clean test`600개 통과; `JAVA_TOOL_OPTIONS=-Dapi.version=1.44 ./gradlew mongoIntegrationTest`134개 통과; `node --test scripts/mongodb/*.test.js`117개 통과(신규3개); `git diff --check` 통과. 최초 Mongo 실행은 Docker API1.32/min1.40 오류로 실패 후 실행환경 호환 옵션으로 해결했다. 테스트 JWT 인증/bean-provider fixture와 경합 테스트를 수정하고 전체 재검증했다. 신규 알림 Mongo13개에는 경쟁 제출·복수worker·marker crash·unknown commit·전송후 저장실패·토큰교체·권한/lifecycle/시간경계·무재발송 포함. loopback HTTP disconnect/redirect에서 실제 POST1회 확인. 실제 Firebase/APNs 전송은 하지 않았다.
+- 기존 사용자/직전 작업의 ChallengeService/Store/Views, ChallengeMongoIntegrationTest, ChallengeStreakTest, ten-second-challenge-frontend-api 변경은 수정하지 않았다. 이번 diff는 알림 및 승인된 연결 지점/테스트/문서이며 예상 밖의 범위 변경 없음. WORKLOG 과거 항목 보존, CURRENT_STATE 갱신. Jira 상태 변경, 운영 발송/배포, commit/push 없음.
+- 배포 전/다음 작업: 모바일 설치 credential·OS 보고·로그아웃·클릭 계약 연동, Firebase 프로젝트/APNs/secret mount·DB 암호화/RBAC, 야간 발송 요건, Mongo indexes·lifecycle gate·writer drain와 전체 KST일 추적, dry-run/실기기 E2E·운영 경보 연결을 확인한다. 모든 flag 기본OFF이며 이번 구현 완료가 활성화 승인은 아니다.

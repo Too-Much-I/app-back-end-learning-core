@@ -1,5 +1,91 @@
 # Learning Core Current State
 
+- 2026-10-07 — TMI-198 서버 구현/로컬 검증 완료, runtime flag 기본OFF. notification domain에 TMI-63 경로/body 기반 기기 PUT/DELETE(JWT owner·설치 proof·OS 관측), 최초 retry0 제출 receipt/Session 완료 Instant, KST21:00~21:15 MEMBER/이용권 무관 모든 적격 기기 sweep, durable SENDING/무재발송/30일 TTL, FCM HTTP v1 OAuth/무자동retry/TTL/quota/auth circuit, 탈퇴·병합·학습 삭제 연계를 추가했다. 기존 시험/AI/S3/Redis 공개 계약 유지. `./gradlew clean test`600개, Docker 호환 옵션 적용 전체 Mongo integration134개, migration Node117개, diff check 통과. 모바일 계약/운영 runbook 추가; TMI-58 모바일·TMI-63 신규 installation secret 반영, Firebase/APNs·야간 요건·index·writer drain/readyAt·실기기 검증은 출시 gate. 오래된 미확정 시험 owner는 보수적 제외. 기존 Challenge dirty 변경은 그대로 보존. Jira 상태/운영DB/FCM/배포/commit/push 변경 없음.
+
+- 2026-10-07 — TMI-198 구현 전 최종 동작 설명. 직전 구현 요청은 실행 시작 전 중단됐고 현재 코드 구현 미착수. 확정 정책·앱/LC/FCM 역할 및 출시 의존성 안내, 기록 외 runtime·Jira·외부 변경 없음.
+
+- 2026-10-07 — TMI-198 생성 턴의 WORKLOG 표식 보완 완료. 이슈 해야 할 일/계획서 연결 상태 유지, 추가 Jira·runtime·외부 변경 없음.
+
+- 2026-10-07 — TMI-198 일일 모의고사 미제출 회원 FCM 알림 구현 이슈 생성, 해야 할 일/미지정 확인. 확정 정책·완료 기준·모바일 연계 및 TMI-63 기기 API 계약 차이 정합화 필요를 기록했다. TMI-58 범위는 추가 확인 대상. 계획서 연결 완료, runtime·실제 발송/배포 없음.
+
+- 2026-10-07 — OS 권한 저장 위치 설명 턴의 WORKLOG 표식 보완 완료. notification_devices 저장은 계획 상태이며 신규 Jira·runtime·외부 변경 없음.
+
+- 2026-10-07 — OS 알림 권한 저장 위치 안내: 원본은 휴대폰 OS, LC는 앱 보고값/관측 시각/기기 발송 정보를 notification_devices에 저장할 계획. 현재 LC 등록/FCM 구현은 검색되지 않았으며 실제 DB 저장 완료 아님. 신규 Jira·runtime·외부 변경 없음.
+
+- 2026-10-07 — OS 권한만 사용 재확정 턴의 WORKLOG 표식 보완 완료. 가입 동의/앱 토글 제외 계획 유지, 신규 Jira·runtime·외부 변경 없음.
+
+- 2026-10-07 — 최신 사용자 결정으로 OS 알림 권한만 사용하는 범위 재확정 및 계획 정합화. 가입 수신 동의·앱 토글·preferences API/저장·Identity 동의 연계 제외, 기기별 권한 확인 적용. 기존 다른 정책 유지, 신규 Jira·runtime·외부 변경 없음.
+
+- 2026-10-07 — OS 권한/수신 동의 설명 턴의 WORKLOG 표식 보완 완료. 가입 동의 계획 유지, 추가 정책 확정·신규 Jira·runtime·외부 변경 없음.
+
+- 2026-10-07 — OS 권한만으로 기술적 푸시 구현은 가능하며 가입 체크박스는 기술적 필수 아님을 설명. 별도 수신 동의 필요 여부 및 가입 시점은 구분하고, 현재21시/이용권 무관 알림의 광고성·야간 요건은 미확인. 질문만으로 가입 동의 계획을 취소하지 않음. 신규 Jira·runtime·외부 변경 없음.
+
+- 2026-10-07 — 가입 시 알림 동의 계획 변경 턴의 WORKLOG 표식 보완 완료. 수신 동의+OS 권한 계획 유지, 신규 Jira·runtime·외부 변경 없음.
+
+- 2026-10-07 — 사용자 요청으로 가입 시 학습 알림 수신 동의 추가 계획 반영. 이전 OS 권한만 정책을 대체하며 회원 수신 동의+기기 OS 권한 모두 필요. 선택 동의/거부 시 가입 허용/인증 후 저장/철회·기존 회원 opt-in을 제안하고 단일 동의 source는 계약 확인 후 결정. 신규 Jira·runtime/signup API·외부 변경 없음.
+
+- 2026-10-07 — 가입/알림 권한 관계 설명: 가입 필수 동의 추가 없이 가입 완료 후 목적 안내→OS 권한 요청→허용 기기 토큰 등록을 권장. 거부해도 가입/이용 유지, 기존 회원도 별도 등록 가능. OS 권한과 광고/야간 동의는 구분. 신규 Jira·runtime·외부 변경 없음.
+
+- 2026-10-07 — 알림 문구/모의고사 홈 이동 확정 턴의 WORKLOG 표식 보완 완료. 계획서 확정 상태 유지, 신규 Jira·runtime·외부 발송/배포 변경 없음.
+
+- 2026-10-07 — 사용자 승인으로 알림 제목 `오늘의 모의고사`, 본문 `오늘 모의고사로 영어 연습을 이어가 볼까요?`, 클릭 시 모의고사 홈 이동 확정 및 계획서 반영. 기존8개 정책 유지, 신규 Jira·runtime 구현·외부 발송/배포 없음.
+
+- 2026-10-07 — 알림 잔여 결정 안내 턴의 WORKLOG 표식 보완 완료. 문구/클릭 목적지는 초안 상태이며 추가 정책 확정·신규 Jira·runtime·외부 변경 없음.
+
+- 2026-10-07 — 알림 잔여 결정 안내: 핵심8개 정책 확정, 최종 문구·클릭 목적지는 현재 초안 확인 대상. 설치 소유권/OS 상태/토큰 정리는 기술 설계, Firebase/APNs·모바일 검증·야간 발송 요건은 출시 준비로 구분. 신규 Jira·정책/runtime·원격 변경 없음.
+
+- 2026-10-07 — 모의고사 알림 8개 사용자 정책 확정 및 계획서 반영: MEMBER만, 이용권 무관, 모든 등록 적격 기기, 제출 완료일, 재발송 없음, KST21:00~21:15 최초 전송, 이력30일, OS 권한만. preferences API/collection·Billing 대상 조회 제외, 기기별 발송 unique/최대1회·SDK 재시도 금지로 정합화. 신규 Jira·runtime 구현·실제 발송/배포 없음.
+
+- 2026-10-07 — 모의고사 알림 미확정 정책의 선택지/장단점/권장안 안내. 회원부터·현재 응시 가능(진행 시험 포함)·최근 기기1대·제출 완료일 기준·불명 재전송 없음·15분 창·30일 이력·명시적 알림 설정을 권장하되 아직 사용자 확정 아님. 신규 Jira·계획서/runtime·원격 변경 없음.
+
+- 2026-10-07 — 일일 모의고사 알림 계획 설명 완료. 앱 등록·동의부터 KST21시 대상 선정/제출 완료 제외/직전 재확인/FCM·이력 저장까지 설명하고, 확정 정책과 다중 기기·발송 창·불명 재시도·회원/이용권 범위 제안을 구분했다. 계획서·runtime·외부 시스템 변경 및 신규 Jira 없음.
+
+- 2026-10-07 — 일일 모의고사 알림 계획 작성 턴의 WORKLOG 표식 보완 완료. 계획서 작성 상태를 유지하며 신규 Jira·runtime 구현·실제 발송·배포 없음.
+
+- 2026-10-07 — 사용자 승인으로 KST 밤9시 하루1회, 오늘 시험 미시작 포함 정책 확정. `DAILY_EXAM_REMINDER_IMPLEMENTATION_PLAN.md` 작성: LC+FCM, 기기/동의, 최초 제출 시각, 원자 발송 이력/UNKNOWN, lifecycle·삭제 연계와 테스트/rollout 계획. MEMBER/권리 source·다중 기기·세부 보존 등은 권장안으로 분리. 신규 Jira·runtime 구현·실제 발송/배포 없음.
+
+- 2026-10-07 — 모의고사 알림 대상에 오늘 시험을 아예 시작하지 않은 사용자까지 포함하기로 사용자 확정. 알림 허용/유효 기기 등록 사용자에서 당일 제출 완료 사용자를 제외하는 방향이며 ExamSession 보유자만 조회하지 않는다. 발송 시각/횟수는 미확정(KST 밤9시 하루1회 권장). 신규 Jira·runtime/API 구현·원격 발송 없음.
+
+- 2026-10-07 — 모의고사 미제출 사용자 FCM 알림 초기 검토. LC 예약 작업+FCM을 제안하며 앱 기기 등록/동의와 서버 제출 완료 시각·발송 직전 재확인·원자 claim/발송 이력이 필요하다. 기존 필수 retryCount=0 제출 증거와 채점 완료는 구분 가능하나 일별 기준은 추가 설계 대상이다. 밤 9시/10시 발송 횟수 및 미시작 사용자 포함 여부 미확정. 신규 Jira·runtime 구현·원격 발송 없음.
+
+- 2026-10-05 — 사용자 정책 확인: 구버전/새버전 앱 서버를 분리하며 각각 업데이트 필요 true/false를 반환할 예정. 앱 버전 비교/header 방식 대신 모의고사 summary result.appUpdateRequired boolean 및 서버별 APP_UPDATE_REQUIRED(default false) 설정을 제안한다. DB 저장/자동 버전 판정 불필요. 기존 앱의 안내 UI 지원은 별도 확인 필요, 구버전 서버 저장소/배포 대상은 아직 미확정. 구현·원격 변경 없음, 신규 Jira 없음.
+
+- 2026-10-05 — 신규 업데이트 안내 요청은 앱 버전 업데이트/모의고사 대상으로 확정. 현재 코드에 버전 header·업데이트 판정 계약 없음. GET /api/v1/exams/{examId}/summary result.appUpdate 추가와 플랫폼/앱 버전 header 전달, 서버의 플랫폼별 출시 버전 정책 비교를 제안한다. 알림/강제 범위·버전 정책 확정 전 구현하지 않음. 신규 Jira 없음.
+
+- 2026-10-05 — 시험 result에 업데이트 필요 여부를 포함하려는 신규 요청 접수. 앱 버전 업데이트인지 채점 결과 재조회/갱신인지 의미 확인 대기. 신규 Jira 미등록, API·코드 변경 없음. TMI-194 구현 상태와 별개다.
+
+- 2026-10-05 — TMI-194(상위 TMI-136) 구현 턴의 WORKLOG 식별 표식을 보완했다. currentStreakDays 구현 및 단위591/Mongo121 통과, 미배포 상태 유지. 추가 제품 코드·원격 변경 없음.
+
+- 2026-10-05 — TMI-194(상위 TMI-136) 구현 완료/미배포: history 응답에 currentStreakDays 추가. 단일 KST today 기준, 오늘 미참여 시 어제까지 유지, 월·연도/조회월 독립 계산. 32일 단위 제출 날짜 최소 projection + 기존 삭제 hidden fence 적용, 첫 공백 종료. 프론트 계약 갱신. 최종 단위591/Mongo121 통과, diff check 통과. 기존 API 필드/AI 계약 유지, 새 DB index·배포·commit/push 없음. 다음은 사용자 commit/push 후 테스트 서버에서 실제 앱 표시 확인, 긴 streak의 실제 DB 부하 점검.
+
+- 2026-10-05 — TMI-194→TMI-136 상위 에픽 연결 작업의 WORKLOG 턴 표식을 보완했다. 연결 검증 완료/구현 미시작 상태 유지, 추가 Jira 변경 없음.
+
+- 2026-10-05 — 사용자 요청으로 TMI-194의 parent를 에픽 TMI-136(sns 로그인)으로 변경하고 재조회 확인했다. 기존 이슈·설명·해야 할 일 상태 유지, 중복 생성·구현·배포 없음.
+
+- 2026-10-05 — TMI-194 생성 완료: [Learning Core] 10초 챌린지 현재 연속 학습일 조회 추가. 상태 해야 할 일, 별도 상위 지정 없이 작업으로 등록. currentStreakDays 및 오늘 미학습 시 어제 연속일 유지/KST/월 경계 독립 기준 확정, 계약·삭제 fence·회귀 테스트 범위 기록. 이번에는 Jira 등록만 수행, 구현·배포 미시작.
+
+- 2026-10-05 — 챌린지 현재 연속 학습일 추가 요청 검토: 기존 History(yearMonth, dates)에 currentStreakDays 추가 제안. KST 기준 하루 음성 제출1건 이상, 오늘 미참여면 어제까지 연속일 유지, 오늘/어제 모두 미참여면0, 월 경계 및 조회 yearMonth와 무관한 현재 streak 계산을 권장한다. 사용자 기준 확정 대기, 제품 코드/API 계약 변경 미수행.
+
+- 2026-10-05 — 챌린지 월별 이력 API 재확인: GET /api/v1/challenges/history?yearMonth=YYYY-MM, 생략 시 현재 KST 월. 날짜별 participated/solvedQuestionCount 반환, 월 합계는 앱에서 합산. Controller/Service 및 프론트 계약 §6.7 확인만 수행, 코드·배포 변경 없음.
+
+- 2026-10-03 — TMI-193(상위 TMI-136) LC 테스트 학습 기록 삭제 활성화 완료: tosunsaeng-learning-core-test:14 배포 COMPLETED/running1, ALB healthy, HTTPS health200/UP. 기존377b043 이미지·Secret 유지, 삭제 command/read-fence/writer-fence/worker/billing-continuation/aggregate 6개 true. 실제 Billing saga/phone/reconciler/AttemptGroup flags는 OFF 유지, Identity/운영 미변경.
+- 테스트 DB writer drain 후 빈 원본·child/불일치0 확인, 승인 migration과 동일한24개 index 생성·검증 및 replica-set snapshot transaction 확인. 실제 테스트 task role·네트워크에서 disposable S3 파일/Redis 키 생성·삭제 검증 통과, 검증 데이터 제거·일회 task STOPPED/정의 INACTIVE. rollout manifest와 aggregate coverage를 majority transaction으로 기록(수집 기준2026-10-03T11:35:28.311738Z, 첫 KST 일자 부분 coverage·기존 이벤트 미포함). CloudShell 임시 /32 허용은 작업 뒤 제거 완료.
+- 실제 공개 OpenAPI의 삭제/상태 route 등록과 무토큰 상태 조회401 확인. 실제 회원 토큰으로 삭제 command→완료/새 학습/모바일 캐시 E2E 및 장애·성능/Billing 검증은 남아 있으며 Jira 완료 선언 아님. 이번 코드 변경·commit/push 없음, CURRENT_STATE/WORKLOG만 갱신, 기존 문서 변경 보존.
+
+- 2026-10-03 — TMI-193(상위 TMI-136) Atlas 접속 경로 확인 턴의 WORKLOG 식별 표식을 보완했다. CloudShell 단일 IP 6시간 임시 허용 승인 대기이며 삭제 OFF·원격 설정 미변경 상태 유지.
+
+- 2026-10-03 — TMI-193(상위 TMI-136) Atlas 재로그인 확인. tosunsaeng-test 허용 IP는 staging NAT 13.124.57.130/32 하나이고 현재 CloudShell egress 3.38.163.97은 미허용임을 확인했다. 테스트 DB 점검용 해당 /32의 6시간 임시 허용 승인 필요. 네트워크 변경/DB DDL/삭제 활성화/재배포 아직 없음.
+
+- 2026-10-03 — TMI-193(상위 TMI-136) 테스트 삭제 활성화 준비: 사용자 명시 승인으로 테스트 task role에 LearningCoreTestDeletion inline policy 추가·read-back 확인. tosunsaeng-test-audio 버전 상태 조회, temp/ 한정 목록·객체/버전 삭제만 허용했고 운영 역할/다른 버킷은 미변경. 실행 revision13 정상, 삭제 flags는 여전히 OFF. CloudShell Mongo 연결 SSL handshake 계열 실패의 원인은 미확정이며 Atlas 설정 확인 중 로그인 만료 확인, 재로그인 필요. DB DDL/manifest/활성화/재배포/실제 삭제 미수행.
+
+- 2026-10-03 — TMI-193 수동 run37117453670에서 develop 377b043 실제 배포 성공 확인(Test, build and deploy 8분28초, LC 테스트 서비스). 모바일 승인 기동 조건 제거 코드 배포 완료. 삭제 활성화 설정·DB/index/manifest·IAM 준비는 미완료/미변경으로 전체 요청은 아직 완료되지 않았다.
+
+- 2026-10-03 — TMI-193 push 배포 확인 턴의 WORKLOG 표식을 EOF에 보완했다. run37116620776 deploy skipped 및 수동 실행/PR merge 필요 상태 유지. 추가 코드·원격 변경 없음.
+
+- 2026-10-03 — TMI-193 develop 377b043 push 확인. GitHub run37116620776 전체 Success지만 실제 deploy job은 PR merge-only gate로 skipped(0초). 이번 push로 새 버전은 배포되지 않았으며 수동 workflow_dispatch 또는 PR merge 필요. 삭제 활성화/원격 변경 미수행.
+
+- 2026-10-03 — TMI-193 모바일 승인 기동 조건 제거 턴의 WORKLOG 표식을 EOF에 보완했다. 로컬 수정 및 단위580/관련 Mongo7 통과 상태 유지, 추가 코드·배포 변경 없음.
+
 - 2026-10-03 — TMI-193 사용자 요청으로 mobileContractVerified 기동 검사를 모든 환경에서 제거했다. storageVerified 및 DB/index/JWT/writer 안전 조건은 유지. 모바일 승인 부재/false 허용과 저장소 검증 미충족 거절 회귀 추가, clean test 및 DeletionWiringMongoTest 통과. 로컬 수정만 완료, commit/push·재배포 미실행.
 
 - 2026-10-03 — TMI-193 mobileContractVerified 설명 턴의 식별 표식을 WORKLOG EOF에 보완했다. 실제 앱 검증 미완료 및 삭제 설정 미변경 상태 유지. 이번 보완은 문서만 변경했다.
@@ -2786,6 +2872,7 @@
 - 후속 실검증: 운영 `/actuator/health`는 비인증 200/UP, `/actuator/health/liveness`는 비인증 401. revision 21 환경과 배포 commit에는 probe 활성화가 없고 보안은 exact `/actuator/health`만 공개한다. 동일 Dockerfile 로컬 이미지의 app 사용자에서 curl·wget 존재를 확인했으나 정확한 ECR bytes 직접 실행은 로컬 AWS CLI credential 부재로 미검증. AWS·코드·배포 변경 없음, 신규 Jira 없음.
 - 기존 revision 20 JSON에도 컨테이너 `healthCheck` 필드가 없어 ECS health UNKNOWN은 이번 축소 이전부터 동일한 표시였다. 현재 revision 21 RUNNING·배포 성공·ALB 정상 1/비정상 0·공개 health 200/UP으로 즉시 운영 문제 신호는 없다. ALB unhealthy 기반 보호는 유지되며 전용 컨테이너 liveness는 후속 개선 대상이다. 신규 Jira·AWS 변경 없음.
 - 프론트/ALB 설명 확인: 현재 계약은 Identity와 Learning Core를 서로 다른 base URL로 호출한다. 도메인은 ALB의 서비스 routing key이고 ALB가 실제 target group·task IP를 선택하므로 프론트가 개별 서버 주소를 아는 구조는 아니다. 단일 base URL 전환은 별도 ALB path routing·DNS/certificate·API path/프론트 계약 설계가 필요하다. 신규 Jira·설정 변경 없음.
+- 2026-10-07 광고 attribution 검토: Android Google Play 설치-only는 Google Play 연동으로 SDK 없이도 일부 측정 가능하지만, Android/iOS의 first_open·가입·시험·구독 전환과 광고 최적화를 위해 모바일 앱의 Firebase Analytics SDK + Firebase/GA4–Google Ads 연결을 우선 권장. 다채널 통합이 필요하면 MMP 비교. 현재 앱 저장소가 없어 설치 여부 미확인, 코드·AWS·광고 설정 변경 없음, 신규 Jira 없음.
 
 ## 학습 기록 삭제와 AI 품질 개선 데이터 경계 검토 (2026-09-21)
 
