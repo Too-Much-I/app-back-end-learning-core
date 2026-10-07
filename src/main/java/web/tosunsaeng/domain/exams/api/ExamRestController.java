@@ -19,6 +19,9 @@ import java.util.Map;
 @RequestMapping("/api/v1/exams")
 public class ExamRestController {
 
+    @org.springframework.beans.factory.annotation.Value("${APP_UPDATE_REQUIRED:false}")
+    private boolean appUpdateRequired;
+
     private final ExamService examService;
     private final ExamReadService examReadService;
 
@@ -110,7 +113,8 @@ public class ExamRestController {
     @Operation(summary = "[프론트엔드] 전체 요약 피드백 조회 API", description = "모의고사의 총점 및 요약 피드백만 빠르게 가져옵니다.")
     @GetMapping("/{examId}/summary")
     public BaseResponse<ExamResponseDTO.SummaryResult> getExamSummary(@PathVariable("examId") String examId) {
-        return BaseResponse.onSuccess(SuccessStatus.OK, examService.getExamSummary(examId));
+        return BaseResponse.onSuccess(SuccessStatus.OK, examService.getExamSummary(examId).toBuilder()
+                .appUpdateRequired(appUpdateRequired).build());
     }
 
     @Operation(
