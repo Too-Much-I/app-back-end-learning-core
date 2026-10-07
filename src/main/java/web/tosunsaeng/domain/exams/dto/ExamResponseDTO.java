@@ -124,8 +124,10 @@ public class ExamResponseDTO {
         private Instant completedAt;
     }
 
-    @Builder @Getter @NoArgsConstructor @AllArgsConstructor
+    @Builder(toBuilder = true) @Getter @NoArgsConstructor @AllArgsConstructor
     public static class SummaryResult {
+        @Schema(description = "이 서버를 사용하는 앱의 업데이트 필요 여부. 서버 설정값이며 강제 차단을 의미하지 않음")
+        private boolean appUpdateRequired;
         private String examId;
         private Integer totalScore;
         private String levelEstimate;
