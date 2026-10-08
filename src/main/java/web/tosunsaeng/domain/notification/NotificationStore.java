@@ -113,9 +113,9 @@ public class NotificationStore {
         if (owner == null || blocked(owner) || completed(owner, day)
                 || mongo.exists(Query.query(Criteria.where("_id").is(owner + ":" + day)), SUPPRESSIONS)
                 || mongo.exists(Query.query(Criteria.where("userId").is(owner).and("activeGuard").is(true)), "learning_record_deletion_operations")) return false;
-        // Never infer original submission time from a recovered Job. Suppress owners of pre-rollout uncertain exams.
-        return !mongo.exists(Query.query(Criteria.where("userId").is(owner).and("submissionCompletedAt").is(null)
-                .orOperator(Criteria.where("createdAt").lt(Date.from(readyAt)), Criteria.where("createdAt").is(null))), "exam_sessions");
+        // Missing historical completion evidence alone does not suppress reminders.
+        // Explicit daily suppressions and lifecycle guards remain enforced above.
+        return true;
     }
     Document device(String id) { return mongo.findById(id, Document.class, DEVICES); }
     static String deliveryId(String owner, LocalDate day, String installation) { return owner + ":" + day + ":" + ReminderPolicy.TYPE + ":" + installation; }

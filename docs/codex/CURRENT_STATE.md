@@ -1,5 +1,15 @@
 # Learning Core Current State
 
+- 2026-10-08 — 사용자 승인 알림 전환 정책 반영. tracking-ready-at을 신서버 추적 준비 시각으로 재정의, 자정 대기 대신 현재 시각 비교. 과거 제출시각 누락 시험의 사용자 전체 제외 제거. 당일 완료·명시 suppression·탈퇴/병합/삭제 guard·권한·일일 중복 방지 유지. 단위608/알림 Mongo15 통과. Mongo는 실행 시 JAVA_TOOL_OPTIONS=-Dapi.version=1.44로 Docker API 호환 처리(설정 파일 변경 없음). 배포/실제 발송 미실행. 기존 문서·rollout 파일 변경 보존.
+
+- 2026-10-07 — TMI-198 알림 Notion API 명세 작성 완료. 사용자 지정 알림 페이지(3f2dcc5dbaeb806a991ed0bb0a625a3e)에 develop a77a53f 기준 PUT 등록/갱신·DELETE 해제, 헤더/필드 검증, 실제 성공/오류 JSON(result 생략), NOTIFICATION 전용 및 인증·계정 공통 코드, 앱 처리와 수신 payload를 정리했다. OS 권한·동기화·발송/완료 기준·무재발송·TTL과 테스트 실발송 OFF 상태는 핵심만 명시했다. 새로고침 후 6개 섹션·본문 끝 저장 확인. NotificationControllerTest 3개 통과. 로컬은 작업 기록만 추가, 기존 변경 보존, 코드/API/DB/배포/Jira 변경 및 commit/push 없음.
+
+- 2026-10-07 — 사용자 요청으로 main APP_UPDATE_REQUIRED를 true→false로 변경하고 tosunsaeng-learning-core:23 배포 완료. 기존 :22의 이미지89defb7 및 나머지 task 설정 동일, ECS COMPLETED/running1/pending0·ALB healthy·HTTPS health UP 확인. 테스트 서비스·Git·코드는 변경하지 않았다. 신규 Jira 없음, 실제 인증 summary 호출은 미수행.
+
+- 2026-10-07 — TMI-198 develop 테스트 재배포·알림 부분 활성화 완료. 커밋 a77a53f의 GitHub Actions 37573651836 성공 후 사용자 승인으로 test writer를 완전 중지하고 notification 12개 인덱스 apply/검증 완료(exit 0). 기존 receipts/devices/deliveries 0건. `tosunsaeng-learning-core-test:17`에서 기기 API·제출 추적 ON, sending OFF/dry-run true, APP_UPDATE_REQUIRED=false 적용. tracking-ready-at=2026-10-07T05:11:49.181835Z. 최종 ECS COMPLETED/desired1/running1/pending0, ALB healthy, HTTPS health 200/UP. 완료 receipt 72시간 TTL 준비 완료, 미완료 receipt/Session 완료시각 유지. 실제 발송은 FCM·탈퇴 lifecycle·하루 전체 추적·모바일 검증 전 OFF. 기존 task 설정 불변 확인, 운영 환경 미변경, commit/push 없음. 상세: docs/codex/deployment/NOTIFICATION_TEST_ROLLOUT_STATUS.md. 다른 작업에서 추가된 main 배포 기록은 보존했다.
+
+- 2026-10-07 — 사용자 명시 승인으로 main 89defb7만 원격 push하고 GitHub Actions 37573037552 배포 성공. 앱 LC main 서비스(tosunsaeng-learning-core-service, api-staging)의 task :20→:21 코드 배포 후 APP_UPDATE_REQUIRED=true만 추가한 :22로 재배포 완료. ECS COMPLETED/desired1/running1/pending0, ALB healthy, HTTPS health UP 및 기동 로그 오류 없음 확인. 다른 task 설정은 동일하며 develop/test 서비스·기존 웹 POC는 변경하지 않았다. 실제 인증된 summary 응답 검증은 미수행. 신규 Jira 없음.
+
 - 2026-10-07 — TMI-198 제출 receipt 72시간 TTL 구현 턴 기록 보완 완료. 최종 단위603개·알림 Mongo14개·migration Node4개 통과. 구현은 로컬 완료이며 원격 인덱스 적용·설정 활성화·재배포는 아직 수행하지 않았다.
 
 - 2026-10-07 — TMI-198 완료 시험 receipt 72시간 보존 구현 완료. 전체 최초 제출 완료와 같은 Transaction에서 해당 시험 영수증 expiresAt=완료시각+72시간을 설정하고 absolute TTL index를 추가했다. 미완료 시험은 무TTL, Session 완료 시각은 유지하며 완료 후 replay는 영수증 재생성/기한 연장 없이 반환한다. 전체 clean test, 알림 Mongo integration14개, migration Node4개와 diff check 통과. 기존 expiresAt 미설정 완료 영수증 backfill은 별도 검토 대상. 새 index 적용/배포와 APP_UPDATE_REQUIRED=false 설정은 미실행이며 기존 기록을 보존했다.
@@ -3001,3 +3011,17 @@
 - 별도 Jira 이슈 없이 현재 앱 API 구현을 확인했다. 문항 상세 조회는 회차별 `AzureResult.raw_data.azure_speech_result`를 `result.question.azureFeedback`으로 반환한다.
 - `azureFeedback`은 `PartResultDTO` 공개 필드이며 spoken word sequence, repeated word events, error counts, legend를 담는다. DTO가 null 필드를 생략하므로 Azure 데이터 삭제 후에는 기존 시험에서 해당 JSON 필드가 미포함될 수 있다.
 - 현재 프론트 코드가 실제로 필드를 소비하는지는 앱 프론트 저장소 확인 대상이며, 이 turn에서는 backend·DB·외부 시스템을 변경하지 않았다.
+
+## 인앱결제 SDK와 상품 등록 검토 (2026-10-07)
+
+- 신규 Jira 없음. Android 실제 결제는 Google Play Billing Library, iOS 실제 결제는 내장 StoreKit 연동이 필요하다. Google 콘솔 준비는 Billing 포함 빌드가 필요할 수 있고 Apple 상품 정보는 App Store Connect에서 먼저 등록할 수 있다. 최초 Apple 상품 심사는 앱 버전과 함께 제출한다.
+- 결제 SDK와 광고 설치·유입 측정 Analytics SDK는 별개다. 이번 작업은 설명·문서 갱신이며 결제 구현이나 배포·외부 설정 변경은 수행하지 않았다.
+
+## 결제·광고 측정 SDK 권장 구성 (2026-10-07)
+
+- Android: Play Billing Library + Firebase Analytics, Meta 광고 집행 시 Meta App Events SDK. iOS: StoreKit 2 + Firebase Analytics + Meta App Events SDK(FBSDKCoreKit).
+- Google Ads–Firebase 연결과 Meta 앱/이벤트·SKAdNetwork 설정이 별도로 필요하다. ATT는 추적/IDFA 사용 조건에 따라 적용하며 거절 시 사용자별 귀속에 제한이 있다. MMP는 선택 사항이다.
+- 신규 Jira 없음. SDK 실제 설치·광고 계정 설정·결제 구현 없이 설명만 수행했다. 최신 버전·세부 설정값은 이번 검색 오류로 미검증이다.
+- 안내 완료: 첫 실행·가입·시험 시작/완료·검증된 구매를 초기 측정 대상으로 권장했다. 자동/수동 구매 이벤트 중복을 방지하고 Billing 서버가 구매 검증·이용권 지급을 최종 판단한다. 실제 모바일 연동·실기기 광고 귀속 검증은 아직 수행하지 않았다.
+- 카카오톡 공유용으로 Android/iOS별 필요한 SDK 목록을 제공했다. 별도 Jira·실제 SDK 설치·구현 변경은 없다.
+- 공유용 목록 전달 완료와 현재 작업 종료 기록을 확인했다. 각 SDK의 목적 및 iOS 추가 설정 안내를 포함하며 구현 상태는 변경되지 않았다.

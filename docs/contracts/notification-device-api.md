@@ -2,6 +2,8 @@
 
 ## 핵심 계약
 
+- 2026-10-08 전환 정책: 구서버 제출 추적/종료를 기다리지 않는다. `app.notifications.tracking-ready-at`은 신서버 제출 추적 준비 시각이며, 해당 시각 이후 당일 21:00–21:15 KST에도 발송 가능하다. 과거 시험의 제출 완료 시각 누락만으로 사용자를 제외하지 않는다. 구앱에서 완료 후 신앱으로 전환한 사용자에게 일일 알림이 갈 수 있음은 허용한다. 확인된 당일 제출, 명시적 일일 suppression, 탈퇴·병합·삭제 guard, 기기 동의/활성 및 일일 중복 방지는 유지한다. 실제 발송 기본 OFF/dry-run ON과 기동 검증은 유지한다.
+
 - 신규 Learning Core API다. 기존 시험·회원가입·AI API는 변경하지 않는다.
 - TMI-63에 기재된 `PUT /api/v1/notifications/devices`와 body `installationId`, `platform`, `pushToken`을 사용한다. 일일 알림은 MEMBER만 발송하며 이 기기 API는 향후 채점 완료 알림의 GUEST 기기도 등록할 수 있다. 채점 완료 알림·재시도 자체는 구현하지 않았다.
 - 검증된 JWT의 `sub`와 `account_type`만 사용한다. MEMBER/GUEST 이외, claim 누락, Legacy 인증은 403이다. 요청·응답에 userId를 넣지 않는다.

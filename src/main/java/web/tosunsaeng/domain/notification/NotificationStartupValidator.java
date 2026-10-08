@@ -50,7 +50,7 @@ public class NotificationStartupValidator {
             throw new IllegalStateException("Notification API/sender requires JWT mode");
         if (p.isSendingEnabled()) {
             if (!p.isApiEnabled() || !p.isTrackingEnabled() || p.getTrackingReadyAt() == null)
-                throw new IllegalStateException("Notification sender requires API and fully drained submission tracking");
+                throw new IllegalStateException("Notification sender requires API and new-server submission tracking readiness");
             for (String flag : List.of("app.user-merged.writer-enabled", "app.user-merged.consumer-enabled", "app.user-merged.source-deny-enabled",
                     "app.user-withdrawn.consumer-enabled", "app.user-withdrawn.deny-gate-enabled"))
                 if (!env.getProperty(flag, Boolean.class, false)) throw new IllegalStateException("Notification sender requires lifecycle gates: " + flag);

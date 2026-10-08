@@ -14044,3 +14044,89 @@
 
 - 완료 시험의 문항별 제출 receipt에 완료시각+72시간 TTL을 설정하고, 미완료 receipt와 Session 완료 시각을 유지하는 구현 결과에 현재 턴 표식을 보완했다. 완료 후 replay는 만료 연장/영수증 재생성을 하지 않는다.
 - 최종 검증 수치는 전체 단위603개, 알림 Mongo integration14개, migration Node4개 통과다. CURRENT_STATE 갱신 및 과거 WORKLOG 보존, git diff --check와 표식 단일 출현 확인. 배포 전 새 TTL index 적용 및 과거 미설정 데이터 inventory가 필요하다. 추가 코드 수정·원격 DB/설정/배포·Jira·commit/push 변경 및 Secret/Token 기록 없음.
+
+## 2026-10-07 — main 앱 업데이트 안내 배포·활성화
+
+<!-- codex-turn:01a114ab-de0d-77c2-a39e-4dea9a17198c -->
+
+- 사용자 명시 승인으로 기존 독립 커밋 main 89defb7bd26d4ee4b9ac2018118911d616a05a20만 git push origin main:main 수행했다. 원격 기존 afa686c 대비 앱 업데이트 안내 코드·테스트 3파일 한 커밋이다. develop push·추가 코드 커밋·Jira 변경은 수행하지 않았다.
+- GitHub Actions 37573037552의 테스트·이미지 빌드·ECS 배포·HTTPS health 모두 성공했다. AWS 계정 889384901776/ap-northeast-2의 tosunsaeng-staging-cluster/tosunsaeng-learning-core-service를 확인했고 task :20에서 :21로 해당 이미지가 배포됐다.
+- 코드 배포 완료 후 현재 task를 복제해 APP_UPDATE_REQUIRED=true만 추가한 tosunsaeng-learning-core:22 등록·서비스 업데이트를 수행했다. 이미지·secret 참조·IAM·네트워크·나머지 환경변수/설정 불변을 메모리 비교로 확인했다. develop/test 서비스와 별도 웹 POC는 변경하지 않았다.
+- 최종 ECS rollout COMPLETED, desired1/running1/pending0, ALB healthy, https://api-staging.to-teacher.com/actuator/health UP 확인. :21/:22 기동 로그 표본에서 Started 확인·APPLICATION FAILED 없음·ERROR0·Exception 없음. 초기 unhealthy는 기동 후 healthy로 수렴했고 기존 태스크 연결 정리 대기 후 완료됐다. 실제 로그인 토큰을 이용한 summary 응답 E2E는 수행하지 않았으며 설정·배포 성공과 구분한다.
+- 신규 Jira 없음. CURRENT_STATE와 WORKLOG만 갱신하고 기존/동시 작업 기록을 보존했다. Secret/Token 원문 조회·기록 없음. 문서 diff check 수행, 문서는 별도 커밋하지 않는다.
+
+## 2026-10-07 — TMI-198 테스트 재배포와 알림 API·제출 추적 활성화
+
+<!-- codex-turn:01a114b4-d34d-7a83-ab2a-315db6e25a65 -->
+
+- 사용자 push 후 develop 직접 push 배포 gate가 skip되어 workflow_dispatch로 GitHub Actions 37573651836을 실행했다. 커밋 a77a53f907e3ee91528e1d14afe17a801fc6b42a의 unit/migration, Mongo replica-set integration, image build/push, ECS 배포 및 health 모두 성공했다. 코드 배포는 test revision 16이다.
+- 사용자가 API·제출 추적까지 ON과 테스트 일시 중지·인덱스 준비를 승인했다. 기존 테스트 준비 task의 execution role/secret reference/network로 격리 Fargate 작업을 실행해 dry-run exit 0(6 collections/12 indexes), receipts/devices/deliveries 0건을 확인했다. 보조 inventory의 최초 await 문법 오류는 async wrapper로 수정해 읽기 전용 재실행에 성공했다.
+- 테스트 서비스 desired 0과 기존 task STOPPED·남은 서비스 task 없음 확인 뒤 고정 커밋의 notification-prepare.js apply/사후 index 검증을 실행했다(exit 0, 12 indexes). DB 문서 삭제/backfill·발송·운영 환경 변경은 하지 않았다. 완료 receipt의 expiresAt absolute TTL과 Session 비만료 계약을 유지했다.
+- 기존 task를 보존 복제한 tosunsaeng-learning-core-test:17에 APP_UPDATE_REQUIRED=false 및 SPRING_APPLICATION_JSON의 tracking/API=true, sending=false, dry-run=true, tracking-ready-at=2026-10-07T05:11:49.181835Z를 설정했다. 빈 tags 필드로 최초 등록이 거절되어 이를 생략한 재요청에 성공했다. 중지 상태에서 revision 전환 후 안정화 확인 뒤 desired 1을 복원했다.
+- ECR test-a77a53f 태그 digest와 task image 일치, 요청된 두 환경변수 외 등록 가능 task 설정 불변을 검증했다. 최종 ECS COMPLETED/desired1/running1/pending0, ALB healthy, HTTPS health 200/UP, Started 로그와 startup failure/Exception 신호 없음 확인. container 자체 health UNKNOWN은 ALB health와 구분한다. 실제 회원 JWT 기기 등록·submit E2E와 실기기 FCM 발송은 하지 않았다.
+- 신규 런타임 코드·공개 API/AI/S3/Redis 계약 변경 없이 deployment 상태 문서·CURRENT_STATE·WORKLOG만 기록했다. 같은 작업 공간에서 다른 작업이 추가한 main 배포 기록을 보존했다. Secret/Token 원문 기록, 신규 IAM/credential, 운영 변경, Jira 상태 변경, commit/push 없음. 실제 발송 전 FCM/탈퇴 lifecycle/하루 전체 KST 추적/모바일 출시 gate가 남는다. git diff --check 및 현재 턴 표식 단일 출현을 확인한다.
+
+## 2026-10-07 — main 업데이트 안내 false 전환
+
+<!-- codex-turn:01a114d0-f9d0-7700-845a-13c665e71283 -->
+
+- 사용자 요청에 따라 AWS 계정889384901776/서울의 tosunsaeng-staging-cluster/tosunsaeng-learning-core-service를 확인하고 APP_UPDATE_REQUIRED=true인 정상 :22를 복제해 false만 변경한 :23을 등록·배포했다. 이미지89defb7 및 다른 등록 가능 task 설정 불변을 비교 확인했다. 테스트 서비스·기존 웹 POC·IAM·네트워크·시크릿은 변경하지 않았다.
+- 최종 ECS rollout COMPLETED/running1/pending0, ALB healthy, 공개 HTTPS api-staging /actuator/health UP 확인. 새 태스크 기동 로그에서 Started 확인, startup failed 없음/ERROR0. 초기 unhealthy는 기동 후 정상으로 수렴했고 이전 연결 drain 뒤 배포가 완료됐다. 실제 인증된 summary 응답 E2E는 미수행이다.
+- 신규 Jira 없음. 코드·Git commit/push·GitHub Actions 실행 없이 환경설정만 변경했다. 기존/동시 작업 기록을 보존해 CURRENT_STATE 갱신 및 WORKLOG EOF append, diff check와 표식 단일 출현 검증. Secret/Token 기록 없음.
+
+## 2026-10-07 — TMI-198 Notion 알림 API 명세 정리
+
+<!-- codex-turn:01a11535-add2-7611-ae7e-2faf584af123 -->
+
+- 사용자 지정 Notion 알림 페이지 https://app.notion.com/p/3f2dcc5dbaeb806a991ed0bb0a625a3e 의 빈 본문에 API 명세를 작성했다. 제목·다른 페이지·공유 권한은 유지했다. 브라우저 새로고침 뒤 공통/PUT/DELETE/오류/푸시/중요사항 6개 섹션과 본문 끝이 저장된 것을 확인했다.
+- develop a77a53f의 Controller/Store/Advice/BaseResponse/Security handler·계정 gate/FCM/ReminderPolicy 및 기존 계약을 대조했다. 요청 헤더·필수/조건부 필드·검증·JSON 예시, 성공 COMMON_200과 result 생략, NOTIFICATION_400/403/409/429/503 및 COMMON401/COMMON403·계정 공통 오류의 차이와 앱 처리를 정리했다. 실제 인증정보 대신 placeholder만 사용했다.
+- 핵심 주의사항은 설치 ID/secret 보관·계정 전환/로그아웃, PUT permission 생략 시 UNKNOWN, OS 권한 동기화, 회원/미시작 포함·제출 완료 기준·21:00~21:15 KST·무재발송, 완료 receipt72시간/발송 이력30일 TTL로 한정했다. 최근 테스트 배포 기준 기기 API/추적 ON과 실발송 OFF, FCM/탈퇴 연동·모바일 검증 후 별도 활성화 경계를 명시했다.
+- 검증: ./gradlew test --tests 'web.tosunsaeng.domain.notification.NotificationControllerTest' 성공(3 tests, 실패/오류0), Notion 저장·표·코드 블록 확인과 화면 증빙. 전체 빌드/통합/E2E는 문서 작업이므로 재실행하지 않았다. 실제 기기·FCM 검증 미수행을 문서에 구분했다. git diff --check 및 현재 marker 단일 출현을 확인한다.
+- 로컬 변경은 CURRENT_STATE와 WORKLOG 새 항목뿐이며 기존/동시 작업의 문서 diff와 배포 상태 파일은 보존했다. 런타임 코드·외부 API/AI/S3/Redis 계약·DB·배포·Jira 상태·commit/push 변경 없음. Secret/Token 기록 없음.
+
+## 2026-10-07 — Google·Apple 인앱결제 상품 등록과 SDK 구분
+
+<!-- codex-turn:01a11551-7141-75e0-9627-3db14f908b9d -->
+
+- Google Play Billing Library와 Apple의 내장 StoreKit 프레임워크가 실제 앱 구매 처리에 필요함을 설명했다. Google은 결제 라이브러리가 포함된 앱 빌드 업로드가 콘솔 설정 선행 조건이 될 수 있으며, Apple은 App Store Connect에서 상품 정보를 먼저 생성할 수 있으나 실제 구매에는 StoreKit 연동이 필요하다.
+- Apple 최초 인앱결제 상품 심사는 앱 버전과 함께 제출하는 흐름이며 상품 등록만으로 구매가 활성화되지는 않는다. 결제 연동과 광고 유입 측정용 Analytics SDK는 별개다.
+- 공식 Google Billing 준비/연동 및 Apple StoreKit/App Store Connect 문서를 근거로 안내했다. 신규 Jira 없음. 런타임·배포·외부 설정 변경 없이 문서만 갱신했으며 Secret/Token 기록 없음. 문서 변경은 git diff --check로 검증한다.
+
+## 2026-10-07 — 결제·Firebase Analytics·Meta 광고 SDK 정리
+
+- Android Play Billing Library, iOS StoreKit 2, 양 플랫폼 Firebase Analytics와 Meta App Events SDK의 목적을 구분했다. Meta iOS 기본 구성은 FBSDKCoreKit이며 Facebook Login은 광고 측정만으로 필요하지 않다.
+- Google Ads–Firebase 연결, Meta 앱 등록·이벤트 설정, SKAdNetwork 및 ATT/IDFA 조건을 SDK 설치와 구분했다. ATT 거절 시 개별 광고 귀속은 제한되며 SKAdNetwork 집계 측정과 구분한다. MMP는 선택적 대안이며 구매 이벤트 중복 방지가 필요하다.
+- 신규 Jira 없음. 공식 문서 링크를 안내하되 이번 웹 검색 도구가 오류로 응답하여 최신 SDK 버전과 세부 설정값은 검증하지 않았다. 문서만 갱신했으며 코드·배포·외부 설정 변경과 Secret/Token 기록 없음.
+
+## 2026-10-07 — 결제·광고 측정 SDK 안내 종료 기록
+
+<!-- codex-turn:01a11554-03cc-71e1-8223-927b5e6a5f12 -->
+
+- Android Play Billing Library와 iOS StoreKit 2, 양 플랫폼 Firebase Analytics 및 Meta App Events SDK를 목적별로 정리했다. iOS Meta 광고 측정에 FBSDKCoreKit을 사용하며 광고 측정만으로 Facebook Login SDK가 필요하지 않음을 안내했다.
+- Google Ads/Firebase 연결, Meta 앱·광고 계정·이벤트와 SKAdNetwork 설정, ATT 추적 동의와 사용자별 귀속 제한을 설명했다. 앱 첫 실행·가입·시험 시작/완료·검증된 구매 이벤트를 권장하고 구매 자동/수동 수집 중복 방지와 Billing 서버의 권리 지급 책임을 구분했다.
+- 신규 Jira 없음. 최신 SDK 버전·Meta 세부 설정값은 검색 도구 오류로 미검증이며 공식 문서 링크를 제공했다. SDK 설치·runtime·외부 계정·배포 변경 없이 문서만 갱신했다. 과거 기록 보존, Secret/Token 기록 없음. git diff --check와 현재 표식 단일 출현을 검증한다.
+
+## 2026-10-07 — 카카오톡 공유용 SDK 목록
+
+- 사용자 요청에 따라 Android/iOS별 결제·Firebase Analytics·Meta App Events SDK 목록만 간결하게 정리했다. iOS StoreKit 2는 내장 프레임워크임을 표시했다.
+- 신규 Jira 없음. SDK 설치·코드·배포 변경 없이 안내와 상태 문서만 갱신했다. Secret/Token 기록 없음.
+
+## 2026-10-07 — 카카오톡 공유용 SDK 목록 종료 기록
+
+<!-- codex-turn:01a11556-243a-7273-85fb-d979ce5e73ef -->
+
+- Android는 Play Billing Library·Firebase Analytics·Meta App Events SDK, iOS는 내장 StoreKit 2·Firebase Analytics·Meta App Events SDK(FBSDKCoreKit)를 카카오톡에 붙여 넣을 수 있는 목록으로 제공했다.
+- SKAdNetwork 설정과 추적 사용 시 ATT 처리, 광고 측정만을 위한 Facebook Login SDK 불필요를 간단히 덧붙였다. 신규 Jira 없음. 구현·설치·배포 변경 및 Secret/Token 기록 없음. 기존 기록을 보존하고 CURRENT_STATE 갱신과 문서 검증을 완료한다.
+
+## 2026-10-08 — 신서버 기준 일일 알림 전환 정책 구현
+
+<!-- codex-turn:01a119e8-04e9-7703-97cc-98cd8b80d6b4 -->
+
+- 날짜/브랜치: 2026-10-08, develop. 사용자 요청: 구서버 완료 미관측 알림 허용, 구 추적/종료 대기 없이 신서버 기준 발송.
+- 변경 파일: notification/DailyReminderWorker.java, NotificationProperties.java, NotificationStartupValidator.java, NotificationStore.java, NotificationTransitionTest.java, NotificationMongoIntegrationTest.java, docs/contracts/notification-device-api.md, CURRENT_STATE.md, WORKLOG.md.
+- 구현: 준비시각 이후 같은 날 발송 허용(발송시간 창 유지), 과거 submissionCompletedAt 누락만으로 전체 소유자 제외하는 query 제거. 준비시각 미설정/미래는 차단 유지.
+- 유지 계약: 공개 API/DTO, 신서버 당일 제출 완료 제외, MEMBER·권한/활성 기기·탈퇴/병합/삭제 guard·명시 일일 suppression·중복 claim/무재전송 불변. 데이터 backfill/시각 추정 없음.
+- 테스트: ./gradlew clean test 608개 통과(신규 정책 테스트5). 알림 mongoIntegrationTest 첫 실행은 Docker API1.32 대 최소1.40 불일치로 컨테이너 초기화 실패. JAVA_TOOL_OPTIONS=-Dapi.version=1.44로 동일 알림 suite 재실행15개 통과. 운영 외부 인프라 호출 없음. git diff --check 통과.
+- 위험/배포 전: 구앱 완료 후 신앱 전환 당일 알림 가능성은 사용자 허용. FCM·운영 인덱스·모바일 실기기 검증 및 신규 서버 추적 준비 시각 확인 필요. 실제 발송 활성화·배포 미실행.
+- 범위: 기존 CURRENT_STATE/WORKLOG 및 미추적 deployment/NOTIFICATION_TEST_ROLLOUT_STATUS.md는 다른 작업 변경으로 보존. 이번 예상 밖 제품 변경 없음. commit/push/Jira 변경 없음. Secret 미기록.
+- 다음 작업: 사용자 commit/push와 배포 뒤 등록/동의·완료 제외·탈퇴·중복 방지 실기기 확인. Jira 댓글 초안: 알림 전환 조건 완화 및 테스트608+15 통과, 운영 실발송 검증 별도(자동 등록 안 함).

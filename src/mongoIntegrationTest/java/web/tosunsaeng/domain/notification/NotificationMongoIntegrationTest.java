@@ -195,11 +195,13 @@ class NotificationMongoIntegrationTest {
                 .isInstanceOf(NotificationFailure.class);
         assertThat(store.device(id).getString("userId")).isEqualTo(OWNER);
     }
-    @Test void unknownLegacyExamAndActiveDeletionFailClosed() {
+    @Test void unknownLegacyExamDoesNotSuppressReminder() {
         String id = register(OWNER); session("legacy");
         mongo.updateFirst(Query.query(Criteria.where("_id").is("legacy")), Update.update("createdAt", Date.from(p.getTrackingReadyAt().minusSeconds(1))), "exam_sessions");
-        worker.tick(); assertThat(gateway.calls.get()).isZero();
-        mongo.remove(Query.query(Criteria.where("_id").is("legacy")), "exam_sessions");
+        worker.tick(); assertThat(gateway.calls.get()).isEqualTo(1);
+    }
+    @Test void activeDeletionStillFailsClosed() {
+        String id = register(OWNER);
         mongo.insert(new Document("_id", "delete").append("userId", OWNER).append("activeGuard", true), "learning_record_deletion_operations");
         worker.process(id); assertThat(gateway.calls.get()).isZero();
     }

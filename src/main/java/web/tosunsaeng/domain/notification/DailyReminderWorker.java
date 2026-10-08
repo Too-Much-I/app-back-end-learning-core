@@ -24,7 +24,7 @@ public class DailyReminderWorker {
             store.maintain(now, properties.getBatchSize());
             if (!properties.isSendingEnabled()) return;
             if (!ReminderPolicy.inWindow(now) || properties.getTrackingReadyAt() == null
-                    || properties.getTrackingReadyAt().isAfter(ReminderPolicy.start(ReminderPolicy.day(now))) || store.paused(now)) { cursor = null; return; }
+                    || properties.getTrackingReadyAt().isAfter(now) || store.paused(now)) { cursor = null; return; }
             var devices = store.candidates(cursor, properties.getBatchSize());
             if (devices.isEmpty()) { cursor = null; return; }
             for (var device : devices) {
