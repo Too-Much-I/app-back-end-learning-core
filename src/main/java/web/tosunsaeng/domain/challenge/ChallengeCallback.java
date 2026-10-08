@@ -32,8 +32,12 @@ public record ChallengeCallback(String callbackId, String attemptId, String jobI
             if ("completed".equals(outcome)) {
                 if (transcript == null || !("correct".equals(verdict) || "needs_improvement".equals(verdict))
                         || ("needs_improvement".equals(verdict) && corrected == null) || !feedback.isObject() || !error.isNull()) throw invalid();
-                result = new Result(transcript, verdict, corrected, new Feedback(text(feedback, "meaning", 500, true),
-                        text(feedback, "grammar", 500, true), text(feedback, "pronunciation", 500, true)));
+                if (feedback.has("meaning")) {
+                    result = new Result(transcript, verdict, corrected, new Feedback(text(feedback, "meaning", 500, true),
+                            text(feedback, "grammar", 500, true), text(feedback, "pronunciation", 500, true)));
+                } else {
+                    result = new Result(transcript, verdict, corrected, null, detailedFeedback(feedback, corrected));
+                }
             } else if ("no_speech".equals(outcome) || "failed".equals(outcome)) {
                 if (transcript != null || verdict != null || corrected != null || !feedback.isNull()) throw invalid();
                 if ("no_speech".equals(outcome)) { if (!error.isNull()) throw invalid(); result = new Result(null, null, null, null); }
@@ -48,6 +52,27 @@ public record ChallengeCallback(String callbackId, String attemptId, String jobI
                     sha256(semantic.getBytes(StandardCharsets.UTF_8)));
         } catch (ChallengeFailure e) { throw e; }
         catch (Exception e) { throw invalid(); }
+    }
+    private static DetailedFeedback detailedFeedback(JsonNode feedback, String corrected) {
+        String summary = text(feedback, "summary", 500, true);
+        String nestedCorrected = text(feedback, "correctedAnswer", 1000, false);
+        if (!Objects.equals(corrected, nestedCorrected)) throw invalid();
+        JsonNode items = required(feedback, "correctionItems");
+        if (!items.isArray()) throw invalid();
+        if (items.size() > 20) throw oversized();
+        List<CorrectionItem> corrections = new ArrayList<>();
+        for (JsonNode item : items) {
+            if (!item.isObject()) throw invalid();
+            String type = text(item, "type", 32, true);
+            String original = text(item, "original", 500, true);
+            String issue = text(item, "issue", 500, true);
+            String explanation = text(item, "explanation", 500, true);
+            String suggested = text(item, "suggested", 500, true);
+            String severity = text(item, "severity", 16, true);
+            if (!Set.of("low", "medium", "high").contains(severity)) throw invalid();
+            corrections.add(new CorrectionItem(type, original, issue, explanation, suggested, severity));
+        }
+        return new DetailedFeedback(summary, nestedCorrected, List.copyOf(corrections));
     }
     private static JsonNode required(JsonNode n, String field) { JsonNode value = n.get(field); if (value == null) throw invalid(); return value; }
     private static String text(JsonNode n, String field, int max, boolean mandatory) {

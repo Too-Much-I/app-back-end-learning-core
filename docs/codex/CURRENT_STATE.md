@@ -1,5 +1,22 @@
 # Learning Core Current State
 
+## 2026-10-08 — 챌린지 상세 교정 응답 구현 완료 (develop)
+
+<!-- codex-turn:01a11bdb-28b4-7a41-8e18-41c494d11f60 -->
+
+- 사용자 서버 변경 요청 및 AI도 새 형식으로 수정 예정이라는 확인에 따라 feedback.summary/correctedAnswer/correctionItems 수신·저장·응답 구현. 기존 부가 응답 필드, MEMBER/owner 검증, referenceAnswer snapshot, no_speech null, 기존 시험 계약 유지.
+- legacy 저장 결과/콜백 호환, 기존 semantic digest 동일성, Mongo 변환 및 상세 교정 검증 테스트 포함 clean test 624개 통과, diff --check 통과. AI 전체 콜백 fixture 추가. 임시 테스트 타입 추론 오류 수정 후 최종 성공.
+- AI/프론트 동시 계약 반영 필요: LC 먼저 배포, 그 뒤 AI 전환. envelope corrected_answer와 feedback.correctedAnswer 동일 값 필수. 기존 결과 correctionItems=[]; 새 교정 추정 생성 없음. 실제 AI E2E·배포 미실행.
+- 변경: ChallengeModels/Callback/Views, ChallengeDetailedFeedbackTest, 두 계약/fixture, 작업 기록. 기존 .DS_Store 및 문서 변경 보존. commit/push/Jira/외부 DB 변경 없음.
+
+- 2026-10-08 — 구 LC89defb7 callback 정적 조사: 병합 후 Session 조회는 target owner로 정상 insert. Session owner를 되돌리는 완료 갱신 없음. 단 source 조회→신 consumer migration commit→구 feedback/summary insert 경합이면 결과 userId만 source로 남을 수 있음. 이력은 Session→examId 조회라 즉시 소실 단정 불가. SpeechAce/Azure는 직접 owner 없음. 제품 수정·운영 재현·배포 없음; 최소 경합 보호 범위 추가 결정 필요.
+
+- 2026-10-08 — 구·신 전환 구현 조사: 기존 UserMergedMongoTransactionIntegration11개 통과, 병합 전후 callback 결과/summary 현재 소유자 보존 확인. 제품 수정 없음. 구 binary 최소 backport vs 최신 공통 코드 구앱 호환 적용 방식 사용자 선택 대기. 운영 혼재 E2E 미검증.
+
+- 2026-10-08 — 사용자 배포 승인으로 develop 3fda35b workflow_dispatch 실행37731404441 성공. CI 단위/마이그레이션·Mongo 통합, 이미지 빌드, ECS 안정화 및 api-test health 검사 모두 통과. 테스트 서비스 코드 배포만 수행, 알림 sending/dry-run 설정 별도 변경 없음. 실제 푸시 수신 E2E는 별도.
+
+- 2026-10-08 — 3fda35b 푸시 확인. Actions37731221798 전체 success이나 Test, build and deploy skipped. develop 직접 push는 병합 PR commit 조건 미충족으로 배포하지 않음. workflow_dispatch 허용 확인, 사용자 승인 전 수동 실행 없음. 실제 발송 설정 미변경.
+
 - 2026-10-08 — 사용자 승인 알림 전환 정책 반영. tracking-ready-at을 신서버 추적 준비 시각으로 재정의, 자정 대기 대신 현재 시각 비교. 과거 제출시각 누락 시험의 사용자 전체 제외 제거. 당일 완료·명시 suppression·탈퇴/병합/삭제 guard·권한·일일 중복 방지 유지. 단위608/알림 Mongo15 통과. Mongo는 실행 시 JAVA_TOOL_OPTIONS=-Dapi.version=1.44로 Docker API 호환 처리(설정 파일 변경 없음). 배포/실제 발송 미실행. 기존 문서·rollout 파일 변경 보존.
 
 - 2026-10-07 — TMI-198 알림 Notion API 명세 작성 완료. 사용자 지정 알림 페이지(3f2dcc5dbaeb806a991ed0bb0a625a3e)에 develop a77a53f 기준 PUT 등록/갱신·DELETE 해제, 헤더/필드 검증, 실제 성공/오류 JSON(result 생략), NOTIFICATION 전용 및 인증·계정 공통 코드, 앱 처리와 수신 payload를 정리했다. OS 권한·동기화·발송/완료 기준·무재발송·TTL과 테스트 실발송 OFF 상태는 핵심만 명시했다. 새로고침 후 6개 섹션·본문 끝 저장 확인. NotificationControllerTest 3개 통과. 로컬은 작업 기록만 추가, 기존 변경 보존, 코드/API/DB/배포/Jira 변경 및 commit/push 없음.

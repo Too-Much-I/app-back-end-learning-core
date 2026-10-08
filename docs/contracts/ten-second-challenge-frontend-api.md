@@ -545,9 +545,9 @@ AI 분석이 정상 완료된 응답:
         "verdict": "correct",
         "correctedAnswer": null,
         "feedback": {
-          "meaning": "문장의 핵심 의미를 정확하게 전달했어요.",
-          "grammar": "문법적으로 자연스러운 문장이에요.",
-          "pronunciation": "normally의 첫 음절을 조금 더 분명하게 발음해 보세요."
+          "summary": "문장의 핵심 의미를 정확하게 전달했어요.",
+          "correctedAnswer": null,
+          "correctionItems": []
         }
       }
     }
@@ -602,11 +602,13 @@ AI 분석이 정상 완료된 응답:
 | `verdict` | `correct`, `needs_improvement` 또는 null | `no_speech`에서 null | AI Callback |
 | `correctedAnswer` | string/null | correct·no-speech에서 null 가능 | AI Callback |
 | `feedback` | object/null | `no_speech`에서 null | AI Callback |
-| `feedback.meaning` | string | completed feedback에서 non-blank | AI Callback |
-| `feedback.grammar` | string | completed feedback에서 non-blank | AI Callback |
-| `feedback.pronunciation` | string | completed feedback에서 non-blank | AI Callback |
+| `feedback.summary` | string | completed feedback에서 non-blank | AI Callback; legacy는 기존 세 문장을 줄바꿈으로 연결 |
+| `feedback.correctedAnswer` | string/null | aiResult.correctedAnswer와 동일 | AI Callback |
+| `feedback.correctionItems` | array | 교정 없음 또는 legacy 결과는 [] | AI Callback |
 
-서버는 transcript·correctedAnswer를 각각 최대 1,000자, feedback 각 문장을 최대 500자로 보장한다.
+2026-10-08 변경: feedback은 위 세 필드로 반환한다. correctionItems 원소는 type/original/issue/explanation/suggested/severity이며 AI가 준 값을 그대로 반환한다. type은 문자열(예: GRAMMAR), severity는 low/medium/high다. 새 summary는 최대500자, 항목별 설명 문자열 최대500자, 배열 최대20개다. 기존 저장 결과의 summary는 기존 meaning/grammar/pronunciation을 순서대로 줄바꿈 연결하므로 최대1502자다. 서버가 교정 항목을 추정해서 만들지 않는다.
+
+transcript·correctedAnswer는 각각 최대1000자다. 기존 difficulty/submittedAt/gradedAt 및 aiResult.referenceAnswer/verdict/correctedAnswer는 유지한다. no_speech는 feedback=null, processing/failed는 기존 aiResult=null 규칙을 유지한다. 프론트는 신규 feedback 구조를 반영해야 한다. AI 서버 상세 feedback 계약과 reader-first 전환 순서는 [AI 계약 6.2](ten-second-challenge-ai-api.md#62-공통-callback-field)를 따른다.
 
 자동 재시도까지 모두 실패한 경우에도 같은 결과 조회 API가 HTTP 200을 반환한다.
 

@@ -202,6 +202,28 @@ Content-Type: application/json
 
 ### 6.2 공통 Callback field
 
+#### 2026-10-08 상세 교정 feedback 전환 계약
+
+사용자 요청에 따라 AI 생산자도 상세 교정을 제공하도록 변경한다. LC reader를 먼저 배포한 뒤 AI 생산자를 전환한다. endpoint/header/contract_version=v1 및 아래 공통 envelope는 유지한다. 이 배포의 새 completed feedback은 다음 camelCase 구조다(외부 envelope는 기존 snake_case 유지).
+
+```json
+{
+  "summary": "현재진행형을 사용해 주세요.",
+  "correctedAnswer": "She is wearing black shoes.",
+  "correctionItems": [
+    {"type": "GRAMMAR", "original": "wear", "issue": "현재진행형 필요", "explanation": "진행 중인 상태를 나타내요.", "suggested": "is wearing", "severity": "high"}
+  ]
+}
+```
+
+- summary 필수 non-blank 최대 500자. correctedAnswer 키 필수, null 또는 최대 1000자 non-blank 문자열이며 envelope corrected_answer와 정확히 일치해야 한다. verdict 및 corrected_answer의 기존 조건은 유지한다.
+- correctionItems 필수 배열(0~20개). 교정 없음은 []. 각 원소는 객체이며 예시의 여섯 키 모두 필수 non-blank 문자열이다. type은 최대32자 문자열(예: GRAMMAR), original/issue/explanation/suggested는 각각500자, severity는 low/medium/high다. 전체16KiB 제한이 우선한다.
+- 이전 meaning/grammar/pronunciation 구조도 수신 가능하다. meaning 키가 있으면 legacy로 해석하고 추가 필드를 무시한다. AI는 두 형식을 섞지 않는다. 아래 기존 completed 예시는 legacy 호환 입력이다.
+- 기존 callback의 semantic digest는 그대로 유지한다. 신규 상세 교정 값 변경은 다른 결과로 취급한다. 재전송은 같은 형식·값을 유지하고 동일 job의 이미 완료된 결과를 새 형식으로 다시 발행하지 않는다.
+- no_speech/failed의 null 조건, 인증, 재시도, stale/duplicate/conflict 처리는 변경하지 않는다. AI 생산자 구현 및 실연동 검증은 별도이며 이 문서 수정만으로 완료되지 않는다.
+
+전달용 전체 콜백 예시: [상세 교정 fixture](fixtures/ten-second-challenge-detailed-feedback.json). 실제 전송에서는 작업 식별자를 요청 값으로 교체한다. 이 fixture는 LC parser와 공개 응답 변환 테스트에서 검증한다. 구 LC로 롤백하면 신규 형식을 수신할 수 없으므로 AI도 legacy 발행으로 되돌려야 하며, 이미 처리한 작업 재전송의 형식은 바꾸지 않는다.
+
 | field | 형식 | 필수 | 설명 |
 | --- | --- | --- | --- |
 | `contract_version` | 문자열 | O | 고정값 `v1` |
@@ -232,7 +254,7 @@ Callback 크기 제한:
 - 길이 상한을 넘는 Callback은 `413 CALLBACK_PAYLOAD_TOO_LARGE`로 거절한다.
 - AI는 잘라낸 문장임을 나타내는 별도 suffix를 추가하지 않고, 의미가 완결된 범위 안에서 상한 이하로 생성한다.
 
-### 6.3 `completed`
+### 6.3 `completed` (legacy 입력 예시 — 신규 상세 교정은 6.2 참조)
 
 ```json
 {

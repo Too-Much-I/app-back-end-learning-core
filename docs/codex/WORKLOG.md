@@ -14130,3 +14130,55 @@
 - 위험/배포 전: 구앱 완료 후 신앱 전환 당일 알림 가능성은 사용자 허용. FCM·운영 인덱스·모바일 실기기 검증 및 신규 서버 추적 준비 시각 확인 필요. 실제 발송 활성화·배포 미실행.
 - 범위: 기존 CURRENT_STATE/WORKLOG 및 미추적 deployment/NOTIFICATION_TEST_ROLLOUT_STATUS.md는 다른 작업 변경으로 보존. 이번 예상 밖 제품 변경 없음. commit/push/Jira 변경 없음. Secret 미기록.
 - 다음 작업: 사용자 commit/push와 배포 뒤 등록/동의·완료 제외·탈퇴·중복 방지 실기기 확인. Jira 댓글 초안: 알림 전환 조건 완화 및 테스트608+15 통과, 운영 실발송 검증 별도(자동 등록 안 함).
+
+## 2026-10-08 — 푸시 이후 자동 배포 생략 확인
+
+<!-- codex-turn:01a119ed-8fa7-79a2-a57f-f21732d7abf3 -->
+
+- 날짜/브랜치: 2026-10-08, develop. 목표: 사용자 푸시 배포 상태 확인. 변경 파일: CURRENT_STATE.md/WORKLOG.md만.
+- 결과: 3fda35b Actions37731221798 전체success, 배포 job skipped. gate 소스는 develop merged PR commit만 push 배포, workflow_dispatch 허용.
+- 검증: gh run list/view와 workflow/gate 읽기, git diff --check. 제품 코드 변경 없어 Gradle 미실행. 기존 변경 보존, 예상 밖 제품 변경 없음.
+- 계약/위험/다음 작업: 이번 실행으로 서버 반영되지 않음. 승인된 수동 실행 또는 PR 병합 필요. 실제 알림 발송/배포/DB/IAM/commit/push/Jira 변경 없음. Secret 미기록. Jira 댓글 초안: 푸시 확인, 자동 배포 skipped로 배포 대기(자동 등록 없음).
+
+## 2026-10-08 — 승인된 알림 수정 테스트 배포 완료
+
+<!-- codex-turn:01a119ed-8fa7-79a2-a57f-f21732d7abf3 -->
+
+- 날짜/브랜치: 2026-10-08, develop. 목표: 사용자 배포 요청에 따른 테스트 배포. 변경 파일: CURRENT_STATE.md/WORKLOG.md, 제품 추가 변경 없음.
+- 수행: deploy-staging.yml workflow_dispatch ref develop, commit3fda35b0c799ac6d1f2c037a53442311551ab27f, run37731404441. branch routing으로 tosunsaeng-learning-core-test-service 대상.
+- 검증: CI 단위/마이그레이션·Mongo replica-set 통합 테스트, 이미지 빌드·업로드, ECS Deploy(wait-for-service-stability), Verify health 전부 success. 배포 job9분16초, gh run watch exit0.
+- 유지 계약/범위: 기존 task 기반 이미지 갱신 workflow 사용. 별도 환경변수·알림 sending/dry-run·DB/IAM 변경 없음. main 운영 배포 없음. 기존 문서 변경 보존, 예상 밖 제품 diff 없음. Secret/Token 미기록.
+- 위험/다음 작업: 실제 FCM 수신 E2E와 운영 rollout은 별도. Node action/runner deprecation 경고는 배포 실패 아님, 추후 유지보수 항목. diff 공백 검사. 사용자 git commit/push 작업 불침해. Jira 댓글 초안: 테스트 배포/health 성공, 실발송 검증 별도(자동 등록 안 함).
+
+## 2026-10-08 — 구·신 전환 구현의 기존 callback 회귀 검증
+
+<!-- codex-turn:01a11a09-4751-7210-aad8-1b3519e084e1 -->
+
+- 날짜/브랜치: 2026-10-08, develop. 목표: 기존 코드의 전환 안전장치와 적용 전략 확인. 변경 파일: CURRENT_STATE.md/WORKLOG.md만.
+- 확인/테스트: JAVA_TOOL_OPTIONS=-Dapi.version=1.44 ./gradlew mongoIntegrationTest --tests '*UserMergedMongoTransactionIntegrationTest' 11개 성공. 병합 전/후 도착 callback의 현재 owner 저장은 이미 구현됨. 기존 코드 분석으로 전체clean 대신 관련suite 실행.
+- 결정/위험: 구주소에 적용할 최소 backport와 최신 공통 코드 호환 방식은 사용자 선택 대기. 기존 구 binary에 자동 적용된 것이 아니며 실환경 양 주소 경합 미검증.
+- 유지 계약/다음: userId/examId 및 기존 callback 계약 변경 없음. 사용자 선택 후 구현, 이번 제품 수정·배포/DB/IAM/Jira 없음. 기존 변경 보존, 예상 밖 제품 변경 없음. Secret 미기록. Jira 초안: 기존 병합callback 회귀11개 통과, 전환 방식 결정 필요(미등록).
+
+## 2026-10-08 — 구 callback와 신 병합의 경합 정적 조사
+
+<!-- codex-turn:01a11a12-6915-7583-a6b1-84829b7b5144 -->
+
+- 날짜/브랜치: 2026-10-08, develop. 목표: 진행 채점이 병합 기록을 손상하는지 확인. 변경 파일: CURRENT_STATE.md/WORKLOG.md만.
+- 근거: 89defb7 ExamServiceImpl331~435는 Session 조회 당시 userId로 feedback/summary insert. SpeechAce/Azure661~775는 examId만 보유. 구 ExamSessionRepository53~56 완료는 status/active/completedAt만 갱신. 현재 UserMergedTransactionService119~121 owner migration, PROCESSED 중복은 DUPLICATE. ExamReadService65~104는 Session→examId 조회.
+- 결론/결정: 순차 처리 대부분 정상이고 Session 소유권 회귀 없음. source 조회→migration commit→insert 경합은 source userId 결과를 남길 수 있음. 이력 소실이나 전체 최신 코드 배포 필수로 단정하지 않음. 같은 UUID 승격과 타계정 병합 구분.
+- 테스트/결과: git show/현재 코드 정적 대조와 git diff --check. 문서만 변경하여 Gradle 미실행, 실제 구 binary 동시성 테스트/운영 DB 재현 없음. 직전 최신코드11개 통과는 구 writer 안전 증거 아님.
+- 유지 계약/위험/다음: 공개 API·AI user_id=examId 유지. metadata 경합 최소 보호 설계 시 단순 재조회만으로는 TOCTOU 미해결, 격리 재현·회귀 필요. 기존 변경 보존, 예상 밖 제품 변경 없음. 배포/DB/IAM/Jira/commit/push 없음.
+
+## 2026-10-08 — 챌린지 상세 교정 feedback 서버 구현
+
+<!-- codex-turn:01a11bdb-28b4-7a41-8e18-41c494d11f60 -->
+
+- 날짜/브랜치: 2026-10-08, develop. 목표: 사용자 예시 feedback 구조로 서버 수정. AI 생산자도 변경 예정임을 사용자 확인. 현재 Jira 지정 없음.
+- 변경 파일: src/main/java/web/tosunsaeng/domain/challenge/ChallengeModels.java, ChallengeCallback.java, ChallengeViews.java; src/test/java/web/tosunsaeng/domain/challenge/ChallengeDetailedFeedbackTest.java; docs/contracts/ten-second-challenge-ai-api.md, ten-second-challenge-frontend-api.md, fixtures/ten-second-challenge-detailed-feedback.json; docs/codex/CURRENT_STATE.md, WORKLOG.md.
+- 구현: 신규 DetailedFeedback/CorrectionItem 저장, camelCase 상세 feedback 검증 및 그대로 응답. legacy Result 4필드 생성·Mongo 읽기 호환. 새 저장 필드 null일 때 JSON 제외로 기존 semantic digest 보존. legacy summary는 세 문장 연결, correctionItems=[].
+- 결정/계약: 공개 feedback 구조만 교체하며 sibling 난이도/시각/referenceAnswer/verdict/correctedAnswer 유지. AI v1 envelope 유지, 신규 feedback와 기존 feedback 이중 reader. summary500/answer1000/설명500자, correctionItems20개/16KiB, severity low/medium/high 검증. envelope corrected_answer와 nested correctedAnswer 동일성 요구. type은 최대32자 문자열.
+- 유지: MEMBER·소유권, 제출 전 답안 비노출, no_speech, stale/duplicate/conflict 및 기존 시험/AI/S3/Redis 계약. 기존 콜백 의미 해시 재현 테스트 통과.
+- 테스트: 최초 clean test623개 통과. 전체 fixture 테스트 추가 중 assertThat generic 타입 추론 컴파일 오류 수정. 최종 ./gradlew clean test624개 통과(실패0), git diff --check 통과. Mock/로컬 Mongo converter만 사용, 실제 DB/AI/S3 호출 없음.
+- 위험/배포 전 확인: LC reader 선배포 후 AI 생산자 전환 및 프론트 신규 feedback 반영 필요. 구 binary로 롤백 시 신규 payload 수신 불가. 동일 작업 재전송의 형식은 변경 금지. 실제 AI 완료/no_speech/재전송 E2E 미검증.
+- 다음 작업: AI 담당자에게 fixture 및 6.2 계약 전달, frontend 반영 확인 후 배포/E2E. 사용자 기존 .DS_Store·작업 기록 변경 보존, 예상 밖 이번 변경 없음. 배포/commit/push/Jira 조작·Secret 기록 없음.
+- Jira 댓글 초안(미등록): 상세 교정 feedback 수신·저장·응답 및 legacy 호환 완료, 코드3개/테스트1개/계약·fixture 수정, 단위624개 성공. AI·프론트 배포와 실연동 검증 필요.

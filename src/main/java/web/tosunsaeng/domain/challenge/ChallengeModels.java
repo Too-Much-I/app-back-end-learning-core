@@ -6,6 +6,9 @@ import org.springframework.data.annotation.Version;
 import org.springframework.data.mongodb.core.mapping.Document;
 
 import java.time.Instant;
+import java.util.List;
+import com.fasterxml.jackson.annotation.JsonInclude;
+import org.springframework.data.annotation.PersistenceCreator;
 
 /** Internal persistence models; never serialize these as public responses. */
 public final class ChallengeModels {
@@ -15,7 +18,18 @@ public final class ChallengeModels {
     public record Question(int dayNumber, int questionNumber, String questionId, String korean,
                            String referenceAnswer, int difficulty) {}
     public record Feedback(String meaning, String grammar, String pronunciation) {}
-    public record Result(String transcript, String verdict, String correctedAnswer, Feedback feedback) {}
+    public record CorrectionItem(String type, String original, String issue, String explanation,
+                                 String suggested, String severity) {}
+    @JsonInclude(JsonInclude.Include.ALWAYS)
+    public record DetailedFeedback(String summary, String correctedAnswer, List<CorrectionItem> correctionItems) {}
+    public record Result(String transcript, String verdict, String correctedAnswer, Feedback feedback,
+                         @JsonInclude(JsonInclude.Include.NON_NULL) DetailedFeedback detailedFeedback) {
+        @PersistenceCreator
+        public Result {}
+        public Result(String transcript, String verdict, String correctedAnswer, Feedback feedback) {
+            this(transcript, verdict, correctedAnswer, feedback, null);
+        }
+    }
 
     @Document("challenge_10s_attempts") @NoArgsConstructor
     public static class Attempt {

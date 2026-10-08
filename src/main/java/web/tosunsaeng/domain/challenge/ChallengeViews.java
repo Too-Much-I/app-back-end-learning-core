@@ -24,7 +24,7 @@ public final class ChallengeViews {
                              String attemptStatus, String gradingStatus, Instant acceptedAt,
                              String referenceAnswer, boolean feedbackAvailable) {}
     @JsonInclude(JsonInclude.Include.ALWAYS)
-    public record AiResult(String referenceAnswer, String transcript, String verdict, String correctedAnswer, Feedback feedback) {}
+    public record AiResult(String referenceAnswer, String transcript, String verdict, String correctedAnswer, DetailedFeedback feedback) {}
     @JsonInclude(JsonInclude.Include.ALWAYS)
     public record Detail(int questionNumber, String promptKo, int difficulty, String attemptStatus,
                          String gradingStatus, Instant submittedAt, Instant gradedAt, String referenceAnswer, AiResult aiResult) {}
@@ -41,8 +41,17 @@ public final class ChallengeViews {
     public static Detail detail(Attempt a) {
         if (a == null || !a.terminal()) return null;
         Result r = a.result;
-        AiResult ai = r == null ? null : new AiResult(a.question.referenceAnswer(), r.transcript(), r.verdict(), r.correctedAnswer(), r.feedback());
+        AiResult ai = r == null ? null : new AiResult(a.question.referenceAnswer(), r.transcript(), r.verdict(), r.correctedAnswer(), feedback(r));
         return new Detail(a.questionNumber, a.question.korean(), a.question.difficulty(), "submitted",
                 a.gradingStatus, a.submittedAt, a.gradedAt, a.question.referenceAnswer(), ai);
+    }
+    private static DetailedFeedback feedback(Result result) {
+        if (result.detailedFeedback() != null) return result.detailedFeedback();
+        Feedback legacy = result.feedback();
+        if (legacy == null) return null;
+        // Historical feedback contains no per-error evidence: never fabricate correction items.
+        String summary = java.util.stream.Stream.of(legacy.meaning(), legacy.grammar(), legacy.pronunciation())
+                .filter(s -> s != null && !s.isBlank()).collect(java.util.stream.Collectors.joining("\n"));
+        return new DetailedFeedback(summary, result.correctedAnswer(), List.of());
     }
 }
