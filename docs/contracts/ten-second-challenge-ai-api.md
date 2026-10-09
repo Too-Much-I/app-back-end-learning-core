@@ -218,8 +218,8 @@ Content-Type: application/json
 
 - summary 필수 non-blank 최대 500자. correctedAnswer 키 필수, null 또는 최대 1000자 non-blank 문자열이며 envelope corrected_answer와 정확히 일치해야 한다. verdict 및 corrected_answer의 기존 조건은 유지한다.
 - correctionItems 필수 배열(0~20개). 교정 없음은 []. 각 원소는 객체이며 예시의 여섯 키 모두 필수 non-blank 문자열이다. type은 최대32자 문자열(예: GRAMMAR), original/issue/explanation/suggested는 각각500자, severity는 low/medium/high다. 전체16KiB 제한이 우선한다.
-- 이전 meaning/grammar/pronunciation 구조도 수신 가능하다. meaning 키가 있으면 legacy로 해석하고 추가 필드를 무시한다. AI는 두 형식을 섞지 않는다. 아래 기존 completed 예시는 legacy 호환 입력이다.
-- 기존 callback의 semantic digest는 그대로 유지한다. 신규 상세 교정 값 변경은 다른 결과로 취급한다. 재전송은 같은 형식·값을 유지하고 동일 job의 이미 완료된 결과를 새 형식으로 다시 발행하지 않는다.
+- 이전 meaning/grammar/pronunciation 구조도 수신 가능하다. meaning 키가 있으면 legacy로 해석한다. 선택 correctionItems 확장 배열이 있으면 상세 형식과 동일한 항목 검증 후 DB의 detailedFeedback에도 보존한다. summary는 기존 세 문장을 줄바꿈으로 연결하고 correctedAnswer는 envelope corrected_answer를 사용한다. 목록 미제공은 null, 명시적 빈 배열은 []로 구분하며 명시적 null/잘못된 배열은 거절한다. 그 밖의 알 수 없는 추가 필드는 무시한다. AI는 두 summary/meaning 형식을 섞지 않는다.
+- correctionItems 없는 기존 callback의 semantic digest는 그대로 유지한다. 확장 배열/상세 교정 값은 digest에 포함해 변경 시 다른 결과로 취급한다. reader 배포 전 무시됐던 확장 배열의 재전송은 기존 digest와 충돌할 수 있으므로 reader-first로 신규 job부터 생산자를 전환한다. 재전송은 같은 형식·값을 유지하고 동일 job의 이미 완료된 결과를 새 형식으로 다시 발행하지 않는다. 과거 유실된 목록은 자동 복원하지 않는다.
 - no_speech/failed의 null 조건, 인증, 재시도, stale/duplicate/conflict 처리는 변경하지 않는다. AI 생산자 구현 및 실연동 검증은 별도이며 이 문서 수정만으로 완료되지 않는다.
 
 전달용 전체 콜백 예시: [상세 교정 fixture](fixtures/ten-second-challenge-detailed-feedback.json). 실제 전송에서는 작업 식별자를 요청 값으로 교체한다. 이 fixture는 LC parser와 공개 응답 변환 테스트에서 검증한다. 구 LC로 롤백하면 신규 형식을 수신할 수 없으므로 AI도 legacy 발행으로 되돌려야 하며, 이미 처리한 작업 재전송의 형식은 바꾸지 않는다.
@@ -307,7 +307,7 @@ Callback 크기 제한:
 - Learning Core는 Job을 `COMPLETED`로 저장한다.
 - 공개 `gradingStatus=completed`로 projection한다.
 - 프론트 공개 `feedbackType` enum은 추가하지 않는다.
-- 2026-10-09 공개 응답 변경: 프론트 `aiResult`는 {"transcript":null,"feedback":null}이며 snapshot 참고 답안은 `question.referenceAnswer`에만 포함한다. AI Callback의 verdict/corrected_answer 및 null 조건은 변경하지 않는다.
+- 2026-10-09 공개 응답 변경: 프론트 `aiResult`는 {"transcript":null,"feedback":{"summary":null,"correctedAnswer":null,"correctionItems":null}}이며 snapshot 참고 답안은 `question.referenceAnswer`에만 포함한다. AI Callback의 verdict/corrected_answer 및 feedback=null 조건은 변경하지 않는다.
 - 사전 정의 답안은 AI가 Callback으로 echo하지 않는다. Learning Core가 DB 콘텐츠 snapshot에서 조립하므로 no-speech에서도 그대로 유지된다.
 - 프론트에는 transcript가 null인 경우의 고정 발화 없음 안내와 참고 답안을 제공한다.
 

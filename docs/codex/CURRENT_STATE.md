@@ -1,5 +1,89 @@
 # Learning Core Current State
 
+## 2026-10-09 — 피드백 null 객체·교정 목록 저장 수정 완료/미배포
+
+<!-- codex-turn:01a11fa9-b30f-73f0-82e2-8a6c3b59e868 -->
+
+- aiResult가 존재하면 feedback는 항상 summary/correctedAnswer/correctionItems 객체이며 내용 없을 때 세 값 null. 결과 자체가 없는 aiResult=null은 유지한다.
+- AI legacy+correctionItems 입력도 검증 후 detailedFeedback에 저장해 재조회/응답에 보존한다. 기존 상세 형식과 목록 없는 legacy 호환 유지. 기존 완료 job의 유실 목록 자동 복원은 하지 않는다.
+- LC clean test640개·Mongo통합138개 성공, 양 저장소 diff check 성공. 테스트는 로컬 격리 Mongo만 사용, 운영 DB/실제 AI 조회·쓰기 없음.
+- 제품2개/테스트4개/계약2개와 양 저장소 작업 기록 수정. 기존/동시 변경 보존, 예상 밖 이번 변경 없음. commit/push/배포 미실행.
+- 배포 전: 프론트 feedback==null 판정 수정, LC reader 먼저 배포 후 AI 신규 job 검증. 이미 무시됐던 확장 목록의 기존 job 재전송은 digest 충돌 가능. 실제 AI E2E는 별도.
+
+
+## 2026-10-09 — prod 보류 원인 확인/AWS 콘솔 복원
+
+- Chrome 종료로 AWS 콘솔 연결이 끊겨 prod 새버전 배포 시작 전에 보류된 것이며 서버 정지는 아니다. CLI NoCredentials 재확인.
+- 사용자 Chrome 재열기 후 AWS prod 콘솔 연결 복원. 현재 prod4, 1실행/0보류, 배포완료1건, ALB1정상/0비정상. 이번은 원인 확인 요청이므로 prod 배포 재개 없이 읽기/기록만 수행. 신규 Jira 없음.
+
+## 2026-10-09 — 배포 중단 대상 정정/상태 재확인
+
+- Identity 테스트 자동 배포는 취소하지 않았으며 Actions37885862047 completed/success로 14:01 KST 완료했다. commit4842d6c2. 멈춘 대상은 아직 시작하지 않은 prod 새버전 배포다.
+- test/prod 공개 health UP 재확인; prod는 기존 버전이며 새배포 성공 증거 아님. 이번 read-only 상태 확인과 기록만 수행, 제품·배포·설정 변경 없음. 신규 Jira 없음.
+
+## 2026-10-09 — Identity Apple 변경 test 배포 성공/prod 대기
+
+- 이번 한정 사용자 승인으로 Identity 변경7개 파일만4842d6c2 commit/push develop. Actions37885862047 전체 성공, identity-test:35 배포 완료/health200UP. 다른 dirty 작업 보존, 신규 Jira 없음.
+- prod4는 기존57192f45 이미지 유지. AWS CLI credential 없음·Chrome 종료로 콘솔 연결 상실; prod 새배포는 아직 안 했고 AWS Chrome 재열기를 요청했다. main은 구staging 대상으로 확인되어 push/merge 안 함.
+- LC runtime·다른 서비스·prod 설정/DB/IAM 변경 없음. 이번 LC 변경은 작업 기록뿐이다. 다음은 AWS 연결 복원 후 검증된 동일 이미지로 prod 배포와 최종stable/healthy/UP 확인. Apple 실기기E2E는 별도다.
+
+## 2026-10-09 — 프론트 Apple 철회 전제 Identity 정합화 완료/미배포
+
+- 이전 Identity code 필수/최근5분 Apple 재인증/서버 철회 구현만 회수하고 Apple CLIENT_MANAGED 전제로 기존 Firebase 삭제와 identity release가 이어지도록 수정했다. API·소유권 계약 불변, 서버 독립 철회 증명 없음.
+- Identity 전체 clean test1311개(실행1305/skip6), 실패·오류0. 최신 계약은 Identity docs/contracts/apple-withdrawal-token-revocation.md. LC runtime 변경 없이 기록만 갱신, 기존/동시 작업 보존.
+- iOS 확인 소스는 프론트 수정 불필요. Android Apple unsupported·설치앱 최종 CLEANED/재가입 E2E·기존 보류 건 별도 복구가 남는다. 이번 commit/push/배포·운영 데이터 변경 없음. 신규 Jira 없음.
+
+## 2026-10-09 — 프론트 Apple 철회 구현 확인/서버 정합화 필요
+
+- app-front-end main526c877 고정 소스에서 iOS Apple 창→authorization code→Firebase revokeToken→서버 withdraw 호출을 확인했다. 화면 hook→auth runtime→withdrawal flow→실제 SDK/API 연결까지 대조했다. 설치된 앱/실기기 검증은 아니다.
+- 프론트는 code를 서버에 보내지 않고 Firebase 최근 재인증도 하지 않는다. 앞서 Identity에 추가한 code 필수·5분 Apple 재인증·server revoke 경로는 현재 앱과 충돌한다. iOS 중복 철회는 필요 없지만 기존 Apple cleanup 보류/완료 증거 계약 정합화는 필요하다.
+- Android는 SDK 철회 unsupported를 반환해 건너뛴다. 팀원 확인은 사용자 보고이며 플랫폼별 완료를 확대하지 않는다. 이번 runtime/외부 설정/배포 변경·신규 Jira 없음.
+- 프론트 확인 턴의 종료 표식을 기록했다. iOS client-managed 철회에 맞춘 서버 정합화는 후속 구현이며 아직 변경하지 않았다.
+
+## 2026-10-09 — Apple code 없는 처리 가능성 확인
+
+- 현재 서버 구현은 Apple 연결 회원의 appleAuthorizationCode 필수이며 Firebase ID Token/UID만으로 대체하지 않는다. Apple access/refresh credential을 별도로 확보·보관하는 방식은 별도 설계이며 현재 미구현이다.
+- 모바일 SDK 철회로 요청 필드를 없앨 수는 있으나 앱 내부 code 확보와 서버 확인 증거 계약 변경이 필요하다. 사용자 질문만으로 현재 구현을 변경하지 않았다. 신규 Jira·runtime·배포 변경 없음.
+- 현재 작업 종료 표식 기록을 보완했다. 대안은 설명 상태이며 구현 방향 전환이나 활성화는 수행하지 않았다.
+
+## 2026-10-09 — Identity Apple 탈퇴 수정 완료/연동 대기
+
+- 사용자 요청으로 Identity에 Apple 재인증 code의 Firebase 승인 철회와 server-confirmed timestamp 기록·cleanup 이어가기 구현. 신규 Jira 없음. LC runtime/외부 계약 변경 없음.
+- Identity 전체1321개 테스트 중 실패/오류0·skip6, diff check 성공. 실제 배포/flag 활성화는 미실행이며 모바일 appleAuthorizationCode 전달과 Firebase API key/OAuth code flow·실기기 E2E가 필요하다. 기존 증거 없는 Apple 보류 건은 자동 repair하지 않는다.
+- 상세 프론트·배포 인계: /Users/msde76/identity/docs/contracts/apple-withdrawal-token-revocation.md. 기존/동시 배포 작업 기록과 사용자 변경을 보존했다.
+
+## 2026-10-09 — 챌린지 수정 test·prod 병렬 배포 완료
+
+<!-- codex-turn:01a11ee8-645f-7d21-95ba-7593899095a6 -->
+
+- 사용자 병렬 배포 요청 및 이번 한정 commit/push 승인. CI37883824730은 삭제된 Detail.submittedAt() 통합 테스트 참조로 이미지 생성 전 실패했다.
+- ChallengeMongoIntegrationTest1개만 수정해 c766d54로 develop 푸시. clean test632개/통합 테스트 컴파일 통과, 로컬 Docker API 호환 옵션 api.version=1.44로 Mongo 통합136개 성공. 최초 API1.32 불일치 초기화 실패와 구분한다.
+- CI37884298904 전체 성공. test21·prod5에 동일 c766d54 digest43c9284e 적용 완료. 단일 PRIMARY/COMPLETED, desired/running/pending1/1/0, ALB 단일 healthy, 공개 health200/UP 및 기동 로그 ERROR0. 이전 target/배포 정리 완료.
+- 양 환경 definition 비교 결과 image만 변경. 설정·Secret·역할·네트워크·Identity·AI·구운영 불변. topology Node4개와 양 저장소 diff check 통과. 기존/동시 변경 보존, 예상 밖 이번 변경 없음. 실제 AI/프론트 E2E와 앱 새 응답 확인은 남아 있다. 배포 기록은 로컬 변경으로 유지한다.
+
+## 2026-10-09 — Apple 탈퇴 연결 해제 확인
+
+- 사용자가 다른 앱 준비 항목은 팀원이 확인했다고 보고했다. 이번에는 Apple 탈퇴만 코드 확인했다.
+- Identity cleanup adapter는 Apple provider가 있으면 PROVIDER_OBLIGATION_REQUIRED로 중단하며 Apple 승인 토큰 revoke 미구현이다. worker가 Firebase delete 전에 이를 호출하므로 외부 계정 삭제가 보류될 수 있다.
+- Apple 로그인 탈퇴에 필요한 승인 철회 연동은 별도 보완 대상이다. Apple ID 삭제·이용권 취소와는 별개이며 Firebase deleteUser만으로 충족했다고 보지 않는다. 신규 Jira·구현·배포 변경 없이 설명/기록만 수행했다.
+- 현재 턴 종료 표식 기록 완료. 모바일 Apple 철회 구현 여부와 Identity cleanup 성공 증거 연결은 미검증이며 다음 확인 대상이다.
+- 미구현 영향 추가 확인: 내부 탈퇴·Session 폐기는 선행하지만 Apple obligation에서 Firebase 삭제/외부 cleanup 완료가 중단되고 reconciliation 대상으로 남는다. 로그인·시험 자체 장애와 구분한다. 실제 운영 계정 상태는 미조회, 신규 Jira/구현/배포 변경 없음.
+- 이번 영향 분석 종료 기록 완료. PROVIDER_OBLIGATION_REQUIRED는 non-retryable이므로 단순 자동 재시도나 설정 활성화로 해결되지 않는다.
+
+## 2026-10-09 — 앱 전체 잔여 설정 확인 및 알림 상태 정정
+
+- 신규 prod의 10월8일 Identity 준비 기록상 FCM 연결·실제 발송 ON/dry-run false다(TMI-198). 앞선 테스트 OFF 기록을 신규 prod에 확대하지 않는다. 실기기 수신 및 현재 AWS runtime은 이번에 재검증하지 않았다.
+- 앱 범위 잔여는 게스트 병합 발행 활성화/수신 E2E(TMI-125), Billing·스토어 기간제 상품/구매 검증·phone 무료 claim와 LC saga/continuation/reconciliation/AttemptGroup 연동(TMI-116 등), 신규 prod 삭제 스키마/권한/fence/worker 준비(TMI-193)다. 테스트 활성화와 운영 활성화는 별개다.
+- 신규 prod 로그인·챌린지·일반 탈퇴는 활성 기록이 있으나 전체 앱 E2E 미완료. Apple 탈퇴 provider obligation은 미구현으로 별도 보완 필요. 모바일 결제/Analytics/Meta SDK와 스토어·광고 계정 준비는 확인 대상이다.
+- 이번 작업은 문서 기반 읽기 전용 확인이며 flag·배포·DB·Jira·commit/push 변경 없음.
+
+## 2026-10-09 — 최신 수정 추가 설정·배포 확인
+
+- develop 055d491의 챌린지 상세 결과 필드/null 수정은 새 설정·DB migration 없이 이미지 배포로 적용된다. GitHub Actions37883144327은 success이나 배포 job skipped이므로 최신 테스트 배포 완료 증거가 아니다.
+- 테스트/prod 배포 요청은 아직 완료하지 않았다. 이전 운영 확인은 prod4/1da0d09이며 이번에는 AWS runtime을 재조회하지 않았다.
+- TMI-198 테스트 알림은 마지막 rollout 기록상 기기 API/추적 ON, 발송 OFF/dry-run true. 실제 발송은 FCM/APNs·모바일·lifecycle readiness 확인 후 별도 활성화 대상이다. 현재 AWS 설정을 직접 확인한 것은 아니다.
+- 이 턴은 읽기 전용 확인과 문서 갱신이며 deployment dispatch·feature 변경·commit/push는 없다.
+
 ## 2026-10-09 — 챌린지 상세 응답 필드 완전 일치·null 규칙 수정 완료
 
 <!-- codex-turn:01a11ed8-b6ad-7280-90d8-1cf456d9f6a8 -->

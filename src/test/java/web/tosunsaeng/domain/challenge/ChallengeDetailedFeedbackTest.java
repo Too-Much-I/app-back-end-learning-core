@@ -15,6 +15,48 @@ import static web.tosunsaeng.domain.challenge.ChallengeContractTest.*;
 import static web.tosunsaeng.domain.challenge.ChallengeModels.*;
 
 class ChallengeDetailedFeedbackTest {
+    static Map<String, Object> extendedLegacy() {
+        var f = new LinkedHashMap<String, Object>();
+        f.put("meaning", "의미 피드백"); f.put("grammar", "문법 피드백"); f.put("pronunciation", "발음 피드백");
+        f.put("correctionItems", List.of(item()));
+        return rich(f);
+    }
+    @Test void extendedLegacyItemsSurviveMongoRoundTripAndResponse() throws Exception {
+        var expected = parse(extendedLegacy()).result();
+        var context = new MongoMappingContext(); context.afterPropertiesSet();
+        var converter = new MappingMongoConverter(NoOpDbRefResolver.INSTANCE, context); converter.afterPropertiesSet();
+        var stored = new Document(); converter.write(expected, stored);
+        var a = attempt(); a.state = State.SUBMITTED; a.result = converter.read(Result.class, stored);
+        assertThat(a.result).isEqualTo(expected);
+        var view = ChallengeViews.detail(a).aiResult().feedback();
+        assertThat(view.summary()).isEqualTo("의미 피드백\n문법 피드백\n발음 피드백");
+        assertThat(view.correctedAnswer()).isEqualTo("She is wearing black shoes.");
+        assertThat(new ObjectMapper().<com.fasterxml.jackson.databind.JsonNode>valueToTree(view.correctionItems()))
+                .isEqualTo(new ObjectMapper().valueToTree(List.of(item())));
+    }
+    @Test void extendedLegacyEmptyItemsArePreservedAndRetriesAreStable() throws Exception {
+        var n = extendedLegacy(); var first = parse(n).digest();
+        n.put("callback_id", UUID.randomUUID().toString());
+        assertThat(parse(new TreeMap<>(n)).digest()).isEqualTo(first);
+        @SuppressWarnings("unchecked") var f = (Map<String, Object>) n.get("feedback");
+        f.put("correctionItems", List.of());
+        assertThat(parse(n).result().detailedFeedback().correctionItems()).isEmpty();
+        assertThat(parse(n).digest()).isNotEqualTo(first);
+        f.remove("correctionItems");
+        assertThat(parse(n).result().detailedFeedback()).isNull();
+    }
+    @ParameterizedTest @ValueSource(strings = {"type", "original", "issue", "explanation", "suggested", "severity"})
+    void extendedLegacyValidatesItemsAndIncludesEveryFieldInDigest(String field) throws Exception {
+        var n = extendedLegacy(); var digest = parse(n).digest();
+        @SuppressWarnings("unchecked") var f = (Map<String, Object>) n.get("feedback");
+        var i = item(); i.remove(field); f.put("correctionItems", List.of(i));
+        assertInvalid(n, 400);
+        i.put(field, field.equals("severity") ? "low" : "Changed");
+        assertThat(parse(n).digest()).isNotEqualTo(digest);
+        f.put("correctionItems", null); assertInvalid(n, 400);
+        f.put("correctionItems", Map.of()); assertInvalid(n, 400);
+        f.put("correctionItems", Collections.nCopies(21, item())); assertInvalid(n, 413);
+    }
     @Test void sharedAiFixtureIsAcceptedAndProjectedWithoutLosingItems() throws Exception {
         byte[] bytes = java.nio.file.Files.readAllBytes(java.nio.file.Path.of(
                 "docs/contracts/fixtures/ten-second-challenge-detailed-feedback.json"));

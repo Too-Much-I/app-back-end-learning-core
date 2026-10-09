@@ -48,7 +48,7 @@ public final class ChallengeViews {
     private static DetailedFeedback feedback(Result result) {
         if (result.detailedFeedback() != null) return result.detailedFeedback();
         Feedback legacy = result.feedback();
-        if (legacy == null) return null;
+        if (legacy == null) return new DetailedFeedback(null, null, null);
         // Historical feedback contains no per-error evidence: never fabricate correction items.
         String summary = java.util.stream.Stream.of(legacy.meaning(), legacy.grammar(), legacy.pronunciation())
                 .filter(s -> s != null && !s.isBlank()).collect(java.util.stream.Collectors.joining("\n"));

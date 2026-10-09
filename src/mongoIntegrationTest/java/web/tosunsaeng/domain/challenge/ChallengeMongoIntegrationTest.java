@@ -84,6 +84,34 @@ class ChallengeMongoIntegrationTest {
         if (outcome.equals("failed")) body.put("error", Map.of("code", "MODEL_UNAVAILABLE", "retryable", true));
         try { return ChallengeCallback.parse(ChallengeCallback.JSON.writeValueAsBytes(body), "v1"); } catch (Exception e) { throw new AssertionError(e); }
     }
+    @ParameterizedTest @ValueSource(booleans = {false, true})
+    void detailedAndExtendedLegacyItemsPersistAndConflictingRetryCannotOverwrite(boolean legacy) throws Exception {
+        String id = submitted();
+        var body = (com.fasterxml.jackson.databind.node.ObjectNode) ChallengeCallback.JSON.readTree(
+                java.nio.file.Files.readAllBytes(java.nio.file.Path.of("docs/contracts/fixtures/ten-second-challenge-detailed-feedback.json")));
+        body.put("attempt_id", id); body.put("job_id", Job.id(id, 1));
+        if (legacy) {
+            var items = body.path("feedback").get("correctionItems");
+            var feedback = body.putObject("feedback");
+            feedback.put("meaning", "의미 피드백"); feedback.put("grammar", "문법 피드백"); feedback.put("pronunciation", "발음 피드백");
+            feedback.set("correctionItems", items);
+        }
+        var callback = ChallengeCallback.parse(ChallengeCallback.JSON.writeValueAsBytes(body), "v1");
+        callbacks.accept(callback);
+        var stored = store.attempt(id);
+        assertThat(stored.result).isEqualTo(callback.result());
+        assertThat(stored.result.detailedFeedback().correctionItems()).isNotEmpty();
+        var response = (ChallengeViews.Results) service.results(OWNER, "2026-09-07", 1);
+        assertThat(response.question().aiResult().feedback()).isEqualTo(callback.result().detailedFeedback());
+        callbacks.accept(callback);
+        assertThat(mongo.count(new Query(), CallbackReceipt.class)).isEqualTo(1);
+        ((com.fasterxml.jackson.databind.node.ObjectNode) body.path("feedback").path("correctionItems").get(0))
+                .put("explanation", "Changed fixture");
+        var conflicting = ChallengeCallback.parse(ChallengeCallback.JSON.writeValueAsBytes(body), "v1");
+        assertThatThrownBy(() -> callbacks.accept(conflicting)).isInstanceOfSatisfying(ChallengeFailure.class,
+                e -> assertThat(e.status).isEqualTo(409));
+        assertThat(store.attempt(id).result).isEqualTo(callback.result());
+    }
     @Test void oneTimeBaseDateAndNonCyclicCatalog() {
         clock.at(NOW.plusSeconds(86400)); catalog.initialize();
         assertThat(catalog.baseDate()).isEqualTo(LocalDate.parse("2026-09-07"));

@@ -564,7 +564,11 @@ AI 분석이 정상 완료된 응답:
       "referenceAnswer": "I usually take the bus to work.",
       "aiResult": {
         "transcript": null,
-        "feedback": null
+        "feedback": {
+          "summary": null,
+          "correctedAnswer": null,
+          "correctionItems": null
+        }
       }
     }
   }
@@ -574,15 +578,15 @@ AI 분석이 정상 완료된 응답:
 2026-10-09 사용자 확정: 상세 응답은 예시와 동일한 필드 집합으로 반환한다. question은 questionNumber/promptKo/attemptStatus/gradingStatus/referenceAnswer/aiResult만 포함하며, aiResult는 transcript/feedback만 포함한다. difficulty/submittedAt/gradedAt 및 aiResult.referenceAnswer/verdict/상위 correctedAnswer는 제거한다. 문제 조회·제출 API와 내부 저장 모델/AI callback은 변경하지 않는다.
 
 - referenceAnswer는 question에만 있으며 attempt snapshot을 사용한다. 제출 전 답안은 노출하지 않는다.
-- no_speech는 gradingStatus=completed, aiResult={"transcript":null,"feedback":null}이다.
-- AI 결과 자체가 없으면 aiResult=null. feedback 전체가 없으면 feedback=null이며 임의의 교정 객체를 생성하지 않는다.
+- no_speech는 gradingStatus=completed, aiResult={"transcript":null,"feedback":{"summary":null,"correctedAnswer":null,"correctionItems":null}}이다.
+- AI 결과 자체가 없으면 aiResult=null은 유지한다. aiResult가 존재하면 feedback 객체도 제공하며 피드백 전체가 없을 때 세 하위 필드를 명시적 null로 반환한다. 내용이나 교정 항목을 추정 생성하지 않는다.
 - feedback이 있으면 summary/correctedAnswer/correctionItems 세 키를 포함하고 값이 없으면 명시적 null을 반환한다.
 - correctionItems=[]는 AI가 명시적으로 교정 없음으로 보낸 경우다. 과거 legacy 결과처럼 상세 교정 정보가 없으면 correctionItems=null이다.
 
 | aiResult 하위 필드 | 형식 | 출처/값 없음 |
 | --- | --- | --- |
 | transcript | string/null | AI 발화 인식; no_speech는 null |
-| feedback | object/null | AI 피드백; 없으면 null |
+| feedback | object | aiResult가 존재하면 항상 객체; 피드백 없음은 세 하위 값 null |
 | feedback.summary | string/null | AI 요약, legacy 세 문장 연결; 없으면 null |
 | feedback.correctedAnswer | string/null | AI 교정 답안; 없으면 null |
 | feedback.correctionItems | array/null | AI 상세 교정; legacy는 null, 명시적 교정 없음은 [] |
@@ -620,7 +624,7 @@ correctionItems 원소의 필드는 type/original/issue/explanation/suggested/se
 - AI 결과가 아직 없을 때도 prompt와 참고 답안은 유지하고 AI에 의존하는 필드만 `null`로 반환한다.
 - `gradingStatus=failed`는 결과 조회 요청 자체의 실패가 아니므로 root `isSuccess=true`, `code=COMMON_200`을 유지한다. 프론트는 polling을 멈추고 참고 답안과 `피드백을 생성하지 못했어요` 안내를 표시한다.
 - 내부 예외명, AI 응답 원문, 재시도 횟수와 `failureReason`은 공개 DTO에 넣지 않는다. 운영 진단용 Job과 로그에서만 관리한다.
-- 발화가 감지되지 않으면 `gradingStatus=completed`, `question.referenceAnswer`는 non-blank, `aiResult.transcript`와 `aiResult.feedback`은 null이다. 프론트는 이 조합에 고정 발화 없음 안내를 표시하고 별도 `feedbackType` enum은 사용하지 않는다.
+- 발화가 감지되지 않으면 `gradingStatus=completed`, `question.referenceAnswer`는 non-blank, `aiResult.transcript=null`이며 feedback의 summary/correctedAnswer/correctionItems가 모두 null이다. 프론트는 이 조합에 고정 발화 없음 안내를 표시하고 별도 `feedbackType` enum은 사용하지 않는다.
 - 1시간 미제출 만료는 풀이 수에서 제외한다. 문제 번호를 지정하면 참고 답안과 `gradingStatus=not_requested`, `aiResult=null`인 `question`은 반환한다. 따라서 `solvedQuestionCount=0`이어도 만료 문제의 `question`은 non-null일 수 있다.
 - 내부 만료 기록의 제출/채점 시각은 null로 보존하되 상세 공개 응답에는 시각 필드를 포함하지 않는다.
 

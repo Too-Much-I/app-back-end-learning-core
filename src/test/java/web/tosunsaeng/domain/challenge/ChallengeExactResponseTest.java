@@ -55,14 +55,17 @@ class ChallengeExactResponseTest {
         assertThat(keys(actual.at("/result/question/aiResult/feedback/correctionItems/0")))
                 .containsExactly("type", "original", "issue", "explanation", "suggested", "severity");
     }
-    @Test void noSpeechRetainsOnlyTranscriptAndFeedbackAsExplicitNulls() {
+    @Test void noSpeechRetainsTranscriptNullAndAllFeedbackFieldsAsExplicitNulls() {
         var a = attempt(); a.state = State.SUBMITTED; a.gradingStatus = "completed";
         a.result = new Result(null, null, null, null);
         var question = response(a).at("/result/question");
         assertThat(keys(question)).containsExactly("questionNumber", "promptKo", "attemptStatus",
                 "gradingStatus", "referenceAnswer", "aiResult");
         assertThat(question.get("referenceAnswer").asText()).isEqualTo(a.question.referenceAnswer());
-        assertThat(question.get("aiResult")).isEqualTo(json.createObjectNode().putNull("transcript").putNull("feedback"));
+        var expectedAi = json.createObjectNode().putNull("transcript");
+        expectedAi.set("feedback", json.createObjectNode().putNull("summary")
+                .putNull("correctedAnswer").putNull("correctionItems"));
+        assertThat(question.get("aiResult")).isEqualTo(expectedAi);
     }
     @ParameterizedTest @ValueSource(strings = {"pending", "processing", "failed", "not_requested"})
     void missingResultIsExplicitNullWithoutExtraFields(String status) {

@@ -14223,3 +14223,155 @@
 - 유지 계약/결정: 사용자 최신 승인으로 기존 공개 Detail 필드 유지 및 aiResult 참고답안 규칙을 대체. AI callback v1·semantic digest·DB 저장 모델·MEMBER/owner 검증·제출 전 답안 비노출·기존 시험 및 다른 Challenge API는 유지. null 요청은 응답에만 적용하며 잘못된 AI callback 수신 검증은 완화하지 않음.
 - 위험/배포 전 확인: 제거 필드 의존 프론트 확인, 실제 발화인데 no_speech인 원인은 별도 미조사. 커밋·푸시 후 새 이미지 배포 필요. 기존 문서/.DS_Store 변경 보존, 예상 밖 이번 변경 없음. 배포/DB/Jira/commit/push 및 민감정보 기록 없음.
 - 다음/Jira 댓글 초안(미등록): 정확한 필드/null 응답 구현, 전체632개 테스트 성공. 프론트 호환 및 배포 후 정상/no_speech 실연동 확인 필요.
+
+## 2026-10-09 — 최신 챌린지 수정의 추가 설정 및 배포 상태 확인
+
+<!-- codex-turn:01a11ee2-e221-7383-a3b6-4a08d8297ae5 -->
+
+- 사용자 후속 질문에 따라 develop 055d491의 ChallengeViews 응답 변경과 기존 rollout 기록을 읽기 전용으로 대조했다. 이번 응답 필드/null 수정에는 새 flag·credential·DB migration이 없으며 이미지 배포가 필요하다.
+- GitHub run37883144327은 전체 success이지만 Test, build and deploy job은 skipped다. 따라서 이 실행을 테스트 배포 완료로 판단하지 않는다. 이전 기록의 prod4는 1da0d09이며 최신 운영 runtime은 이번에 AWS 직접 조회하지 않았다.
+- TMI-198 알림은 마지막 테스트 rollout 기록상 API/제출 추적 ON, sending OFF/dry-run true이며 FCM/APNs·모바일 및 lifecycle 검증 후 별도 발송 활성화가 필요하다. 현재 AWS 값으로 재검증한 사실과 구분한다. Billing 등 별도 feature를 이번 응답 수정의 필수 설정으로 취급하지 않는다.
+- 이번 턴은 질문에 대한 상태 확인이다. workflow dispatch·ECS 변경·새 flag 활성화·commit/push·Jira 변경 없이 WORKLOG/CURRENT_STATE만 갱신했다. 기존 .DS_Store 변경 보존, Secret/Token 기록 없음. 코드 미변경으로 Gradle 재실행 생략, git diff --check 수행. 테스트/prod 배포 요청은 미완료 상태로 기록한다.
+
+## 2026-10-09 — 앱 전체 범위의 잔여 활성화 항목 재정리
+
+- 사용자 정정에 따라 최신 수정 단독이 아닌 앱 확정 범위의 잔여 설정을 조사했다. Identity CURRENT_STATE 및 production-settings/topology/결정서와 LC runtime 설정·rollout 기록을 대조했다. 이번 AWS 실조회는 수행하지 않았다.
+- 앞선 테스트 기준 알림 OFF 설명을 정정했다. 신규 prod는 10월8일 기록상 FCM 연결·발송 ON/dry-run false, validate-only 성공이나 실기기 수신은 미검증이다. Identity Firebase 로그인 및 LC Challenge는 활성 기록이 있다.
+- 잔여: Identity 게스트 병합/발행 활성화와 LC 수신 연동 검증, Billing 서비스·스토어 구매 검증·기간 권리와 무료 phone claim 및 LC saga/phone continuation/reconciliation/AttemptGroup publisher 연결, 신규 prod 학습 삭제의 인덱스·권한·fence/worker 준비. 테스트 삭제 활성화 완료를 운영 활성화로 간주하지 않는다.
+- Apple 탈퇴 provider obligation 미구현은 설정만으로 해결되지 않는 구현 사항이다. 일반 탈퇴 플래그는 신규 prod ON이나 실제 lifecycle E2E는 남는다. SDK/스토어 상품/광고 연결은 모바일·외부 준비 항목이며 설치 완료를 확인하지 않았다.
+- 관련 기존 이력 TMI-198(알림), TMI-193(학습 삭제), TMI-125(병합), TMI-116(시험 생성 saga); 신규 Jira 없음. 설명·문서만 변경하고 실제 flag·배포·DB·commit/push 변경 없음. Secret/Token 기록 없음, 기존 변경 보존, diff check 수행.
+
+## 2026-10-09 — Apple 로그인 탈퇴 시 연결 해제 필요성 확인
+
+- 사용자는 다른 항목을 팀원이 확인했다고 전달했다. 이 사실을 사용자 보고로 기록하며 재검증 완료로 확대하지 않는다. 이번 검토는 Apple 탈퇴만 대상으로 했다.
+- Identity FirebaseSdkWithdrawalCleanupAdapter는 apple.com provider가 있으면 PROVIDER_OBLIGATION_REQUIRED를 발생시키며 Apple revoke 처리를 구현하지 않는다. cleanup worker는 Firebase disable·refresh revoke 뒤 이 단계를 수행하고 이후 delete하므로 현재 Apple 사용자의 외부 정리가 보류될 수 있다.
+- Apple 로그인 승인 토큰 철회는 Apple ID 삭제·결제 구독 취소와 다르며 Firebase 사용자 삭제만으로 대체하지 않는다. Apple 계정 삭제 안내와 Firebase Apple 인증 문서를 근거 링크로 안내하고 모바일 재인증/authorization code를 이용한 철회 또는 서버 revoke 연동 보완이 필요함을 설명했다. 최신 웹 검색은 도구 오류로 미검증이다.
+- 신규 Jira 없음. 코드·외부 설정·DB·배포 변경 없이 WORKLOG/CURRENT_STATE만 갱신, 기존 변경 보존 및 diff check 수행. Secret/Token 기록 없음.
+
+## 2026-10-09 — Apple 탈퇴 검토 종료 기록
+
+<!-- codex-turn:01a11ee5-906d-7312-b6a2-e7e80518a134 -->
+
+- Apple 로그인 제공 시 계정 탈퇴의 승인 토큰 철회 필요성을 설명했다. Firebase 사용자 삭제와 Apple 승인 철회는 별도이며 Apple ID 삭제나 이용권 취소를 의미하지 않는다.
+- Identity 코드에서 Apple provider 감지 시 PROVIDER_OBLIGATION_REQUIRED로 외부 정리를 보류하는 것을 확인했다. 모바일 철회가 이미 구현되어 있다면 서버 cleanup과 성공 증거 연결을 확인해야 한다. 사용자 보고상 다른 항목은 팀원이 확인했으므로 이번 검토는 Apple 탈퇴만 대상으로 했다.
+- 신규 Jira 없음. 실제 구현·배포·외부 설정 변경 없이 문서만 갱신했고 Secret/Token 기록 없음. 기존 기록 보존 및 diff check/현재 표식 단일 출현 확인.
+
+## 2026-10-09 — Apple 철회 미구현 시 실제 영향 설명
+
+- Identity 내부 탈퇴 Transaction은 tombstone 및 Session 폐기를 먼저 처리한다. 외부 worker는 Firebase 비활성화/refresh 철회 뒤 Apple obligation에서 중단되므로 내부 탈퇴 전체 rollback이나 기존 로그인 지속으로 단정하지 않는다.
+- PROVIDER_OBLIGATION_REQUIRED는 worker의 reconciliation 대상으로 남고 Firebase delete 및 외부 cleanup 완료 단계가 실행되지 않는다. Apple 승인 철회 미처리와 Apple 로그인 계정 탈퇴의 출시/심사 위험을 구분해 설명했다. 현재 실제 운영 계정의 상태를 조회한 것은 아니다.
+- 신규 Jira 없음. 읽기 전용 소스 확인·문서 갱신만 수행, 코드·DB·배포·외부 설정 변경 및 Secret/Token 기록 없음. 코드 미변경으로 Gradle 생략, diff check 수행.
+
+## 2026-10-09 — Apple 철회 미구현 영향 분석 종료 기록
+
+<!-- codex-turn:01a11ee6-c8d7-7d63-8132-031532fdcc98 -->
+
+- Apple 철회가 없을 때 내부 탈퇴·Session 폐기와 Firebase 비활성화/refresh 철회는 선행하지만 provider obligation에서 Firebase 삭제·외부 정리가 보류되는 코드 경로를 확인했다. PROVIDER_OBLIGATION_REQUIRED는 재시도 가능 오류가 아니며 reconciliation 대상으로 남는다.
+- 일반 로그인·시험 사용과 탈퇴 정리 완성을 구분하고 Apple 계정 삭제 요구사항에 따른 심사 위험을 설명했다. 실제 운영 사용자 상태는 미조회다.
+- 신규 Jira 없음. 문서 갱신만 수행하고 구현·배포·DB·외부 설정 변경 및 Secret/Token 기록 없음. 과거 기록 보존, diff check와 현재 표식 단일 출현 확인.
+
+## 2026-10-09 — 챌린지 통합 테스트 보완 및 test·prod 병렬 배포
+
+<!-- codex-turn:01a11ee8-645f-7d21-95ba-7593899095a6 -->
+
+- 날짜/브랜치: 2026-10-09, develop. 목표: 사용자 최신 응답 계약을 test·신규 prod에 병렬 배포.
+- 변경 파일: ChallengeMongoIntegrationTest.java, CURRENT_STATE/WORKLOG 및 Identity 배포 기록. CI37883824730은 삭제된 submittedAt() 참조로 이미지 빌드 전에 실패했다. 만료 결과의 참고 답안 nonblank와 aiResult null 검증으로 보완했다.
+- 검증: clean test632개 및 통합 테스트 컴파일 성공. Docker API1.32가 최소1.40보다 낮아 Mongo 통합 초기화 실패 후 단일 명령 JAVA_TOOL_OPTIONS=-Dapi.version=1.44로136개 성공. diff --check 성공.
+- 승인/결정: 사용자 이번 한정 commit/push 승인으로 테스트1개만 c766d54에 커밋·origin/develop 푸시. 기존 문서/.DS_Store는 포함하지 않았다. CI37884298904 시작, 공통 빌드 후 test·prod 병렬 rollout 예정.
+- 유지 계약: 제품 코드·API·AI callback·DB 추가 변경 없음. 환경별 설정/Secret/역할/네트워크 및 구운영/Identity/AI 불변. Jira 변경 없음, 민감정보 미기록.
+- 위험/다음: 현재 배포 미완료. ECS·ALB·health 확인 및 기록 갱신 필요, 실제 AI/프론트 E2E 별도. 사용자 기존 변경 보존, 이번 예상 밖 변경 없음.
+
+## 2026-10-09 — Identity Apple 탈퇴 승인 철회 수정 인계
+
+- 사용자 수정 요청에 따라 Identity의 Apple 승인 철회 port/REST adapter와 탈퇴 재인증·완료 evidence·worker 경로를 구현했다. LC runtime은 변경하지 않았다. 신규 Jira 없음.
+- 기존 탈퇴 endpoint/성공 응답·비Apple 계약 유지. Apple 연결 회원은 같은 Firebase User의 최근5분 Apple 재인증 ID Token과 appleAuthorizationCode를 전달한다. 서버 철회200 후 내부 탈퇴와 시각만 원자 저장, 원문 code/token 보존 없음. 기존 증거 없는 보류 건은 그대로 보호한다.
+- Identity 최종 ./gradlew clean test1321개 중 실패/오류0·skip6, 양 저장소 diff check 성공. 실제 Firebase/Apple/DB 호출 및 이번 commit/push/배포 없음. 신규 flag 기본OFF와 API key·mobile·실기기 E2E 준비는 Identity docs/contracts/apple-withdrawal-token-revocation.md 참조.
+- 기존/동시 작업의 LC 배포·통합 테스트 및 기록 변경은 보존했다. 이번 LC 수정은 CURRENT_STATE/WORKLOG뿐이며 예상 밖 제품 변경 없음. Secret/Token 기록 없음.
+
+## 2026-10-09 — Apple authorization code 없는 탈퇴 대안 설명
+
+<!-- codex-turn:01a11ef3-ac0c-71c9-acd4-52f2a5cbf3c8 -->
+
+- 현재 구현은 Apple 연결 회원의 appleAuthorizationCode가 필요하며 Firebase ID Token·UID·관리자 credential만으로 Apple 승인을 철회하지 않는다. Apple OAuth access/refresh token을 이미 보유했다면 code 대신 그 credential을 사용하는 별도 경로는 가능하나 현재 저장/연동되지 않았다.
+- 모바일 Firebase SDK가 철회를 수행하면 서버 요청 필드를 생략하는 설계는 가능하지만 앱 내부에서 새 Apple code가 필요하며 현재 worker의 서버 확인 증거 계약을 별도로 바꿔야 한다. 단순 성공 boolean으로 보류를 해제하지 않는다.
+- 신규 Jira 없음. 질문에 대한 설명과 CURRENT_STATE 갱신만 수행, 구현·계약·배포·외부 설정 변경 및 Secret/Token 기록 없음. 기존 작업 보존, 코드 미변경으로 테스트 재실행 생략, diff check 수행.
+
+## 2026-10-09 — Apple code 대안 안내 종료 기록
+
+<!-- codex-turn:01a11ef3-ac0c-7cb2-99f4-280318447d8c -->
+
+- 현재 Firebase 기반 서버 구현에는 새 Apple authorization code가 필요하며 Firebase ID Token/UID만으로 대체할 수 없음을 설명했다. 모바일 SDK 철회 또는 사전 확보한 Apple OAuth token을 이용하는 대안은 현재 구현과 별개다.
+- 모바일 방식도 내부 code 확보와 서버 완료 확인 계약이 필요하고, 서버 장기 token 보관 방식은 확보·암호화 저장의 별도 설계가 필요하다. 질문에 대한 설명만 수행하고 기존 구현·계약은 변경하지 않았다.
+- 신규 Jira 없음. CURRENT_STATE/WORKLOG만 갱신, Secret/Token 기록 없음. diff check와 현재 작업 표식 단일 출현 확인.
+
+## 2026-10-09 — 앱 프론트 Apple 철회 실구현 확인
+
+- 사용자 요청으로 조직 app-front-end 저장소의 main 고정 commit526c877b0bfeb7630dcd0e2f201cdde932432aac을 GitHub API로 읽기 전용 확인했다. 기존 웹 프론트는 조회하지 않았다. 로컬에 앱 checkout이 없어 원격 소스를 사용했다.
+- firebase-auth-sdk.ts의 revokeAppleSignIn은 iOS에서 AppleAuthentication.signInAsync로 code 확보 후 await revokeToken(getAuth(), authorizationCode)를 수행한다. account-withdrawal.ts는 apple.com 연결 여부 확인→철회 성공→withdraw-account.ts의 POST 요청 순서다. auth-runtime.ts와 settings hook에서 실제 호출 연결을 확인했다.
+- 서버 요청은 refreshToken/firebaseIdToken뿐이며 Apple code나 철회 receipt를 전송하지 않는다. 최근 Firebase 재인증도 하지 않는다. 따라서 앞서 추가한 서버 code 필수/최근5분 Apple auth/서버 재철회 방식은 현재 프론트와 충돌하며 이 상태로 연동 완료라고 하지 않는다. 중복 철회 자체는 불필요하나 서버 기존 PROVIDER_OBLIGATION_REQUIRED 보류 조건과 완료 증거 계약 정합화는 남는다.
+- Android는 revokeAppleSignIn에서 unsupported로 반환하여 철회를 건너뛴다. 이번 검증은 고정 소스 확인이며 설치된 앱 build·실기기 철회·서버 CLEANED 완료는 직접 검증하지 않았다. 팀원 동작 확인은 사용자 보고로 구분한다.
+- 신규 Jira 없음. frontend/Identity/LC runtime 변경·SDK 호출·외부 설정·배포·commit/push 없이 기록만 갱신, Secret/Token 기록 없음. 코드 미변경으로 테스트 실행 생략, git diff --check 수행. 다음은 iOS client-managed 철회와 서버 cleanup 계약 조정이며 사용자 확인 요청만으로 runtime을 변경하지 않았다.
+
+## 2026-10-09 — 프론트 Apple 철회 확인 종료 기록
+
+<!-- codex-turn:01a11ef5-afa7-7d73-ba23-2a434256d958 -->
+
+- app-front-end main526c877에서 iOS Apple authentication code 확보와 Firebase revokeToken 성공 후 서버 탈퇴 요청이 실제 연결된 것을 확인했다. 이 흐름에는 서버 code 전송·중복 철회가 불필요하나 현재 서버 Apple cleanup 보류 조건 정합화가 남는다.
+- Android unsupported 경로와 소스 확인/실기기 검증 차이를 설명했다. 앞선 서버 code 필수 수정은 현재 프론트 계약과 충돌하며 이번에는 이를 변경하지 않았다.
+- 신규 Jira 없음. WORKLOG EOF append/CURRENT_STATE 갱신만 수행, runtime·배포·외부 설정 변경 및 Secret/Token 기록 없음. diff check와 현재 표식 단일 출현 확인.
+
+## 2026-10-09 — test·prod 병렬 배포 최종 검증
+
+- 날짜/브랜치: 2026-10-09, develop. 목표: 앞선 챌린지 응답 배포 완료. 사용자 이번 한정 commit/push 예외로 통합 테스트1개 c766d54를 올렸으며 CI37884298904 전체 성공. 빌드 직후 prod도 시작해 test rollout과 병렬 진행했다.
+- 결과: test21·prod5, 동일 digest sha256:43c9284ecbc96a39732fe2e517656902155dc0e75ab556899c0efd7d0955ffaa. 양 환경 단일 PRIMARY/COMPLETED, desired/running/pending1/1/0, ALB 단일 healthy, 공개 health200/UP, 기동 ERROR0. 이전 target/배포 정리 완료.
+- 변경 파일: ChallengeMongoIntegrationTest.java와 양 저장소 WORKLOG/CURRENT_STATE, Identity production-topology-2026-10-08.json의 LC revision/image. 환경별 old/new definition 비교에서 image 외 변경 없음 확인. 기존 사용자/동시 작업과 .DS_Store 보존, 예상 밖 이번 변경 없음.
+- 검증: clean test632개·Mongo 통합136개 성공, CI unit/migration/integration/build/deploy/health 성공, topology Node4개 및 양 저장소 diff check 성공. 초기 Docker API 불일치는 단일 검증 명령 옵션으로 해소했고 저장소/운영 설정은 바꾸지 않았다.
+- 유지/결정: 제품 코드/API/AI callback/DB 추가 변경 없음. 환경변수·Secret·역할·네트워크·Identity·AI·구운영 불변. 배포 전 검증 완료, 추가 설정 불필요. 완료 화면 /private/tmp/learning-core-parallel-deploy-2026-10-09.png. 배포 기록은 로컬로 남기고 추가 commit/push하지 않는다.
+- 위험/다음: 실제 AI callback/프론트 E2E 미실행. 앱 새 챌린지의 정확한 필드 구성·null 확인 필요. Jira 변경 없음, 민감정보 기록 없음.
+
+## 2026-10-09 — 프론트 Apple 철회 전제 Identity 변경 완료
+
+<!-- codex-turn:01a11ef9-0004-7683-8d16-eebaadd0d0c1 -->
+
+- 브랜치: develop. 신규 Jira 없음. 사용자 요청으로 이전 Identity 서버 code 필수/최근5분 Apple 재인증/중복 철회 변경을 scoped apply_patch로 되돌리고 프론트 Firebase SDK 철회 전제로 탈퇴 정리를 진행하도록 수정했다.
+- 변경 파일: Identity adapter/ProviderObligationResult/회귀 테스트2개/Apple 계약과 stage1/2 문서/작업 기록. LC는 WORKLOG/CURRENT_STATE만 변경하며 LC runtime·AI·Billing 계약 유지. 기존/동시 변경 보존, 예상 밖 제품 변경 없음.
+- 구현: Apple CLIENT_MANAGED 반환 후 기존 Firebase disable/refresh revoke/delete/absence 확인과 identity release 진행. API 입력/응답, 소유권 검증, flag/secret/schema는 기존 계약 유지. 서버가 SDK 철회 성공을 독립 검증하는 것은 아니다.
+- 테스트: Identity 최종 ./gradlew clean test 성공1311개(실행1305/skip6), 실패·오류0. 초기 테스트 boolean matcher 오류를 수정 후 전체 통과. 양 저장소 git diff --check 수행. LC runtime 변경 없어 LC 테스트 미실행.
+- 위험/다음: iOS 확인 소스는 프론트 추가 수정 불필요하나 설치 build/E2E 미검증. Android Apple unsupported 보완 필요. 기존 보류 건 자동 repair 없음. worker/release 설정·최종 CLEANED/재가입 실기기 확인 후 사용자 commit/push/배포. 이번 배포·AWS/DB/프론트 수정·Jira write 없음. Secret/Token 기록 없음.
+
+## 2026-10-09 — Identity Apple 탈퇴 한정 commit/push·test 완료/prod 대기
+
+<!-- codex-turn:01a11eff-d007-7001-9449-3eed39e9f305 -->
+
+- 날짜/브랜치: 2026-10-09 KST, develop. 신규 Jira 없음.
+- 목표/실행: 사용자 명시적 예외 승인으로 Identity Apple client-managed cleanup 변경7개 파일만 commit4842d6c205081d0d47cebc366e09e15f0c9f5f5a/push origin develop. 다른 dirty 문서/script/미추적 테스트는 보존하고 커밋 제외.
+- 테스트/배포 결과: GitHub Actions37885862047 test/build/ECR/ECS/health 전체 성공, identity-test:35 완료. 새 runtime digest sha256:c8871b41035a13b08bcee7fc113680061748436266321a286f85fef162616de8. 공개 test/prod health200/UP. prod는 기존4/57192f45 이미지이며 새 버전 배포 증거로 해석하지 않는다.
+- prod blocker: CLI AWS 자격증명 없음. Chrome CloudShell로 exact 서비스/prod4/기존 flag 사전 조회 후 Chrome 종료로 연결 상실. prod registration/update 미수행, AWS 콘솔 재열기 요청. main은 구staging 대상으로 확인되어 main push/merge 안 함.
+- 유지/위험/다음: LC runtime·API·AI/Billing·DB/IAM/네트워크·prod·구staging 불변. 이번 LC 변경은 WORKLOG/CURRENT_STATE뿐이고 LC 테스트 불필요. 양 저장소 diff check 수행. 기존/동시 변경 보존, 예상 밖 제품 변경 없음. AWS 연결 복원 후 exact digest로 prod 이미지 교체 및 최종 stable/healthy/UP 검증 필요; Apple 실제 기기CLEANED E2E와 기존 보류 건repair 미포함. Secret/Token 기록 없음.
+
+## 2026-10-09 — 배포 중단 대상 설명 정정
+
+<!-- codex-turn:01a11f96-c346-7843-9284-b29254a8aaea -->
+
+- 브랜치: develop. 신규 Jira 없음. 사용자의 배포 중단 여부 질문에 상태 재확인만 수행했다.
+- 확인: Identity Actions37885862047는 commit4842d6c2로 completed/success이며 2026-10-09 14:01 KST 완료. test/prod 공개 health는 UP이다. prod health는 기존 버전 응답이며 새 배포 완료 증거가 아니다.
+- 정정: prod 진행을 멈춘 것이며, develop push로 이미 시작된 테스트 자동 배포는 취소하지 않았다. Chrome 종료는 GitHub Actions 실행을 중단시키지 않으며 테스트는 이후 정상 완료됐다. prod registration/update는 이전 턴에 수행하지 않았고 이번에도 새 배포를 실행하지 않았다.
+- 변경 파일: 양 저장소 WORKLOG/CURRENT_STATE 기록뿐. 제품/API·배포/설정/DB·commit/push 변경 없음. 테스트는 read-only Actions/health 확인과 diff check, 코드 테스트 재실행 불필요. 기존/동시 변경 보존, 예상 밖 변경 없음. 다음: AWS 연결 복원 후 별도 승인된 기존 prod 배포 작업 재개. Secret/Token 기록 없음.
+
+## 2026-10-09 — prod 보류 원인/AWS 콘솔 복원 확인
+
+- 브랜치 develop, 신규 Jira 없음. 사용자 원인 확인 요청에 읽기만 수행. 로컬 AWS CLI NoCredentials 및 profile 없음 재확인. Chrome 재열기 응답 후 로그인된 AWS prod 콘솔 연결 복원 확인.
+- 현재 prod는 identity-prod:4, desired/running/pending1/1/0, 완료 배포1건 및 ALB1정상/0비정상. prod 서비스 정지나 새버전 배포 실패가 아니라 브라우저 종료로 배포 시작 전 보류됐던 것이다. 이전 테스트 Actions 성공 유지.
+- 변경은 양 저장소 기록뿐. prod 등록/update·제품/API/DB/설정/commit/push 수행 없음. 이번 최신 요청은 확인이므로 자동 배포 재개하지 않음. 기존/동시 변경 보존, 예상 밖 변경 없음. 다음은 사용자 배포 재개 방향 확인 후 동일검증이미지 적용. Secret/Token 기록 없음.
+
+## 2026-10-09 — 피드백 null 객체와 확장 교정 목록 저장 수정
+
+<!-- codex-turn:01a11fa9-b30f-73f0-82e2-8a6c3b59e868 -->
+
+- 날짜/브랜치: 2026-10-09, develop. 목표: feedback 내용 없음에도 세 하위 필드 null 제공, AI 기존 형식에 추가된 correctionItems 보존.
+- 변경 파일: LC ChallengeViews.java, ChallengeCallback.java, ChallengeContractTest/ChallengeDetailedFeedbackTest/ChallengeExactResponseTest, ChallengeMongoIntegrationTest, 프론트/AI 계약2개 및 양 저장소 WORKLOG/CURRENT_STATE.
+- 구현: aiResult가 존재하면 feedback 없는 경우 summary/correctedAnswer/correctionItems 모두 null인 객체 반환. 결과 자체가 없으면 aiResult=null 유지. legacy meaning/grammar/pronunciation+correctionItems는 공통 항목 검증 후 기존 상세 저장 필드 detailedFeedback에 보존, summary는 세 문장 연결, correctedAnswer는 기존 envelope 사용. 상세 형식 지원 유지.
+- 검증: env JAVA_TOOL_OPTIONS=-Dapi.version=1.44 ./gradlew clean test mongoIntegrationTest 성공; 단위640개/격리 Mongo통합138개. 실제 DB 저장·재조회·응답, 동일 callback 멱등, 항목 변경409/미덮어쓰기, 전역 NON_NULL 아래 null 필드 보존, 구 digest/역사 문서 호환 검증. 처음 추가 테스트의 Jackson 제네릭 assertThat 모호성 컴파일 오류는 JsonNode 명시 후 해소. 양 저장소 diff --check 성공.
+- 유지 계약: URL/인증/소유권/AI no_speech·failed null 입력/DB collection·인덱스 불변. correctionItems 없는 legacy digest 유지. 배열이 있는 확장 입력은 이제 semantic digest에 반영되므로 배포 전 목록을 무시했던 완료 job 재전송은 충돌 가능; 과거 결과를 새 형식으로 재전송하지 않는다.
+- 결정/위험/배포 전: LC reader 먼저 배포 후 AI 신규 job으로 검증. 기존 feedback==null 기반 프론트 분기는 세 필드 null 판정으로 갱신 필요. 과거 이미 잃은 목록 자동 복원/운영 데이터 변경 없음, 실제 운영 AI E2E 미실행.
+- 다음: 사용자 commit/push 후 별도 배포 진행, 새 챌린지 결과 확인. 이번 commit/push/배포/Jira 변경 없음. 기존/동시 문서 및 .DS_Store 변경 보존, 예상 밖 이번 변경 없음. Secret/사용자 발화 기록 없음.

@@ -53,7 +53,11 @@ class ChallengeContractTest {
         assertThat(detail.path("referenceAnswer").textValue()).isEqualTo(a.question.referenceAnswer());
         assertThat(detail.path("aiResult").has("referenceAnswer")).isFalse();
         assertThat(detail.path("aiResult").path("transcript").isNull()).isTrue();
-        assertThat(detail.path("aiResult").path("feedback").isNull()).isTrue();
+        var feedback = detail.path("aiResult").path("feedback");
+        assertThat(feedback.isObject()).isTrue();
+        for (String field : List.of("summary", "correctedAnswer", "correctionItems")) {
+            assertThat(feedback.has(field)).isTrue(); assertThat(feedback.get(field).isNull()).isTrue();
+        }
     }
     @Test void expiryHasNoFakeSubmitTimeAndCountShapeOmitsQuestion() throws Exception {
         Attempt a = attempt(); a.state = State.EXPIRED;

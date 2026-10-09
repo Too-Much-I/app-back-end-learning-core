@@ -33,8 +33,13 @@ public record ChallengeCallback(String callbackId, String attemptId, String jobI
                 if (transcript == null || !("correct".equals(verdict) || "needs_improvement".equals(verdict))
                         || ("needs_improvement".equals(verdict) && corrected == null) || !feedback.isObject() || !error.isNull()) throw invalid();
                 if (feedback.has("meaning")) {
-                    result = new Result(transcript, verdict, corrected, new Feedback(text(feedback, "meaning", 500, true),
-                            text(feedback, "grammar", 500, true), text(feedback, "pronunciation", 500, true)));
+                    Feedback legacy = new Feedback(text(feedback, "meaning", 500, true),
+                            text(feedback, "grammar", 500, true), text(feedback, "pronunciation", 500, true));
+                    // Preserve the old digest when the extension is absent; explicit items are semantic data.
+                    DetailedFeedback detailed = feedback.has("correctionItems")
+                            ? new DetailedFeedback(String.join("\n", legacy.meaning(), legacy.grammar(), legacy.pronunciation()),
+                                    corrected, correctionItems(feedback)) : null;
+                    result = new Result(transcript, verdict, corrected, legacy, detailed);
                 } else {
                     result = new Result(transcript, verdict, corrected, null, detailedFeedback(feedback, corrected));
                 }
@@ -57,6 +62,9 @@ public record ChallengeCallback(String callbackId, String attemptId, String jobI
         String summary = text(feedback, "summary", 500, true);
         String nestedCorrected = text(feedback, "correctedAnswer", 1000, false);
         if (!Objects.equals(corrected, nestedCorrected)) throw invalid();
+        return new DetailedFeedback(summary, nestedCorrected, correctionItems(feedback));
+    }
+    private static List<CorrectionItem> correctionItems(JsonNode feedback) {
         JsonNode items = required(feedback, "correctionItems");
         if (!items.isArray()) throw invalid();
         if (items.size() > 20) throw oversized();
@@ -72,7 +80,7 @@ public record ChallengeCallback(String callbackId, String attemptId, String jobI
             if (!Set.of("low", "medium", "high").contains(severity)) throw invalid();
             corrections.add(new CorrectionItem(type, original, issue, explanation, suggested, severity));
         }
-        return new DetailedFeedback(summary, nestedCorrected, List.copyOf(corrections));
+        return List.copyOf(corrections);
     }
     private static JsonNode required(JsonNode n, String field) { JsonNode value = n.get(field); if (value == null) throw invalid(); return value; }
     private static String text(JsonNode n, String field, int max, boolean mandatory) {
