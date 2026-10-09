@@ -162,7 +162,8 @@ class ChallengeMongoIntegrationTest {
         var progress = service.today(OWNER); assertThat(progress.dailyStatus()).isEqualTo("completed");
         assertThat(progress.completedQuestionNumbers()).containsExactly(1, 2, 3);
         var results = (ChallengeViews.Results) service.results(OWNER, "2026-09-07", 1);
-        assertThat(results.solvedQuestionCount()).isZero(); assertThat(results.question()).isNotNull(); assertThat(results.question().submittedAt()).isNull();
+        assertThat(results.solvedQuestionCount()).isZero(); assertThat(results.question()).isNotNull();
+        assertThat(results.question().referenceAnswer()).isNotBlank(); assertThat(results.question().aiResult()).isNull();
         assertThat(service.history(OWNER, "2026-09").dates()).containsExactly(new ChallengeViews.Day("2026-09-07", false, 0));
     }
     @Test void crossMidnightSubmitBelongsToOriginalDate() {
