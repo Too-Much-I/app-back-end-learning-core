@@ -14182,3 +14182,44 @@
 - 위험/배포 전 확인: LC reader 선배포 후 AI 생산자 전환 및 프론트 신규 feedback 반영 필요. 구 binary로 롤백 시 신규 payload 수신 불가. 동일 작업 재전송의 형식은 변경 금지. 실제 AI 완료/no_speech/재전송 E2E 미검증.
 - 다음 작업: AI 담당자에게 fixture 및 6.2 계약 전달, frontend 반영 확인 후 배포/E2E. 사용자 기존 .DS_Store·작업 기록 변경 보존, 예상 밖 이번 변경 없음. 배포/commit/push/Jira 조작·Secret 기록 없음.
 - Jira 댓글 초안(미등록): 상세 교정 feedback 수신·저장·응답 및 legacy 호환 완료, 코드3개/테스트1개/계약·fixture 수정, 단위624개 성공. AI·프론트 배포와 실연동 검증 필요.
+
+## 2026-10-08 — 챌린지 상세 교정 prod 배포
+
+<!-- codex-turn:01a11be9-3025-7f81-9f73-93c4dd110b81 -->
+
+- 날짜/브랜치: 2026-10-08, develop. 목표: 사용자 푸시1da0d09 prod 반영. 로컬 변경은 CURRENT_STATE/WORKLOG, Identity 쪽 배포 metadata/기록. 제품 코드 추가 수정 없음.
+- 배포: 최초 push run37792474911 deploy skipped. 사용자 승인 후 수동 run37793027295에서 단위/마이그레이션·Mongo 통합·이미지 빌드·test20 배포/health 성공. prod3 기준3fda35b 대비 승인된 챌린지 변경만 확인.
+- prod: 태스크 설정 그대로 복제, image만 sha256:32620c3f0d631200fc0165a8d29f7cb78e93d4c911b391d50c6421aa991b65c7로 교체해 prod4 등록/update. 빈 tags 첫 등록 오류는 tags 항목 생략으로 해결, 오류 시 서비스 변경 없음.
+- 검증: image 이외 설정 동일=True, 새 태스크 digest 일치 및 RUNNING. 시작 로그53건 error0/started1, 23:49 KST 새 ALB healthy/공개 health200/running1/pending0. 이전 태스크 draining으로 최종 ECS 완료 대기.
+- 유지 계약/결정: 추가 API 변경·prod 환경변수·Secret·IAM·DB·AI/Identity/구서비스 변경 없음. CHALLENGE_ENABLED 기존 true 유지. rollback prod3 보존.
+- 테스트: CI 전체 성공, git diff --check. 추가 제품 코드 없으므로 로컬 Gradle 생략. 위험/다음: 최종 ECS COMPLETED 및 AI 새 콜백·프론트 E2E 별도. .DS_Store 기존 변경 보존, 예상 밖 이번 변경 없음. commit/push/Jira 변경 없음, 민감정보 미기록.
+- Jira 댓글 초안(미등록): CI 성공 및 LC prod4 이미지 교체, 새 target healthy, 최종 안정화 확인 중. AI 실제 채점 E2E 필요.
+
+## 2026-10-08 — prod4 배포 최종 확인
+
+<!-- codex-turn:01a11be9-3025-7f81-9f73-93c4dd110b81 -->
+
+- 날짜/브랜치: 2026-10-08 23:55 KST, develop. 목표: 앞선 prod 반영 완료 확인. 변경 파일: CURRENT_STATE/WORKLOG 및 Identity 토폴로지/기록. 추가 제품 코드 없음.
+- 결과: prod4 단일 PRIMARY/COMPLETED, desired/running/pending1/1/0, ALB 단일 healthy, 공개 api-prod health200. 이전 배포 정리 완료. 목표 커밋1da0d09/image32620c3f 적용 확인.
+- 검증: CI37793027295 모든 검사·test 배포 성공, Identity 토폴로지 Node4개 및 양 저장소 diff --check 성공. 추가 코드 없으므로 로컬 Gradle 재실행 생략. 설정·외부 계약은 앞선 승인 변경 외 불변.
+- 위험/다음: AI 새 payload 및 프론트 E2E 별도 확인. 기존 .DS_Store 보존, 예상 밖 이번 변경 없음. commit/push/Jira 없음. 완료 화면은 /private/tmp/learning-core-prod-deployment-2026-10-08.jpg. Jira 초안(미등록): prod4 안정화 완료, 실제 AI 채점1건 확인 필요.
+
+## 2026-10-09 — 사용자 null feedback 응답 분석
+
+<!-- codex-turn:01a11ed8-b6ad-7280-90d8-1cf456d9f6a8 -->
+
+- 날짜/브랜치: 2026-10-09, develop. 목표: 기대 JSON과 실제 응답 차이 확인. 변경: CURRENT_STATE/WORKLOG만.
+- 확인: ChallengeCallback의 no_speech는 null Result, CallbackService는 이를 completed로 저장. Views는 참고답안 snapshot 및 기존 sibling 유지, feedback 없으면 null. 정상 completed 콜백은 transcript 필수이므로 제공 응답은 no_speech 경로와 일치.
+- 결정/위험: 해당 운영 콜백 직접 확인은 아니며 무발화 원인·AI 배포 문제 단정 금지. 기존 부가 필드는 이전에 의도적으로 유지했으며 최소 예시와 완전 동일 필드 집합으로 교체한 것은 아님.
+- 검증: 소스 정적 대조 및 diff --check. 코드 미변경으로 Gradle 미실행. 유지 계약: API/AI/no_speech 불변. 다음: 실제 발화가 있었다면 attemptId/요청 주소 기준 AI 콜백·녹음 흐름 확인. 기존 변경 보존, 예상 밖 변경·배포/DB/Jira/commit/push 없음.
+
+## 2026-10-09 — 사용자 예시와 정확히 같은 상세 응답 및 null 규칙
+
+<!-- codex-turn:01a11ed8-b6ad-7280-90d8-1cf456d9f6a8 -->
+
+- 날짜/브랜치: 2026-10-09, develop. 목표: 예시와 동일한 필드만 반환, 값 없음은 null. 변경 파일: ChallengeViews.java, ChallengeContractTest.java, ChallengeDetailedFeedbackTest.java, 신규 ChallengeExactResponseTest.java, 프론트/AI 계약2개, CURRENT_STATE/WORKLOG.
+- 구현: 결과 question6필드/aiResult2필드로 축소. difficulty/시각 및 중복 참고답안/verdict/상위 correctedAnswer 제거. 무발화 transcript/feedback null, 미완료/실패/만료 aiResult null, 미응시 question null 유지. legacy correctionItems는 정보 없음 의미의 null로 변경; AI가 명시한 빈 배열은 보존.
+- 검증: 전체 BaseResponse JSON 정확 일치, 내부 feedback/교정 원소 필드, 전역 NON_NULL에서도 null 키 보존, 정상/무발화/미완료/실패/만료/미응시/legacy를 테스트. ./gradlew clean test632개 성공, git diff --check 통과. 외부 인프라 미호출.
+- 유지 계약/결정: 사용자 최신 승인으로 기존 공개 Detail 필드 유지 및 aiResult 참고답안 규칙을 대체. AI callback v1·semantic digest·DB 저장 모델·MEMBER/owner 검증·제출 전 답안 비노출·기존 시험 및 다른 Challenge API는 유지. null 요청은 응답에만 적용하며 잘못된 AI callback 수신 검증은 완화하지 않음.
+- 위험/배포 전 확인: 제거 필드 의존 프론트 확인, 실제 발화인데 no_speech인 원인은 별도 미조사. 커밋·푸시 후 새 이미지 배포 필요. 기존 문서/.DS_Store 변경 보존, 예상 밖 이번 변경 없음. 배포/DB/Jira/commit/push 및 민감정보 기록 없음.
+- 다음/Jira 댓글 초안(미등록): 정확한 필드/null 응답 구현, 전체632개 테스트 성공. 프론트 호환 및 배포 후 정상/no_speech 실연동 확인 필요.

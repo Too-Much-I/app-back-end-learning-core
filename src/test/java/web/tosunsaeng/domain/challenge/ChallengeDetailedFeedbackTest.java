@@ -47,8 +47,9 @@ class ChallengeDetailedFeedbackTest {
         var ai = response.path("question").path("aiResult");
         assertThat(ai.path("feedback")).isEqualTo(json.valueToTree(feedback()));
         assertThat(ai.path("feedback").has("meaning")).isFalse();
-        assertThat(ai.path("referenceAnswer").asText()).isEqualTo(a.question.referenceAnswer());
-        assertThat(ai.path("correctedAnswer")).isEqualTo(ai.path("feedback").path("correctedAnswer"));
+        assertThat(response.path("question").path("referenceAnswer").asText()).isEqualTo(a.question.referenceAnswer());
+        assertThat(ai.has("referenceAnswer")).isFalse();
+        assertThat(ai.has("correctedAnswer")).isFalse();
         assertThat(response.path("solvedQuestionCount").asInt()).isEqualTo(1);
     }
     @Test void legacyDigestMatchesPreMigrationBytesAndLegacyViewDoesNotInventCorrections() throws Exception {
@@ -66,7 +67,7 @@ class ChallengeDetailedFeedbackTest {
         var a = attempt(); a.state = State.SUBMITTED; a.result = c.result();
         var view = ChallengeViews.detail(a).aiResult().feedback();
         assertThat(view.summary()).isEqualTo("의미 피드백\n문법 피드백\n발음 피드백");
-        assertThat(view.correctionItems()).isEmpty();
+        assertThat(view.correctionItems()).isNull();
         assertThat(view.correctedAnswer()).isNull();
     }
     @Test void mongoReadsHistoricalDocumentsAndRoundTripsDetailedFeedbackWithoutExternalDb() throws Exception {

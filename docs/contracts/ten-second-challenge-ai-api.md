@@ -307,7 +307,7 @@ Callback 크기 제한:
 - Learning Core는 Job을 `COMPLETED`로 저장한다.
 - 공개 `gradingStatus=completed`로 projection한다.
 - 프론트 공개 `feedbackType` enum은 추가하지 않는다.
-- 프론트 `aiResult`는 null이 아니며 Learning Core의 attempt snapshot에서 가져온 `referenceAnswer`를 포함한다. `transcript`, `verdict`, `correctedAnswer`, `feedback`은 null이다.
+- 2026-10-09 공개 응답 변경: 프론트 `aiResult`는 {"transcript":null,"feedback":null}이며 snapshot 참고 답안은 `question.referenceAnswer`에만 포함한다. AI Callback의 verdict/corrected_answer 및 null 조건은 변경하지 않는다.
 - 사전 정의 답안은 AI가 Callback으로 echo하지 않는다. Learning Core가 DB 콘텐츠 snapshot에서 조립하므로 no-speech에서도 그대로 유지된다.
 - 프론트에는 transcript가 null인 경우의 고정 발화 없음 안내와 참고 답안을 제공한다.
 

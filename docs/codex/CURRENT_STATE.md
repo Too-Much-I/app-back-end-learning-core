@@ -1,5 +1,23 @@
 # Learning Core Current State
 
+## 2026-10-09 — 챌린지 상세 응답 필드 완전 일치·null 규칙 수정 완료
+
+<!-- codex-turn:01a11ed8-b6ad-7280-90d8-1cf456d9f6a8 -->
+
+- 사용자 명시 요청으로 결과 Detail의 difficulty/submittedAt/gradedAt 및 aiResult.referenceAnswer/verdict/상위 correctedAnswer 제거. 참고 답안은 question에만 제공, 교정 답안은 feedback 안에만 제공.
+- 값 없음은 명시적 null. 무발화는 aiResult의 transcript/feedback null, 결과 없음은 aiResult=null. legacy 상세 교정 정보 없음은 correctionItems=null, AI의 명시적 교정 없음 []는 유지.
+- ChallengeViews/테스트3개/계약2개 및 기록 변경. clean test632개 성공, diff --check 통과. AI callback·DB·MEMBER/owner 검증·결과 외 API 유지. 커밋/배포 미실행; 제거 필드 의존 프론트 및 실제 AI 연동 확인 필요.
+
+- 2026-10-09: 사용자 null feedback 응답 소스 분석. no_speech 경로와 일치하며 운영 콜백 자체는 미조회. 기존 difficulty/시각/aiResult 참고답안·verdict·상위 correctedAnswer는 앞선 변경에서 유지했으므로 최소 예시와 완전 동일 JSON은 아님. 코드/배포 변경 없음.
+
+## 2026-10-08 — 사용자 승인 prod 배포
+
+<!-- codex-turn:01a11be9-3025-7f81-9f73-93c4dd110b81 -->
+
+- 1da0d09 수동CI run37793027295 전체 성공(단위/마이그레이션·Mongo 통합·이미지 빌드·test20 배포/health). prod3→4 이미지 단독 교체, 설정 동일성 확인.
+- 최종23:55 KST prod4 단일 PRIMARY/COMPLETED, desired/running/pending1/1/0, ALB 단일 healthy·공개 health200. 목표 이미지 RUNNING, 시작 로그53건 error0. 이전 태스크 정리 완료. 토폴로지 Node4개·양 저장소 diff --check 성공.
+- 제품 추가 변경 없음. AI·Identity·구운영·prod 설정 미변경. AI 신규 payload E2E 별도. 기존 .DS_Store 변경 보존.
+
 ## 2026-10-08 — 챌린지 상세 교정 응답 구현 완료 (develop)
 
 <!-- codex-turn:01a11bdb-28b4-7a41-8e18-41c494d11f60 -->

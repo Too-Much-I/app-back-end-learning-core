@@ -508,11 +508,8 @@ Parameter:
     "question": {
       "questionNumber": 2,
       "promptKo": "저는 보통 버스를 타고 출근해요.",
-      "difficulty": 2,
       "attemptStatus": "submitted",
       "gradingStatus": "processing",
-      "submittedAt": "2026-08-24T03:21:02Z",
-      "gradedAt": null,
       "referenceAnswer": "I usually take the bus to work.",
       "aiResult": null
     }
@@ -533,17 +530,11 @@ AI 분석이 정상 완료된 응답:
     "question": {
       "questionNumber": 2,
       "promptKo": "저는 보통 버스를 타고 출근해요.",
-      "difficulty": 2,
       "attemptStatus": "submitted",
       "gradingStatus": "completed",
-      "submittedAt": "2026-08-24T03:21:02Z",
-      "gradedAt": "2026-08-24T03:21:25Z",
       "referenceAnswer": "I usually take the bus to work.",
       "aiResult": {
-        "referenceAnswer": "I usually take the bus to work.",
         "transcript": "I normally take a bus to work.",
-        "verdict": "correct",
-        "correctedAnswer": null,
         "feedback": {
           "summary": "문장의 핵심 의미를 정확하게 전달했어요.",
           "correctedAnswer": null,
@@ -568,17 +559,11 @@ AI 분석이 정상 완료된 응답:
     "question": {
       "questionNumber": 2,
       "promptKo": "저는 보통 버스를 타고 출근해요.",
-      "difficulty": 2,
       "attemptStatus": "submitted",
       "gradingStatus": "completed",
-      "submittedAt": "2026-08-24T03:21:02Z",
-      "gradedAt": "2026-08-24T03:21:25Z",
       "referenceAnswer": "I usually take the bus to work.",
       "aiResult": {
-        "referenceAnswer": "I usually take the bus to work.",
         "transcript": null,
-        "verdict": null,
-        "correctedAnswer": null,
         "feedback": null
       }
     }
@@ -586,29 +571,23 @@ AI 분석이 정상 완료된 응답:
 }
 ```
 
-- `aiResult.referenceAnswer`는 AI Callback 값이 아니다. Learning Core가 attempt 생성 시 Mongo `questions[].referenceAnswer`에서 snapshot한 사전 정의 답안을 결과 DTO에 조립한다.
-- 정상 완료와 `no_speech` 모두 `aiResult.referenceAnswer`를 non-blank로 반환한다.
-- `no_speech`는 `gradingStatus=completed`이며 `aiResult` 자체는 null이 아니다. `referenceAnswer`만 유지하고 AI 생성 하위 필드는 null이다.
-- `question.referenceAnswer`는 제출 접수 직후부터 사용할 수 있는 기존 필드이고, `aiResult.referenceAnswer`는 완료 결과 component를 독립적으로 렌더링할 수 있도록 같은 snapshot 값을 포함한다.
-- 두 `referenceAnswer` 값이 다르면 서버 데이터 정합성 오류이며 attempt snapshot 값을 authoritative 값으로 사용한다.
-- `verdict`는 `correct | needs_improvement`다. `needs_improvement`에서는 `correctedAnswer`가 non-blank이며 `correct`에서는 null일 수 있다.
+2026-10-09 사용자 확정: 상세 응답은 예시와 동일한 필드 집합으로 반환한다. question은 questionNumber/promptKo/attemptStatus/gradingStatus/referenceAnswer/aiResult만 포함하며, aiResult는 transcript/feedback만 포함한다. difficulty/submittedAt/gradedAt 및 aiResult.referenceAnswer/verdict/상위 correctedAnswer는 제거한다. 문제 조회·제출 API와 내부 저장 모델/AI callback은 변경하지 않는다.
 
-`aiResult` 필드:
+- referenceAnswer는 question에만 있으며 attempt snapshot을 사용한다. 제출 전 답안은 노출하지 않는다.
+- no_speech는 gradingStatus=completed, aiResult={"transcript":null,"feedback":null}이다.
+- AI 결과 자체가 없으면 aiResult=null. feedback 전체가 없으면 feedback=null이며 임의의 교정 객체를 생성하지 않는다.
+- feedback이 있으면 summary/correctedAnswer/correctionItems 세 키를 포함하고 값이 없으면 명시적 null을 반환한다.
+- correctionItems=[]는 AI가 명시적으로 교정 없음으로 보낸 경우다. 과거 legacy 결과처럼 상세 교정 정보가 없으면 correctionItems=null이다.
 
-| 필드 | 형식 | null 규칙 | 출처 |
-| --- | --- | --- | --- |
-| `referenceAnswer` | string | 항상 non-blank | Learning Core attempt의 DB 콘텐츠 snapshot |
-| `transcript` | string/null | `no_speech`에서 null | AI Callback |
-| `verdict` | `correct`, `needs_improvement` 또는 null | `no_speech`에서 null | AI Callback |
-| `correctedAnswer` | string/null | correct·no-speech에서 null 가능 | AI Callback |
-| `feedback` | object/null | `no_speech`에서 null | AI Callback |
-| `feedback.summary` | string | completed feedback에서 non-blank | AI Callback; legacy는 기존 세 문장을 줄바꿈으로 연결 |
-| `feedback.correctedAnswer` | string/null | aiResult.correctedAnswer와 동일 | AI Callback |
-| `feedback.correctionItems` | array | 교정 없음 또는 legacy 결과는 [] | AI Callback |
+| aiResult 하위 필드 | 형식 | 출처/값 없음 |
+| --- | --- | --- |
+| transcript | string/null | AI 발화 인식; no_speech는 null |
+| feedback | object/null | AI 피드백; 없으면 null |
+| feedback.summary | string/null | AI 요약, legacy 세 문장 연결; 없으면 null |
+| feedback.correctedAnswer | string/null | AI 교정 답안; 없으면 null |
+| feedback.correctionItems | array/null | AI 상세 교정; legacy는 null, 명시적 교정 없음은 [] |
 
-2026-10-08 변경: feedback은 위 세 필드로 반환한다. correctionItems 원소는 type/original/issue/explanation/suggested/severity이며 AI가 준 값을 그대로 반환한다. type은 문자열(예: GRAMMAR), severity는 low/medium/high다. 새 summary는 최대500자, 항목별 설명 문자열 최대500자, 배열 최대20개다. 기존 저장 결과의 summary는 기존 meaning/grammar/pronunciation을 순서대로 줄바꿈 연결하므로 최대1502자다. 서버가 교정 항목을 추정해서 만들지 않는다.
-
-transcript·correctedAnswer는 각각 최대1000자다. 기존 difficulty/submittedAt/gradedAt 및 aiResult.referenceAnswer/verdict/correctedAnswer는 유지한다. no_speech는 feedback=null, processing/failed는 기존 aiResult=null 규칙을 유지한다. 프론트는 신규 feedback 구조를 반영해야 한다. AI 서버 상세 feedback 계약과 reader-first 전환 순서는 [AI 계약 6.2](ten-second-challenge-ai-api.md#62-공통-callback-field)를 따른다.
+correctionItems 원소의 필드는 type/original/issue/explanation/suggested/severity다. AI가 보낸 값만 반환하며 추정 생성하지 않는다. type은 문자열(예: GRAMMAR), severity는 low/medium/high다. 새 summary500자/legacy summary최대1502자, transcript 및 correctedAnswer1000자, 항목별 설명500자, 배열20개 제한은 유지한다. AI 콜백의 verdict와 corrected_answer는 내부 검증용으로 유지하며 공개 응답에서만 제거한다. [AI 계약](ten-second-challenge-ai-api.md)을 따른다.
 
 자동 재시도까지 모두 실패한 경우에도 같은 결과 조회 API가 HTTP 200을 반환한다.
 
@@ -623,11 +602,8 @@ transcript·correctedAnswer는 각각 최대1000자다. 기존 difficulty/submit
     "question": {
       "questionNumber": 2,
       "promptKo": "저는 보통 버스를 타고 출근해요.",
-      "difficulty": 2,
       "attemptStatus": "submitted",
       "gradingStatus": "failed",
-      "submittedAt": "2026-08-24T03:21:02Z",
-      "gradedAt": null,
       "referenceAnswer": "I usually take the bus to work.",
       "aiResult": null
     }
@@ -641,12 +617,12 @@ transcript·correctedAnswer는 각각 최대1000자다. 기존 difficulty/submit
 - 지정 문제의 attempt가 없거나 아직 미제출·미만료라면 날짜 전체 `solvedQuestionCount`는 유지하고 `question=null`을 반환한다. 미제출 만료는 풀이 수에 포함하지 않지만 참고 답안을 제공하기 위해 `question`을 반환한다.
 - AI 처리 중에도 HTTP 200과 `gradingStatus=pending|processing`, `aiResult=null`을 반환한다.
 - 공개 `attemptStatus=submitted`인 문제는 AI Callback 도착 여부와 관계없이 항상 결과 조회가 가능해야 한다. 이 경우 `404 CHALLENGE_ATTEMPT_NOT_FOUND`가 발생하면 정상 대기 상태가 아니라 서버 데이터 정합성 오류다.
-- AI 결과가 아직 없을 때도 prompt, 제출 시각과 참고 답안은 유지하고 AI에 의존하는 필드만 `null`로 반환한다.
+- AI 결과가 아직 없을 때도 prompt와 참고 답안은 유지하고 AI에 의존하는 필드만 `null`로 반환한다.
 - `gradingStatus=failed`는 결과 조회 요청 자체의 실패가 아니므로 root `isSuccess=true`, `code=COMMON_200`을 유지한다. 프론트는 polling을 멈추고 참고 답안과 `피드백을 생성하지 못했어요` 안내를 표시한다.
 - 내부 예외명, AI 응답 원문, 재시도 횟수와 `failureReason`은 공개 DTO에 넣지 않는다. 운영 진단용 Job과 로그에서만 관리한다.
-- 발화가 감지되지 않으면 `gradingStatus=completed`, `aiResult.referenceAnswer`는 non-blank, 나머지 AI 생성 field는 null이다. 프론트는 이 조합에 고정 발화 없음 안내를 표시하고 별도 `feedbackType` enum은 사용하지 않는다.
+- 발화가 감지되지 않으면 `gradingStatus=completed`, `question.referenceAnswer`는 non-blank, `aiResult.transcript`와 `aiResult.feedback`은 null이다. 프론트는 이 조합에 고정 발화 없음 안내를 표시하고 별도 `feedbackType` enum은 사용하지 않는다.
 - 1시간 미제출 만료는 풀이 수에서 제외한다. 문제 번호를 지정하면 참고 답안과 `gradingStatus=not_requested`, `aiResult=null`인 `question`은 반환한다. 따라서 `solvedQuestionCount=0`이어도 만료 문제의 `question`은 non-null일 수 있다.
-- 만료된 문제의 `submittedAt=null`, `gradedAt=null`을 반환한다. 실제 제출이 없으므로 만료 시각을 제출 시각으로 사용하지 않는다. 프론트는 제출 시각이 null이면 해당 시각 표시를 생략한다.
+- 내부 만료 기록의 제출/채점 시각은 null로 보존하되 상세 공개 응답에는 시각 필드를 포함하지 않는다.
 
 ## 7. 오류 계약
 

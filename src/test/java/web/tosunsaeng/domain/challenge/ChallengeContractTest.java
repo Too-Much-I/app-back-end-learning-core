@@ -50,13 +50,14 @@ class ChallengeContractTest {
         a.state = State.SUBMITTED; a.result = new Result(null, null, null, null); a.gradingStatus = "completed";
         var detail = json.readTree(json.writeValueAsBytes(ChallengeViews.detail(a)));
         assertThat(detail.path("aiResult").isObject()).isTrue();
-        assertThat(detail.path("aiResult").path("referenceAnswer").textValue()).isEqualTo(a.question.referenceAnswer());
+        assertThat(detail.path("referenceAnswer").textValue()).isEqualTo(a.question.referenceAnswer());
+        assertThat(detail.path("aiResult").has("referenceAnswer")).isFalse();
         assertThat(detail.path("aiResult").path("transcript").isNull()).isTrue();
         assertThat(detail.path("aiResult").path("feedback").isNull()).isTrue();
     }
     @Test void expiryHasNoFakeSubmitTimeAndCountShapeOmitsQuestion() throws Exception {
         Attempt a = attempt(); a.state = State.EXPIRED;
-        var d = ChallengeViews.detail(a); assertThat(d.submittedAt()).isNull(); assertThat(d.gradedAt()).isNull();
+        var d = ChallengeViews.detail(a); assertThat(a.submittedAt).isNull(); assertThat(a.gradedAt).isNull();
         assertThat(d.referenceAnswer()).isEqualTo(a.question.referenceAnswer()); assertThat(d.aiResult()).isNull();
         ObjectMapper json = new ObjectMapper();
         assertThat(json.writeValueAsString(new ChallengeViews.Count(a.challengeDate, 0))).doesNotContain("question");
