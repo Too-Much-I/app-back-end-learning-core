@@ -185,14 +185,102 @@ class ChallengeMongoIntegrationTest {
         wire(uncertain); assertThatThrownBy(() -> service.submit(OWNER, 1, id, UUID.randomUUID().toString())).satisfies(e -> assertThat(((ChallengeFailure)e).status).isEqualTo(500));
         assertThat(runs.get()).isEqualTo(1); assertThat(store.attempt(id).state).isEqualTo(State.CREATED);
     }
-    @Test void expiredCountsZeroButProgressAndReferenceRemainAvailable() {
-        for (int q = 1; q <= 3; q++) { start(q); clock.at(clock.instant().plusSeconds(3600)); service.today(OWNER); }
-        var progress = service.today(OWNER); assertThat(progress.dailyStatus()).isEqualTo("completed");
-        assertThat(progress.completedQuestionNumbers()).containsExactly(1, 2, 3);
+    @Test void expiredCountsZeroAndCanRestartWithoutReferenceOrNextQuestion() {
+        String old = start(1); clock.at(NOW.plusSeconds(3600));
+        var progress = service.today(OWNER); assertThat(progress.dailyStatus()).isEqualTo("in_progress");
+        assertThat(progress.completedQuestionNumbers()).isEmpty();
+        assertThat(progress.nextQuestionNumber()).isEqualTo(1);
+        assertThat(progress.questions().getFirst().resultAvailable()).isFalse();
+        assertThatThrownBy(() -> start(2)).isInstanceOfSatisfying(ChallengeFailure.class,
+                e -> assertThat(e.code).isEqualTo("CHALLENGE_PREVIOUS_QUESTION_INCOMPLETE"));
         var results = (ChallengeViews.Results) service.results(OWNER, "2026-09-07", 1);
-        assertThat(results.solvedQuestionCount()).isZero(); assertThat(results.question()).isNotNull();
-        assertThat(results.question().referenceAnswer()).isNotBlank(); assertThat(results.question().aiResult()).isNull();
+        assertThat(results.solvedQuestionCount()).isZero(); assertThat(results.question()).isNull();
         assertThat(service.history(OWNER, "2026-09").dates()).containsExactly(new ChallengeViews.Day("2026-09-07", false, 0));
+        String next = start(1); assertThat(next).isNotEqualTo(old); assertThat(start(1)).isEqualTo(next);
+        assertThat(store.attempt(next).attemptSequence).isEqualTo(1);
+        assertThat(store.attempt(next).submissionDeadlineAt).isEqualTo(NOW.plusSeconds(7200));
+        assertThat(store.attempt(old).state).isEqualTo(State.EXPIRED);
+        assertThatThrownBy(() -> service.upload(OWNER, old)).isInstanceOfSatisfying(ChallengeFailure.class, e -> assertThat(e.status).isEqualTo(410));
+        assertThatThrownBy(() -> service.submit(OWNER, 1, old, UUID.randomUUID().toString())).isInstanceOfSatisfying(ChallengeFailure.class, e -> assertThat(e.status).isEqualTo(410));
+        service.submit(OWNER, 1, next, UUID.randomUUID().toString());
+        assertThat(((ChallengeViews.Count)service.results(OWNER, "2026-09-07", null)).solvedQuestionCount()).isEqualTo(1);
+        assertThat(start(2)).isNotNull();
+        assertThatThrownBy(() -> start(1)).isInstanceOfSatisfying(ChallengeFailure.class, e -> assertThat(e.code).isEqualTo("CHALLENGE_ALREADY_ATTEMPTED"));
+    }
+    @Test void simultaneousRestartsCreateOnlyOneNewAttemptAndCountOnce() throws Exception {
+        String old = start(1); clock.at(NOW.plusSeconds(3600));
+        List<String> ids = race(() -> start(1), () -> start(1));
+        assertThat(ids.getFirst()).isNotEqualTo(old).isEqualTo(ids.get(1));
+        assertThat(mongo.count(new Query(), Attempt.class)).isEqualTo(2);
+        String key = UUID.randomUUID().toString();
+        race(() -> service.submit(OWNER, 1, ids.getFirst(), key), () -> service.submit(OWNER, 1, ids.getFirst(), key));
+        assertThat(mongo.count(new Query(), Job.class)).isEqualTo(1);
+        assertThat(((ChallengeViews.Count)service.results(OWNER, "2026-09-07", null)).solvedQuestionCount()).isEqualTo(1);
+        assertThat(service.today(OWNER).completedQuestionNumbers()).containsExactly(1);
+    }
+    @Test void repeatedExpirySelectsLatestAttemptAndKeepsOriginalSnapshot() {
+        String first = start(1);
+        for (int i = 1; i <= 3; i++) {
+            clock.at(NOW.plusSeconds(3600L * i));
+            String id = start(1);
+            assertThat(store.attempt(id).sequence()).isEqualTo(i);
+            assertThat(store.attempt(id).question).isEqualTo(store.attempt(first).question);
+            assertThat(store.question(OWNER, "2026-09-07", 1).id).isEqualTo(id);
+            assertThat(((ChallengeViews.Results)service.results(OWNER, "2026-09-07", 1)).question()).isNull();
+        }
+        service.submit(OWNER, 1, start(1), UUID.randomUUID().toString());
+        assertThat(((ChallengeViews.Results)service.results(OWNER, "2026-09-07", 1)).question()).isNotNull();
+        assertThat(service.history(OWNER, null).currentStreakDays()).isEqualTo(1);
+    }
+    @Test void restartFailureRollsBackAndUnknownCommitRecoversWinner() {
+        String old = start(1); clock.at(NOW.plusSeconds(3600)); service.today(OWNER);
+        doAnswer(i -> { i.callRealMethod(); throw new IllegalStateException("injected"); }).when(store).insert(any(Attempt.class));
+        assertThatThrownBy(() -> start(1)).isInstanceOf(ChallengeFailure.class);
+        assertThat(mongo.count(new Query(), Attempt.class)).isEqualTo(1);
+        doCallRealMethod().when(store).insert(any(Attempt.class));
+        ChallengeTransactions uncertain = new ChallengeTransactions(factory, guards) {
+            @Override public <T> T run(String owner, Supplier<T> command) {
+                super.run(owner, command);
+                MongoException error = new MongoException("synthetic lost commit ack");
+                error.addLabel(MongoException.UNKNOWN_TRANSACTION_COMMIT_RESULT_LABEL); throw error;
+            }
+        };
+        wire(uncertain);
+        String next = start(1);
+        assertThat(next).isNotEqualTo(old);
+        assertThat(mongo.count(new Query(), Attempt.class)).isEqualTo(2);
+    }
+    @Test void expiredPreviousDateCannotRestart() {
+        String old = start(1); clock.at(NOW.plusSeconds(86400));
+        assertThatThrownBy(() -> start(1)).isInstanceOfSatisfying(ChallengeFailure.class,
+                e -> assertThat(e.code).isEqualTo("CHALLENGE_DATE_CHANGED"));
+        assertThat(mongo.count(new Query(), Attempt.class)).isEqualTo(1);
+        assertThatThrownBy(() -> service.submit(OWNER, 1, old, UUID.randomUUID().toString())).isInstanceOfSatisfying(ChallengeFailure.class,
+                e -> assertThat(e.code).isEqualTo("CHALLENGE_ATTEMPT_EXPIRED"));
+    }
+    @Test void legacyIndexBlocksStartupAndExplicitMigrationPreservesAttempts() throws Exception {
+        String old = start(1);
+        mongo.indexOps(Attempt.class).ensureIndex(new Index().named("challenge_owner_date_question_unique")
+                .on("userId", Sort.Direction.ASC).on("challengeDate", Sort.Direction.ASC).on("questionNumber", Sort.Direction.ASC).unique());
+        try {
+            assertThatThrownBy(() -> new ChallengeStartupValidator(store, tx, catalog).validate()).isInstanceOf(IllegalStateException.class);
+            MONGO.copyFileToContainer(org.testcontainers.utility.MountableFile.forHostPath(
+                    java.nio.file.Path.of("scripts/mongodb/challenge-10s-prepare.js").toAbsolutePath()), "/tmp/challenge-retry-prepare.js");
+            for (String approval : List.of("false", "true")) {
+                var result = MONGO.execInContainer("env", "MONGODB_URI=mongodb://localhost:27017/", "MONGODB_DATABASE=isolated-challenge-it",
+                        "CHALLENGE_MONGOSH_PAYLOAD=true", "CHALLENGE_PREPARE_APPLY=true", "CHALLENGE_WRITERS_DRAINED=true",
+                        "CHALLENGE_RETRY_INDEX_MIGRATION=" + approval,
+                        "mongosh", "--nodb", "--quiet", "--file", "/tmp/challenge-retry-prepare.js");
+                assertThat(result.getExitCode()).isEqualTo(approval.equals("true") ? 0 : 2);
+                assertThat(store.attempt(old)).isNotNull();
+            }
+            new ChallengeStartupValidator(store, tx, catalog).validate();
+            clock.at(NOW.plusSeconds(3600)); assertThat(start(1)).isNotEqualTo(old);
+        } finally {
+            if (mongo.getCollection("challenge_10s_attempts").listIndexes().into(new ArrayList<>()).stream()
+                    .anyMatch(i -> "challenge_owner_date_question_unique".equals(i.getString("name"))))
+                mongo.indexOps(Attempt.class).dropIndex("challenge_owner_date_question_unique");
+        }
     }
     @Test void crossMidnightSubmitBelongsToOriginalDate() {
         clock.at(Instant.parse("2026-09-07T14:59:50Z")); String id = start(1);
@@ -290,10 +378,12 @@ class ChallengeMongoIntegrationTest {
                     .satisfies(e -> assertThat(((ChallengeFailure)e).status).isEqualTo(410)));
             try {
                 assertThat(validating.await(10, TimeUnit.SECONDS)).isTrue(); clock.at(NOW.plusSeconds(3600)); worker.expire();
+                assertThat(start(1)).isNotEqualTo(id);
             } finally { release.countDown(); }
             submit.get(10, TimeUnit.SECONDS);
         }
         assertThat(store.attempt(id).state).isEqualTo(State.EXPIRED); assertThat(store.job(Job.id(id, 1))).isNull();
+        assertThat(store.question(OWNER, "2026-09-07", 1).state).isEqualTo(State.CREATED);
     }
     @Test void retryableCallbackCreatesNewGenerationWithSameAudioDigest() {
         String id = submitted(); worker.tick(); String digest = store.attempt(id).audioDigest;
@@ -303,9 +393,8 @@ class ChallengeMongoIntegrationTest {
         callbacks.accept(callback(id, 1, "no_speech")); assertThat(store.attempt(id).gradingStatus).isEqualTo("processing");
     }
     @Test void mixedExpiryAndSubmissionCountsActualSubmittedOnlyAndHistoryClipsMonths() {
-        String first = start(1); clock.at(NOW.plusSeconds(3600)); service.today(OWNER);
-        String second = start(2); service.submit(OWNER, 2, second, UUID.randomUUID().toString());
-        assertThat(store.attempt(first).state).isEqualTo(State.EXPIRED);
+        submitted(); String second = start(2); clock.at(NOW.plusSeconds(3600)); service.today(OWNER);
+        assertThat(store.attempt(second).state).isEqualTo(State.EXPIRED);
         assertThat(service.history(OWNER, "2026-09").dates()).containsExactly(new ChallengeViews.Day("2026-09-07", true, 1));
         assertThat(service.history(OWNER, "2026-08").dates()).isEmpty();
         assertThat(service.history(OWNER, "2026-08").currentStreakDays()).isEqualTo(1);

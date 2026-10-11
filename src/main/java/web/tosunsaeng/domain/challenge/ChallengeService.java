@@ -30,7 +30,8 @@ public class ChallengeService {
         return store.range(owner, from, to).stream().map(this::expire).toList();
     }
     private static Attempt at(List<Attempt> attempts, int q) {
-        return attempts.stream().filter(a -> a.questionNumber == q).findFirst().orElse(null);
+        return attempts.stream().filter(a -> a.questionNumber == q)
+                .max(Comparator.comparingInt(Attempt::sequence)).orElse(null);
     }
     private static int solved(List<Attempt> attempts) {
         return (int) attempts.stream().filter(a -> a.state == State.SUBMITTED).count();
@@ -38,16 +39,16 @@ public class ChallengeService {
     private static void previous(List<Attempt> attempts, int q) {
         for (int n = 1; n < q; n++) {
             Attempt prior = at(attempts, n);
-            if (prior == null || !prior.terminal()) throw new ChallengeFailure(409, "CHALLENGE_PREVIOUS_QUESTION_INCOMPLETE");
+            if (prior == null || !prior.submitted()) throw new ChallengeFailure(409, "CHALLENGE_PREVIOUS_QUESTION_INCOMPLETE");
         }
     }
     public Progress today(String owner) {
         DateInfo date = catalog.dateInfo(); catalog.questions(LocalDate.parse(date.challengeDate()));
         List<Attempt> attempts = range(owner, date.challengeDate(), date.challengeDate());
-        List<Integer> complete = attempts.stream().filter(Attempt::terminal).map(a -> a.questionNumber).sorted().toList();
+        List<Integer> complete = attempts.stream().filter(Attempt::submitted).map(a -> a.questionNumber).sorted().toList();
         Integer next = IntStream.rangeClosed(1, 3).boxed().filter(n -> !complete.contains(n)).findFirst().orElse(null);
         List<QuestionStatus> questions = IntStream.rangeClosed(1, 3).mapToObj(n -> {
-            Attempt a = at(attempts, n); boolean terminal = a != null && a.terminal();
+            Attempt a = at(attempts, n); boolean terminal = a != null && a.submitted();
             return new QuestionStatus(n, terminal ? "submitted" : "not_started", a == null ? "not_requested" : a.gradingStatus, terminal);
         }).toList();
         return new Progress(date.challengeDate(), date.challengeDateExpiresAt(), date.expiresInSeconds(),
@@ -60,7 +61,7 @@ public class ChallengeService {
         Attempt a = at(attempts, q); Question snapshot = a == null ? questions.get(q - 1) : a.question;
         catalog.requireToday(date);
         return new QuestionView(date, q, 3, snapshot.korean(), snapshot.difficulty(),
-                a != null && a.terminal() ? "submitted" : "not_started", a == null ? "not_requested" : a.gradingStatus);
+                a != null && a.submitted() ? "submitted" : "not_started", a == null ? "not_requested" : a.gradingStatus);
     }
     public Start start(String owner, int q, String date) {
         store.requirePublicWrite(owner);
@@ -68,27 +69,39 @@ public class ChallengeService {
         List<Question> questions = catalog.questions(LocalDate.parse(date));
         previous(range(owner, date, date), q);
         Attempt observed = store.question(owner, date, q);
-        if (observed != null) { observed = expire(observed); if (observed.terminal()) throw already(); return ChallengeViews.start(observed); }
+        if (observed != null) {
+            observed = expire(observed);
+            if (observed.submitted()) throw already();
+            if (observed.state == State.CREATED) return ChallengeViews.start(observed);
+        }
         try {
             return tx.run(owner, () -> {
                 catalog.requireToday(date);
                 previous(store.range(owner, date, date), q);
                 Attempt existing = store.question(owner, date, q);
-                if (existing != null) {
-                    if (existing.terminal() || !clock.instant().isBefore(existing.submissionDeadlineAt)) throw already();
-                    return ChallengeViews.start(existing);
-                }
                 Instant now = clock.instant();
+                if (existing != null) {
+                    if (existing.submitted()) throw already();
+                    if (existing.state == State.CREATED && now.isBefore(existing.submissionDeadlineAt)) return ChallengeViews.start(existing);
+                    existing.state = State.EXPIRED; existing.expiredAt = existing.submissionDeadlineAt;
+                    // Touch the old revision in the same transaction to fence concurrent submit/restart.
+                    store.save(existing);
+                }
                 // Date and createdAt are chosen from the same server instant, not response delivery time.
                 if (!LocalDate.ofInstant(now, ChallengeCatalog.KST).toString().equals(date)) catalog.requireToday(date);
-                return ChallengeViews.start(store.insert(Attempt.create(UUID.randomUUID().toString(), owner, date, questions.get(q - 1), now)));
+                Attempt next = Attempt.create(UUID.randomUUID().toString(), owner, date,
+                        existing == null ? questions.get(q - 1) : existing.question, now);
+                if (existing != null) next.attemptSequence = Math.addExact(existing.sequence(), 1);
+                return ChallengeViews.start(store.insert(next));
             });
         } catch (RuntimeException failure) {
             if (failure instanceof web.tosunsaeng.domain.learningrecorddeletion.application.DeletionFailure) throw failure;
             if (failure instanceof ChallengeFailure) throw failure;
             Attempt winner = store.question(owner, date, q);
             if (winner != null) {
-                winner = expire(winner); if (winner.terminal()) throw already(); return ChallengeViews.start(winner);
+                winner = expire(winner);
+                if (winner.submitted()) throw already();
+                if (winner.state == State.CREATED) return ChallengeViews.start(winner);
             }
             throw ChallengeFailure.internal();
         }

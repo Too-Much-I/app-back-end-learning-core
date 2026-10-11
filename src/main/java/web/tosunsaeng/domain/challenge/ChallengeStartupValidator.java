@@ -11,7 +11,7 @@ public class ChallengeStartupValidator {
     public static final List<RequiredIndex> INDEXES = List.of(
             index("questions", "challenge_day_unique", true, "dayNumber"),
             index("questions", "challenge_question_id_unique", true, "questions.questionId"),
-            index("attempts", "challenge_owner_date_question_unique", true, "userId", "challengeDate", "questionNumber"),
+            index("attempts", "challenge_owner_date_question_sequence_unique", true, "userId", "challengeDate", "questionNumber", "attemptSequence"),
             index("attempts", "challenge_expiry", false, "state", "submissionDeadlineAt", "_id"),
             index("submit_receipts", "challenge_submit_key_unique", true, "userId", "idempotencyKey"),
             index("grading_jobs", "challenge_generation_unique", true, "attemptId", "generation"),
@@ -28,6 +28,11 @@ public class ChallengeStartupValidator {
     public void validate() {
         try {
             for (String collection : COLLECTIONS) if (!store.mongo.collectionExists(collection)) throw new IllegalStateException("Challenge collection missing");
+            for (Document index : store.mongo.getCollection("challenge_10s_attempts").listIndexes()) {
+                if (Boolean.TRUE.equals(index.get("unique")) && new Document("userId", 1).append("challengeDate", 1)
+                        .append("questionNumber", 1).equals(index.get("key")))
+                    throw new IllegalStateException("Legacy Challenge unique index prevents retries");
+            }
             for (RequiredIndex expected : INDEXES) {
                 List<Document> indexes = store.mongo.getCollection(expected.collection()).listIndexes().into(new ArrayList<>());
                 boolean found = indexes.stream().anyMatch(i -> expected.name().equals(i.getString("name"))

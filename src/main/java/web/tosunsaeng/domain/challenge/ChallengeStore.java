@@ -46,7 +46,8 @@ public class ChallengeStore {
     }
     public Attempt question(String owner, String date, int q) {
         Attempt a = mongo.findOne(Query.query(Criteria.where("userId").is(owner).and("challengeDate").is(date)
-                .and("questionNumber").is(q)), Attempt.class);
+                .and("questionNumber").is(q)).with(org.springframework.data.domain.Sort.by(
+                        org.springframework.data.domain.Sort.Direction.DESC, "attemptSequence")), Attempt.class);
         return a != null && hidden(a) ? null : a;
     }
     public SubmitReceipt receipt(String owner, String key) {

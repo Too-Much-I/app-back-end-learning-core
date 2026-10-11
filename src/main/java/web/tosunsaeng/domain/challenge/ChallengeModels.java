@@ -38,6 +38,8 @@ public final class ChallengeModels {
         public String userId;
         public String challengeDate;
         public int questionNumber;
+        // null is the original attempt (including pre-migration documents); retries start at 1.
+        public Integer attemptSequence;
         public Question question;
         public Instant createdAt;
         public Instant submissionDeadlineAt;
@@ -51,6 +53,8 @@ public final class ChallengeModels {
         public String audioDigest;
         public Result result;
         public boolean terminal() { return state != State.CREATED; }
+        public boolean submitted() { return state == State.SUBMITTED; }
+        public int sequence() { return attemptSequence == null ? 0 : attemptSequence; }
         public boolean gradingTerminal() { return "completed".equals(gradingStatus) || "failed".equals(gradingStatus); }
         public static Attempt create(String id, String owner, String date, Question question, Instant now) {
             Attempt a = new Attempt();

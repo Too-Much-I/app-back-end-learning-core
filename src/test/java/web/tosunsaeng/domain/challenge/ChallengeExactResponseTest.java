@@ -67,7 +67,7 @@ class ChallengeExactResponseTest {
                 .putNull("correctedAnswer").putNull("correctionItems"));
         assertThat(question.get("aiResult")).isEqualTo(expectedAi);
     }
-    @ParameterizedTest @ValueSource(strings = {"pending", "processing", "failed", "not_requested"})
+    @ParameterizedTest @ValueSource(strings = {"pending", "processing", "failed"})
     void missingResultIsExplicitNullWithoutExtraFields(String status) {
         var a = attempt(); a.state = status.equals("not_requested") ? State.EXPIRED : State.SUBMITTED;
         a.gradingStatus = status;
@@ -81,6 +81,10 @@ class ChallengeExactResponseTest {
         assertThat(response(null).at("/result").has("question")).isTrue();
         assertThat(response(null).at("/result/question").isNull()).isTrue();
         assertThat(response(attempt()).at("/result/question").isNull()).isTrue();
+    }
+    @Test void expiredAttemptDoesNotExposeReferenceAnswer() {
+        var a = attempt(); a.state = State.EXPIRED;
+        assertThat(response(a).at("/result/question").isNull()).isTrue();
     }
     @Test void unavailableFeedbackFieldsAreNullButKnownEmptyCorrectionsStayEmpty() {
         var a = attempt(); a.state = State.SUBMITTED;

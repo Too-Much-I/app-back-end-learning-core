@@ -39,7 +39,7 @@ public final class ChallengeViews {
                 "pending", a.submittedAt, a.question.referenceAnswer(), false);
     }
     public static Detail detail(Attempt a) {
-        if (a == null || !a.terminal()) return null;
+        if (a == null || !a.submitted()) return null;
         Result r = a.result;
         AiResult ai = r == null ? null : new AiResult(r.transcript(), feedback(r));
         return new Detail(a.questionNumber, a.question.korean(), "submitted",

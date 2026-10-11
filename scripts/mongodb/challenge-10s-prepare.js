@@ -6,7 +6,7 @@ const spec = (suffix, name, unique, ...keys) => ({collection: `challenge_10s_${s
 const INDEXES = [
     spec("questions", "challenge_day_unique", true, "dayNumber"),
     spec("questions", "challenge_question_id_unique", true, "questions.questionId"),
-    spec("attempts", "challenge_owner_date_question_unique", true, "userId", "challengeDate", "questionNumber"),
+    spec("attempts", "challenge_owner_date_question_sequence_unique", true, "userId", "challengeDate", "questionNumber", "attemptSequence"),
     spec("attempts", "challenge_expiry", false, "state", "submissionDeadlineAt", "_id"),
     spec("submit_receipts", "challenge_submit_key_unique", true, "userId", "idempotencyKey"),
     spec("grading_jobs", "challenge_generation_unique", true, "attemptId", "generation"),
@@ -48,7 +48,7 @@ function compatible(index, expected) {
     return JSON.stringify(index.key) === JSON.stringify(expected.key) && (index.unique === true) === expected.unique
         && !index.sparse && !index.hidden && !index.partialFilterExpression && !index.collation && index.expireAfterSeconds === undefined;
 }
-async function prepare(database, apply) {
+async function prepare(database, apply, allowRetryMigration = false) {
     databaseName(database.getName());
     const catalog = await database.getCollection(COLLECTIONS[0]).find().toArray();
     const report = validateCatalog(catalog);
@@ -61,6 +61,13 @@ async function prepare(database, apply) {
     ]).toArray();
     if (wrongTypes.length) throw Error("Catalog requires BSON int fields");
     const names = new Set((await database.getCollectionInfos()).map(c => c.name));
+    const legacy = spec("attempts", "challenge_owner_date_question_unique", true, "userId", "challengeDate", "questionNumber");
+    const oldIndexes = names.has(legacy.collection) ? await database.getCollection(legacy.collection).getIndexes() : [];
+    const oldIndex = oldIndexes.find(i => i.name === legacy.name);
+    if (oldIndex && !compatible(oldIndex, legacy)) throw Error("Incompatible legacy Challenge index");
+    if (oldIndexes.some(i => i.unique && JSON.stringify(i.key) === JSON.stringify(legacy.key) && i.name !== legacy.name))
+        throw Error("Unexpected legacy Challenge index name; explicit review required");
+    if (apply && oldIndex && !allowRetryMigration) throw Error("Explicit CHALLENGE_RETRY_INDEX_MIGRATION required");
     for (const collection of COLLECTIONS) {
         if (!names.has(collection)) continue;
         const indexes = await database.getCollection(collection).getIndexes();
@@ -77,9 +84,19 @@ async function prepare(database, apply) {
         }
     }
     const attempts = database.getCollection("challenge_10s_attempts");
+    if ((await attempts.aggregate([
+        {$group: {_id: {userId: "$userId", challengeDate: "$challengeDate", questionNumber: "$questionNumber"},
+            activeCount: {$sum: {$cond: [{$ne: ["$state", "EXPIRED"]}, 1, 0]}},
+            activeSequence: {$max: {$cond: [{$ne: ["$state", "EXPIRED"]}, {$ifNull: ["$attemptSequence", 0]}, -1]}},
+            maxSequence: {$max: {$ifNull: ["$attemptSequence", 0]}}}},
+        {$match: {$or: [{activeCount: {$gt: 1}}, {$expr: {$and: [{$eq: ["$activeCount", 1]}, {$ne: ["$activeSequence", "$maxSequence"]}]}}]}},
+        {$limit: 1}
+    ]).toArray()).length) throw Error("Invalid Challenge attempt chain");
     const uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
     for await (const a of attempts.find()) {
         const questionNumber = integer(a.questionNumber), generation = integer(a.generation);
+        if (a.attemptSequence != null && (!Number.isInteger(integer(a.attemptSequence)) || integer(a.attemptSequence) < 1))
+            throw Error("Invalid Challenge retry sequence");
         if (!uuid.test(a._id) || !uuid.test(a.userId) || !/^\d{4}-\d{2}-\d{2}$/.test(a.challengeDate)
             || ![1, 2, 3].includes(questionNumber) || !["CREATED", "SUBMITTED", "EXPIRED"].includes(a.state)
             || !(a.createdAt instanceof Date) || !(a.submissionDeadlineAt instanceof Date)
@@ -103,8 +120,11 @@ async function prepare(database, apply) {
         for (const name of COLLECTIONS) if (!names.has(name)) await database.createCollection(name);
         for (const index of INDEXES) await database.getCollection(index.collection).createIndex(index.key, {name: index.name, unique: index.unique});
         for (const index of INDEXES) if (!(await database.getCollection(index.collection).getIndexes()).some(i => i.name === index.name && compatible(i, index))) throw Error("Index verification failed");
+        // Only the reviewed legacy constraint is removed, after its replacement is verified.
+        // Writers must remain drained until the new application is running.
+        if (oldIndex) await database.getCollection(legacy.collection).dropIndex(legacy.name);
     }
-    return {...report, apply, collections: COLLECTIONS.length, indexes: INDEXES.length};
+    return {...report, apply, retryIndexMigrationRequired: !!oldIndex, collections: COLLECTIONS.length, indexes: INDEXES.length};
 }
 async function runMongosh() {
     const name = databaseName(environment("MONGODB_DATABASE"));
@@ -112,7 +132,7 @@ async function runMongosh() {
     if (apply && environment("CHALLENGE_WRITERS_DRAINED") !== "true") throw Error("Drain Challenge writers before apply");
     if (!environment("MONGODB_URI")) throw Error("MONGODB_URI required");
     const connection = new Mongo(environment("MONGODB_URI"));
-    print(JSON.stringify(await prepare(connection.getDB(name), apply)));
+    print(JSON.stringify(await prepare(connection.getDB(name), apply, environment("CHALLENGE_RETRY_INDEX_MIGRATION") === "true")));
     quit(0);
 }
 if (typeof module !== "undefined") module.exports = {COLLECTIONS, INDEXES, databaseName, validateCatalog, compatible, prepare};
