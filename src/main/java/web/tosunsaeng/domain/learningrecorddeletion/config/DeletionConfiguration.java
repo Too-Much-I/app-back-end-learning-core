@@ -16,6 +16,7 @@ import java.time.Clock;
 
 @Configuration(proxyBeanMethods = false)
 @ConditionalOnProperty(prefix = "app.learning-record-deletion", name = "writer-fence-enabled", havingValue = "true")
+@org.springframework.boot.context.properties.EnableConfigurationProperties(web.tosunsaeng.domain.answerlearning.LearningProperties.class)
 public class DeletionConfiguration {
     @Bean public DeletionAccess deletionAccess(MongoTemplate mongo) { return new DeletionAccess(mongo); }
     @Bean public DeletionTransactions deletionTransactions(MongoDatabaseFactory factory) { return new DeletionTransactions(factory); }
@@ -44,8 +45,11 @@ public class DeletionConfiguration {
     }
 
     @Bean @ConditionalOnProperty(prefix = "app.learning-record-deletion", name = "worker-enabled", havingValue = "true")
-    public DeletionStorage deletionStorage(S3Client s3, StringRedisTemplate redis, @Value("${spring.cloud.aws.s3.bucket}") String bucket) {
-        return new S3RedisDeletionStorage(s3, redis, bucket);
+    public DeletionStorage deletionStorage(S3Client s3, StringRedisTemplate redis, @Value("${spring.cloud.aws.s3.bucket}") String bucket,
+            web.tosunsaeng.domain.answerlearning.LearningProperties learning,
+            software.amazon.awssdk.auth.credentials.AwsCredentialsProvider credentials, com.fasterxml.jackson.databind.ObjectMapper json) {
+        var remote = new web.tosunsaeng.domain.answerlearning.LearningLambdaClient(learning, credentials, json);
+        return new S3RedisDeletionStorage(s3, redis, bucket, learning.getBucket(), remote::purge);
     }
     @Bean @ConditionalOnProperty(prefix = "app.learning-record-deletion", name = "worker-enabled", havingValue = "true")
     public DeletionWorker deletionWorker(MongoTemplate mongo, DeletionTransactions tx, UserOwnershipGuardService guards,

@@ -1,5 +1,131 @@
 # Learning Core Current State
 
+## 2026-10-13 — 사용자 승인에 따른 학습 feature 브랜치 GitHub 전달
+
+- 요청: “feat/answer-learning에 올려줄래? 백엔드 러닝 코어 레포에”. 이번 명시적인 commit/push 요청은 이전 로컬 브랜치 유지 결정과 AGENTS의 수동 Git 규칙보다 우선한다. 대상은 Too-Much-I/app-back-end-learning-core의 feat/answer-learning뿐이며 main/develop push·PR merge·배포는 범위에 포함하지 않는다. 신규 Jira 없음.
+- 검증된 전체 학습 변경63개 파일을 463ae2e에 커밋했다. 신규 API·학습/채점 worker·소유권/삭제 연결·Lambda 전달 소스·테스트·환경 예시·인계 문서를 함께 포함한다. 비공개 문제은행/실제 음성/환경파일/배포 원시자료는 제외했다. 추가 라인의 credential 패턴 검사와 git diff --check 통과, 예상 밖 파일 변경 없음.
+- 원격에 같은 feature 브랜치가 없음을 확인했다. 최신 develop 3d50195를 feature에 병합하며 기록 문서 CURRENT_STATE/WORKLOG의 충돌2개는 양쪽 전체 이력을 보존해 해결했다. application.yml은 두 기능 설정을 유지하며 자동 병합됐다. main/develop 원격 ref는 바꾸지 않는다.
+- 제품 코드를 이번 전달 단계에서 추가 수정하지 않았다. 앞서 통과한 최신 develop 합류 검사(Java908개 중 조건부 fixture1 skip, Mongo160개 실패/오류0)와 실제 병합된 소스·테스트·설정의 동일성을 대조한다. 전체 콘텐츠 fixture는 별도 통과했고 프론트 계약 catalogs13/details520/answers1000/contentVersions1 일치. 같은 코드를 대상으로 전체 테스트를 중복 실행하지 않는다.
+- 외부 API/DTO·기존 시험/챌린지 계약 유지. 문서의 로컬 보류 안내를 이번 전달 결정에 맞춰 갱신했다. 이 feature 브랜치 push는 현재 배포 workflow의 main/develop 트리거를 실행하지 않는다. 최종 push 성공은 원격 branch SHA와 로컬 HEAD 일치로 확인한다.
+- 남은 위험/다음: develop PR 검토·머지 및 새 backend 이미지 배포, 실제 로그인 앱의 목록→녹음→제출→채점→완료·계정 통합/삭제 E2E는 별도다. 전달 사실을 테스트 서버 배포 완료로 해석하지 않는다. 현재 증거는 Git 제외 build/answer-learning-push-20261013/에 보관한다.
+
+## 2026-10-13 — 학습 전용 코드에서 대기열·한도 오류 수정, 공통 코드 변경 최소화
+
+- 요청: “메인 코드와 최대한 충돌이 안나게 수정”. 신규 Jira 없음. 기존 `feat/answer-learning`의 미커밋 변경을 보존하고, 이번 런타임 수정은 신규 학습 `LearningService.java`, `LearningStore.java`, `LearningWorker.java` 3개로 한정했다. 공통 owner transaction/삭제/계정 통합 구현과 main은 추가 수정하지 않았다.
+- P1 수정: worker는 `(nextRunAt, _id)` 커서와 고정된 조회 시각으로 매 tick 최대10개씩 다음 후보를 확인한다. claim 실패 전 커서를 이동하고 순회 끝에서 초기화한다. 차단된 소유자 데이터 변경 없이 다른 사용자를 처리하며, 이후 차단 해제된 작업을 다시 처리한다. 격리 Mongo에서 동일 시각의 차단40개·정상1개·뒤늦은 신규1개로 순회/재방문을 검증했다.
+- P2 수정: 제출 insert/재시도 attempt CAS와 quota 갱신을 기존 owner 트랜잭션 하나로 묶었다. insert 전 중복 재확인, 실제 생성/상태 전환 승자만 차감한다. 한도 거절이면 생성/attempt도 롤백한다. 새 LearningQuotaTransactionTest 5개는 실제 Mongo replica set·UserOwnedTransactionExecutor로 중복 생성/재시도, 마지막 한도 경쟁, 생성/재시도 롤백을 검증한다.
+- 기존 학습 unit/Mongo 검사를 새 내부 메서드에 맞게 갱신했다. 계정 통합·기록 삭제 통합 검사의 완료 fixture는 quota와 무관한 준비 데이터이므로 직접 insert하도록 변경했다. 테스트 외 공통 runtime 변경 없음. 기존 공개 URL/method/DTO/BaseResponse·exam/challenge/AI/S3/Redis 계약, 설정·의존성·DB 스키마 변경 없음.
+- 검증: JDK21 `./gradlew clean test mongoIntegrationTest` Java689개(콘텐츠 fixture1 조건부 skip), Mongo157개 실패/오류0. 전체 비공개 콘텐츠 fixture 별도 통과. 서버 DTO→프론트 계약 catalogs13/details520/answers1000/contentVersions1 일치. Docker29 호환은 검증 프로세스에만 JAVA_TOOL_OPTIONS=-Dapi.version=1.44 적용. clean 전 기존 build/answer-learning* 배포 증거를 보호 복사 후 복원했다.
+- 최신 develop `3d50195`를 별도 임시 폴더로 export하고 전체 학습 변경을 합친 검사: Java908개(같은 fixture1 skip), Mongo160개 실패/오류0. application.yml 자동 병합으로 양쪽 설정 유지, 런타임 파일 충돌0. 원래 feature ref/index는 그대로이며 rebase/merge/commit/push하지 않았다.
+- 공통 CURRENT_STATE/WORKLOG는 같은 위치의 기록 추가로 텍스트 충돌2개가 남는다. 양쪽 기록을 보존한 머지용 파일을 Git 제외 build/answer-learning-conflict-fix-20261013/resolved-docs/에 준비했다. 실제 머지 시 최신 기준 재확인 필요. 인계 문서의 미해결2건 안내와 quota 설명을 현 상태로 갱신했으며 과거 로그를 삭제하지 않았다.
+- 수정 전 파일 hash와 대조해 위 범위 외 사용자 변경 보존을 확인했다. main/origin-main/origin-develop/HEAD 불변, 예상 밖 변경 없음. 전체 검증 수치·병합/수정 범위 증거는 build/answer-learning-conflict-fix-20261013/. AWS·운영 DB·실제 음성·STT/Decisions 호출 없음. Secret/Token/사용자 데이터 기록 없음.
+- 남은 위험/배포 전/다음: 새 backend 이미지는 미배포다. 담당자가 전체 로컬 브랜치 변경을 수령해 문서 충돌 해결·커밋·develop PR 배포한 뒤 실제 JWT 앱 목록→녹음→채점→완료 및 계정 통합/삭제·기존 기능 회귀를 검증한다. 이번 통과는 실제 앱 종단 검증을 대신하지 않는다.
+
+## 2026-10-13 — 학습 feature 브랜치 최종 코드 리뷰: 수정 필요 2건
+
+- 요청: “백엔드 디벨롭 학습기능 관련 브랜치 코드를 최종적으로 점검”. 신규 Jira 없음. `feat/answer-learning`의 staged/unstaged/untracked 전체를 검토했다. 제품 코드 수정이나 원격 배포는 요청 범위로 실행하지 않았다.
+- 원격 develop 조회/fetch 결과 `b2b37ff` 이후 `3d50195`(Billing workload JWT)가 추가돼 있었다. 원래 HEAD/main/origin-main은 유지했다. 최신 develop을 임시 디렉터리에 export하고 전체 로컬 변경을 합쳐 런타임 합류를 검사했다. application.yml은 양쪽 설정을 보존하며 자동 병합됐고 CURRENT_STATE/WORKLOG 2개 문서는 충돌했다. 실제 feature 브랜치 rebase/merge/commit/push 없음. 신규 upstream AGENTS의 Billing JWT 예외를 읽고 해당 코드는 수정하지 않았다.
+- 발견 P1: LearningStore.due의 오래된 10건 제한 + LearningWorker.tick의 claim 실패 무시로 삭제 중 owner의 작업 10개가 앞서면 다른 사용자의 queued 작업을 계속 누락한다. 실제 격리 Mongo 조회·정렬/worker를 사용하고 production과 같은 DeletionFailure를 guard에서 주입한 재현에서 5회 tick 후 정상 11번째 제출은 dispatched=false였다. 차단된 owner 건을 건너뛰는 후보 탐색/스케줄링이 필요하다.
+- 발견 P2: LearningService의 quota 갱신과 submission insert/retry CAS가 별도 transaction이다. 같은 ID의 동시 생성 2회를 실제 격리 Mongo로 재현하면 제출은 1개지만 quota는 2회 증가한다. 검사는 초기 counter 1에서 expected2/actual3으로 실패했다. retry에도 같은 분리 순서가 있다. 실제 상태 전환과 quota를 한 owner transaction으로 묶고 중복 승자가 아닌 요청을 재차감하지 않아야 한다.
+- 검증: 원래 브랜치 JDK21 clean test 689개, 실패/오류0, 선택 콘텐츠 fixture1 skip. 전체 테스트 DB import 파일을 지정한 콘텐츠 fixture 별도 통과. Mongo 전체152개 실패/오류/skip0. 최신 develop 합류 복사본 Java908개 실패/오류0·선택 fixture1 skip, Mongo155개 실패/오류/skip0. 두 추가 기대 동작 재현 검사는 실패하여 위 문제를 확인했으며 기존 통과 수치와 구분한다.
+- Lambda 오프라인15개, 설정 생성기3개, 배포/마이그레이션 Node23개 통과. 전체 서버 DTO를 실제 프론트 스키마로 확인해 catalogs13/details520/answers1000/contentVersions1 일치. 기존 공개 URL/HTTP method/DTO/BaseResponse 및 exam/challenge/AI/S3/Redis 계약 변경 없음. 실제 STT/Decisions 호출과 사용자 JWT의 실환경 음성 제출 종단 검증은 수행하지 않았다.
+- 첫 Gradle 시도는 macOS java_home -v21이 Java17을 반환해 toolchain 탐색에 실패했다. 기존 Homebrew JDK21 경로를 명시해 통과했으며 코드/의존성 변경 없음. Docker29 호환은 검증 프로세스에만 JAVA_TOOL_OPTIONS=-Dapi.version=1.44를 적용했다. clean 이전 배포 증거를 임시 보호 복사한 뒤 원래 build 경로에 복원했다.
+- 변경 파일은 docs/answer-learning/release-handoff.md의 머지 전 차단 사항과 이 WORKLOG/CURRENT_STATE 기록뿐이다. 재현 Java 소스·실패 XML·검사 요약은 Git 제외 build/answer-learning-final-review-20261013/에 보관했다. 제품 diff는 검토 전과 일치하며 기존 사용자 변경 보존, 예상 밖 제품 코드 변경 없음. AWS·운영 데이터·main은 수정하지 않았다. Secret/Token/실사용자 전사 기록 없음.
+- 남은 위험/배포 전/다음: P1/P2를 해결하고 재현 검사를 통과시킨 뒤 최신 develop 문서 충돌을 해결한다. 현재 백엔드 코드가 아직 배포되지 않았으므로 그 후 feature 전달/develop PR 배포와 실제 앱 목록→녹음→채점→결과·계정 통합/삭제·기존 기능 회귀 확인이 필요하다. 기존 통과 테스트/인프라 준비를 출시 가능 판정으로 혼동하지 않는다.
+
+## 2026-10-13 — 학습 Lambda 최신 배포 및 테스트 채점 활성화 완료
+
+- 사용자 요청: “이제 람다 관련 작업해줘”. 앞선 테스트 ECS 설정 승인에 이어 테스트 학습 Lambda 배포와 채점 플래그 활성화를 진행했다. 신규 Jira 없음. 기존 사용자 결정대로 백엔드 변경은 로컬 feature 브랜치에 유지하며 commit/push/merge하지 않았다.
+- 서울 `tosunsaeng-answer-learning-staging`의 intake/worker 두 함수를 최신 전달 패키지로 업데이트했다. ZIP 22,082,587 bytes, SHA-256 `3c4196f8b1451fdd5dbbb798b1d92f0ddd773619bc4c99f7dfb90fd5043babf2`. 소스 manifest 12개와 포함 소스 9개·Linux native 모듈 2개, 환경파일/사용자 자료 미포함을 확인했다. 기존 code bucket의 새 해시 경로에 암호화·checksum 검증으로 올렸고 기존 객체는 보존했다.
+- 기존 CloudFormation 템플릿/파라미터를 유지하고 CodeKey만 변경하는 changeset을 검토·실행했다. UPDATE_COMPLETE, 두 함수 Active/Successful 및 CodeSha256 일치. 리소스 12개 실제 ID, Function URL, AWS_IAM 인증·호출 정책, 역할/runtime/환경설정/secret 참조 불변. API 키 값은 조회·기록하지 않았다.
+- Lambda 합성 테스트 15개 통과. 초기 실행은 pytest 의존성/작업 디렉터리 문제로 실패했으며 기존 boto3 환경을 PYTHONPATH로 로드하고 Lambda 디렉터리에서 실행해 통과했다. 설치나 제품 코드 수정으로 우회하지 않았다. 실제 IAM health deletionContract=v1, 미서명 403, 존재하지 않는 합성 UUID의 DELETE 2회/세 attempt의 비개인정보 tombstone·GET404, 삭제된 작업의 지연 worker 전달 ACK를 확인했다. 합성 표식 3개는 30일 TTL로 만료된다. 큐 대기/처리/지연 0, 실제 사용자 자료·음성/STT/Decisions 모델 호출 없음.
+- 테스트 ECS는 `:25` → `:26`에서 ANSWER_LEARNING_GRADING_ENABLED만 false → true로 변경했다. 나머지 전체 task 설정·이미지·기존 환경/secret/역할/네트워크/서비스 rollout 설정 보존. 14:12 KST services-stable 성공, 단일 COMPLETED 배포·desired/running/pending 1/1/0, 같은 image digest의 새 task와 healthy ALB target 확인. 테스트 Core·Identity 및 운영 Core HTTP200/UP.
+- 다른 서비스 9개의 설정·primary deployment ID는 그대로다. 최초 전체 상태 동일성 검사는 이미 진행 중이던 테스트 Identity :43 배포의 정상 완료(실행 수 2→1) 때문에 실패했다. 변경 전부터 같은 primary deployment ID가 진행 중이었음을 확인하고, 서비스 설정 보존과 독립적 rollout 상태 변화를 분리해 재검증했다. 나머지 8개는 배포/실행 수도 동일하다. 이번 작업은 Identity·기존 staging/prod 서비스를 수정하지 않았다.
+- 변경 파일: lambda/answer-learning/README.md, docs/answer-learning/README.md·test-release.md·release-handoff.md, docs/codex/WORKLOG.md·CURRENT_STATE.md. 제품 소스와 기존 공개 API/DTO/BaseResponse·exam/challenge/AI/S3/Redis 계약은 유지했다. 배포/문서 작업으로 Gradle을 불필요하게 재실행하지 않았으며 Lambda 테스트·실환경 계약·AWS 설정 대조·문서 diff 검사를 수행했다.
+- 원시 구성/변경 계획/검증 증거와 일회성 검사 도구는 Git 제외 build/answer-learning-lambda-release-20261013/의 0700 폴더·0600 파일에 보관한다. Secret/Token/사용자 음성·전사 기록 없음. 기존 staged/unstaged/untracked 작업 보존, 예상 밖 제품 코드 변경 없음. main/origin-main/origin-develop ref 불변.
+- 남은 위험/다음 작업/배포 전 확인: 새 학습 API를 포함한 백엔드 코드는 아직 배포하지 않았다. feature 전체 변경을 담당자가 커밋·push하고 develop PR 배포한 뒤 실제 JWT 앱→ECS→S3→Lambda→Mongo 목록·녹음·결과·계정 통합/삭제와 기존 앱 회귀를 확인한다. 네이티브 STT 포함 새 앱 빌드가 필요하며 이번 Lambda 계약 검사만으로 실제 음성 채점/모델 정확도 통과를 주장하지 않는다. 이후 문제가 생기면 현재 이미지·삭제 계약을 유지하면서 채점 접수 플래그만 끄고, 삭제 계약이 없는 과거 Lambda로 단순 복귀하지 않는다.
+
+## 2026-10-13 — 테스트 ECS 학습 환경설정 단계 배포 완료
+
+- 사용자 요청: 권한 적용 후 다음 작업으로 제안한 테스트 ECS 학습 환경설정에 대해 “그러면 다음 작업 해줘”라고 승인했다. 이번 범위는 테스트 설정 배포이며 main/기존 staging/prod·새 코드 이미지·Lambda 배포·commit/push는 포함하지 않는다. 신규 Jira 없음.
+- 서울 `tosunsaeng-learning-core-test-service`의 task definition `:24`를 기준으로 `:25`를 등록·적용했다. `ANSWER_LEARNING_*` 9개만 추가했고 기존 환경변수 48개, secret 참조, 고정 image digest, 역할/CPU/메모리/포트/네트워크/로그/rollout·rollback 설정은 보존했다. 서버 이미지를 빌드하거나 변경하지 않았다.
+- 추가 설정: enabled=true, grading-enabled=false, dataset `ts-level-bank-40-per-part-20261007-v1`, content `20261012-cda52eb5001a`, bucket `tosunsaeng-app-audio`, 기존 서울 IAM Lambda URL, region ap-northeast-2, 일일 제출60, poll1500ms. 최신 Lambda 삭제 계약 배포가 남아 있어 생성기의 전체 출시 기본값 grading=true를 이번 단계에 한해 false로 조정했다. 새 제출을 조기에 활성화하지 않는 의도적 단계 적용이며 사용자에게 진행 중 안내했다.
+- 기존 UserMerged writer/consumer/source deny 및 학습 기록 삭제 writer fence가 true임을 확인하고 그대로 보존했다. 테스트 DB 이름도 유지했다. 앞서 적용한 S3/Lambda 정책 연결을 재확인했다. AWS API가 환경변수 배열 순서만 재정렬해 최초 등록 후 동일성 assert가 중단됐지만 서비스 변경 전이었고, 순서 무관 전체 값/나머지 설정 일치를 확인한 후 같은 :25를 적용했다. 불필요한 추가 revision 없음.
+- 검증: 설정 생성기 unittest 3개 통과, 등록 요청과 기존 설정의 delta가 9개뿐임을 확인했다. 새 task가 기존과 같은 image digest로 실행, 54초에 Spring 정상 기동·예외 없음. 초기 부팅 중 ALB health 실패 후 기존 30초 간격/5회 성공 규칙으로 healthy 전환. 기존 task를 유지한 rolling 전환, `aws ecs wait services-stable` 성공. 13:52 KST 최종 COMPLETED / desired1 running1 pending0 / 새 target healthy / Core HTTP200 UP 확인.
+- 다른 서비스 9개는 task definition·deployment ID·실행 수·네트워크·배포 설정 그대로다. 테스트 Core·Identity 및 운영 Core health 모두 HTTP200 UP. 기존 공개 API/DTO/BaseResponse와 exam/challenge/AI/S3/Redis 계약 및 제품 소스 불변. 이번에는 설정·문서만 변경해 Gradle 전체 검사는 재실행하지 않았고 설정 검사·AWS 실상태 검증·diff 검사로 범위를 확인했다.
+- 변경 파일: `docs/answer-learning/README.md`, `test-release.md`, `release-handoff.md`, `docs/codex/WORKLOG.md`, `CURRENT_STATE.md`. 변경 전후 원시 ECS 설정 및 검증은 Git 제외 `build/answer-learning-ecs-20261013/`의 0600 파일에 보관한다. 이전 :24는 이 설정 배포만 되돌릴 때의 기준이며, 이후 새 기능 코드/기록이 배포된 뒤에는 과거 이미지로 단순 복귀하지 않도록 문서화했다.
+- 남은 위험/배포 전/다음: 최신 Lambda 배포와 IAM health의 deletionContract=v1 검증, 채점 설정 true 전환, 기능 브랜치→develop PR을 통한 새 backend 이미지 배포, 실제 JWT 앱 목록→녹음→채점 E2E. 현재 이미지는 새 학습 코드를 포함하도록 변경한 것이 아니므로 설정 완료를 학습 기능 사용 가능/전체 회귀 통과로 표현하지 않는다.
+- 기존 staged/unstaged/untracked 작업 보존, 예상 밖 변경 없음. main/origin-main/origin-develop ref 불변, commit/push/merge 없음. 운영 설정·DB·객체·Lambda·모델 호출 없음. Secret/Token/사용자 녹음·전사 기록 없음.
+
+## 2026-10-13 — 테스트 Learning Core 학습 S3/Lambda 권한 적용
+
+- 사용자 요청: “그러면 ecs에 s3, lambda 권한을 적용해 줄래? 이거 하면 기존의 서버에 문제가 생기는건 아니지?” 이번 요청은 테스트 task role의 학습 권한 추가에 한해 기존 AWS 변경 금지의 명시적 예외다. 신규 Jira 없음, main/운영 및 ECS 배포 변경은 범위 밖이다.
+- 적용: `tosunsaeng-learning-core-test-task-role`에 `LearningCoreTestAnswerLearningS3` 인라인 정책을 추가하고 기존 `tosunsaeng-answer-learning-staging-BackendInvokePolicy-Te87n2HOPfmQ`를 연결했다. 출판 버전 media 읽기, 학습 녹음 두 prefix 저장·정리, 학습 intake 한 함수의 IAM Function URL 호출만 허용한다. 출판 콘텐츠 수정·삭제, 다른 Lambda 호출은 허용하지 않는다.
+- 변경 전 클러스터 서비스 10개의 역할을 대조해 테스트 Learning Core만 사용하는 task role임을 확인했다. execution role·기존 staging/prod 역할·trust policy·permissions boundary 및 기존 인라인 정책 3개는 유지했다. 관리형 정책 본문, ECS 환경변수/이미지/배포, 버킷 정책·객체/DB/Lambda 코드 변경 없음.
+- 검증: 추가 권한만 대상으로 18개 IAM simulation, 적용 후 실제 역할 18개 simulation 통과. 기존 정책 재조회 일치, 서비스 10개의 task definition·deployment ID·desired/running/pending 불변. 테스트 Learning Core·Identity, 운영 Learning Core health 모두 HTTP 200 / UP. 신규 학습 기능은 아직 비활성이고 실제 녹음·채점 호출은 수행하지 않았다.
+- 초기 시뮬레이션 요청은 문서당 2,000자 제한으로 거절돼 같은 정책의 Statement별 문서로 분할해 통과했다. health의 시스템 Python은 로컬 CA 설정 오류가 있어 인증서 검증을 유지하는 curl로 확인했다. 서비스 오류나 보안 검증 우회는 없었다.
+- 변경 파일: `docs/answer-learning/README.md`, `test-release.md`, `release-handoff.md`, `docs/codex/WORKLOG.md`, `CURRENT_STATE.md`. 원시 역할 변경 전후·시뮬레이션·health 증거와 일회성 확인 도구는 Git 제외 `build/answer-learning-iam-20261013/`에 0600 파일로 보관했다. 테스트 적용 문서에 추가한 정책 두 개만 되돌리는 절차를 기록했다.
+- 외부 API·DTO/BaseResponse·기존 exam/challenge/AI/S3/Redis 계약과 제품 소스 불변. 문서·IAM만 변경했으므로 Gradle 전체 테스트는 재실행하지 않았으며 실제 AWS 정책 검증·health·diff 검사를 수행했다. 기존 staged/unstaged/untracked 변경을 보존했고 예상 밖 변경 없음. commit/push/merge 없음.
+- 남은 위험/배포 전/다음 작업: ECS 학습 설정과 기존 owner transaction fence 확인, 최신 Lambda 패키지 및 backend develop PR 배포, 실제 JWT 앱→S3→Lambda→Mongo 종단 확인이 남는다. IAM simulation·health 정상은 전체 기능 회귀 검증의 대체가 아니다. 이후 새 학습 작업을 시작한 뒤 권한을 제거하면 업로드/채점/삭제에 영향을 주므로 되돌리기 전 처리 중 상태를 확인한다. Secret/Token/사용자 음성·전사 기록 없음.
+
+## 2026-10-13 — 기존 feature 브랜치에서 앱 통합 보완 (미배포)
+
+- 최종 추가 확인: 기존 비-v4 canonical 제출 ID 삭제 호환성 검사 및 bootJar 성공. 시작/종료 main/develop SHA 불변.
+
+- 사용자 요청: 기존 프론트/백엔드 브랜치를 이어서 추가 이식 없이 머지 가능한 코드로 준비. main 코드/브랜치 변경 금지. 사용자 기존 결정대로 commit/push 없이 로컬 유지. 신규 Jira/외부 메시지 없음.
+- 변경 파일/동작: `LearningOwnership`와 기존 UserMerged 트랜잭션 연결, owner CAS/lease 차단, 완료 business-key 멱등성 및 root+완료 원자 저장. `DeletionTarget/Worker/Configuration`, `S3RedisDeletionStorage`에 신규 제출·Part 1 포함 완료·두 녹음 prefix/버전·Lambda 전사/결과 삭제를 연결. 업로드 발급/외부 쓰기 drain, 안전 지점 이후 재학습 보존. 기능 OFF에서도 기존 기록 lifecycle 유지, 활성화에는 기존 owner transaction fence 요구.
+- `lambda/answer-learning/`에 전용 런타임·고정 의존성·인프라 템플릿·합성 테스트를 함께 전달했다. IAM 전용 DELETE가 모든 attempt를 개인정보 없는 30일 tombstone으로 교체하고 worker의 늦은 저장을 차단한다. 빌드 ZIP은 무시된 build/에만 생성하고 소스 해시/환경파일·사용자 데이터 미포함을 확인. 원본 AI 저장소의 해당 Lambda도 동일하게 보완. 실제 배포 안 함.
+- `scripts/answer-learning/prepare_test_release.py`와 3개 검사, S3 역할 정책, verify CI 및 인수인계/환경 적용 문서 추가. 도구는 현재 test task만 받아 학습 환경변수만 추가한 로컬 JSON을 생성하며 AWS를 호출하지 않는다. 기존 배포 workflow/서비스/IAM/DB 변경 없음.
+- 프론트 같은 feature 브랜치: `LearningSessionScreen`의 첫 응답 snapshot 유지로 캐시 갱신 시 연습/녹음 초기화 방지. `auth-runtime`에서 계정 통합 완료 후 서버 캐시 갱신. `.env.local.example`의 Identity/Core test 환경 정렬. 기존 staged/unstaged 작업 및 샘플 어댑터 수정 보존.
+- 유지 계약: 기존 공개 API/DTO/BaseResponse, exam/challenge AI callback, 기존 S3/Redis key, `/api/v1/learning` 10개 앱 API 불변. Lambda 내부 DELETE와 health의 deletionContract만 추가. 모델 호출·공식 발음/등급 판정 추가 없음.
+- 검사: JDK21 `./gradlew clean test` 689개, 실패/오류 0, optional 콘텐츠 fixture 1개 skip; 이 fixture는 전체 비공개 import를 지정해 별도 통과. 전체 `mongoIntegrationTest` 152개, 실패/오류/skip 0. 계정 통합/삭제·새 완료 보존·늦은 worker·완료 rollback 검증 포함. 처음 Docker 29 API 호환 오류로 컨테이너 초기화 실패 후 검증 프로세스에만 `JAVA_TOOL_OPTIONS=-Dapi.version=1.44`를 적용해 통과. 기존 테스트의 새 atomic 완료 경로 기대값 2개도 갱신했다.
+- 기존 배포/마이그레이션 Node 23개, 환경 생성기 3개, 포함 Lambda 합성 15개, 원본 AI 관련 검사 45개 통과. 프론트 학습 68개 및 lint/tsc/architecture/naming/format 통과(기존 참고 경고 35개). Java→프론트 계약 catalogs13/details520/answers1000/contentVersions1 일치. AWS/Atlas/실제 STT/모델 호출 없음.
+- 남은 위험/배포 전/다음 확인: Lambda 새 DELETE 배포와 IAM/ANSWER_LEARNING 환경 적용, 실제 JWT 앱→ECS→S3→Lambda→Mongo 수용 검증, 새 iOS/Android 네이티브 빌드. 설정/IAM은 머지로 자동 생성되지 않음. 현재 프론트 설정 화면의 기록 삭제 UI는 준비 중 그대로이며 다른 기능 UI를 임의로 추가하지 않았다. 일반 보존 기간/운영 환경 격리 정책은 실제 적용 담당자 확인.
+- 예상 밖 변경 없음. main/develop ref 변경·merge/commit/push·운영 서비스 수정 없음. 기존 사용자 변경 보존. 상세: docs/answer-learning/release-handoff.md, test-release.md, lambda/answer-learning/README.md. Secret/Token/실사용자 전사는 기록하지 않았다.
+
+
+## 2026-10-13 — 앱 합류 인수인계 및 Atlas 테스트 DB 학습 콘텐츠 반영
+
+- 신규 Jira 없음. 사용자 요청은 기존 앱에 합류 가능한 프론트/백엔드 전달과 MongoDB 테스트 DB 반영이며 ECS 수정은 금지했다. 이번 저장소 변경은 `docs/answer-learning/release-handoff.md`, README 보완과 WORKLOG/CURRENT_STATE 기록이다. 기존 staged 구현 30개 파일과 사용자 변경을 보존했으며 Java 런타임은 변경하지 않았다.
+- 실제 AWS 구조를 읽기 전용으로 확인해 테스트 `api-test.to-teacher.com` / `tosunsaeng-learning-core-test-service` / `to-teacher-learning-core-test` 매핑, 현재 학습 설정·권한 부재, 이미지 교체만 수행하는 배포 흐름을 기록했다. 테스트 DB 반영에 필요한 기존 Mongo secret만 메모리에서 사용했고 운영 연결 비밀은 읽지 않았다.
+- 사용자 승인으로 AI 저장소의 `scripts/import_learning_test_db.py`를 이용해 Atlas 테스트 DB에 학습용 6개 컬렉션, 4,637문서를 추가했다(200 units, 360 lessons, 1,000 answers, 320 checklists, 2,756 media, 1 dataset). 기존 대상 문서 0개 확인, 참조·해시·고유키 검증, S3 객체 2,756개 HEAD 검증, 전체 Mongo 재조회 일치, ready 마지막 발행을 완료했다. Part 2~5 320문항·721항목이며 Part 1은 제외한다.
+- 임시 Atlas IP `43.203.150.185/32`를 사용자 승인으로 6시간 허용한 뒤 반영·검증 직후 제거했다. 기존 NAT 허용 항목만 남은 상태를 화면에서 확인했다. 기존 시험/사용자/제출/완료·운영 DB와 ECS/IAM/S3/Lambda/배포 설정은 변경하지 않았다. 모델/TTS/STT 호출 없음. 결과·화면 증거는 AI 저장소 `.local/test-db-import-20261013/`, 설명은 `docs/answer-learning-test-db-import-20261013.md`에 있다.
+- 기존 공개 API/DTO/BaseResponse, 시험 AI·S3·Redis 계약 불변. 프론트의 새 검증 도구로 실제 Java export와 앱 Zod 스키마를 대조했다: catalogs 13/details 520/answers 1000/contentVersions 1. sample 5/5/9 및 잘못된/누락/중복 자료 거절도 확인했다.
+- 이번 전체 세션 검증: JDK21 `./gradlew clean test` 686개, 실패/오류 0, optional fixture 1개 skipped; 전체 콘텐츠를 지정한 `LearningImportedContentTest`는 별도 통과했다. 프론트 학습 테스트 68개와 lint/tsc/architecture 차단 규칙/naming/format 검사 통과(architecture 35개 검토 정보). DB 도구 오프라인 검증·변조/누락/중복 거절·py_compile 및 실제 dry-run/apply/readback 통과. 이후 문서 변경만 있어 런타임 테스트를 불필요하게 재실행하지 않았다.
+- 남은 위험/배포 전: 신규 learning_submissions/completions의 UserMerged 이전, 기존 기록 삭제 worker와 녹음·Lambda 전사 lifecycle 연결이 누락돼 있다. 테스트 task role의 S3/Lambda 권한, ANSWER_LEARNING 설정, 실제 JWT/네이티브 앱→ECS→S3→Lambda→Mongo 종단 확인과 모델 정확도 검증도 남는다. 코드 검사/데이터 반영을 출시 완료로 보고하지 않는다.
+- 예상 밖 이번 코드 변경 없음. 기존 미커밋/사용자 작업 보존, 사용자 선택대로 commit/push/merge/배포 없음. 다음 작업은 인수인계 문서의 lifecycle 및 테스트 환경 활성화 순서 확인이다. Secret/Token/사용자 전사 기록 없음.
+
+## 2026-10-12 — 프론트 전달 계약과 백엔드 호환성 재확인
+
+- 사용자 질문에 따라 프론트 `docs/api/answer-learning.md`, 제출 API 클라이언트와 백엔드 `docs/answer-learning/api.md`, LearningController/LearningModels를 직접 대조했다. 신규 Jira 없음.
+- 두 계약 문서는 상태 설명·문서 링크·검증 설명 외 본문이 동일하다. 목록/상세/미디어/채점 지원/제출/업로드/조회/재시도/완료의 10개 경로와 메서드, 요청 필드, 공통 envelope 및 작업 응답 필드가 대응한다. 외부 계약과 런타임 코드 변경 없음.
+- 이번 변경 파일은 WORKLOG/CURRENT_STATE 기록뿐이며 기존 staged/unstaged 작업을 보존했다. 문서 diff와 실제 핸들러·프론트 요청 코드를 확인했고 코드 변경이 없어 테스트 재실행은 하지 않았다. 직전 41개 Python 테스트 및 로컬 capabilities 360문항 검증 결과는 별도 기존 증거다.
+- 현재 휴대폰 테스트는 로컬 백엔드/DB 연결이며 320개 기준이 준비되어 있다. 운영 사용 전에는 백엔드 브랜치 전달·배포, 실제 인증/API 주소 연결과 전체 기준의 Atlas 반영이 필요하다. 샘플 fixture 모드를 실제 연동으로 오인하지 않아야 한다. 실제 사용자 JWT/배포 환경의 최종 E2E와 모델 정확도 평가는 여전히 별도다.
+- 예상 밖 변경·commit/push·배포·외부 모델 호출·DB 변경 없음. 다음 단계는 운영 환경 연결이며 이번 질문을 배포 실행 요청으로 해석하지 않았다. Secret/Token 기록 없음.
+
+## 2026-10-12 — 전체 학습 체크리스트 준비 및 로컬 적용
+
+- 신규 Jira 없음. Part 2–5 총 320문항(40/120/120/40), 721개 내용 확인 항목을 AI 저장소에서 직접 작성했다. 기준 버전 `question-checklists-20261012-v1`; 기존 콘텐츠·음성 버전 유지. Part 1은 채점하지 않는다.
+- 변경 파일: 이 저장소는 `docs/answer-learning/README.md`, `docs/codex/CURRENT_STATE.md`, `docs/codex/WORKLOG.md`만 갱신했다. 데이터·조립/로컬 설치 도구·회귀 테스트는 `app-ai-learning/data/practice_checklists/full-bank/`, 관련 scripts/tests와 `docs/local-practice-grading.md`에 있다. 기존 staged 구현 30개 파일을 보존했고 이번에 Java 런타임은 수정하지 않았다.
+- 개인 질문은 다른 의견/경험 허용, 표는 정확한 사실·취소/변경·Q10 모든 해당 항목, 사진은 직접 확인한 장면을 기준으로 한다. 발음·공식 등급 판정 없음. 외부 생성·STT·채점 API 추가 호출 없음; 작성자 자체 검토이며 독립/사람 검수나 실제 모델 정확도 평가가 아니다.
+- 로컬 휴대폰 테스트 DB에서 기존 9개는 superseded로 보존하고 320개만 prepared로 활성화했다. 부분 고유 인덱스로 문항별 중복 prepared를 방지하며 staged 중단 후 재개가 가능하다. 제출 3개·완료 1개 문서의 전후 해시 일치를 확인했다.
+- 실제 Java capabilities API 360문항 조회: Part 2–5 320개 지원, Part 1 40개 제외 확인. Python corpus/기존 채점/Lambda 관련 테스트 41개 통과. 초기 시스템 Python에 boto3가 없어 3개 테스트가 import 실패했으나 기존 cloud-import 가상환경의 의존성을 로드해 전체 통과했다. Java 코드 변경이 없어 Gradle 전체 재실행은 하지 않았고 이전 686개 통과를 이번 새 검증으로 재표기하지 않는다.
+- 기존 공개 API·DTO·Lambda 요청/결과·S3/Redis·AI 계약 불변. 예상 밖 이번 변경 없음, 기존 사용자/동시 작업 보존. 사용자 선택대로 로컬 브랜치 유지, commit/push 없음.
+- 남은 위험/배포 전: 실제 학습자 답변에 대한 모델 정확도 검증과 Atlas 확장 반영은 별도다. Atlas에는 기존 9개가 있으며 insert-only importer로 신버전을 단순 추가하면 prepared 중복이 된다. 다음 작업은 구 기준 비활성화와 문항별 활성 버전 전환을 포함한 Atlas 마이그레이션 및 표본 실답변 검증이다. 기존 제출 기준/결과는 덮어쓰지 않는다. Secret/Token/사용자 전사 기록 없음.
+
+## 2026-10-12 — 답변 익히기 백엔드 구현 / 배포 전
+
+- 사용자 요청으로 최신 origin/develop `b2b37ff`에서 별도 `feat/answer-learning` 브랜치를 만들었다. 기존 main checkout의 미커밋 문서는 보존했다. 신규 Jira 없음.
+- 신규 `/api/v1/learning` 10개 API: 목록·상세·미디어 URL·채점 지원·제출 생성·업로드 URL·제출 확인·상태 조회·명시적 재시도·완료 저장. 기존 CurrentUserProvider/JWT 및 BaseResponse를 사용한다.
+- Mongo 콘텐츠/체크리스트 스냅샷, Part 1 common, 문항/등급/버전별 완료, S3 임시 업로드→조건부 최초 고정, SHA-256/ETag, 서울 IAM Lambda SigV4, durable Mongo Worker 및 완료 upsert 복구 구현. 모델 API는 직접 호출하지 않는다.
+- 소유권·멱등성·lease/attempt fencing·하루 기본 60회·최대 3 attempt·24시간 dispatch/retry 유효기간. 준비된 체크리스트 9문항만 채점 지원. 중간 진행 저장 없음.
+- `./gradlew clean test`: 686 tests / failures 0 / errors 0 / skipped 0 (신규 46). 실제 정규화 자료의 13개 목록 응답·520개 수준별 상세·1,000답안이 프론트 스키마 검증 통과.
+- 신규 격리 Mongo 통합 6개 통과: 동시 생성/접수, 요청 한도, lease 교체, 재시도 CAS, 결과/완료 복구, 완료 upsert. Docker 29 호환을 위해 테스트 명령에만 `JAVA_TOOL_OPTIONS=-Dapi.version=1.44` 사용. AWS/Atlas/실제 모델 호출 없음.
+- 설정은 기본 OFF. 기존 API·DTO·AI Callback·Redis/S3 key 계약 변경 없음, 신규 운영 의존성 없음. 인수인계 문서: docs/answer-learning/README.md 및 api.md, S3 IAM 정책 예제.
+- 운영 연결 전 task role의 Lambda/S3 권한, 콘텐츠 버전과 기능 플래그 설정, 실제 JWT 앱 통합 확인이 필요하다. 기존 계정 통합/기록 삭제의 신규 컬렉션 포함과 녹음/전사 보존 정책은 운영 후속 범위다. 이번 작업에서 백엔드 배포·IAM 변경·운영 데이터 쓰기는 하지 않았다.
+- 저장소 Git 규칙에 따라 현재 commit/push 전이며, 완성된 변경을 stage하여 사용자 검토/예외 승인을 준비했다.
+
+
 - 2026-10-13 — 사용자 B 구현 승인으로 LC 두 Billing client workload JWT 전환 완료(TMI-116/TMI-128/TMI-122). default OFF, private key ON 검증/OFF 미파싱, 64조합22허용/42거절, W OFF/P ON drain 허용 및 W OR P 필수 index 검사·publisher 초기화 의존을 구현했다. 단위/계약859, 격리 Mongo146, migration121 통과 및 bootJar 성공. Mongo는 Docker29 API 호환을 위해 실행 시 JAVA_TOOL_OPTIONS=-Dapi.version=1.44 사용. A 계약/fixtures bytes/hash와 API/AI/S3/Redis/업무 retry 계약 유지. 상세 증거·private JWK 입력 형식·미검증 범위는 LC_BILLING_WORKLOAD_JWT_B_VALIDATION.md. Billing HTTP27/양측 실TLS·키 배포/E2E와 C도구·배포/활성화는 별도. 실제 환경 설정·타 저장소·Jira·commit/push 변경 없음. 아래 착수 대기 기록은 과거 이력이다.
 
 - 2026-10-13 — B 착수 가능 여부 안내의 현재 턴 기록 보완(TMI-116/TMI-128/TMI-122). 구현 준비 완료, 별도 착수 승인 대기 상태 유지. 코드·테스트 실행·배포 변경 없이 기록만 검증했다.

@@ -1,0 +1,7 @@
+# The dedicated Lambda does not bundle FastAPI, LangSmith or the production grading stack.
+openai==2.45.0
+httpx==0.28.1
+pydantic==2.13.4
+python-dotenv==1.2.2
+mutagen==1.47.0
+boto3==1.43.82
