@@ -1,0 +1,88 @@
+{
+  "lc": {
+    "keys": [
+      {
+        "kty": "RSA",
+        "n": "vdu-japeGfFBVPyLxg-hT0pNe2THmSfTFkG7jkJfjDnJM6WT-W61ZFo-_bttACI9tEhhzybklxra_uDf7Ggz0LcyVlN837HcyAh7dz8US58x-Ql9Na-H8E0bfwhVnv58iS0594oKkVjdynoqYwQAfhA3NQkhrqqV43elddsKJFWEQpj0spXC1jyEefEdMGWjhkvmsb2eTCR0UiTCIaREZJ8d5IqLTMHh0TDWQE3lqcV03W3QXCD6E1ccxF993hoinqLm4_gTOZB9skOhHASmV7OW6kojJ6oNzZ0vQ0LpiioCui3nmzHJvSwLZ5cn0SPvR7tcQ06s5Mqwbt600gWCiw",
+        "e": "AQAB",
+        "kid": "fake-shared-kid",
+        "alg": "RS256",
+        "use": "sig",
+        "key_ops": [
+          "verify"
+        ]
+      }
+    ]
+  },
+  "identity": {
+    "keys": [
+      {
+        "kty": "RSA",
+        "n": "1fTk8Oba6yR3t68aQfXeCpwEqjMgNBY8xfQl9ywpJH_ABGp1yYHFK6IuL_0nJIFdCMzMZcLw0n4YGOp8tjUmUKPegZ8zGf4ch2dTUHp0LrqYHYvZs7efcsxxhbk9d7qNjWpqHolQWOg47TBpNICABdcngGWnx4T6VaLfFq4lGFRG6Iwa5S43NagyGxTfroRlOR00TBQu8tT0x1wV0i0fQ4Wetf6S3EGr5Jef7GXV8Ckt8OTiSnVH9YiIdsRuQkgPSEnIGZH8YHZpk7hfd1AESFSdxVYEYi9tEPQnnhiZ9he0SkM3KVbbqQLsZFlBNLf3gmpQSj4sSMx7OrfrTlYbHw",
+        "e": "AQAB",
+        "kid": "fake-shared-kid",
+        "alg": "RS256",
+        "use": "sig",
+        "key_ops": [
+          "verify"
+        ]
+      }
+    ]
+  },
+  "user": {
+    "keys": [
+      {
+        "kty": "RSA",
+        "n": "v90SSSQY0bYzfzOvB8dyVKcmx-9p9yIDihPt3v2aw64Y-VC1i0Bv8mXNXQlJxv7wVVAgDdkyI0prRscdJxbrg_LlEsCHicmr4t2tJy-raJaPJZUN1pZsy80Rx4Fbi8_uj7i4HlJWpuKWnp-92x-QLi6K1PNKnFWXnW438kpjRn7LvmsJA7KHPWo_-8Cu-SpB05aF1aBG0L1CBkW6T5rgzfOOB-BocqKZFakoSTuslm_WjsPrAOyRgGr2W0AQQZ-9x5WLNwUkTb5_Fek_Av45UgeusHJvhuDzN_DrbnwzXkGrwUQa8u8wMd55hDLqP3L7o4foNDs4KudtxewCrBeFWw",
+        "e": "AQAB",
+        "kid": "fake-shared-kid",
+        "alg": "RS256",
+        "use": "sig",
+        "key_ops": [
+          "verify"
+        ]
+      }
+    ]
+  },
+  "overlap": {
+    "keys": [
+      {
+        "kty": "RSA",
+        "n": "vdu-japeGfFBVPyLxg-hT0pNe2THmSfTFkG7jkJfjDnJM6WT-W61ZFo-_bttACI9tEhhzybklxra_uDf7Ggz0LcyVlN837HcyAh7dz8US58x-Ql9Na-H8E0bfwhVnv58iS0594oKkVjdynoqYwQAfhA3NQkhrqqV43elddsKJFWEQpj0spXC1jyEefEdMGWjhkvmsb2eTCR0UiTCIaREZJ8d5IqLTMHh0TDWQE3lqcV03W3QXCD6E1ccxF993hoinqLm4_gTOZB9skOhHASmV7OW6kojJ6oNzZ0vQ0LpiioCui3nmzHJvSwLZ5cn0SPvR7tcQ06s5Mqwbt600gWCiw",
+        "e": "AQAB",
+        "kid": "fake-shared-kid",
+        "alg": "RS256",
+        "use": "sig",
+        "key_ops": [
+          "verify"
+        ]
+      },
+      {
+        "kty": "RSA",
+        "n": "wxoodjHjLVMxWbvUS0cVd1mC-bb5d_wlm27QIQh3gZA_ElQVPUMuksbZrMa3cWibGFkpPru0i3mWbWOqGaCnBVqcxEEVLWOAjvEq8vYTT4yOKUob2gfXbHW_eagJ_-Z22D4VYAXvwriN7yZBQCKvG3qjUIvMTFQrTx8AzOomIo02SQ0wI1NIyocAyS6nJI1MsNieP7MZZM7ondCGvTyQWk6TTMx0ZEbrmJuvyCwXrMHy-8hYrBn71ENx3aZm_6dL0-w69Nur6Vj32mcqEyUE4Su6mE5GYrgf-ojlEGkdP0DANkNjLr8wl2NJcisU5lZS6tiPGFT0om_A_5lyq8EX0w",
+        "e": "AQAB",
+        "kid": "fake-next",
+        "alg": "RS256",
+        "use": "sig",
+        "key_ops": [
+          "verify"
+        ]
+      }
+    ]
+  },
+  "next": {
+    "keys": [
+      {
+        "kty": "RSA",
+        "n": "wxoodjHjLVMxWbvUS0cVd1mC-bb5d_wlm27QIQh3gZA_ElQVPUMuksbZrMa3cWibGFkpPru0i3mWbWOqGaCnBVqcxEEVLWOAjvEq8vYTT4yOKUob2gfXbHW_eagJ_-Z22D4VYAXvwriN7yZBQCKvG3qjUIvMTFQrTx8AzOomIo02SQ0wI1NIyocAyS6nJI1MsNieP7MZZM7ondCGvTyQWk6TTMx0ZEbrmJuvyCwXrMHy-8hYrBn71ENx3aZm_6dL0-w69Nur6Vj32mcqEyUE4Su6mE5GYrgf-ojlEGkdP0DANkNjLr8wl2NJcisU5lZS6tiPGFT0om_A_5lyq8EX0w",
+        "e": "AQAB",
+        "kid": "fake-next",
+        "alg": "RS256",
+        "use": "sig",
+        "key_ops": [
+          "verify"
+        ]
+      }
+    ]
+  }
+}

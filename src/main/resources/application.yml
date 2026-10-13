@@ -39,6 +39,10 @@ app:
     poll-ms: ${CHALLENGE_POLL_MS:1000}
     expiry-poll-ms: ${CHALLENGE_EXPIRY_POLL_MS:10000}
   billing:
+    workload-jwt:
+      sender-enabled: ${BILLING_WORKLOAD_JWT_SENDER_ENABLED:false}
+      environment: ${BILLING_WORKLOAD_JWT_ENVIRONMENT:}
+      private-jwk: ${BILLING_WORKLOAD_JWT_PRIVATE_JWK:}
     creation-saga-enabled: ${BILLING_CREATION_SAGA_ENABLED:false}
     phone-continuation-enabled: ${BILLING_PHONE_CONTINUATION_ENABLED:false}
     reconciliation:

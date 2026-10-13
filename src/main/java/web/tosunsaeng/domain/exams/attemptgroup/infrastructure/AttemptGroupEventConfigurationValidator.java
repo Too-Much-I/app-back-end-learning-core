@@ -27,9 +27,8 @@ public class AttemptGroupEventConfigurationValidator {
                 || uri.getUserInfo() != null
                 || uri.getQuery() != null
                 || uri.getFragment() != null
-                || properties.awsRegion() == null
-                || properties.awsRegion().isBlank()) {
-            throw new IllegalStateException("AttemptGroup publisher requires HTTPS Billing URL and AWS region");
+                || (uri.getPath() != null && !uri.getPath().isEmpty() && !"/".equals(uri.getPath()))) {
+            throw new IllegalStateException("AttemptGroup publisher requires HTTPS Billing origin");
         }
     }
 }

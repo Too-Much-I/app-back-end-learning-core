@@ -9,12 +9,6 @@ import io.micrometer.tracing.Span;
 import io.micrometer.tracing.Tracer;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.ObjectProvider;
-import software.amazon.awssdk.auth.credentials.AwsCredentialsProvider;
-import software.amazon.awssdk.http.ContentStreamProvider;
-import software.amazon.awssdk.http.SdkHttpMethod;
-import software.amazon.awssdk.http.SdkHttpRequest;
-import software.amazon.awssdk.http.auth.aws.signer.AwsV4HttpSigner;
-import software.amazon.awssdk.http.auth.spi.signer.SignedRequest;
 import web.tosunsaeng.domain.exams.domain.enums.BillingContinuationReason;
 
 import java.io.IOException;
@@ -26,37 +20,33 @@ import java.net.http.HttpResponse;
 import java.time.Instant;
 import java.time.format.DateTimeFormatter;
 import java.time.format.DateTimeFormatterBuilder;
-import java.util.Locale;
 import java.util.Optional;
 import java.util.concurrent.TimeUnit;
 
 @Slf4j
-public class SigV4BillingReservationClient implements BillingReservationClient {
+public class JwtBillingReservationClient implements BillingReservationClient {
 
     static final int MAX_RESPONSE_BYTES = 16 * 1024;
-    private static final String SIGNING_NAME = "vpc-lattice-svcs";
     private static final DateTimeFormatter UTC_MILLIS = new DateTimeFormatterBuilder()
             .appendInstant(3)
             .toFormatter();
 
     private final BillingSagaProperties properties;
-    private final AwsCredentialsProvider credentialsProvider;
+    private final BillingWorkloadTokenIssuer tokenIssuer;
     private final ObjectMapper objectMapper;
-    private final AwsV4HttpSigner signer;
     private final HttpClient httpClient;
     private final ObjectProvider<Tracer> tracerProvider;
     private final MeterRegistry meterRegistry;
 
-    public SigV4BillingReservationClient(
+    public JwtBillingReservationClient(
             BillingSagaProperties properties,
-            AwsCredentialsProvider credentialsProvider,
+            BillingWorkloadTokenIssuer tokenIssuer,
             ObjectMapper objectMapper
     ) {
         this(
                 properties,
-                credentialsProvider,
+                tokenIssuer,
                 objectMapper,
-                AwsV4HttpSigner.create(),
                 HttpClient.newBuilder()
                         .connectTimeout(properties.getConnectTimeout())
                         .followRedirects(HttpClient.Redirect.NEVER)
@@ -66,18 +56,17 @@ public class SigV4BillingReservationClient implements BillingReservationClient {
         );
     }
 
-    public SigV4BillingReservationClient(
+    public JwtBillingReservationClient(
             BillingSagaProperties properties,
-            AwsCredentialsProvider credentialsProvider,
+            BillingWorkloadTokenIssuer tokenIssuer,
             ObjectMapper objectMapper,
             ObjectProvider<Tracer> tracerProvider,
             MeterRegistry meterRegistry
     ) {
         this(
                 properties,
-                credentialsProvider,
+                tokenIssuer,
                 objectMapper,
-                AwsV4HttpSigner.create(),
                 HttpClient.newBuilder()
                         .connectTimeout(properties.getConnectTimeout())
                         .followRedirects(HttpClient.Redirect.NEVER)
@@ -87,29 +76,26 @@ public class SigV4BillingReservationClient implements BillingReservationClient {
         );
     }
 
-    SigV4BillingReservationClient(
+    JwtBillingReservationClient(
             BillingSagaProperties properties,
-            AwsCredentialsProvider credentialsProvider,
+            BillingWorkloadTokenIssuer tokenIssuer,
             ObjectMapper objectMapper,
-            AwsV4HttpSigner signer,
             HttpClient httpClient
     ) {
-        this(properties, credentialsProvider, objectMapper, signer, httpClient, null, null);
+        this(properties, tokenIssuer, objectMapper, httpClient, null, null);
     }
 
-    private SigV4BillingReservationClient(
+    private JwtBillingReservationClient(
             BillingSagaProperties properties,
-            AwsCredentialsProvider credentialsProvider,
+            BillingWorkloadTokenIssuer tokenIssuer,
             ObjectMapper objectMapper,
-            AwsV4HttpSigner signer,
             HttpClient httpClient,
             ObjectProvider<Tracer> tracerProvider,
             MeterRegistry meterRegistry
     ) {
         this.properties = properties;
-        this.credentialsProvider = credentialsProvider;
+        this.tokenIssuer = tokenIssuer;
         this.objectMapper = objectMapper;
-        this.signer = signer;
         this.httpClient = httpClient;
         this.tracerProvider = tracerProvider;
         this.meterRegistry = meterRegistry;
@@ -279,33 +265,18 @@ public class SigV4BillingReservationClient implements BillingReservationClient {
         String outcome = "temporary_failure";
         try (Tracer.SpanInScope ignored = span == null || tracer == null
                 ? null : tracer.withSpan(span)) {
-            SdkHttpRequest.Builder unsignedBuilder = SdkHttpRequest.builder()
-                    .uri(uri)
-                    .method(SdkHttpMethod.POST)
-                    .putHeader("Content-Type", "application/json");
-            if (operationId != null) {
-                unsignedBuilder.putHeader("Idempotency-Key", operationId);
-            }
-            if (span != null) {
-                unsignedBuilder.putHeader("traceparent", traceparent(span));
-            }
-            ContentStreamProvider payload = ContentStreamProvider.fromByteArray(requestBody);
-            // URI, body and trace headers are final before signing. Do not mutate afterwards.
-            SignedRequest signed = signer.sign(signRequest -> signRequest
-                    .identity(credentialsProvider.resolveCredentials())
-                    .request(unsignedBuilder.build())
-                    .payload(payload)
-                    .putProperty(AwsV4HttpSigner.SERVICE_SIGNING_NAME, SIGNING_NAME)
-                    .putProperty(AwsV4HttpSigner.REGION_NAME, properties.getRegion()));
-
             HttpRequest.Builder requestBuilder = HttpRequest.newBuilder(uri)
                     .timeout(properties.getReadTimeout())
+                    .header("Content-Type", "application/json")
                     .POST(HttpRequest.BodyPublishers.ofByteArray(requestBody));
-            signed.request().headers().forEach((name, values) -> {
-                if (!isRestrictedHeader(name)) {
-                    values.forEach(value -> requestBuilder.header(name, value));
-                }
-            });
+            if (operationId != null) {
+                requestBuilder.header("Idempotency-Key", operationId);
+            }
+            if (span != null) {
+                requestBuilder.header("traceparent", traceparent(span));
+            }
+            requestBuilder.header("Authorization", tokenIssuer.authorization(
+                    BillingWorkloadTokenIssuer.Purpose.RESERVATIONS));
 
             HttpResponse<InputStream> response = httpClient.send(
                     requestBuilder.build(),
@@ -516,10 +487,6 @@ public class SigV4BillingReservationClient implements BillingReservationClient {
                 .orElse(null);
     }
 
-    private static boolean isRestrictedHeader(String name) {
-        String normalized = name.toLowerCase(Locale.ROOT);
-        return normalized.equals("host") || normalized.equals("content-length");
-    }
 
     private record ReserveRequest(String userId, String sessionId, String mockExamId) {
     }

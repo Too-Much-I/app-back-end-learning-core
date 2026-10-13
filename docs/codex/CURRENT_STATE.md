@@ -1,5 +1,178 @@
 # Learning Core Current State
 
+- 2026-10-13 — 사용자 B 구현 승인으로 LC 두 Billing client workload JWT 전환 완료(TMI-116/TMI-128/TMI-122). default OFF, private key ON 검증/OFF 미파싱, 64조합22허용/42거절, W OFF/P ON drain 허용 및 W OR P 필수 index 검사·publisher 초기화 의존을 구현했다. 단위/계약859, 격리 Mongo146, migration121 통과 및 bootJar 성공. Mongo는 Docker29 API 호환을 위해 실행 시 JAVA_TOOL_OPTIONS=-Dapi.version=1.44 사용. A 계약/fixtures bytes/hash와 API/AI/S3/Redis/업무 retry 계약 유지. 상세 증거·private JWK 입력 형식·미검증 범위는 LC_BILLING_WORKLOAD_JWT_B_VALIDATION.md. Billing HTTP27/양측 실TLS·키 배포/E2E와 C도구·배포/활성화는 별도. 실제 환경 설정·타 저장소·Jira·commit/push 변경 없음. 아래 착수 대기 기록은 과거 이력이다.
+
+- 2026-10-13 — B 착수 가능 여부 안내의 현재 턴 기록 보완(TMI-116/TMI-128/TMI-122). 구현 준비 완료, 별도 착수 승인 대기 상태 유지. 코드·테스트 실행·배포 변경 없이 기록만 검증했다.
+
+- 2026-10-13 — 구현 착수 가능 여부 안내(TMI-116/TMI-128/TMI-122). A 수락·검증과 B 문서 준비 완료로 별도 승인 후 LC B 코드/테스트 착수 가능. 이번은 질문 답변이며 착수 승인으로 해석하지 않는다. Billing 수신 구현은 별도 담당, C/배포/활성화 제외 및 기본 OFF 유지.
+
+- 2026-10-13 — Billing B계획/startup 표의 LC 담당 범위 검토·수락 및 문서 동기화 완료(TMI-116/TMI-128/TMI-122). LC_BILLING_WORKLOAD_JWT_B_IMPLEMENTATION_PLAN.md와 ADR-LC-BILLING-WORKLOAD-JWT.md 신설, sender mapping 상세표/AGENTS 동기화. W OFF/P ON drain 허용·writer Transaction 비필수, W OR P 필수index 검사·성공 전 claim/send 차단을 명시했다. 규칙 계산22허용/42거절과 source 정적 확인이며 runtime 검증 아님. A 인증/fixtures bytes/hash 유지. B코드·C도구·DB/AWS/배포/활성화는 별도 승인 대기.
+
+- 2026-10-13 — 사용자 「확정해줘」 승인으로 LC의 A 인증 규격/fixtures-1 hash/신규 설정3명칭 최종 수락 완료(TMI-116/TMI-128/TMI-122). LC-BILLING-WORKLOAD-A-ACCEPTANCE-R1.md를 신설하고 AUTH/MAPPING 인수본 상단에 현행 수락 기록을 연결했다. 인증 상세/fixture bytes 불변. 다음은 startup flag 조합표·B 계획/ADR·AGENTS 준비이며 B/C 코드·Billing 저장소·실제 배포 활성화 승인은 포함하지 않는다.
+
+- 2026-10-13 — Billing의 A 독립 검증 접수 회신 확인(TMI-116/TMI-128/TMI-122). 제공 회신상 Billing도 LC XML/소스/fixture 동일bytes 대조 완료. 양측 token/hash73 검증 완료를 기록하되 전체 테스트713/1004는 합산하지 않는다. 최종 A/설정명 수락·startup조합표/B범위 승인·ADR/AGENTS 동기화는 남아 있다. writerOFF/publisherON drain 가능성을 임의 금지하지 않고 B 준비에서 실제 Transaction bean 의존을 확인한다. 이번은 접수 기록만, 코드/배포 변경 없음.
+
+- 2026-10-13 — A 독립 검증 완료(TMI-116/TMI-128/TMI-122). test-only LcBillingSharedFixtureTest 신규 작성, Billing codec 복사 없이 JCA/Jackson으로 fixtures-1 원문 token72+hash1 모두 통과. clean test 전체713/실패0/오류0/skip0, 원본 세JSON hash 유지. 결과·환경·설정 매핑 기술 검토·미실행 범위는 LC_BILLING_FIXTURES_1_VALIDATION.md. HTTP27/B sender/C복구·실환경·설정 최종 수락은 미완료. 제품/Billing/AWS 변경 없음.
+
+- 2026-10-13 — 다음 테스트 순서 안내의 현재 턴 기록 보완(TMI-116/TMI-128/TMI-122). A 독립 token 검증·설정 매핑 검토가 다음 단계이며 테스트 작성/실행이나 B/C 구현은 아직 수행하지 않았다. 기록 검증만 완료.
+
+- 2026-10-13 — 다음 작업 순서 안내(TMI-116/TMI-128/TMI-122): A 단계의 테스트 전용 독립 검증기/러너 준비 후 원문 token72 및 hash 검증·설정 매핑 검토가 다음 작업이다. 기존 SigV4 구현에 전체 테스트만 실행해 JWT 검증 완료로 보고하지 않는다. HTTP27은 B 실제 인증 구현 뒤, 재처리/TLS/E2E는 C 단계에서 검증한다. 이번 질문은 순서 설명이며 테스트 작성/실행·런타임 구현 승인은 아님.
+
+- 2026-10-13 — fixtures-1 원본 인수 완료(TMI-116/TMI-128/TMI-122). 사용자 요청으로 /Users/msde76/billing의 untracked fixture5파일 및 A명세/매핑2문서를 LC 동일 상대 위치로 byte 복사했다. 양측 SHA256SUMS 세JSON OK 및 나머지 cmp 일치, 출처/미검증 범위는 LC_BILLING_FIXTURES_1_RECEIPT.md에 기록. 독립 JWT72/HTTP27 실행·설정 수락·B/C 구현·배포는 미수행. Billing 수정 없음.
+
+- 2026-10-13 — fixtures-1 설명서 검토(TMI-116/TMI-128/TMI-122). Billing 보고상 기존 codec 원문 token72+hash1 통과/전체1004 통과이며 LC HTTP27 manifest는 미실행. 보고를 LC 독립 검증으로 취급하지 않는다. 세 JSON·SHA256SUMS 원본 및 LC-BILLING-WORKLOAD-SENDER-MAPPING-R1.md가 미제공되어 LC byte hash/독립 실행/설정명 수락은 대기. 재생성·제품 코드·배포 변경 없음.
+
+- 2026-10-13 — A 후보 수정본 검토(TMI-116/TMI-128/TMI-122). §2.1.1 Bearer/compact 문법·추가payload claim 무시와 JOSE 추가field 거절, §2.4.1 ON/OFF별 verifier·401/403/404 매트릭스 및 AUTH-08/10/11 반영 확인. 앞선 두 문구 지적은 해소돼 해당 검토 범위 추가 수정 의견 없음. 공동 fixture/hash·독립 실행·LC 설정manifest·최종 승인 및 B/C 구현·배포는 미완료로 유지한다.
+
+- 2026-10-13 — 첨부 lc-billing-workload-auth-r1 A 후보 검토(TMI-116/TMI-128/TMI-122). transport/살아있는 ingress404 및 모든query/빈? 구분과 테스트 반영 확인. 동결 전 Bearer exact 문법/추가claim 허용 및 AUTH-08 교차서비스403의 verifier 선택·OFF 신뢰키 조건을 명문화할 것을 권고한다. 명세 후보 검토뿐이며 fixture/hash 실행·최종 수락·B/C 구현/배포 승인 없음.
+
+- 2026-10-13 — Billing 후속 회신 §6 exact 후보 검토(TMI-116/TMI-128/TMI-122). 환경별 issuer/목적별 audience·TTL60/skew30·배포 공개키·shared connector 독립flags·오류순서·A/B/C 분리는 권장 후보로 적절하다. 둘다OFF로 connector 미기동 시 transport 실패와 살아있는 ingress의404 보장을 구분하고 query없음의 의미/fixture를 명시할 것을 권고한다. A 계약/fixture 범위부터 승인받고 B 구현·C 도구/배포는 별도로 진행하는 방향이며 아직 승인/구현 없음.
+
+- 2026-10-13 — LC-JWT-TRANSITION-R2 검토 완료(TMI-116/TMI-128/TMI-122). §16.3 빈 ingress404/업무 OPERATION_NOT_FOUND 분리, §16.5 승인 requeue 도구 미준비·별도 승인/구현/검증, §16.6 exact 규격/fixture/ADR·AGENTS 동결 목록 반영을 확인했다. 요청된 문구 보정은 적절하며 앞선 지적을 반복 보완할 필요 없음. 인증 규격 동결·구현/배포 완료는 별개이고 사용자 승인으로 간주하지 않는다.
+
+- 2026-10-13 — 재첨부 Billing 통합 계약은 직전 §16 추가본과 diff 차이 없음(TMI-116/TMI-128/TMI-122). 빈 ingress404와 업무 OPERATION_NOT_FOUND 구분, LC 승인 requeue 도구, exact JWT/ADR/AGENTS·fixture 확정 필요 의견 유지. 새로운 승인이나 구현/배포 변경 없음.
+
+- 2026-10-13 — 첨부 Billing 통합 계약 §16 검토(TMI-116/TMI-128/TMI-122). 수신 준비 선행·원본 보존·status-first·승인 bounded requeue·우회 차단 보완을 확인했다. 단 §16.3 Reservation404는 빈 ingress404와 code=OPERATION_NOT_FOUND 업무404를 구분해야 한다. LC publisher/store/scripts 범위에서 DEAD_LETTER 승인 requeue 도구는 확인되지 않아 별도 범위 승인/구현 필요. exact JWT 규격 및 ADR/AGENTS 동기화·fixture는 아직 미완료이며 계약 첨부를 구현/배포 승인으로 해석하지 않았다.
+
+- 2026-10-13 — 재첨부 Billing 회신은 직전 첨부와 byte 단위 동일함을 확인(TMI-116/TMI-128/TMI-122). 신규 보완/승인 없음. TTL60·배포 공개키·목적별 audience·빈401/403 권장과 OFF/오포트404의 LC 오류 분류·event 복구 정책 보완 필요 의견 유지. 기록만 갱신.
+
+- 2026-10-13 — Billing 회신 초안 검토(TMI-116/TMI-128/TMI-122). TTL60·배포 공개키·목적/환경별 audience·빈401/403은 수용 가능한 권장안이며 승인/구현은 미수행. connector 공유 시 LC/Identity trust·chain·flag 독립과 교차 차단 필요. LC 빈404는 Reservation CONTRACT_ERROR, AttemptGroup DEAD_LETTER로 분류하므로 OFF/오포트404와 rollout·보존/복구 정책을 공동 fixture로 확정해야 한다. Billing permitAll 위험은 제공 회신 기준이며 직접 검증 없음.
+
+- 2026-10-13 — Billing workload JWT 인계서 작성의 현재 턴 기록 보완 완료(TMI-116/TMI-128, 관련 TMI-122). 인계서는 양측 검토용이며 세부 인증 계약 승인·구현·배포는 아직 미수행. 기록 및 문서 검증만 수행했다.
+
+- 2026-10-13 — Billing 인계서 `docs/codex/BILLING_WORKLOAD_JWT_HANDOFF.md` 작성(TMI-116/TMI-128, 관련 TMI-122). Lattice 제외·계약 우선 개발 방향, 현행 6개 endpoint/멱등성 유지, RS256 workload JWT 제안/결정 항목, Billing·LC 책임, 키 관리·오류·회귀 테스트·활성화 gate를 정리했다. JWT 세부 값은 양측 합의 전 제안이며 코드 구현/배포 승인 아님. Billing 저장소/외부 서비스 변경 없이 문서만 작성했다.
+
+- 2026-10-13 — TMI-116/TMI-128 계약 우선 설명의 현재 턴 기록 보완 완료. 계약·구현 선행 가능, 실제 연결 검증은 활성화 전 필수라는 설명을 유지한다. 문서 검증만 수행했으며 코드·AWS·배포 변경 없음.
+
+- 2026-10-13 — TMI-116/TMI-128 후속 설명: 내부 경로 사전 구축은 workload JWT 계약 정의·구현의 선행 조건이 아니다. 인증 계약과 기존 업무 계약을 먼저 합의하고 base URL/JWKS 위치를 설정으로 분리해 mock/contract test로 구현 가능하다. 실제 안전한 HTTPS 연결·키 배포·E2E는 기능 활성화 전에 필요하며 내부망은 권장이지 절대 요건은 아니다. 이번은 순서 설명만이며 계약 확정·구현·AWS 변경 없음.
+
+- 2026-10-13 — AWS 탭 읽기 조사(TMI-116/TMI-128): 현재 계정 서울 리전은 ECS cluster 1개(tosunsaeng-staging-cluster), 서비스 10개이며 Billing 명명 서비스/활성 task family 없음. ALB는 internet-facing tosunsaeng-staging-alb 1개, HTTP80 redirect/HTTPS443이며 Billing target group·host/path rule 없음. 기존 Billing 접속 주소는 확인되지 않아 JWT 교체만으로 연결 준비 완료가 되지는 않는다. 내부 HTTPS 경로 신규 준비를 우선 검토하되 리소스 생성 권한·비용은 별도 확인한다. 다른 계정/리전/비ECS 배포와 실제 LC→Billing 연결은 미확인. AWS 설정/배포/코드 변경 없이 기록만 갱신.
+
+- 2026-10-13 — TMI-116/TMI-128 관련 Lattice 제외 설명의 현재 턴 표식 보완 완료. HTTPS + workload JWT 방향이며 Billing 접속 경로 확인이 다음 단계다. 기존 기록 보존, 코드·인프라·배포 변경 없음.
+
+- 2026-10-13 — 사용자가 Lattice 사용 불가를 명확히 해 Billing 연동 제안에서 Lattice를 제외했다(TMI-116/TMI-128 관련). 기존 접근 가능한 Billing HTTPS 경로를 우선 확인하고 LC 전용 workload JWT 서명/Billing 검증으로 인증하는 방향을 제안한다. 내부 연결이 가능하면 내부 경로를 우선하며 공개 경로는 전용 인증·접근 제한이 필요하다. 실제 Billing 주소/ALB 존재와 네트워크는 미확인, 코드/인프라 변경 승인은 별도이며 이번은 설명·기록만 수행했다.
+
+- 2026-10-13 — Billing workload JWT 발급 주체 비교(TMI-116/TMI-128 관련). Identity 중앙 발급은 키/권한 통합·확장성이 장점이나 LC→Identity 인증 및 신규 발급 endpoint·가용성 의존이 필요하다. LC 전용 키 직접 서명은 발급 네트워크 의존과 변경 서비스 수를 줄이나 LC의 private key 보호·JWKS/rotation 운영 책임이 생긴다. 현재 LC→Billing 전환에 한정하면 LC 직접 서명을 조건부 권장하며, 이미 안전한 중앙 M2M 발급 기능이 있거나 서비스 수가 늘면 Identity 발급을 재검토한다. 기존 Identity UserMerged 자체 토큰 서명과 범용 M2M 발급은 구분한다. 설계 비교만 수행했고 권장안 채택·구현·배포 승인은 아직 없다.
+
+- 2026-10-13 — TMI-116/TMI-128 관련 Billing workload JWT 전환 설명의 현재 턴 기록 보완 완료. 발급 주체/양측 인증 계약/HTTPS 접근 경로는 미확정이며 구현·배포·원격 설정 변경은 수행하지 않았다. 기존 기록 보존과 diff check 확인.
+
+- 2026-10-13 — Billing SigV4 대신 workload JWT 전환 방향 검토(TMI-116/TMI-128 연관, 신규 Jira 없음). 기존 UserMerged 수신의 RS256/JWKS 전용 검증 패턴을 참고할 수 있으나 Billing용 발급 주체·issuer/audience/subject·키 관리와 양측 계약은 별도 확정해야 한다. LC 발신/Reservation·AttemptGroup client와 Billing 수신 검증을 함께 맞추고 사용자 JWT는 재사용하지 않는다. Lattice AWS_IAM 인증 경로라면 JWT만으로 통과하지 못하므로 허용된 HTTPS 경로·접근 통제도 필요하다. 이번은 설계 설명만이며 Billing 저장소/원격 설정 조회·코드·인프라·배포 변경이나 보안 완화 없음.
+
+- 2026-10-13 — Billing SigV4 설정 여부 설명(TMI-116/TMI-198 관련). 로컬 코드와 기존 배포 기록을 대조해 당시 테스트는 Billing saga/AttemptGroup OFF를 유지했고 알림 배포에서 Billing IAM/Lattice를 설정하거나 실제 통신 검증하지 않았음을 확인했다. saga OFF는 기존 ExamSessionManager.startNew 경로로 Billing reserve/confirm·이용권 검증/차감을 하지 않는다. SigV4 client bean은 생성되지만 credential resolve/sign은 실제 호출 시 수행하고 saga 설정 검증도 OFF면 생략한다. 실제 연동에는 Task Role 임시 자격증명·Lattice invoke 권한/정책·네트워크·base URL와 활성화 전 검증이 필요하다. 이번 AWS 실환경 재조회·설정 변경 없음; 현재 원격 상태와 과거 확인을 구분한다.
+
+## 2026-10-12 — 리뷰 문구 안내
+
+- 사용자5점리뷰문구요청에실제경험·개발참여관계공개기준으로안내. 리뷰게시나외부작업없이문구제안/기록만수행, 신규Jira없음. 제품/배포/DB변경없음.
+
+## 2026-10-12 — prod 문항피드백 오류 자동 복구 확인
+
+- LC7787409483은실제prod7로그와requestId대조완료. AI-prod500응답에서Mongo112 WriteConflict/TransientTransactionError확인, 첫문항ownershipguard동시쓰기경합. 용량오류아님; 구체경쟁요청/LC내부retry실횟수미확인.
+- 15:23:29.354실패→15:23:30.403같은시험q1COMPLETED→30.433 feedbackHTTP200, 약1.08초뒤재전송성공. 같은시험11문항retry0완료및15:32:44Summarycompleted/stored/AIHTTP200확인. 최종저장로그상정상완료, 앱표시/직접DB조회미실행.
+- 사용자로그인복원후AWS읽기조회와기록만수행. 신규Jira없음, 제품/DB/설정/배포/Sentryissue상태변경없음. 기존작업보존, diffcheck통과. 수동재전송/시험재시작불필요, 재발시retry/backoff·공유guard경합분석검토.
+
+## 2026-10-12 — 신규 prod 피드백 Callback DB 오류 조사
+
+- 사용자 메일의LC7787409483/LEARNING-CORE-5는오늘15:23:29 KST prod태그,1event/500. 모의고사AI피드백Callback에서결과저장전 ownershipguard updateFirst(revision/updatedAt)실패, DataIntegrityViolationException→MongoCommandException.
+- 실제병합요청/AI채점실패/10월7일용량원인재발로단정하지않음. 해당요청저장실패경계확인, 후속재전송/최종결과미확인. Sentry빈release경고는별도. Mongo원인코드필요.
+- AWS세션로그인필요로CloudWatch조회미실행, handoff탭유지. 신규Jira없음, 제품/설정/DB/배포변경없이기록만수정. 다음은AWS로그인후requestId로그및후속Callback성공확인.
+
+## 2026-10-12 — 정리 후 동일 Sentry 오류 확인
+
+- 이번 재발 확인 턴의 종료 표식을 보완했다. 확인 결과 유지, 추가 외부 조회·변경 없음.
+
+- Azure정리 완료 결과파일 저장mtime는10월7일23:23:50 KST(completed/deleted4721/after0). 실제 마지막삭제 정확시각과 구분.
+- 새조회한3그룹 Latest는 신규Guest23:10:41/reissue23:16:44/Guest복구23:17:35 KST, 모두10월7일. 결과저장시각 이후 동일3그룹 이벤트 없음. 모든오류없음·현재정상·정리인과는 미확정.
+- 신규 Jira 없음, 읽기조회/기록만 수행. 제품/DB/설정/배포 변경 없음. 다음은 Mongo원인코드와 실제쓰기성공 로그 대조.
+
+
+
+## 2026-10-12 — 10월7일 이력·테스트 Sentry 수집 설명
+
+- 이번 이력·수집 구조 설명 턴의 종료 표식 기록 완료. 결과와 읽기 전용 범위 유지, 추가 외부 변경 없음.
+
+- 당시 기록에 Atlas99.7% 용량·21:17 뉴스레터Mongo오류·테스트 recovery/탈퇴flag 배포·azure_results 백업후삭제 존재. Identity DB쓰기오류와 공통DB 문제 가능성은 있으나 작업 인과/정확한원인 미확정.
+- 테스트도 같은 Sentry 프로젝트 DSN이면 해당 프로젝트로 수집되고 alert조건이 맞으면 메일 발송. 이번staging은SENTRY_ENVIRONMENT 설정 태그이며 특정ECS 서비스나prod 미발생을 단독 증명하지 않는다.
+- 코드/기록 정적 확인만, 외부설정/제품/DB/배포 변경 없음. 신규 Jira 없음. 다음은 Mongo원인코드 및 환경별수집/alert설정 확인.
+
+
+
+## 2026-10-12 — Guest 신규 저장 오류 시간 확인
+
+- 이번 환경·시각 조사 턴의 종료 표식 보완 완료. 확인 결과와 읽기 전용 조사 범위는 동일하다.
+
+- Identity-3 Sentry73events는100%staging 태그. 한국시간10월7일22:37:16~23:10:41 약33분25초에 발생. 토큰 재발급 오류 구간과 겹친다. 특정 ECS 서비스/revision·공통 원인은 미확정.
+- 읽기 전용 조회 및 기록만 수행. 제품/설정/DB/배포 변경 없음, 신규 Jira 없음.
+
+
+
+## 2026-10-12 — Identity-2 최대 발생 시간 확인
+
+- 시간대 조사 턴의 종료 표식을 보완했다. 추가 원격 조회나 제품 변경 없이 기존 확인 결과를 유지한다.
+
+- Sentry7일 그래프: KST10월7일21:00~23:00에591/623건(94.9%), 다음2시간 버킷32건. 실제 First/Latest는10월7일21:23:42~23:16:44 KST. 분단위 최다 시각/고유 사용자 수는 미확인.
+- 조회·양 저장소 기록만 갱신, 제품/배포/DB/Sentry issue상태 변경 없음. 신규 Jira 없음. 다음은 해당 구간 원인 로그 대조.
+
+
+
+## 2026-10-12 — Identity-2 오류 횟수 안내
+
+- 현재 설명 턴 종료 기록 표식을 보완했다. 결과와 범위는 동일하며 추가 원격 조회나 제품 변경 없음.
+
+- 직전 조회623events는 Sentry 오류 이벤트 수이며 사용자623명이 아니다. 토큰 재발급 반복 요청으로 누적될 가능성은 있으나 고유 요청/사용자/재시도 수는 미확인. 신규 Jira 없음. 이번 설명/기록만 수행, 원격 재조회·제품 변경 없음.
+
+## 2026-10-12 — Sentry Identity DB 쓰기 오류 조사
+
+- 제공 링크7778941899는 Identity staging POST /api/v1/auth/guest의 기존 Guest 세션 복구 findAndModify 실패/500,11events. 같은 프로젝트에 신규 Guest 저장7778858472(73),Refresh 세션 회전 저장7778713685(623)도 확인. 모두 MongoCommandException 체인/first-last seen5days ago, 대표10월7일 이벤트. 두 번째 메일 링크 미제공으로 해당 그룹 미확정.
+- 원문 message/code는 Sentry sanitizer에서 제거돼 정확한 DB 원인 미확정. 과거10월7일 Atlas99.7% 용량 기록은 후보일 뿐 현재 용량·이번 원인·복구 증거 아님. staging 태그만으로 특정 ECS revision이나 prod 영향 확정 불가.
+- 코드/과거 git 스택 대조 및 diff check만 수행, 제품 테스트 불필요. 기록만 변경, DB/AWS/Sentry/배포/issue상태/commit/push/Jira 변경 없음. 신규 Jira 없음, 기존 변경 보존. 다음은 두 번째 메일 링크 및 CloudWatch Mongo 원인 code 확인.
+
+
+
+## 2026-10-11 — 챌린지 재시도 DB 이행·test/prod 배포 완료
+
+<!-- codex-turn:01a12962-b3d9-7f51-a0ab-6eaf10a7797e -->
+
+- LC develop b2b37ff1857c807817235a9891073812538589c2의 동일 이미지로 prod7/test23 배포 완료. 두 환경 구 writer STOPPED 뒤 새4필드 unique 교체 완료. 양 환경 단일 deployment COMPLETED, desired/running/pending=1/1/0, 승인 digest 일치, ALB healthy, 공개 health HTTP200/UP 및 최근 기동 로그 ERROR0 확인. 중단된 서비스 없음. Node26개 이번 턴 재실행 전부 통과.
+- prod orphan6건은 승인된 transaction으로 ops_challenge_retry_orphans_20261011.originalDocument에 원본 보존 후 활성 컬렉션에서 격리(복구 가능). 원인 미확정. 원본 prepare apply 및 재검사 성공; test는 로그인한 Atlas aggregate/UI로 검사·이행했고 원본 CLI 전체 dry-run 미실행.
+- 제품 코드 추가 변경 없음. 이번 변경 파일은 양 저장소 WORKLOG/CURRENT_STATE뿐. 앞선 일반640·Mongo143·Node26 통과 결과 재사용, diff check 성공. 공개 URL/DTO·인증·AI·S3 형식 유지, 구운영·Identity·AI·IAM·Secret·네트워크 불변. 기존 dirty 파일 보존 및 예상 밖 제품 변경 없음.
+- 실제 앱 만료/재시작/제출 E2E와 프론트 분기 보완은 후속. 재시도 생성 뒤 구버전 단순 rollback 금지. Swagger 공유본 생성 없음. 상세 실행 근거·위험·결정은 이번 WORKLOG 항목에 보존.
+
+
+## 2026-10-11 — 재시도 commit/push·이미지 완료, test/prod 배포 보류
+
+<!-- codex-turn:01a12953-d238-7290-b232-00e14fb49172 -->
+
+- 이번 작업 한정 사용자 승인으로 관련12개 파일을 develop b2b37ff1857c807817235a9891073812538589c2로 commit/push. 무관한 .DS_Store 및 작업 기록 변경은 보존하고 commit에서 제외했다.
+- 전체 clean test640·mongoIntegrationTest143·Node26 성공. JAVA_TOOL_OPTIONS=-Dapi.version=1.44는 로컬 실행에만 적용. CloudShell committed archive Docker build 성공 및 ECR push 완료: sha256:0b566cc1cd7b73ac87a0be133aa834f84333bb16b1a44db12d36b09bc9958fd0.
+- 원본 prepare dry-run: test MongoServerSelectionError, prod Orphan Challenge Job or receipt로 실패. prod 읽기 전용 집계는 grading_jobs/submit_receipts/callback_receipts 각각 missing_attempt2·valid21. 기록 삭제나 검증 우회하지 않았다.
+- 서비스 중단/DDL/task definition 등록/배포 없음. 기존 test22/prod6/구운영23 유지. 테스트 DB 접속 확보 및 prod6개 고아 기록 원인·보존/격리 범위 확인 후 재검사 필요. 기존 Compass 테스트 연결은 ECS 대상과 다른 과거 연결이며 DNS 실패.
+- 공개 API/인증/AI/S3 계약 유지, 이번 runtime 추가 수정 없음. 실제 앱 E2E 및 기존 프론트 만료 분기 위험 유지, 새 재시도 생성 뒤 단순 구버전 rollback 금지. 사용자 기존 변경 보존, 예상 밖 변경 없음.
+
+## 2026-10-11 — 챌린지 미제출 만료 재시도 구현, 미배포
+
+- develop, 사용자 승인: 같은 KST 날짜의 미제출 EXPIRED는 새 attemptId·새 1시간으로 재시작. 유효 CREATED는 기존 ID 재사용, SUBMITTED는 재응시 금지, 옛 만료 ID는 410 유지. 만료로 완료/참고 답안/다음 문제를 열지 않는다.
+- Attempt의 nullable attemptSequence(기존=없음/null, 후속=1부터), 최신 시도 조회, 이전 revision touch+새 시도 insert transaction으로 기존 기록 보존 및 경합 제어. 기존 문제 snapshot 사용, 제출/AI/인증/S3 key 형식/공개 DTO 불변.
+- 변경: ChallengeModels/Service/Store/Views/StartupValidator, 단위 테스트2개·Mongo 통합 테스트, prepare 스크립트/Node 테스트, 프론트 계약 및 CHALLENGE_EXPIRED_RETRY_ROLLOUT.md, 작업 기록. 기존 .DS_Store/기록 변경 보존, 예상 밖 변경 없음.
+- 검증: 전체 일반 테스트640/640, 챌린지 Mongo 통합38/38, Node10/10, git diff --check 성공. Docker API1.32 충돌을 실행 환경 JAVA_TOOL_OPTIONS=-Dapi.version=1.44로 해결(의존성 변경 없음). 최초 통합 테스트의 구 만료 진행 기대값 수정 후 최종 clean test+통합 재실행17초 성공. 전체 타 도메인 Mongo suite는 미실행.
+- 배포 전 필수: 프론트 만료 처리 확인, Challenge 전체 writer drain, 스크립트 dry-run 후 승인된 인덱스 이행. 새 unique는 owner/date/question/attemptSequence, 구3필드 unique 제거 필요. 운영 DB/배포/commit/push 없음. 재시도 데이터 이후 구버전 단순 롤백 불가. 실제 앱 E2E와 운영 dry-run은 다음 작업.
+
+## 2026-10-09 — AI Learning·Identity test/prod 배포 완료
+
+- AI commit4f4d0b2의 API/Worker 동일 digest a5f8fbb3으로 test3·prod2 병렬 배포 완료. Identity commit4842d6c2의 검증 이미지 c8871b41로 prod5 배포, 이미 동일본인 test35 유지.
+- 네 서비스 단일 COMPLETED/1실행·0보류/ALB단일healthy, 이전 타깃 정리 완료. 실제 앱 컨테이너 digest/startup/RUNNING 확인, 조회한 기동로그 ERROR0. Identity test/prod GET health200/UP.
+- AI 로컬180/CloudShell180 테스트 및 topology Node4개, 양 저장소 diff check 통과. LC test22/prod6·시험AI·웹POC·환경별 Secret/flag/IAM/네트워크/DB 불변; 이번 코드 수정/commit/push 없음. 신규 Jira 없음, 기존/동시 변경 보존.
+- 변경 파일은 양 저장소 기록 및 Identity topology revision/image metadata. 실제 채점·Apple CLEANED E2E는 별도; 상태를 바꾸는 POST probe는 실행하지 않았다. 증거 /private/tmp/ai-identity-deployment-2026-10-09.png.
+
+
+
+## 2026-10-09 — 피드백/교정 목록 수정 test·prod 병렬 배포 완료
+
+<!-- codex-turn:01a11faf-382a-7731-9598-19fbb6fdd1ae -->
+
+- 사용자 푸시 dbe4b81의 push37902484709는 실제 배포 skipped. 기존 workflow_dispatch37902563372로 공통 테스트 통과/이미지 생성 후 test rollout과 prod6 업데이트를 병렬 시작했다.
+- CI37902563372 전체 성공. test22/prod6 동일 digest fe0015a2, 단일 COMPLETED/desired-running-pending1/1/0/ALB단일healthy/공개health200-UP, 기동 ERROR0. 이전 배포/타깃 정리 완료. 두 환경 definition image-only 변경 확인. Secret/설정/AI/Identity/구운영 유지.
+- topology Node4개/양 저장소 diff check 통과, 이번 제품 코드 수정·commit/push 없음. 기록/metadata만 변경, 기존 변경 보존, 예상 밖 변경 없음. 앱 새 결과 확인 및 실제 AI E2E는 별도. 증거 /private/tmp/learning-core-feedback-deploy-2026-10-09.png.
+
 ## 2026-10-09 — 피드백 null 객체·교정 목록 저장 수정 완료/미배포
 
 <!-- codex-turn:01a11fa9-b30f-73f0-82e2-8a6c3b59e868 -->

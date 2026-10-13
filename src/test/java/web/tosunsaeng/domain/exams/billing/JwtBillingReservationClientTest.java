@@ -8,8 +8,6 @@ import io.micrometer.tracing.Tracer;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.ObjectProvider;
-import software.amazon.awssdk.auth.credentials.AwsBasicCredentials;
-import software.amazon.awssdk.auth.credentials.StaticCredentialsProvider;
 import web.tosunsaeng.domain.exams.domain.enums.BillingReservationKind;
 import web.tosunsaeng.domain.exams.domain.enums.BillingContinuationReason;
 
@@ -28,9 +26,44 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
-class SigV4BillingReservationClientTest {
+class JwtBillingReservationClientTest {
 
     private HttpServer server;
+
+    @Test
+    void repeatedOperationKeepsBodyAndKeyButRefreshesJwtAndDistinguishesIngress404() throws Exception {
+        var tokens = new java.util.ArrayList<String>();
+        var bodies = new java.util.ArrayList<byte[]>();
+        var keys = new java.util.ArrayList<String>();
+        server = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
+        server.createContext("/internal/v1/reservations", exchange -> {
+            tokens.add(exchange.getRequestHeaders().getFirst("Authorization"));
+            keys.add(exchange.getRequestHeaders().getFirst("Idempotency-Key"));
+            bodies.add(exchange.getRequestBody().readAllBytes());
+            if (tokens.size() == 1) exchange.sendResponseHeaders(404, -1);
+            else {
+                byte[] response = "{\"code\":\"OPERATION_NOT_FOUND\"}".getBytes(StandardCharsets.UTF_8);
+                exchange.sendResponseHeaders(404, response.length); exchange.getResponseBody().write(response);
+            }
+            exchange.close();
+        });
+        server.start();
+        var p = new BillingSagaProperties(); p.setBaseUrl("http://127.0.0.1:" + server.getAddress().getPort());
+        var client = new JwtBillingReservationClient(p, WorkloadTestKeys.issuer(), new BillingSagaConfiguration().billingContractObjectMapper());
+        String operation = "018f6f36-2f42-4bf5-8c17-0be35de4872c";
+        for (var category : java.util.List.of(BillingClientException.Category.CONTRACT_ERROR, BillingClientException.Category.OPERATION_NOT_FOUND)) {
+            assertEquals(category, assertThrows(BillingClientException.class,
+                    () -> client.reserve(operation, "00000000-0000-4000-8000-000000000001", "ex_test", "mock_exam_003")).category());
+        }
+        org.junit.jupiter.api.Assertions.assertArrayEquals(bodies.get(0), bodies.get(1));
+        assertEquals(java.util.List.of(operation, operation), keys);
+        var ids = new java.util.HashSet<String>();
+        for (String token : tokens) {
+            var jwt = com.nimbusds.jwt.SignedJWT.parse(token.substring(7));
+            assertTrue(jwt.verify(new com.nimbusds.jose.crypto.RSASSAVerifier(WorkloadTestKeys.KEY.toPublicJWK())));
+            assertTrue(ids.add(jwt.getJWTClaimsSet().getJWTID()));
+        }
+    }
 
     @AfterEach
     void tearDown() {
@@ -72,9 +105,9 @@ class SigV4BillingReservationClientTest {
         properties.setRegion("ap-northeast-2");
         properties.setConnectTimeout(Duration.ofSeconds(1));
         properties.setReadTimeout(Duration.ofSeconds(2));
-        BillingReservationClient client = new SigV4BillingReservationClient(
+        BillingReservationClient client = new JwtBillingReservationClient(
                 properties,
-                StaticCredentialsProvider.create(AwsBasicCredentials.create("test-key", "test-secret")),
+                WorkloadTestKeys.issuer(),
                 new BillingSagaConfiguration().billingContractObjectMapper()
         );
 
@@ -89,8 +122,10 @@ class SigV4BillingReservationClientTest {
         assertEquals(BillingReservationClient.ReservationStatus.RESERVED, result.reservationStatus());
         assertEquals("018f6f36-2f42-4bf5-8c17-0be35de4872c", idempotencyKey.get());
         assertNotNull(authorization.get());
-        assertTrue(authorization.get().contains("Credential=test-key/"));
-        assertTrue(authorization.get().contains("/ap-northeast-2/vpc-lattice-svcs/aws4_request"));
+        assertTrue(authorization.get().startsWith("Bearer "));
+        var jwt = com.nimbusds.jwt.SignedJWT.parse(authorization.get().substring(7));
+        assertTrue(jwt.verify(new com.nimbusds.jose.crypto.RSASSAVerifier(WorkloadTestKeys.KEY.toPublicJWK())));
+        assertEquals(java.util.List.of("tosunsaeng-billing:reservations:test"), jwt.getJWTClaimsSet().getAudience());
         assertTrue(body.get().contains("\"sessionId\":\"ex_contract\""));
     }
 
@@ -126,9 +161,9 @@ class SigV4BillingReservationClientTest {
         BillingSagaProperties properties = new BillingSagaProperties();
         properties.setCreationSagaEnabled(true);
         properties.setBaseUrl("http://127.0.0.1:" + server.getAddress().getPort());
-        BillingReservationClient client = new SigV4BillingReservationClient(
+        BillingReservationClient client = new JwtBillingReservationClient(
                 properties,
-                StaticCredentialsProvider.create(AwsBasicCredentials.create("test-key", "test-secret")),
+                WorkloadTestKeys.issuer(),
                 new BillingSagaConfiguration().billingContractObjectMapper()
         );
 
@@ -454,7 +489,7 @@ class SigV4BillingReservationClientTest {
     }
 
     @Test
-    void clientSpanTraceparentIsIncludedBeforeSigV4Signing() throws Exception {
+    void clientSpanTraceparentIsPreservedWithBearerAuthentication() throws Exception {
         AtomicReference<String> traceparent = new AtomicReference<>();
         AtomicReference<String> authorization = new AtomicReference<>();
         server = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
@@ -495,10 +530,9 @@ class SigV4BillingReservationClientTest {
         properties.setRegion("ap-northeast-2");
         properties.setConnectTimeout(Duration.ofSeconds(1));
         properties.setReadTimeout(Duration.ofSeconds(2));
-        BillingReservationClient client = new SigV4BillingReservationClient(
+        BillingReservationClient client = new JwtBillingReservationClient(
                 properties,
-                StaticCredentialsProvider.create(
-                        AwsBasicCredentials.create("test-key", "test-secret")),
+                WorkloadTestKeys.issuer(),
                 new BillingSagaConfiguration().billingContractObjectMapper(),
                 tracerProvider,
                 new SimpleMeterRegistry()
@@ -510,7 +544,7 @@ class SigV4BillingReservationClientTest {
                 "00-0123456789abcdef0123456789abcdef-fedcba9876543210-01",
                 traceparent.get()
         );
-        assertTrue(authorization.get().contains("traceparent"));
+        assertTrue(authorization.get().startsWith("Bearer "));
         verify(child).end();
         verify(scope).close();
     }
@@ -522,10 +556,9 @@ class SigV4BillingReservationClientTest {
         properties.setRegion("ap-northeast-2");
         properties.setConnectTimeout(Duration.ofSeconds(1));
         properties.setReadTimeout(Duration.ofSeconds(2));
-        return new SigV4BillingReservationClient(
+        return new JwtBillingReservationClient(
                 properties,
-                StaticCredentialsProvider.create(
-                        AwsBasicCredentials.create("test-key", "test-secret")),
+                WorkloadTestKeys.issuer(),
                 new BillingSagaConfiguration().billingContractObjectMapper()
         );
     }
@@ -548,9 +581,9 @@ class SigV4BillingReservationClientTest {
         properties.setRegion("ap-northeast-2");
         properties.setConnectTimeout(Duration.ofSeconds(1));
         properties.setReadTimeout(Duration.ofSeconds(2));
-        return new SigV4BillingReservationClient(
+        return new JwtBillingReservationClient(
                 properties,
-                StaticCredentialsProvider.create(AwsBasicCredentials.create("test-key", "test-secret")),
+                WorkloadTestKeys.issuer(),
                 new BillingSagaConfiguration().billingContractObjectMapper()
         );
     }

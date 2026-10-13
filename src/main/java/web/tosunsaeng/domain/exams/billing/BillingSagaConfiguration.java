@@ -21,7 +21,6 @@ import org.springframework.data.mongodb.MongoDatabaseFactory;
 import org.springframework.data.mongodb.MongoTransactionManager;
 import org.springframework.transaction.support.TransactionOperations;
 import org.springframework.transaction.support.TransactionTemplate;
-import software.amazon.awssdk.auth.credentials.AwsCredentialsProvider;
 import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.tracing.Tracer;
 
@@ -60,13 +59,13 @@ public class BillingSagaConfiguration {
     @Bean
     public BillingReservationClient billingReservationClient(
             BillingSagaProperties properties,
-            AwsCredentialsProvider credentialsProvider,
+            BillingWorkloadTokenIssuer tokenIssuer,
             @Qualifier("billingContractObjectMapper") ObjectMapper objectMapper,
             ObjectProvider<Tracer> tracerProvider,
             MeterRegistry meterRegistry
     ) {
-        return new SigV4BillingReservationClient(
-                properties, credentialsProvider, objectMapper, tracerProvider, meterRegistry
+        return new JwtBillingReservationClient(
+                properties, tokenIssuer, objectMapper, tracerProvider, meterRegistry
         );
     }
 

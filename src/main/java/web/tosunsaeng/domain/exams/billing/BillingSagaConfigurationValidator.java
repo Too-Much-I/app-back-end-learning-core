@@ -37,9 +37,6 @@ public class BillingSagaConfigurationValidator implements ApplicationRunner {
                 && !"https".equalsIgnoreCase(baseUri.getScheme())) {
             throw new IllegalStateException("Billing base URL must use HTTPS in staging/prod");
         }
-        if (!"ap-northeast-2".equals(properties.getRegion())) {
-            throw new IllegalStateException("Billing SigV4 region must be ap-northeast-2");
-        }
         requirePositive(properties.getConnectTimeout(), "Billing connect timeout");
         requirePositive(properties.getReadTimeout(), "Billing read timeout");
     }
