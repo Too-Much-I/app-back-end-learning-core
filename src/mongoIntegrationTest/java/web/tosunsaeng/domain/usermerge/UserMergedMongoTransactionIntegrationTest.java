@@ -157,6 +157,51 @@ class UserMergedMongoTransactionIntegrationTest {
     }
 
     @Test
+    void answerLearningMergeDeduplicatesCompletionAndFencesOldWorker() {
+        var store = new web.tosunsaeng.domain.answerlearning.LearningStore(mongoTemplate, transactionExecutor);
+        store.indexes();
+        var s = new web.tosunsaeng.domain.answerlearning.LearningModels.Submission();
+        s.id = java.util.UUID.randomUUID().toString(); s.userId = SOURCE; s.lessonId = "lesson"; s.level = "IH";
+        s.contentVersion = "v1"; s.createdAt = NOW; s.queuedAt = NOW; s.status = "completed";
+        s.result = new org.bson.Document("transcript", "Synthetic answer"); s.completionPending = true;
+        s.nextRunAt = NOW; s.leaseUntil = Instant.EPOCH;
+        mongoTemplate.insert(s);
+        var oldClaim = store.claim(s, NOW);
+        store.complete(SOURCE, "read", "common", "v1", null, NOW.minusSeconds(10));
+        store.complete(TARGET, "read", "common", "v1", null, NOW);
+        assertThat(service.consume(event("9a88bc80-d73a-4a3d-8f68-492641d27208"))).isEqualTo(UserMergedConsumeResult.PROCESSED);
+        assertThat(store.find(s.id).userId).isEqualTo(TARGET);
+        assertThat(store.find(s.id).leaseToken).isNull();
+        assertThatThrownBy(() -> store.completeClaim(oldClaim, NOW)).isInstanceOf(RuntimeException.class);
+        var moved = store.find(s.id); var nextClaim = store.claim(moved, NOW); store.completeClaim(nextClaim, NOW);
+        var rows = mongoTemplate.findAll(org.bson.Document.class, "learning_completions");
+        assertThat(rows).hasSize(2).allSatisfy(row -> assertThat(row.getString("userId")).isEqualTo(TARGET));
+        assertThat(rows.stream().filter(row -> "read".equals(row.getString("lessonId"))).findFirst().orElseThrow().getDate("completedAt").toInstant())
+                .isEqualTo(NOW.minusSeconds(10));
+        assertThat(store.find(s.id).completionPending).isFalse();
+    }
+
+    @Test
+    void completionFailureRollsBackRootUpdateInTheSameOwnerTransaction() {
+        var store = new web.tosunsaeng.domain.answerlearning.LearningStore(mongoTemplate, transactionExecutor); store.indexes();
+        var s = new web.tosunsaeng.domain.answerlearning.LearningModels.Submission();
+        s.id=java.util.UUID.randomUUID().toString(); s.userId=SOURCE; s.lessonId="lesson"; s.level="IH"; s.contentVersion="v1";
+        s.status="completed"; s.result=new org.bson.Document("transcript","synthetic"); s.completionPending=true;
+        s.nextRunAt=NOW; s.leaseUntil=Instant.EPOCH;
+        mongoTemplate.insert(s); var claim=store.claim(s,NOW);
+        var failingMongo=mock(MongoTemplate.class,withSettings().defaultAnswer(delegatesTo(mongoTemplate)));
+        doThrow(new DataAccessResourceFailureException("synthetic failure")).when(failingMongo)
+                .upsert(any(org.springframework.data.mongodb.core.query.Query.class),any(org.springframework.data.mongodb.core.query.UpdateDefinition.class),org.mockito.ArgumentMatchers.eq("learning_completions"));
+        var failingStore=new web.tosunsaeng.domain.answerlearning.LearningStore(failingMongo,transactionExecutor);
+        assertThatThrownBy(()->failingStore.completeClaim(claim,NOW)).isInstanceOf(DataAccessResourceFailureException.class);
+        assertThat(store.find(s.id).completionPending).isTrue();
+        assertThat(store.find(s.id).leaseToken).isEqualTo(claim.leaseToken);
+        assertThat(mongoTemplate.getCollection("learning_completions").countDocuments()).isZero();
+        store.completeClaim(claim,NOW);
+        assertThat(mongoTemplate.getCollection("learning_completions").countDocuments()).isEqualTo(1);
+    }
+
+    @Test
     void ownerMigrationSourceDenyAndInboxCommitAtomically() {
         mongoTemplate.insert(ExamSession.builder()
                 .examId("exam-source")

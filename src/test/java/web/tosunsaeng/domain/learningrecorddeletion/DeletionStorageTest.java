@@ -61,4 +61,24 @@ class DeletionStorageTest {
         verify(redis, times(2)).delete("exam:status:exam-old");
         verifyNoMoreInteractions(s3);
     }
+    @Test void answerLearningSweepsBothRecordingPrefixesOnlyAfterRemotePurge() {
+        var purge = mock(java.util.function.Consumer.class);
+        var learning = new S3RedisDeletionStorage(s3, redis, "exam-bucket", "learning-bucket", purge);
+        String id="239f345b-9be8-43a3-a63d-9108df972741";
+        var target=DeletionTarget.draining("139f345b-9be8-43a3-a63d-9108df972741", "00000000-0000-0000-0000-000000000001",DeletionTarget.Type.LEARNING_SUBMISSION,id);
+        when(s3.getBucketVersioning(any(GetBucketVersioningRequest.class))).thenReturn(GetBucketVersioningResponse.builder().build());
+        when(s3.listObjectsV2(any(ListObjectsV2Request.class))).thenReturn(ListObjectsV2Response.builder().build());
+        assertThat(learning.sweep(target)).isTrue();
+        var order=inOrder(purge,s3); order.verify(purge).accept(id); order.verify(s3).getBucketVersioning(any(GetBucketVersioningRequest.class));
+        var requests=ArgumentCaptor.forClass(ListObjectsV2Request.class); verify(s3,times(2)).listObjectsV2(requests.capture());
+        assertThat(requests.getAllValues()).allSatisfy(request->assertThat(request.bucket()).isEqualTo("learning-bucket"));
+        assertThat(requests.getAllValues()).extracting(ListObjectsV2Request::prefix).containsExactly("answer-learning-uploads/"+id+"/","answer-learning-submissions/"+id+"/");
+        assertThat(learning.clearCache(target)).isTrue(); verifyNoInteractions(redis);
+    }
+    @Test void missingLearningCleanupConfigurationNeverReportsSuccess() {
+        var target=DeletionTarget.draining("139f345b-9be8-43a3-a63d-9108df972741", "00000000-0000-0000-0000-000000000001",DeletionTarget.Type.LEARNING_SUBMISSION,"239f345b-9be8-43a3-a63d-9108df972741");
+        assertThatThrownBy(()->storage.sweep(target)).isInstanceOf(IllegalStateException.class);
+        verifyNoInteractions(s3,redis);
+    }
+
 }

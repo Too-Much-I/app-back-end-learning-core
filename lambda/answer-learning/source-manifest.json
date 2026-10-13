@@ -1,0 +1,17 @@
+{
+  "source": "app-ai-learning learning runtime snapshot 2026-10-13",
+  "sha256": {
+    "app/__init__.py": "7e63672db65d4861d7a6171c36304ec38adc2f155c20ca6ca5dc12d7a6f4783f",
+    "app/practice_grading/__init__.py": "26ba075eb7776fa50e3da5fba5aa22ee3bd0ad6209df3197c61856939bee639f",
+    "app/practice_grading/contracts.py": "d5f800eee30e207982cfdcc80906fc111161de8407ca1c06392ad02c15806b4e",
+    "app/practice_grading/provider.py": "6bce4c7295e18cee61296d2a23f816ff645e27a7541166092bba835acb3c3760",
+    "app/practice_grading/settings.py": "88d2e6f25e90c0f151aa2fe49e438f81adcc82f55cc7f0802bf94f933093ea5a",
+    "scripts/build_practice_lambda.py": "d08cbeac8bd36ec98fe6eec338fc5ab0943ad9b38a100ebb46b345af1996977c",
+    "infra/practice-learning-stack.json": "0fffbe508e5c5b4d9ae450892fef6e7ca80230fbddff361de31265340f9ca2ec",
+    "requirements-practice-lambda.txt": "93cdc85e0a75aecfd1ce2a607f30efe48fc762dd449ac78108557bbc942f32fa",
+    "app/practice_lambda/__init__.py": "557b3d9ce089ef7f8910f0c959d473576ea55b55eea96b1b957245c45f222c44",
+    "app/practice_lambda/aws.py": "4fea5fb3c001c254ecabe7fd6ca748005655b5c58c978776a2f330c480ec4077",
+    "app/practice_lambda/handler.py": "05010980d1ec1349bf29624e0f0009f074c0c48b828a09208d2924b5beb50c4c",
+    "app/practice_lambda/service.py": "10394a734466d2ebde37f0394071aaeb10dd8c028711fc710aa531ef2d4dd347"
+  }
+}

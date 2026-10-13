@@ -24,6 +24,16 @@ spring:
       max-request-size: 10MB
 
 app:
+  answer-learning:
+    enabled: ${ANSWER_LEARNING_ENABLED:false}
+    grading-enabled: ${ANSWER_LEARNING_GRADING_ENABLED:false}
+    dataset-id: ${ANSWER_LEARNING_DATASET_ID:}
+    content-version: ${ANSWER_LEARNING_CONTENT_VERSION:}
+    bucket: ${ANSWER_LEARNING_S3_BUCKET:}
+    lambda-url: ${ANSWER_LEARNING_LAMBDA_URL:}
+    region: ${ANSWER_LEARNING_AWS_REGION:ap-northeast-2}
+    daily-submissions: ${ANSWER_LEARNING_DAILY_SUBMISSIONS:60}
+    poll-ms: ${ANSWER_LEARNING_POLL_MS:1500}
   learning-record-deletion:
     command-enabled: ${LEARNING_RECORD_DELETION_COMMAND_ENABLED:false}
     read-fence-enabled: ${LEARNING_RECORD_DELETION_READ_FENCE_ENABLED:false}

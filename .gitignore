@@ -39,3 +39,7 @@ out/
 ### Local environment ###
 .env*
 !.env.example
+
+### Isolated learning Lambda/tooling caches ###
+__pycache__/
+.pytest_cache/
