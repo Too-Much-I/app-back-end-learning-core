@@ -1,5 +1,14 @@
 # 프로젝트 목적
 
+## 2026-10-13 LC–Billing workload JWT B 구현 승인 예외
+
+- 문서 동기화 후 사용자의 「어 해줘」로 LC B 코드·관련 테스트 구현이 승인됐다. **C 재처리 도구, 실제 DB/AWS/배포/활성화는 별도 승인 전 수행하지 않는다.** 격리 Testcontainers DB 검증은 B 테스트 범위다.
+- 기준: `docs/contracts/LC-BILLING-WORKLOAD-A-ACCEPTANCE-R1.md`, `LC-BILLING-WORKLOAD-AUTH-R1.md`, `LC-BILLING-WORKLOAD-SENDER-MAPPING-R1.md`, `docs/codex/LC_BILLING_WORKLOAD_JWT_B_IMPLEMENTATION_PLAN.md`, `docs/adr/ADR-LC-BILLING-WORKLOAD-JWT.md`.
+- TMI-116/TMI-128/TMI-122 및 AttemptGroup의 기존 SigV4/Lattice 전제는 이 B 전환의 두 Billing 발신 구현 범위에 한해 workload JWT/HTTPS exact-auth gate로 대체한다. 배포·활성화를 뜻하지 않으며 기존 업무·공개 API/AI/S3/Redis/복구·멱등 계약과 default-off를 유지한다. A 규격과 fixtures-1 bytes/hash를 변경하지 않는다.
+- B 후속 구현 기준: J/S/H/R/W/P 조합은 수락 표대로22허용/42거절(키·기존 업무/DB 조건 정상 전제). H/R→S 유지, J OFF+(S OR P) 거절, ON 키 검증/OFF 미파싱. **writer OFF/publisher ON은 기존 outbox drain용 허용이며 P→W 의존이나 writer Transaction 필수 의존을 추가하지 않는다.**
+- **publisher 단독 ON에서도 필수 outbox index 및 state `_id` 점검이 필요하다. 검증 경계를 W OR P로 준비하고 점검 성공 전에 claim/send하지 않는다.** 기존 key/options 유지, 충돌은 fail-closed하며 임의 index drop/recreate·데이터 정리는 허용하지 않는다. 새 event 생성/DEAD_LETTER 자동 requeue를 drain으로 간주하지 않는다.
+- 후속 B에서 두 Billing signer만 교체하며 S3 공용 AWS provider/SDK를 보존한다. Billing 저장소의 수신 보안·ADR/AGENTS는 LC 작업으로 수정하지 않는다. fixture/runtime/실환경 검증 증거를 분리한다.
+
 이 저장소는 기존 토선생 웹 POC 백엔드를 복제하여 만든 앱용 Learning Core 서비스다.
 
 현재 이 저장소의 제품·구현 범위는 앱 전용이다. 기존 웹 백엔드와 웹 프론트는 별도 저장소·별도 배포 서비스이며 이 저장소의 변경 대상으로 취급하지 않는다. 명시적인 요청이 없으면 웹 저장소를 조회하거나 웹 동작을 함께 검증하지 않는다.

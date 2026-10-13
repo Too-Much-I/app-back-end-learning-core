@@ -13,14 +13,14 @@
 - 최신 develop `3d50195`와 전체 학습 변경을 합친 임시 복사본: Java 908개(같은 조건부 fixture 1개 skip), Mongo 160개, 실패·오류 0.
 - 실제 서버 DTO → 프론트 스키마: 목록 13개·상세 520개·답안 1,000개·콘텐츠 버전 1개 일치.
 
-최신 develop과 **런타임 파일의 병합 충돌은 없으며** `application.yml`은 양쪽 설정을 보존해 자동 병합됐다. 공통 기록 `docs/codex/CURRENT_STATE.md`와 `WORKLOG.md`는 같은 위치에 양쪽 기록을 추가해 텍스트 충돌이 남는다. 양쪽 이력을 보존한 적용용 파일을 로컬 `build/answer-learning-conflict-fix-20261013/resolved-docs/`에 준비했다. 이는 현재 `3d50195` 기준 파일이므로 실제 머지 시 기준이 바뀌었다면 다시 대조해야 한다. 원래 브랜치와 index를 보존했으며 rebase/merge는 실행하지 않았다.
+최신 develop과 **런타임 파일의 병합 충돌은 없으며** `application.yml`은 양쪽 설정을 보존해 자동 병합됐다. 임시 검사에서 발견한 공통 기록 `docs/codex/CURRENT_STATE.md`와 `WORKLOG.md`의 충돌도 후속 GitHub 전달 단계에서 양쪽 이력을 보존해 해결했다. `feat/answer-learning`에는 최신 develop `3d50195`가 반영되어 있다. main/develop 브랜치에는 직접 변경하지 않았다.
 
-전체 검증 수치·병합 검사·수정 범위 증거는 Git 제외 `build/answer-learning-conflict-fix-20261013/`에 있다. 이전 실패 재현 이력은 `build/answer-learning-final-review-20261013/`에 보존했다. 이번에는 AWS/DB 배포·실제 음성·모델 호출·commit/push를 수행하지 않았다. 새 백엔드 이미지 배포 후 실제 앱 종단 검증이 필요하다.
+전체 검증 수치·병합 검사·수정 범위 증거는 Git 제외 `build/answer-learning-conflict-fix-20261013/`에 있다. 이전 실패 재현 이력은 `build/answer-learning-final-review-20261013/`에 보존했다. 이전 오류 수정 검사에서는 AWS/DB 배포·실제 음성·모델 호출·commit/push를 수행하지 않았다. 이후 사용자 요청에 따라 아래 feature 브랜치로 전달하며, 새 백엔드 이미지 배포 후 실제 앱 종단 검증이 필요하다.
 
 ## 5줄 결론
 
 1. 프론트는 기존 앱의 학습 탭에 연결됐고, 백엔드는 기존 Learning Core의 `/api/v1/learning` 10개 API를 구현했다. 별도 앱으로 다시 이식할 작업이 아니다.
-2. 프론트 `feat/answer-learning` → `main`, 백엔드 로컬 `feat/answer-learning` → `develop`이 전달 대상이다. 백엔드 `develop` 머지는 테스트 ECS 배포를 시작한다.
+2. 프론트 `feat/answer-learning` → `main`, 백엔드 `feat/answer-learning` → `develop`이 전달 대상이다. 백엔드 `develop` 머지는 테스트 ECS 배포를 시작한다.
 3. 현재 **코드 검사 통과와 서비스 출시 준비 완료는 다르다**. 테스트 DB 콘텐츠, 계정 통합·기록 삭제 코드·자동 검증, task role 권한, 최신 Lambda 배포와 테스트 ECS 채점 활성화 설정은 완료했다. 새 백엔드 코드 배포와 실제 앱 종단 검증은 남아 있다.
 4. 현행 배포 workflow는 현재 task definition의 **이미지만 교체**한다. `.env.example`만 머지해도 ECS 환경변수나 IAM 권한이 생기지 않는다.
 5. 사용자 승인으로 테스트 DB의 학습용 6개 컬렉션, 테스트 task role 권한, 학습 전용 Lambda 2개와 테스트 ECS 환경변수 9개를 순차 적용했다. 기존 실행 이미지, S3 버킷 정책, 기존 staging/prod 서비스와 운영 DB는 변경하지 않았다.
@@ -32,12 +32,12 @@
 | 구분 | 전달 코드 | 기준/현재 상태 |
 | --- | --- | --- |
 | 앱 | `app-front-end`, `feat/answer-learning` | `3e17478` 기반, HEAD `831cd635` + 로컬 휴대폰 어댑터/계정 통합 캐시 갱신·세션 유지 변경. 10/13 최신 main `ab1c708`과 merge-tree 충돌 없음 |
-| 백엔드 | `app-back-end-learning-core`, 로컬 `feat/answer-learning` | develop `b2b37ff` 기반, 최신 `3d50195` 합류 검사 통과. 사용자 선택대로 commit/push하지 않은 변경도 반드시 전달해야 함 |
+| 백엔드 | `app-back-end-learning-core`, `feat/answer-learning` | develop `b2b37ff` 기반 학습 구현 + 최신 `3d50195` 병합. 전체 구현을 feature 브랜치로 전달 |
 | 데이터 | 서버용 별도 전달 | 200카드·360문항·1,000답안·2,756미디어. 전체 콘텐츠는 공개 Git에 넣지 않음 |
 | 체크리스트 | 서버용 별도 전달 | `question-checklists-20261012-v1`, Part 2~5 320문항·721항목. 로컬 및 Atlas 테스트 DB 반영 완료. 운영 DB의 기존 9개 기준은 이번에 변경하지 않음 |
 | Lambda | 이 브랜치 `lambda/answer-learning/` | 전용 intake/worker/설정/배포 템플릿/합성 테스트 포함. 최신 테스트 배포·삭제 계약 검증 완료. [빌드와 배포 기록](../../lambda/answer-learning/README.md). 프론트에 Lambda 주소/모델 키를 전달하지 않음 |
 
-백엔드 로컬 브랜치는 **브랜치 이름만 전달하면 코드가 전달되지 않는다**. 미커밋 파일을 검토·커밋한 뒤 PR을 만들거나 제공된 패치를 적용해야 한다. 현재 문서를 GitHub에서 읽을 수 있다는 전제로 안내하지 않는다.
+백엔드 전달 위치는 [GitHub `feat/answer-learning`](https://github.com/Too-Much-I/app-back-end-learning-core/tree/feat/answer-learning)이다. 사용자가 10/13 후속 요청으로 commit/push를 승인했다. 전체 학습 구현·Lambda 소스·계약 문서를 이 브랜치로 전달한다. develop PR 머지와 서버 배포는 별도이며, 비공개 전체 콘텐츠는 기존 테스트 Mongo/S3에 보관한다.
 
 ### 실제 서버 매핑
 
@@ -59,7 +59,7 @@
 
 | 순서 | 담당 | 필요한 결과 | 현재 상태 |
 | --- | --- | --- | --- |
-| 1 | 프론트·백엔드 | 두 브랜치 전체 변경 수령, 최신 기준 충돌 확인, API 계약 고정 | 자동 검사 통과, backend commit/push 보류 |
+| 1 | 프론트·백엔드 | 두 브랜치 전체 변경 수령, 최신 기준 충돌 확인, API 계약 고정 | 자동 검사 통과, 최신 develop 병합·feature 브랜치로 전달 |
 | 2 | 백엔드 | 기존 계정 통합/학습 기록 삭제에 신규 사용자 데이터 연결 및 테스트 | **코드·자동 검증 완료** — 소유권 이전·중복 완료 병합·삭제·늦은 결과 차단 |
 | 3 | 데이터 담당 | 테스트 DB에 지정 dataset/version 및 전체 320개 기준 반영 | **완료** — 테스트 DB 6개 컬렉션, 4,637문서 전체 재조회 일치, S3 2,756객체 HEAD 검증 |
 | 4 | 인프라 담당 | 테스트 task role에 전용 S3 prefix·Lambda 호출 권한 부여 | **완료(10/13)** — 기존 정책 보존, 추가 정책/실제 역할 각각 18개 검사 통과 |
@@ -73,7 +73,7 @@
 
 - 기존 계정 통합/기록 삭제에 새 완료·제출·녹음·Lambda 전사/결과를 포함하도록 구현했다. 기존 삭제 API를 유지하며 프론트의 기존 설정 화면에 아직 없는 삭제 UI를 임의로 추가하지 않았다.
 - 테스트와 prod의 학습 녹음/채점 저장소를 어떻게 격리할지 정한 뒤 권한을 적용한다. 현재 준비된 `tosunsaeng-app-audio`와 staging Lambda를 prod에 자동 재사용하지 않는다.
-- backend는 로컬 브랜치 유지가 현재 사용자 결정이다. 담당자의 커밋/PR 없이는 GitHub develop에 합류하지 않는다.
+- backend feature 브랜치 commit/push는 후속 사용자 요청으로 승인됐다. develop 반영에는 담당자의 PR 검토·머지가 필요하다.
 
 ## 주요 위험과 미확인 사항
 

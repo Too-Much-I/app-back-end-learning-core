@@ -27,6 +27,7 @@ import java.util.concurrent.TimeUnit;
 
 @Slf4j
 @Component
+@org.springframework.context.annotation.DependsOn("attemptGroupEventIndexValidator")
 @ConditionalOnProperty(
         prefix = "app.attempt-group-events",
         name = "publisher-enabled",

@@ -32,7 +32,7 @@ class BillingSagaConfigurationValidatorTest {
     }
 
     @Test
-    void enabledStagingRequiresHttpsAndApprovedRegion() {
+    void enabledStagingRequiresHttpsButNoLongerRequiresSigV4Region() {
         BillingSagaProperties properties = enabledProperties("http://billing.internal");
         MockEnvironment environment = new MockEnvironment();
         environment.setActiveProfiles("staging");
@@ -45,11 +45,8 @@ class BillingSagaConfigurationValidatorTest {
 
         properties.setBaseUrl("https://billing.internal");
         properties.setRegion("us-east-1");
-        assertThrows(
-                IllegalStateException.class,
-                () -> new BillingSagaConfigurationValidator(properties, environment)
-                        .run(new DefaultApplicationArguments())
-        );
+        assertDoesNotThrow(() -> new BillingSagaConfigurationValidator(properties, environment)
+                .run(new DefaultApplicationArguments()));
     }
 
     @Test

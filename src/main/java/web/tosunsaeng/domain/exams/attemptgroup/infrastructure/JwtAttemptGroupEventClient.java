@@ -2,12 +2,7 @@ package web.tosunsaeng.domain.exams.attemptgroup.infrastructure;
 
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
-import software.amazon.awssdk.auth.credentials.AwsCredentialsProvider;
-import software.amazon.awssdk.http.ContentStreamProvider;
-import software.amazon.awssdk.http.SdkHttpMethod;
-import software.amazon.awssdk.http.SdkHttpRequest;
-import software.amazon.awssdk.http.auth.aws.signer.AwsV4HttpSigner;
-import software.amazon.awssdk.http.auth.spi.signer.SignedRequest;
+import web.tosunsaeng.domain.exams.billing.BillingWorkloadTokenIssuer;
 
 import java.io.IOException;
 import java.io.InputStream;
@@ -23,34 +18,31 @@ import java.nio.charset.StandardCharsets;
         name = "publisher-enabled",
         havingValue = "true"
 )
-public class SigV4AttemptGroupEventClient implements AttemptGroupEventClient {
+public class JwtAttemptGroupEventClient implements AttemptGroupEventClient {
     static final int MAX_RESPONSE_BYTES = 16 * 1024;
-    private static final String SIGNING_NAME = "vpc-lattice-svcs";
     private final AttemptGroupEventProperties properties;
-    private final AwsCredentialsProvider credentialsProvider;
-    private final AwsV4HttpSigner signer;
+    private final BillingWorkloadTokenIssuer tokenIssuer;
     private final HttpClient httpClient;
 
-    public SigV4AttemptGroupEventClient(
+    @org.springframework.beans.factory.annotation.Autowired
+    public JwtAttemptGroupEventClient(
             AttemptGroupEventProperties properties,
-            AwsCredentialsProvider credentialsProvider
+            BillingWorkloadTokenIssuer tokenIssuer
     ) {
-        this(properties, credentialsProvider, AwsV4HttpSigner.create(),
+        this(properties, tokenIssuer,
                 HttpClient.newBuilder()
                         .connectTimeout(properties.connectTimeout())
                         .followRedirects(HttpClient.Redirect.NEVER)
                         .build());
     }
 
-    SigV4AttemptGroupEventClient(
+    JwtAttemptGroupEventClient(
             AttemptGroupEventProperties properties,
-            AwsCredentialsProvider credentialsProvider,
-            AwsV4HttpSigner signer,
+            BillingWorkloadTokenIssuer tokenIssuer,
             HttpClient httpClient
     ) {
         this.properties = properties;
-        this.credentialsProvider = credentialsProvider;
-        this.signer = signer;
+        this.tokenIssuer = tokenIssuer;
         this.httpClient = httpClient;
     }
 
@@ -59,30 +51,12 @@ public class SigV4AttemptGroupEventClient implements AttemptGroupEventClient {
         URI uri = endpoint();
         byte[] requestBody = canonicalPayload.getBytes(StandardCharsets.UTF_8);
         try {
-            SdkHttpRequest unsigned = SdkHttpRequest.builder()
-                    .uri(uri)
-                    .method(SdkHttpMethod.POST)
-                    .putHeader("Content-Type", "application/json")
-                    .putHeader("traceparent", traceparent)
-                    .build();
-            ContentStreamProvider payload = ContentStreamProvider.fromByteArray(requestBody);
-
-            // traceparent is final before signing. The signed request is immutable afterwards.
-            SignedRequest signed = signer.sign(request -> request
-                    .identity(credentialsProvider.resolveCredentials())
-                    .request(unsigned)
-                    .payload(payload)
-                    .putProperty(AwsV4HttpSigner.SERVICE_SIGNING_NAME, SIGNING_NAME)
-                    .putProperty(AwsV4HttpSigner.REGION_NAME, properties.awsRegion()));
-
             HttpRequest.Builder http = HttpRequest.newBuilder(uri)
                     .timeout(properties.readTimeout())
+                    .header("Content-Type", "application/json")
+                    .header("traceparent", traceparent)
+                    .header("Authorization", tokenIssuer.authorization(BillingWorkloadTokenIssuer.Purpose.ATTEMPT_GROUP_EVENTS))
                     .POST(HttpRequest.BodyPublishers.ofByteArray(requestBody));
-            signed.request().headers().forEach((name, values) -> {
-                if (!isRestrictedHeader(name)) {
-                    values.forEach(value -> http.header(name, value));
-                }
-            });
             HttpResponse<InputStream> response = httpClient.send(
                     http.build(), HttpResponse.BodyHandlers.ofInputStream());
             try (InputStream body = response.body()) {
@@ -122,7 +96,4 @@ public class SigV4AttemptGroupEventClient implements AttemptGroupEventClient {
                 .orElse(null);
     }
 
-    private static boolean isRestrictedHeader(String name) {
-        return "host".equalsIgnoreCase(name) || "content-length".equalsIgnoreCase(name);
-    }
 }
