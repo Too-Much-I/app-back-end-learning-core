@@ -1069,6 +1069,7 @@ public class ExamGradingService {
     private ExamSession requireNotAbandonedSession(String examId) {
         ExamSession session = examSessionRepository.findById(examId)
                 .orElseThrow(() -> new ExamsException(ErrorStatus._EXAM_NOT_FOUND));
+        if (session.isAccessRevoked()) throw new ExamsException(ErrorStatus._ENTITLEMENT_REVOKED);
         if (session.isEntitlementConfirming()) throw new ExamsException(ErrorStatus._EXAM_CREATION_PROCESSING,1);
         if (session.isAbandoned()) {
             throw new ExamsException(ErrorStatus._EXAM_ABANDONED);
@@ -1082,6 +1083,7 @@ public class ExamGradingService {
     private void requireNewAdmission(String examId) {
         ExamSession session=examSessionRepository.findById(examId)
                 .orElseThrow(() -> new ExamsException(ErrorStatus._EXAM_NOT_FOUND));
+        if (session.isAccessRevoked()) throw new ExamsException(ErrorStatus._ENTITLEMENT_REVOKED);
         if (session.getSubmissionsClosedAt()!=null) throw new ExamsException(ErrorStatus._EXAM_ABANDONED);
         if (session.isEntitlementConfirming()) throw new ExamsException(ErrorStatus._EXAM_CREATION_PROCESSING,1);
     }

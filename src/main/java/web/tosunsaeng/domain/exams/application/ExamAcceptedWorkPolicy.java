@@ -13,7 +13,7 @@ public class ExamAcceptedWorkPolicy {
     private final ExamSubmissionEvidence evidence;
 
     public static boolean processable(ExamSession session) {
-        return session!=null && !session.isAbandoned() && !session.isRetakeAvailable() && !session.isEntitlementConfirming();
+        return session!=null && !session.isAccessRevoked() && !session.isAbandoned() && !session.isRetakeAvailable() && !session.isEntitlementConfirming();
     }
 
     public static boolean requiresEvidence(ExamSession session) {

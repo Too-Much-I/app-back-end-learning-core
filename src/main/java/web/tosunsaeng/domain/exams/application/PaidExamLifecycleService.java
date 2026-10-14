@@ -24,6 +24,8 @@ import static web.tosunsaeng.domain.exams.billing.PaidReservationProtocol.requir
 @Service
 public class PaidExamLifecycleService {
     @org.springframework.beans.factory.annotation.Autowired(required = false)
+    private web.tosunsaeng.domain.exams.access.AccessRevocationStore accessRevocations;
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
     private web.tosunsaeng.domain.learningrecorddeletion.application.DeletionAccess deletionAccess;
     private final MongoTemplate mongo;
     private final ExamCreationOperationRepository operations;
@@ -53,7 +55,8 @@ public class PaidExamLifecycleService {
     public ExamCreationOperation beforeConfirm(String user,String id) {
         return mutate(user,id,op -> {
             require(op.getState()==ExamCreationState.SESSION_COMMITTED);
-            pending(op);
+            requireAccess(op);
+            require(!pending(op).isAccessRevoked());
             require(op.getPaidReservation().snapshot().reservationStatus()==ReservationStatus.RESERVED);
             op.getRecovery().setConfirmDispatch(ReservationRecovery.Dispatch.MAY_HAVE_BEEN_SENT);
             return save(op);
@@ -172,7 +175,8 @@ public class PaidExamLifecycleService {
 
     public ExamCreationOperation commitPending(String user, String id, ZoneId zone) {
         return mutate(user,id,op -> {
-            if (op.getState()==ExamCreationState.SESSION_COMMITTED) { pending(op); return op; }
+            requireAccess(op);
+            if (op.getState()==ExamCreationState.SESSION_COMMITTED) { require(!pending(op).isAccessRevoked()); return op; }
             require(op.getState()==ExamCreationState.RESERVED && op.getPaidReservation()!=null
                     && op.getPaidReservation().snapshot().reservationStatus()==ReservationStatus.RESERVED);
             requireNoSession(op);
@@ -210,9 +214,11 @@ public class PaidExamLifecycleService {
                 return save(op); // RESERVED is not cancellation or consumption evidence.
             }
             if (snapshot.reservationStatus()==ReservationStatus.CONFIRMED) {
+                requireAccess(op);
                 require(op.getState()==ExamCreationState.SESSION_COMMITTED && op.getSessionCommittedAt()!=null);
                 ReservationSnapshotValidator.confirmed(op,snapshot);
                 ExamSession fresh=pending(op);
+                require(!fresh.isAccessRevoked());
                 ExamSession old=previous(op);
                 requireNoOtherActive(op);
                 if (old!=null) {
@@ -273,6 +279,11 @@ public class PaidExamLifecycleService {
     private void requireNoSession(ExamCreationOperation op) {
         require(!mongo.exists(Query.query(new Criteria().orOperator(Criteria.where("_id").is(op.getSessionId()),
                 Criteria.where("userId").is(op.getUserId()).and("creationOperationId").is(op.getOperationId()))),ExamSession.class));
+    }
+
+    private void requireAccess(ExamCreationOperation op) {
+        // A deny never cancels a successful Billing confirm; keep the unresolved operation for reconciliation.
+        require(accessRevocations==null || !accessRevocations.denied(op.getAttemptGroupId(),op.getSessionId(),op.getUserId()));
     }
 
     private void requireNoOtherActive(ExamCreationOperation op) {

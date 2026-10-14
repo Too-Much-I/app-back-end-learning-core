@@ -72,7 +72,7 @@ public interface ExamSessionRepository extends MongoRepository<ExamSession, Stri
     @Update("{ '$set': { 'status': 'ABANDONED', 'active': false } }")
     long abandonIfInProgress(String examId);
 
-    @Query("{ '_id': ?0, 'status': 'ENTITLEMENT_CONFIRMING', 'active': true }")
+    @Query("{ '_id': ?0, 'status': 'ENTITLEMENT_CONFIRMING', 'active': true, 'accessRevoked': { '$ne': true } }")
     @Update("{ '$set': { 'status': 'IN_PROGRESS', 'entitlementState': 'CONFIRMED', "
             + "'entitlementConfirmedAt': ?1 } }")
     long confirmEntitlementIfConfirming(String examId, java.time.Instant confirmedAt);

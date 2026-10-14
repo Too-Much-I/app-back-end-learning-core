@@ -15445,3 +15445,49 @@
 - 실제 격리 Mongo 생성/삭제 양순서·동시1승자·NEEDS_REVIEW/nonterminal row0·accepted same-key 우선·삭제전/후404·다른actor/탈퇴/merge 거절을 검증했다. 단위5/Mongo12 추가. clean test/mongoIntegrationTest/bootJar 성공 및 추가 부정테스트 후 재실행 성공. 최종 XML 단위1,164개 실패/오류0·기존1 skip, Mongo224개 실패/오류/skip0. Node mongodb121개 성공, fixture SHA256SUMS34항목 불변, diff check 성공. 기존 deprecated/unchecked 경고는 범위 밖 일괄 수정하지 않았다.
 - Billing TMI-217 handoff draft-3/48개 계획을 읽기 확인했다. 새sender/body/audience/owner증거/ACK/최종purge 공동수락·fixture 및 실제 구현은 미완료다. 후속 checkpoint 설계는 원문전 최소fact 보존, 원문정리/전달 독립, 필수ACK 전 새시험차단으로 기록했으며 기존worker runtime을 임의 교체하지 않았다. 상세 LC_BILLING_PAID_EXAM_P4_1_IMPLEMENTATION.md 및 계획/ADR/CURRENT_STATE 동기화.
 - 공개 URL/Method/body/성공DTO/BaseResponse, AI user_id=examId/Callback, retryCount/S3/Redis·Billing wire/fixture 원본 불변. 예상 밖 이번 제품 변경 없음. 공개 paid/자동schema2 scheduler 및 paid 기동차단 유지. 다음은 P5/P6와 신규삭제 공동 gate 확인이며 이번 결과를 실환경E2E/활성화 완료로 보고하지 않는다. Billing/Identity 파일·Jira·외부전송·Secret/Token 기록 없음.
+
+## 2026-10-14 — P4/P4.1 전달, CI 확인 중 중단
+
+<!-- codex-turn:01a139b7-ed70-7831-b0dc-eb1cfa0df2bf -->
+
+- 사용자 커밋/푸시/머지/다음단계 요청에 따라 AGENTS에 P4 전달·P5 구현 승인 경계를 기록했다. P4/P4.1을 commit6163374로 푸시하고 PR #40을 develop 대상으로 생성·채팅에 첨부했다. 사용자 DS_Store는 커밋에서 제외했으며 기존 관련 문서 기록은 보존했다. 관련 TMI-116/TMI-128/TMI-122, TMI-193/TMI-136·TMI-217.
+- 기존 최종 단위1,164개(기존1 skip)/Mongo224개·bootJar/Node121/fixture34 성공 증거를 PR에 기록했다. 이번 턴은 제품 코드를 추가하지 않아 로컬 테스트 재실행 없이 staged diff check를 수행했다. 원격 CI run38541952701은 마지막 확인 시 실행 중, mergeable이었다. CI 통과/머지/배포 완료를 주장하지 않는다.
+- 다음 P5 준비로 기존 workload A·paid R2 draft-2, shared fixture와 LC 독립 oracle·SecurityConfig·접수 gate를 읽었다. 새로운 P5 코드/브랜치는 아직 만들지 않았다. 작업이 중단되어 feat/billing-paid-exam-p4에 남아 있으며 재개 시 PR/CI 최신 상태 확인 후 머지→새 브랜치→구현 순서다. 기능설정/실DB/운영 배포/Billing·Identity 파일 변경 없음. Secret/Token 미기록.
+
+## 2026-10-14 — 전달 작업 현재 턴 식별자 보완
+
+<!-- codex-turn:01a13a2a-d3bc-7f81-8b2c-1d04759785fb -->
+
+- 종료 hook의 현재 턴 식별자로 기록을 append하고 CURRENT_STATE를 갱신했다. 기존 기록은 수정하지 않았다. 관련 TMI-116/TMI-128/TMI-122·TMI-193/TMI-136·TMI-217.
+- commit6163374/PR #40 생성 완료 및 CI 마지막 관측 실행 중이라는 이전 결과를 유지한다. 이번 보완에서 원격 상태를 다시 확인하지 않았으며 머지·P5 브랜치/구현·배포를 수행하지 않았다. 문서만 변경하여 테스트 재실행 없이 diff/marker 검사를 수행한다. Secret/Token 미기록.
+
+## 2026-10-14 — P4 PR 머지 후 P5 수신 구성요소 구현
+
+<!-- codex-turn:01a13a2f-670e-77c0-8e5e-6890ee2ad974 -->
+
+- 사용자 「머지한 다음 브랜치 파서 다음꺼 구현해줘」 승인으로 PR #40의 CI run38541952701 성공/mergeable을 확인하고 develop f59cf284d7f8225e52190116ee13715d7ee06aed에 머지했다. 기존 테스트 자동배포 run38557338164는 ECS deploy/Verify health success. 기능설정/운영환경은 변경하지 않았다. merge 결과에서 feat/billing-paid-exam-p5 생성, 기존 DS_Store/미커밋 문서기록 보존. 관련 TMI-116/TMI-128/TMI-122·TMI-193/TMI-136·TMI-217·선행 TMI-218.
+- P5 AccessWorkloadVerifier/AccessEventJson/AccessRevocationEvent/AccessEventFilter/AccessRevocationStore/AccessEventConfiguration을 추가했다. 고정 Billing trust/strict token·시간/UTF8·scalar/canonical, raw16KiB, OFF·port404/query·JWT401/principal·route403/body검증 순서를 구현했다. auth 오류는 body없음/no-store, 원문/key/parser cause 로깅 없음. 새 namespace의 Spring OFF404 및 ON 기동차단을 등록하고 BILLING_ACCESS_EVENTS_RECEIVER_ENABLED 기본false 매핑만 추가했다.
+- 단일 billing_access_revocations의 group/event unique를 사전검증하며 index 자동 설치/TTL 없음. 최초fact/기존Session deny/version을 같은 owner 경합 Transaction에서 저장한다. event충돌 우선·same digest204·group다른ID409·fresh majority 복구, Session/owner upsert·자동권리이전 없음. 기존 ExamSession 내부 accessRevoked projection과 신규접수/기접수policy/terminal/paid활성화 차단을 추가했다. paid lifecycle store 연결점에서 새사용을 차단하되 권위취소 보상은 허용한다. 금융 성공을 취소하거나 재지급하지 않는다.
+- 공동 원본 token31/canonical18/invalid13/HTTPmanifest11을 제품 구성요소로 검증했다. 실제 loopback Tomcat HTTP와 Spring security chain, 격리 Mongo 동시first/duplicate/conflict·rollback·index·비부활·signedfixture→filter→store→204 및 실제 paid pending/confirm/revoke 양순서·동시경합을 검증했다. 첫 HTTP 테스트의 Tomcat 이중init 오류를 테스트 초기화 수정으로 해결했다. auth/body 실패의 업무 무호출 및 fixture bytes 불변 확인. transport미기동/TLS실환경 전체 검증으로 과장하지 않는다.
+- clean test/mongoIntegrationTest/bootJar 및 최종 보완 후 재실행 성공. XML 단위1,243개 실패/오류0·기존1 skip, Mongo237개 실패/오류/skip0(이번 단위79/Mongo13 추가). Node mongodb121개, 기존 SHA256SUMS34항목, diff check 통과. 기존 deprecation/unchecked 경고는 무관한 일괄 수정 없이 유지했다.
+- P5 전체 완료는 아니다. 현재 Spring은 OFF404만 연결한다. ON verifier/store bean 조립·전용TLS connector·전체 기존writer/legacy/owner coverage와 V07 보존·삭제 gate가 남아 ON startup을 막는다. 신규삭제sender/ACK(TMI-217), P6 inventory/실DB/index적용/배포·활성화는 미실행이다. 상세 P5 보고서·계획/ADR/CURRENT_STATE 갱신. P5 자체 commit/push 없음.
+- 공개 URL/Method/body/성공DTO/BaseResponse·AI user_id=examId/Callback·retryCount/S3/Redis·Billing 발신/fixture bytes 유지. 이번 예상 밖 제품변경 없음. 기존 사용자 파일과 전달기록을 보존했으며 Billing/Identity 저장소·Jira·실DB 변경 및 Secret/Token 기록 없음. 다음은 P5 ON 연결과 legacy/lifecycle 검증을 완료한 뒤 P6 전환 준비다.
+
+## 2026-10-14 — P5.1 Spring ON 구성·전용 TLS 격리 검증
+
+<!-- codex-turn:01a13a40-274f-77b2-a421-f0eae8a71ec1 -->
+
+- 사용자 「어 구현해줘」로 기존 feat/billing-paid-exam-p5에서 ON bean/chain·전용TLS connector·포트격리를 구현했다. OFF는 DB/키/TLS 미구성, ON은 owner writer/index/환경/키/인증서·포트 점검을 요구한다. 별도 AccessEventRolloutGate는 legacy/lifecycle/V07 검증 전 실제 앱ON을 계속 거절한다. 관련 TMI-116/TMI-128/TMI-122, TMI-193/TMI-136·공동TMI-217·선행TMI-218.
+- 기존 생성 commit/finalize group deny, 직접 entitlement 확정 query의 accessRevoked 제외, 접수 receipt deny와 회귀를 추가했다. 임시 test-only 인증서로 실제 loopback HTTPS204/SSL session·공개/내부포트 분리·forwarded-port 우회거절, 별도 실제 Spring ON chain 및 OFF 미파싱/무DB 구성을 검증했다. 전체 앱 활성화/실환경E2E 완료를 주장하지 않는다.
+- 테스트 초기화의 refresh 전 bean 접근 및 추가 테스트 getter 오타를 수정했다. 최종 clean test/mongoIntegrationTest/bootJar 성공: XML 단위1,248개 실패/오류0·기존1 skip, Mongo238개 실패/오류/skip0. Node mongodb121개, fixture SHA256SUMS34항목, diff check 통과. 기존 deprecation/unchecked 경고는 범위 밖 일괄 수정하지 않았다.
+- AGENTS·계획/ADR/CURRENT_STATE 및 P5.1 보고 갱신. 공개 API/DTO/BaseResponse·AI user_id=examId/Callback·retryCount/S3/Redis·Billing wire/fixture bytes 불변. 기존 P5 및 사용자 DS_Store/전달기록 보존, 예상 밖 이번 제품 변경 없음. commit/push/실DB/index적용/배포/활성화·Billing/Identity/Jira 변경·Secret/Token 기록 없음. 다음은 P6 legacy/owner/V07·실환경 인증서/route/ALB 조건 확인이며 guard 제거는 별도다.
+
+## 2026-10-14 — TMI-220 이전 Session 기접수 작업과 환불 충돌 검토
+
+<!-- codex-turn:01a13a48-383e-7252-aa38-c1405090399a -->
+
+- 사용자 제공 TMI-220-REFUND-PROTECTED-SESSION-CLARIFICATION을 읽고 현재 LC AccessRevocationStore, ExamAcceptedWorkPolicy, ExamSubmissionEvidence, ExamGradingService 및 구현계획을 대조했다. Billing worktree PaidAttemptEventService도 읽기 확인했다. 관련 TMI-220/TMI-219/TMI-217, LC TMI-116/TMI-128/TMI-125·선행 TMI-218. PR25 병합/1,603개 통과는 사용자 보고이며 원격 검증·테스트 재실행은 하지 않았다.
+- 충돌 경로 확인: revoke 수신은 단일 confirmedSessionId 외 같은group Session에 accessRevoked=true를 저장한다. processable이 그 값을 먼저 거절하므로 기존 Job/receipt/완료marker가 있어도 question/summary 처리가 막힌다. GradingService에도 같은 선행검사가 있다. Billing도 ACTIVE지만 group.activeSessionId가 아닌 Session 상태event를 targetConflict로 거절한다. LC측 검사 하나만 완화하면 전체 처리완료가 보장되지 않는다.
+- 권고는 기존 기접수 마무리 정책 의도를 유지하는 좁은 공동 의미 보완이다. 환불전 confirm되고 재시작 전에 durable 접수된 S1 exact 작업의 결과/시스템 재시도만 허용하고 신규제출/새녹음 retry/새Session 허용과 분리한다. 일부접수는 전체완료/Summary 근거가 아니다. owner/삭제/탈퇴/실제terminal 우선, S1 늦은완료로 S2/새guard 변경0을 유지한다. 모든 accessRevoked 우회나 timestamp/현재group 추정만의 허용은 금지하며 confirm/접수/lifecycle 증거 coverage 검증이 필요하다.
+- 단일 confirmedSessionId/event 불변을 유지하는 방향을 우선 검토하되 현재 R2 exact Session만 완료 허용 문구와의 경계를 공동 문서/상태 테스트로 명료화하기 전 임의 수락·구현으로 기록하지 않는다. Billing 이전Session event 수용 및 effect 범위를 함께 확정해야 한다. 실제 LC HTTP/Job+Billing 공동 E2E는 미실행이며 운영 사고 확정도 아니다.
+- CURRENT_STATE 갱신·WORKLOG EOF append만 수행했다. 기존 코드/문서 작업 보존, 제품/fixture/계약원본/Billing/Jira/DB/배포/외부발송/commit/push 변경 없음. 정적 검토로 diff check·marker 단일출현만 검증, Secret/Token 미기록.

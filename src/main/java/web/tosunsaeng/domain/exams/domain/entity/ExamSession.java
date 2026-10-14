@@ -36,6 +36,11 @@ public class ExamSession {
 
     private Boolean active;
 
+    // Durable deny projection. OFF/restart must not restore access to a revoked Session.
+    private Boolean accessRevoked;
+
+    public boolean isAccessRevoked() { return Boolean.TRUE.equals(accessRevoked); }
+
     private ExamSessionStatus status;
 
     private LocalDateTime completedAt;
@@ -59,7 +64,7 @@ public class ExamSession {
     }
 
     public void activatePaid(Instant confirmedAt) {
-        if (!isEntitlementConfirming() || entitlementState != ExamEntitlementState.CONFIRMING
+        if (isAccessRevoked() || !isEntitlementConfirming() || entitlementState != ExamEntitlementState.CONFIRMING
                 || submissionsClosedAt != null || completedAt != null)
             throw new IllegalStateException("Session cannot be activated");
         entitlementState = ExamEntitlementState.CONFIRMED;
@@ -210,7 +215,7 @@ public class ExamSession {
     }
 
     private void requireTerminalAvailable() {
-        if (terminalEventId != null || isCompleted() || isRetakeAvailable() || isAbandoned()) {
+        if (isAccessRevoked() || terminalEventId != null || isCompleted() || isRetakeAvailable() || isAbandoned()) {
             throw new IllegalStateException("AttemptGroup terminal state is already decided");
         }
     }

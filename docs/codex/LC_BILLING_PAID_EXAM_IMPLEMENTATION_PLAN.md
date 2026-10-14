@@ -1,5 +1,7 @@
 # LC–Billing 유료 시험 연동 구현 계획
 
+- P5.1 구현 후속(2026-10-14): Spring ON verifier/store 조립·전용 TLS connector·포트 격리 및 기존 생성/접수 writer의 revoke 방어 추가. [상세 보고](LC_BILLING_PAID_EXAM_P5_1_IMPLEMENTATION.md). 실제 ON은 P6 legacy/owner/V07 rollout gate로 차단하며 실DB/index 적용·배포·활성화는 수행하지 않았다.
+
 - 작성일: 2026-10-14
 - 세 단순화 승인 반영(2026-10-14): 기존 operation120일 결과 보관·그룹당 단일 revoke 문서·기존 접수 receipt/완료 marker 재사용을 적용한다. 별도 생성 결과 receipt/inbox/Session 접수 문항 배열은 추가하지 않는다. MEMBER 관측 주기/NEEDS_REVIEW 예외 등 나머지 정책은 변경하지 않는다. 이번은 문서 수정이며 제품 코드/DB 변경은 아니다.
 - 후속 승인: 2026-10-14 사용자 「좋아 지금 계획안 승인할게 다음은 뭐야」로 본 계획안을 승인했다. 아래 승인 전/초안 표기는 작성 당시 이력이다. 다음은 P0의 ADR/AGENTS·schema/index·flag 조합 정리 및 잔여 계약 경계 확인이며, 이번 턴은 승인 기록과 다음 단계 안내만 수행한다. 계획 승인으로 공동 계약 잔여 항목의 확정이나 실제 DB 적용·배포·활성화 완료를 주장하지 않는다.
@@ -173,6 +175,8 @@ S15/V07을 계획에 보류로 둔 채 독립적인 부분의 설계는 가능�
 - 완료 기준: E04/E05/C01에 실제 deletion row0 및 fence 양순서 테스트, 정상 응시중 시험은 생성완료 후 삭제가능 회귀. 삭제대기queue/deny우회 finalize 특례 없음.
 
 ### P5 — 역방향 revoke 수신
+
+- 2026-10-14 [P5 구성요소 구현](LC_BILLING_PAID_EXAM_P5_IMPLEMENTATION.md): 전용 verifier/strict codec/filter·단일group fact/deny projection·paid lifecycle 연결점 및 격리 검증을 추가했다. 현재 Spring namespace는 OFF404만 연결하며 ON은 startup 차단이다. 실제 TLS connector/ON bean 조립·기존 legacy/owner 전체 coverage·V07은 후속으로 남으며 **P5 전체 완료/활성화로 표시하지 않는다.**
 
 - exact `POST /internal/v1/entitlements/access/events`, 독립 Billing issuer/sub/aud/keySet/환경·설정으로 기본 OFF 수신기를 구현한다. A parser/time 규칙을 따르되 기존 Identity/user/LC 발신 trust와 union/fallback하지 않는다.
 - 보안 우선순위: 살아있는 OFF/잘못된 port404 → 활성 query/Bearer/JWT 실패401 → 검증된 wrong sub/aud/method/path403 → body검증. 빈 body/no-store·다른 chain 비침범·인증 실패 업무/DB 무호출을 실제 filter/HTTP 테스트로 검증한다. 포트 미기동은 transport 실패다.

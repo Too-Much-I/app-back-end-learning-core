@@ -63,6 +63,26 @@ class BillingExamCreationTransactionServiceTest {
     }
 
     @Test
+    void revokedGroupCannotCommitOrFinalizeThroughExistingWriter() {
+        Instant now = Instant.parse("2026-10-14T00:00:00Z");
+        var operation = ExamCreationOperation.prepared("00000000-0000-4000-8000-000000000001",
+                "018f6f36-2f42-4bf5-8c17-0be35de4872c", "ex_new", "mock", 1, now);
+        operation.markReserved("018f6f36-2f42-4bf5-8c17-0be35de4872d", BillingReservationKind.INITIAL,
+                "018f6f36-2f42-4bf5-8c17-0be35de4872e", now.plusSeconds(300), now);
+        when(operationRepository.findById(operation.getCommandId())).thenReturn(Optional.of(operation));
+        var store = org.mockito.Mockito.mock(web.tosunsaeng.domain.exams.access.AccessRevocationStore.class);
+        org.springframework.test.util.ReflectionTestUtils.setField(service, "accessRevocations", store);
+        when(store.denied(operation.getAttemptGroupId(), "ex_new", operation.getUserId())).thenReturn(true);
+        org.junit.jupiter.api.Assertions.assertThrows(IllegalStateException.class,
+                () -> service.commitReservedSession(operation.getCommandId(), now, ZoneOffset.UTC));
+        operation.markSessionCommitted(now);
+        org.junit.jupiter.api.Assertions.assertThrows(IllegalStateException.class,
+                () -> service.finalizeConfirmed(operation.getCommandId(), now));
+        org.mockito.Mockito.verifyNoInteractions(sessionRepository, sessionManager);
+        org.mockito.Mockito.verify(operationRepository, org.mockito.Mockito.never()).save(any());
+    }
+
+    @Test
     void commitAtomicallyAbandonsOldSessionAndInsertsConfirmingSessionWithBillingMapping() {
         Instant preparedAt = Instant.parse("2026-08-28T03:00:00Z");
         Instant committedAt = Instant.parse("2026-08-28T03:00:01Z");
