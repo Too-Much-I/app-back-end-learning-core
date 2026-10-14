@@ -27,7 +27,7 @@
 
 공개 URL/Method/요청/성공 DTO/BaseResponse, AI `user_id=examId`, retryCount, S3/Redis key와 workload A 계약을 유지한다. 두 신규409는 승인된 오류 mapper 준비이며 공개 paid 기능은 차단 상태다. 새 collection/index/TTL/환경 설정은 추가하지 않았다.
 
-P3 전에는 E06-owner 공동 문구를 Billing과 정정 revision으로 합의해야 한다. 기존 fixture bytes/hash를 덮어쓰지 않는다. MEMBER 재개 원인 증거·owner/lease/version·J3 PREPARED/예약/commit 부재 확인, confirm/status와 원자적 Session 마무리를 다음 단계에서 연결해야 한다. 실제 상태28개/E2E·역방향 revoke·legacy/purge·운영 rollout gate 완료가 아니며 배포 전에 별도 검증이 필요하다.
+2026-10-14 후속 사용자 승인으로 E06-owner 정정은 P3 구현과 병행 추적한다. 공동 최종 검증·활성화 전에는 Billing과 정정 revision으로 합의해야 하며 기존 fixture bytes/hash를 덮어쓰지 않는다. MEMBER 재개 원인 증거·owner/lease/version·J3 PREPARED/예약/commit 부재 확인, confirm/status와 원자적 Session 마무리를 다음 단계에서 연결해야 한다. 실제 상태28개/E2E·역방향 revoke·legacy/purge·운영 rollout gate 완료가 아니며 배포 전에 별도 검증이 필요하다.
 
 기존 미커밋 P2와 머지/인계 검토 기록, 사용자 DS_Store 변경은 보존했다. 이번 작업의 예상 밖 제품 변경 없음. Billing/Identity 저장소·실제 DB·Jira·외부 메시지·commit/push·배포는 변경하지 않았다.
 

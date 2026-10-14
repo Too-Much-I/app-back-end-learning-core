@@ -124,6 +124,8 @@ S15/V07을 계획에 보류로 둔 채 독립적인 부분의 설계는 가능�
 
 ### P3 — confirm 후 원자적 마무리와 기존 operation 복구
 
+- 2026-10-14: 별도 paid 전용 lifecycle/recovery 서비스로 기존 legacy Transaction 동작을 보존하면서 구현했다. [P3 구현 범위](LC_BILLING_PAID_EXAM_P3_IMPLEMENTATION.md). 공유 lease·status-first·exact 접수차단/활성 원자성·120일 terminal 기반이며 공개 route/자동 schema2 scheduler 연결·MEMBER(P3.1)·P4~P6/활성화는 후속이다. 원 Session은 ABANDONED 대신 접수차단 metadata로 채점 lifecycle과 구분한다. 아래 기존 메서드명은 설계 책임을 뜻하며 실제 paid 서비스 진입점은 보고서를 따른다.
+
 - `commitReservedSession`에서 이전 진행 시험 일괄 abandon을 제거하고 권리 확인대기 새 Session만 저장한다. 새 Session은 사용자 제출 불가이며 기존 시험을 권리 부족/통신 실패 때문에 선종료하지 않는다.
 - `finalizeConfirmed`는 확정된 operation/reservation/session/source 귀속을 검증한 뒤 같은 Transaction으로 exact 이전 Session 신규제출 차단·새 Session 사용 가능·operation SUCCEEDED를 기록한다. 이미 terminal/삭제된 원대상은 부활시키지 않으며 다른 최신 Session을 대신 종료하지 않는다.
 - 기존 worker와 HTTP가 공통 lease/version/intent를 사용한다. Billing CONFIRMED 후 로컬 마무리 실패는 같은 operation의 status-first 복구로 수렴한다. 성공 confirm cancel/새 reserve/새 operation 재지급은 금지한다.
@@ -133,6 +135,10 @@ S15/V07을 계획에 보류로 둔 채 독립적인 부분의 설계는 가능�
 - 완료 기준: confirm 응답 유실/환불 양순서, 로컬 commit 불명/재시작/동시 replay, guard 유지, 새 key 차단, TTL 이후 replay, owner/lifecycle 경합의 격리 Mongo 테스트.
 
 ### P3.1 — MEMBER 영속 대기와 안전한 HTTP 재개
+
+- 2026-10-14 fixture 정정: [simplified fixtures-2 독립 재검증](LC_BILLING_SIMPLIFIED_FIXTURES_2_VALIDATION.md)으로 E06-owner 문구 불일치를 해소했다. 기존 fixtures-1 보존, 계약/제품 정책 불변. 다른 공동 상태/실환경/활성화 gate는 유지한다.
+
+- 2026-10-14 내부 구현: [P3.1 보고](LC_BILLING_PAID_EXAM_P3_1_IMPLEMENTATION.md). 영속 관측/HTTP same-key 재개·worker status-only·CAS·순수 대기 예산 제외·제한적 과거 소진 증거 수용을 추가했다. 공개/자동 scheduler 연결·실제 양측 E02 전체 검증은 미완료이며 활성화 차단 유지. 과거 소진 증거 자동 생성/수입 도구는 없다.
 
 - 기존 PREPARED/recovery에 waitingReason/waitingSince/lastObservedAt·원인 이력 결속을 저장하는 schema를 마련한다(명칭은 후보). 최초 대기시각·firstAcceptedAt·요청 digest/session/mock/context/owner를 고정하며 JWT 원문은 저장하지 않는다. source 미결정을 성공 snapshot으로 꾸미지 않는다.
 - strict pending 관측 및 PREPARED/예약·신규Session·commit marker 부재 확인 후 동일 Transaction에 대기 기록을 저장한다. 기존 이전 Session 존재는 부재 검사 대상이 아니다. 실제 Billing 비종료 receipt는 Billing 담당이다.

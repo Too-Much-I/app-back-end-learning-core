@@ -46,6 +46,8 @@ public class ExamSubmissionEvidence {
         requireTransaction();
         ExamSession session = mongo.findById(examId, ExamSession.class);
         if (session == null) throw new IllegalStateException("Submission Session is missing");
+        if (session.getSubmissionsClosedAt()!=null || session.isEntitlementConfirming())
+            throw new IllegalStateException("Session admission is closed");
         List<Integer> expected = required(covered(session) ? session.getRequiredQuestionNumbers() : legacyRequired);
         if (!expected.contains(question)) throw new IllegalStateException("Question is outside the submission snapshot");
         if (session.getSubmissionCompletedAt() != null) return;

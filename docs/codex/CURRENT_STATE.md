@@ -1,5 +1,17 @@
 # Learning Core Current State
 
+- 2026-10-14 — fixtures-2 검증 완료 턴 기록 식별자 보완. E06-owner 해소·전체 단위1,149개 실패/오류0(기존1 skip) 결과 및 잔여 공동/활성화 gate 유지. 관련 LC TMI-116/TMI-128/TMI-122·선행 TMI-218, Billing TMI-216. 문서 기록만 변경.
+
+- 2026-10-14 — simplified-exact-r1-fixtures-2 인수·LC 독립 재검증 완료, E06-owner 문구 불일치 해소. ZIP10파일 Billing 원본 bytes 및 인계 ZIP/SHA256SUMS hash 일치, fixtures-1 보존·업무 데이터 delta는 message1개. LC offline82개(80벡터+검증2)·실제 loopback HTTP client49개 통과, 전체 단위1,149개 실패/오류0·기존1 skip. [검증 보고](LC_BILLING_SIMPLIFIED_FIXTURES_2_VALIDATION.md). 이번은 fixture/테스트/문서만 변경, 제품 코드/DB/배포/commit/push 없음. 상태28개 전체·T04/실환경 공동 gate·공개/자동 scheduler/paid 활성화는 미완료/차단 유지. 관련 LC TMI-116/TMI-128/TMI-122·선행 TMI-218, Billing TMI-216. 이전 P3/P3.1/사용자 변경 보존.
+
+- 2026-10-14 — P3.1 완료 턴 WORKLOG 식별자 보완. 구현/테스트 결과 및 공개 연결·자동 scheduler·paid 활성화 차단은 아래와 동일하다. 관련 TMI-116/TMI-128/TMI-122·선행 TMI-218. 문서 기록만 변경, 추가 코드/배포 없음.
+
+- 2026-10-14 — P3.1 MEMBER 영속 대기·HTTP same-key 재개 내부 구현 및 검증 완료. strict pending/요청 digest 결속·RESUMING 선기록·worker status-only(61~65초)·순수 대기 장애예산 제외·실제 장애24시간/200회 유지·과거 순수 MEMBER 소진 증거가 있는 NEEDS_REVIEW1회 재개·120일 정각 차단. 일반/혼합 소진·auth/owner 차단 유지. 단위1,147개(기존 조건부1 skip), Mongo208개 실패/오류0, bootJar·Node28·fixture25 checksum·diff check 통과. [P3.1 보고](LC_BILLING_PAID_EXAM_P3_1_IMPLEMENTATION.md). 공개 route/자동 schema2 scheduler·실환경 E02 공동 검증·P4~P6/paid 활성화는 후속/차단 유지. 과거 소진 증거 수입 도구 없음, E06-owner 정정 미해결. 관련 TMI-116/TMI-128/TMI-122·선행 TMI-218. feat/billing-paid-exam-p3 미커밋/미푸시/미배포·실DB 변경 없음, 이전 P3와 사용자 DS_Store/동시 문서 기록 보존.
+
+- 2026-10-14 — P2/P2.1 커밋0cdb458·PR #38 develop 머지001b575 완료. Verify run38532796134 및 테스트 자동 배포 run38533145337(health 포함) success. 머지 결과에서 feat/billing-paid-exam-p3 생성, paid lifecycle/status-first 복구 기반 구현: 대기 Session 비활성·confirm/full status 후 exact 접수차단/활성/성공 Tx, 영속 거절/J3 안전 보상, 공유 lease·120일 terminal·owner/삭제/재전송 검증. 단위1,143개(조건부1 skip)/Mongo197개 실패0, bootJar·Node23·fixture25 checksum 통과. [P3 보고](LC_BILLING_PAID_EXAM_P3_IMPLEMENTATION.md). P3 코드는 미커밋·미배포이며 public/자동 scheduler 연결·P3.1 MEMBER·P4~P6/paid 활성화는 미완료/차단 유지. E06-owner 정정은 공동 최종 검증·활성화 전 병행 추적. 관련 TMI-116/TMI-128/TMI-122·선행 TMI-218. 기능 설정/운영 배포·실DB 변경 없음, DS_Store/동시 문서 기록 보존.
+
+- 2026-10-14 — 사용자 PLAN-012 최소 구현 방향 공유 접수: Billing 구매 신규사용 선차단 뒤 관련 시험 정리/revoke를 작은 묶음으로 순차 처리하며 지연·중복은 기존 불변 이벤트/재시도 계약으로 수렴한다. LC exact Session 보호·새 Session 차단·단일 revoke 문서 계약은 불변. 현재 PLAN-011 및 별도 승인된 진행 범위를 유지하고 이번 공유로 PLAN-012를 착수하지 않는다. 관련 Billing TMI-215/216/217, LC TMI-116/128/122/125·TMI-218. 공유 내용 기록만 수행, 실제 Billing 구현/배포 상태는 확인하지 않았다.
+
 - 2026-10-14 — 사용자 P2/P2.1 커밋·푸시·develop 머지 및 다음 P3 브랜치 구현 승인. E06-owner 정정은 병행 추적하며 최종 공동 검증·활성화 전 해결한다. 테스트 자동 배포 트리거는 허용하되 기능 설정은 유지한다. 관련 TMI-116/TMI-128/TMI-122·선행 TMI-218. 전달/후속 진행 결과는 아래 신규 기록으로 갱신한다.
 
 - 2026-10-14 — P2.1 E06-owner 정정 대상 설명: 공동 fixture의 OPERATION_OWNER_MISMATCH message에 예약 전 거절 문구가 들어 있어 계약의 owner 불일치 고정 문구로 정정할 필요가 있다. HTTP409/code/retryable=false/OWNER_BLOCKED 기대값 및 제품 정책 변경은 필요 없다. 신규 revision/hash로 공유 후 LC 재대조할 사항이며 실제 Billing 응답 오류 여부는 이번에 확인하지 않았다. 관련 TMI-116/TMI-128/TMI-122·선행 TMI-218. 문서 기록만, 코드/fixture/배포 변경 없음.

@@ -4,7 +4,7 @@ import org.springframework.beans.factory.InitializingBean;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
-/** Remove only after P2/P3 wire and confirm-first finalization are implemented and verified. */
+/** Keep until MEMBER/lifecycle/rollout gates and public integration are implemented and verified. */
 @Component
 public class PaidExamActivationGate implements InitializingBean {
     private final boolean enabled;
@@ -12,6 +12,6 @@ public class PaidExamActivationGate implements InitializingBean {
         this.enabled = enabled;
     }
     @Override public void afterPropertiesSet() {
-        if (enabled) throw new IllegalStateException("Paid exam activation requires P2/P3; P1 preparation only");
+        if (enabled) throw new IllegalStateException("Paid exam activation requires remaining MEMBER/lifecycle and rollout gates");
     }
 }

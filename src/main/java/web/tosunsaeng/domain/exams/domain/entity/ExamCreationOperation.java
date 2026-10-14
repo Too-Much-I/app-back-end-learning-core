@@ -219,6 +219,14 @@ public class ExamCreationOperation {
         markTerminal(confirmedAt, purgeAt);
     }
 
+    public void markPaidSucceeded(Instant confirmedAt, Instant resolvedAt) {
+        requireState(ExamCreationState.SESSION_COMMITTED);
+        if (paidSelection == null) throw new IllegalStateException("Paid operation required");
+        this.confirmedAt = confirmedAt;
+        this.state = ExamCreationState.SUCCEEDED;
+        markTerminal(resolvedAt, resolvedAt.plus(java.time.Duration.ofDays(120)));
+    }
+
     public void markCancelPending(Instant now) {
         if (state != ExamCreationState.PREPARED && state != ExamCreationState.RESERVED
                 && state != ExamCreationState.SESSION_COMMITTED

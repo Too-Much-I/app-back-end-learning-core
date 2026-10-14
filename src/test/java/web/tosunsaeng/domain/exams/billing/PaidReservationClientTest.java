@@ -42,7 +42,7 @@ class PaidReservationClientTest {
     }
     @AfterEach void stop() { server.stop(0); }
     JsonNode simplified(String name) throws Exception {
-        try (var input = getClass().getResourceAsStream("/contracts/lc-billing-paid-exam-simplified-exact-r1-fixtures-1/" + name)) {
+        try (var input = getClass().getResourceAsStream("/contracts/lc-billing-paid-exam-simplified-exact-r1-fixtures-2/" + name)) {
             return mapper.readTree(input);
         }
     }
@@ -59,9 +59,6 @@ class PaidReservationClientTest {
                 case "TEMPORARY_FAILURE" -> "TEMPORARILY_UNAVAILABLE";
                 default -> row.get("expected").asText();
             };
-            // Frozen E06-owner has the pre-reserve message, contrary to the exact contract.
-            // Preserve raw bytes and explicitly assert rejection, NOT agreement with its expected OWNER_BLOCKED.
-            if (row.get("id").asText().equals("E06-owner")) expected = "CONTRACT_ERROR";
             var error = catchThrowable(() -> {
                 switch (input.get("endpoint").asText()) {
                     case "status" -> client.statusPaid(USER, OP);
@@ -76,6 +73,18 @@ class PaidReservationClientTest {
             httpStatus = 200; retryHeader = null; rawResponse = null;
         }));
         return tests.stream();
+    }
+    @Test void originalOwnerFixtureStillFailsClosed() throws Exception {
+        try(var in=getClass().getResourceAsStream("/contracts/lc-billing-paid-exam-simplified-exact-r1-fixtures-1/error-cases.json")) {
+            for(JsonNode row:mapper.readTree(in)) if(row.get("id").asText().equals("E06-owner")) {
+                httpStatus=409;
+                rawResponse=Base64.getDecoder().decode(row.get("input").get("rawBodyBase64").asText());
+                assertThatThrownBy(()->client.statusPaid(USER,OP)).isInstanceOf(BillingClientException.class)
+                        .extracting(e->((BillingClientException)e).category()).isEqualTo(BillingClientException.Category.CONTRACT_ERROR);
+                return;
+            }
+        }
+        throw new AssertionError("Missing original owner fixture");
     }
     @Test void correctOwnerMessageAndDiscoveryPendingNeverBecomeFreeFallback() {
         httpStatus = 409;

@@ -14,7 +14,7 @@ import static org.junit.jupiter.api.Assertions.*;
 
 /** Independent LC offline contract models; does not execute a service, HTTP chain or worker. */
 class LcBillingSimplifiedFixtureTest {
-    private static final String ROOT = "/contracts/lc-billing-paid-exam-simplified-exact-r1-fixtures-1/";
+    private static final String ROOT = "/contracts/lc-billing-paid-exam-simplified-exact-r1-fixtures-2/";
     private static final ObjectMapper JSON = new ObjectMapper(JsonFactory.builder()
             .enable(StreamReadFeature.STRICT_DUPLICATE_DETECTION).build())
             .enable(DeserializationFeature.FAIL_ON_TRAILING_TOKENS);
@@ -25,7 +25,7 @@ class LcBillingSimplifiedFixtureTest {
 
     @Test
     void immutableBytesAndScope() throws Exception {
-        assertEquals("35f7d437fb562e1427efe385ffaf1721a60f4780fcaacf495c2a0c7e787c2436", hash(resource("SHA256SUMS")));
+        assertEquals("4e91332dfa549da63d13f3e07a1ec208018e02a353ccd780f12b8570eb2d4845", hash(resource("SHA256SUMS")));
         Set<String> seen = new HashSet<>();
         for (String line : new String(resource("SHA256SUMS"), StandardCharsets.UTF_8).lines().toList()) {
             String[] entry = line.split("  ", -1);
@@ -36,7 +36,7 @@ class LcBillingSimplifiedFixtureTest {
         assertEquals(FILES, seen);
         assertEquals("79bcfe3d79225c21d712791266bea10d4aed9eed3dc0529ddf86f7b29673a482", hash(resource("contract-snapshot.md")));
         JsonNode m = load("manifest.json");
-        assertEquals("lc-billing-paid-exam-simplified-exact-r1-fixtures-1", s(m, "revision"));
+        assertEquals("lc-billing-paid-exam-simplified-exact-r1-fixtures-2", s(m, "revision"));
         assertEquals("lc-billing-paid-exam-simplified-exact-r1-draft-3", s(m, "contractRevision"));
         assertEquals(hash(resource("contract-snapshot.md")), s(m, "contractSha256"));
         for (String flag : List.of("runtimeTested", "httpExecuted", "lcIndependentValidation")) assertFalse(b(m, flag));
@@ -76,12 +76,46 @@ class LcBillingSimplifiedFixtureTest {
             return switch (code) {
                 case "MEMBER_EVIDENCE_PENDING" -> http == 503 && retry ? "WAITING_MEMBER" : "CONTRACT_ERROR";
                 case "BILLING_TEMPORARILY_UNAVAILABLE" -> http == 503 && retry ? "TEMPORARY_FAILURE" : "CONTRACT_ERROR";
-                case "OPERATION_OWNER_MISMATCH" -> http == 409 && !retry ? "OWNER_BLOCKED" : "CONTRACT_ERROR";
+                case "OPERATION_OWNER_MISMATCH" -> http == 409 && !retry
+                        && s(body,"message").equals("The operation owner does not match the current owner.") ? "OWNER_BLOCKED" : "CONTRACT_ERROR";
                 case "RESERVE_REJECTED_BEFORE_CREATION" -> http == 409 && !retry && endpoint.equals("status") ? "PRE_RESERVE_TERMINAL" : "CONTRACT_ERROR";
                 case "OPERATION_NOT_FOUND" -> http == 404 && !retry && endpoint.equals("status") ? "OPERATION_NOT_FOUND" : "CONTRACT_ERROR";
                 default -> "CONTRACT_ERROR";
             };
         } catch (Exception rejected) { return "CONTRACT_ERROR"; }
+    }
+
+    @Test void oldRevisionIsPreservedAndOnlyOwnerMessageChanges() throws Exception {
+        String oldRoot="/contracts/lc-billing-paid-exam-simplified-exact-r1-fixtures-1/";
+        try (var in=getClass().getResourceAsStream(oldRoot+"SHA256SUMS")) {
+            byte[] sums=Objects.requireNonNull(in).readAllBytes();
+            assertEquals("35f7d437fb562e1427efe385ffaf1721a60f4780fcaacf495c2a0c7e787c2436",hash(sums));
+            for (String line:new String(sums,StandardCharsets.UTF_8).lines().toList()) {
+                String[] entry=line.split("  ");
+                try(var original=getClass().getResourceAsStream(oldRoot+entry[1])) {
+                    byte[] bytes=Objects.requireNonNull(original).readAllBytes();
+                    assertEquals(entry[0],hash(bytes));
+                    if (!Set.of("README.md","manifest.json","error-cases.json").contains(entry[1]))
+                        assertArrayEquals(bytes,resource(entry[1]));
+                }
+            }
+        }
+        JsonNode old;
+        try(var in=getClass().getResourceAsStream(oldRoot+"error-cases.json")) { old=JSON.readTree(in); }
+        JsonNode revised=load("error-cases.json"); int differences=0;
+        for(int i=0;i<old.size();i++) {
+            if(old.get(i).equals(revised.get(i))) continue;
+            differences++;
+            assertEquals("E06-owner",s(old.get(i),"id"));
+            var before=strict(Base64.getDecoder().decode(s(old.get(i).get("input"),"rawBodyBase64")));
+            var after=strict(Base64.getDecoder().decode(s(revised.get(i).get("input"),"rawBodyBase64")));
+            assertEquals("CONTRACT_ERROR",error(old.get(i).get("input")));
+            assertEquals("OWNER_BLOCKED",error(revised.get(i).get("input")));
+            ((com.fasterxml.jackson.databind.node.ObjectNode)before).put("message","The operation owner does not match the current owner.");
+            assertEquals(before,after);
+            ((com.fasterxml.jackson.databind.node.ObjectNode)old.get(i).get("input")).put("rawBodyBase64",s(revised.get(i).get("input"),"rawBodyBase64"));
+        }
+        assertEquals(1,differences); assertEquals(old,revised);
     }
 
     @TestFactory Stream<DynamicTest> publicExamples() throws Exception {

@@ -1,5 +1,11 @@
 # ADR — LC 유료 시험의 접수 기준 전환과 복구 경계
 
+- 2026-10-14 정정 수락: simplified fixtures-2의 E06-owner 문구를 LC 독립 재검증했다. [검증 기록](../codex/LC_BILLING_SIMPLIFIED_FIXTURES_2_VALIDATION.md). 아래 과거 E06-owner 미해결 gate는 이 정정 건에 한해 해소됐으며 나머지 공동 검증/활성화 gate는 유지한다. fixtures-1 및 제품 auth 정책 불변.
+
+- P3.1 후속: [MEMBER 영속 대기·HTTP same-key 재개](../codex/LC_BILLING_PAID_EXAM_P3_1_IMPLEMENTATION.md)를 내부 서비스에 구현했다. worker는 status-only, 순수 대기는 장애 budget에서 제외한다. NEEDS_REVIEW는 검증된 과거 순수 MEMBER 소진 증거와 현재 안전 조건을 모두 충족할 때만1회 재개한다. 원인 불명/auth/owner 차단·120일 경계·paid 기동 차단은 유지한다. 공개/자동 scheduler 및 실환경 공동 검증은 후속이다.
+
+- P3 후속: [paid lifecycle/status-first 구현](../codex/LC_BILLING_PAID_EXAM_P3_IMPLEMENTATION.md)을 추가했다. legacy saga는 보존하고 paid 전용 내부 서비스는 공유 lease/owner Tx를 사용한다. 원 시험의 접수차단은 grading 상태와 분리한다. 신규 공개/자동 worker 연결·P3.1/P4~P6 및 paid 기동은 미완료/차단 유지. E06-owner 정정은 사용자 승인으로 병행 추적하되 공동 최종 검증·활성화 전 해결한다.
+
 - P2.1 후속: strict 오류 분류·phone paid/free exact 검증과 owner Tx evidence 저장 준비 완료. [P2.1 보고](../codex/LC_BILLING_PAID_EXAM_P2_1_IMPLEMENTATION.md). E06-owner 원본 문구 불일치는 공동 정정 필요. MEMBER 실제 재개/J3 terminal·P3 saga 연결·기능 활성화는 미실행이며 기존 차단을 유지한다.
 
 - 날짜: 2026-10-14

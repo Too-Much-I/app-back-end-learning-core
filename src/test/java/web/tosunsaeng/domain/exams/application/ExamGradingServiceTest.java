@@ -177,6 +177,32 @@ class ExamGradingServiceTest {
         verify(questionJobRepository, never()).insert(any(QuestionGradingJob.class));
     }
 
+    @Test void paidPendingAndClosedSessionsRejectNewJobs() {
+        for (ExamSession session:List.of(ExamSession.builder().examId(EXAM_ID).status(ExamSessionStatus.ENTITLEMENT_CONFIRMING).build(),
+                ExamSession.builder().examId(EXAM_ID).status(ExamSessionStatus.IN_PROGRESS).submissionsClosedAt(NOW).build())) {
+            when(examSessionRepository.findById(EXAM_ID)).thenReturn(Optional.of(session));
+            assertThrows(ExamsException.class,()->service.submitQuestion(EXAM_ID,1,0));
+            assertThrows(ExamsException.class,()->service.submitQuestion(EXAM_ID,1,1));
+        }
+        verify(questionJobRepository,never()).insert(any(QuestionGradingJob.class));
+    }
+
+    @Test void closedAdmissionPreservesAlreadyAdmittedJobReplay() {
+        var owners=org.mockito.Mockito.mock(web.tosunsaeng.domain.usermerge.application.UserOwnedTransactionExecutor.class);
+        ReflectionTestUtils.setField(service,"userOwnedTransactionExecutor",owners);
+        when(owners.enabled()).thenReturn(true);
+        when(owners.executeExamCoordination(eq("owner"),eq(EXAM_ID),any())).thenAnswer(invocation ->
+                ((java.util.function.Supplier<?>)invocation.getArgument(2)).get());
+        ExamSession session=ExamSession.builder().examId(EXAM_ID).userId("owner").mockExamId(GradingKeys.LEGACY_MOCK_EXAM_ID)
+                .status(ExamSessionStatus.IN_PROGRESS).build();
+        when(examSessionRepository.findById(EXAM_ID)).thenReturn(Optional.of(session));
+        service.submitQuestion(EXAM_ID,1,0);
+        session.closeSubmissions("operation",NOW);
+        assertEquals(ExamStatus.PROCESSING,service.submitQuestion(EXAM_ID,1,0));
+        assertThrows(ExamsException.class,()->service.submitQuestion(EXAM_ID,1,1));
+        verify(questionJobRepository,times(1)).insert(any(QuestionGradingJob.class));
+    }
+
     @Test
     void coveredSubmissionRecordsEvidenceWithNotificationsAbsentOnlyOnFirstRetryZeroJob() {
         var evidence = org.mockito.Mockito.mock(ExamSubmissionEvidence.class);

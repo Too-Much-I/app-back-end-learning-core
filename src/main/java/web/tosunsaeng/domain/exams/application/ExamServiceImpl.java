@@ -181,6 +181,7 @@ public class ExamServiceImpl implements ExamService {
     }
 
     private static void requireInProgressSession(ExamSession examSession) {
+        if (examSession.getSubmissionsClosedAt()!=null) throw new ExamsException(ErrorStatus._EXAM_ABANDONED);
         if (examSession.isAbandoned()) {
             throw new ExamsException(ErrorStatus._EXAM_ABANDONED);
         }

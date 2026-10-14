@@ -44,8 +44,16 @@ public class ReservationOperationExecution {
     }
 
     public <T> T http(String id, Supplier<T> work) {
+        return http(id,work,false);
+    }
+
+    public <T> T httpPaid(String id,Supplier<T> work) {
+        return http(id,work,true);
+    }
+
+    private <T> T http(String id,Supplier<T> work,boolean paid) {
         Lease lease;
-        try { lease = claim(id, false); }
+        try { lease = claim(id, false); if (lease==null && paid) lease=claimMemberReview(id); }
         catch (org.springframework.dao.DataAccessException unavailable) {
             throw new ExamsException(ErrorStatus._BILLING_TEMPORARILY_UNAVAILABLE, 1);
         }
@@ -53,6 +61,7 @@ public class ReservationOperationExecution {
         try {
             return within(lease, work);
         } catch (ReservationRecoveryException | ReservationCommitOutcomeUnknownException
+                 | web.tosunsaeng.domain.usermerge.application.UserOwnedCommitOutcomeUnknownException
                  | org.springframework.transaction.TransactionException failure) {
             throw new ExamsException(ErrorStatus._EXAM_CREATION_PROCESSING, 1);
         } catch (org.springframework.dao.DataAccessException unavailable) {
@@ -64,6 +73,33 @@ public class ReservationOperationExecution {
     }
 
     public Lease claim(String id, boolean worker) {
+        return claim(id,worker,1);
+    }
+
+    /** Explicit paid worker entry only; legacy scheduler/due queries remain schema 1. */
+    public Lease claimPaidWorker(String id) {
+        return claim(id,true,2);
+    }
+
+    private Lease claimMemberReview(String id) {
+        ExamCreationOperation op=freshOperation(id);
+        if (op==null || op.getPaidSelection()==null || op.getRecovery()==null || op.getRecovery().getMemberWait()==null
+                || op.getRecovery().getStatus()!=ReservationRecovery.Status.NEEDS_REVIEW
+                || !op.getRecovery().getMemberWait().reviewEligible(op.getOperationId(),op.getPaidRequestDigest(),op.getRecovery().getFailureCode())
+                || !now().isBefore(op.getCreatedAt().plus(java.time.Duration.ofDays(120)))) return null;
+        var proof=op.getRecovery().getMemberWait().exhaustion();
+        if (proof.quarantinedAt().isAfter(now()) || proof.chargedAttempts()!=op.getRecovery().getAttempts()
+                || !java.util.Objects.equals(proof.firstAttemptAt(),op.getRecovery().getFirstAt())) return null;
+        String token=UUID.randomUUID().toString(); Instant until=now().plus(properties.getLease());
+        Query query=Query.query(Criteria.where("_id").is(id).and("version").is(op.getVersion()).and("activeGuard").is(true)
+                .and("state").is(ExamCreationState.PREPARED).and("recovery.status").is(ReservationRecovery.Status.NEEDS_REVIEW)
+                .andOperator(new Criteria().orOperator(Criteria.where("recovery.leaseUntil").is(null),Criteria.where("recovery.leaseUntil").lte(now()))));
+        var claimed=mongo.findAndModify(query,new Update().set("recovery.leaseToken",token).set("recovery.leaseOwner",instance)
+                .set("recovery.leaseUntil",until).inc("version",1),FindAndModifyOptions.options().returnNew(true),ExamCreationOperation.class);
+        return claimed==null?null:new Lease(id,token,until,false,System.nanoTime()+properties.getAttemptTimeout().toNanos());
+    }
+
+    private Lease claim(String id, boolean worker, int schema) {
         Instant now = now();
         if (!worker) {
             ReservationRecovery legacy = ReservationRecovery.prepared(now);
@@ -78,7 +114,7 @@ public class ReservationOperationExecution {
                 .and("recovery.status").in(ReservationRecovery.Status.READY, ReservationRecovery.Status.IN_FLIGHT)
                 .andOperator(new Criteria().orOperator(Criteria.where("recovery.leaseUntil").is(null),
                         Criteria.where("recovery.leaseUntil").lte(now)));
-        if (worker) eligible.and("recovery.schemaVersion").is(1).and("recovery.nextAt").lte(now);
+        if (worker) eligible.and("recovery.schemaVersion").is(schema).and("recovery.nextAt").lte(now);
         String token = UUID.randomUUID().toString();
         Instant until = now.plus(properties.getLease());
         ExamCreationOperation claimed = mongo.findAndModify(Query.query(eligible), new Update()
@@ -153,6 +189,8 @@ public class ReservationOperationExecution {
     public Instant now() { return clock.instant(); }
 
     public void release(Lease lease) {
+        mongo.updateFirst(owned(lease).addCriteria(Criteria.where("recovery.status").is(ReservationRecovery.Status.NEEDS_REVIEW)),
+                new Update().unset("recovery.leaseToken").unset("recovery.leaseOwner").unset("recovery.leaseUntil").inc("version",1),ExamCreationOperation.class);
         mongo.updateFirst(owned(lease).addCriteria(Criteria.where("recovery.status").is(ReservationRecovery.Status.IN_FLIGHT)),
                 new Update().set("recovery.status", ReservationRecovery.Status.READY)
                         .unset("recovery.leaseToken").unset("recovery.leaseOwner").unset("recovery.leaseUntil")
