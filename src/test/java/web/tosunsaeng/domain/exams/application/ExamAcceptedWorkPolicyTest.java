@@ -47,4 +47,11 @@ class ExamAcceptedWorkPolicyTest {
         }
         verifyNoInteractions(jobs,receipts);
     }
+    @Test void revokeDenyCannotBeOverriddenByAcceptedJobsOrFullSubmission() {
+        var session=ExamSession.builder().examId("old").status(ExamSessionStatus.IN_PROGRESS).accessRevoked(true)
+                .submissionEvidenceVersion(1).requiredQuestionNumbers(List.of(1,2)).submissionCompletedAt(NOW).build();
+        assertThat(policy.questionAllowed(session,1,0)).isFalse();
+        assertThat(ExamAcceptedWorkPolicy.summaryAllowed(session)).isFalse();
+        verifyNoInteractions(jobs,receipts);
+    }
 }

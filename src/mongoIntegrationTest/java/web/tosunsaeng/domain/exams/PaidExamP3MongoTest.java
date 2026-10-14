@@ -87,6 +87,22 @@ class PaidExamP3MongoTest {
         evidence.prepareRequest(USER,prepared.getCommandId());
     }
 
+    @Test void revokedProjectionRejectsLegacyConfirmAndSubmissionReceipt() {
+        mongo.updateFirst(Query.query(Criteria.where("_id").is("old")),
+                new Update().set("accessRevoked",true),ExamSession.class);
+        assertThatThrownBy(()->owners.execute(USER,()->{
+            new ExamSubmissionEvidence(mongo).accepted("old",1,0,List.of(1,2),NOW);
+            return null;
+        })).isInstanceOf(IllegalStateException.class);
+        assertThat(mongo.count(new Query(),"exam_submission_receipts")).isZero();
+        mongo.updateFirst(Query.query(Criteria.where("_id").is("old")),
+                new Update().set("status",ExamSessionStatus.ENTITLEMENT_CONFIRMING)
+                        .set("entitlementState",ExamEntitlementState.CONFIRMING),ExamSession.class);
+        var sessions=new MongoRepositoryFactory(mongo).getRepository(ExamSessionRepository.class);
+        assertThat(sessions.confirmEntitlementIfConfirming("old",NOW)).isZero();
+        assertThat(sessions.findById("old").orElseThrow().isEntitlementConfirming()).isTrue();
+    }
+
     ReservationSnapshot snapshot(ReservationStatus status,boolean rejected) {
         return new ReservationSnapshot(prepared.getOperationId(),RESERVATION,BillingReservationKind.INITIAL,status,
                 NEW_GROUP,status==ReservationStatus.CONFIRMED?AttemptGroupStatus.OPEN:null,"new","mock",null,null,
@@ -101,6 +117,66 @@ class PaidExamP3MongoTest {
         lifecycle.acceptReserved(USER,prepared.getCommandId(),snapshot(ReservationStatus.RESERVED,false));
         return lifecycle.commitPending(USER,prepared.getCommandId(),ZoneOffset.UTC);
     }); }
+
+    web.tosunsaeng.domain.exams.access.AccessRevocationStore revocations() {
+        String collection=web.tosunsaeng.domain.exams.access.AccessRevocationStore.COLLECTION;
+        if(mongo.collectionExists(collection)) mongo.dropCollection(collection);
+        mongo.createCollection(collection);
+        mongo.getCollection(collection).createIndex(web.tosunsaeng.domain.exams.access.AccessRevocationStore.GROUP_INDEX,new IndexOptions().unique(true).name("uq_paid_revoke_group"));
+        mongo.getCollection(collection).createIndex(web.tosunsaeng.domain.exams.access.AccessRevocationStore.EVENT_INDEX,new IndexOptions().unique(true).name("uq_paid_revoke_event"));
+        var store=new web.tosunsaeng.domain.exams.access.AccessRevocationStore(mongo,"test","fixture-test",Clock.fixed(NOW,ZoneOffset.UTC));
+        store.validateIndexes(); org.springframework.test.util.ReflectionTestUtils.setField(lifecycle,"accessRevocations",store); return store;
+    }
+    web.tosunsaeng.domain.exams.access.AccessRevocationEvent revokeEvent(String protectedSession) {
+        var body=new Document("eventId",UUID.randomUUID().toString()).append("eventType","AttemptGroupAccessRevoked")
+                .append("schemaVersion",1).append("producer","billing").append("consumerScopeId","fixture-test")
+                .append("occurredAt","2026-10-14T00:00:00.000Z").append("userId",USER).append("attemptGroupId",NEW_GROUP)
+                .append("reason","PURCHASE_REFUNDED").append("confirmedSessionId",protectedSession);
+        return web.tosunsaeng.domain.exams.access.AccessRevocationEvent.decode(body.toJson().getBytes(java.nio.charset.StandardCharsets.UTF_8),"fixture-test");
+    }
+    @Test void revokeBeforePendingPreventsNewSessionWithoutCancelingBilling() {
+        var store=revocations(); store.accept(revokeEvent(null));
+        leased(()->lifecycle.acceptReserved(USER,prepared.getCommandId(),snapshot(ReservationStatus.RESERVED,false)));
+        assertThatThrownBy(()->leased(()->lifecycle.commitPending(USER,prepared.getCommandId(),ZoneOffset.UTC))).isInstanceOf(BillingClientException.class);
+        assertThat(session("new")).isNull();assertThat(op().getActiveGuard()).isTrue();verifyNoInteractions(billing);
+    }
+    @Test void revokeBetweenPendingAndFinalizeKeepsUnresolvedEvidence() {
+        var store=revocations(); pending(); store.accept(revokeEvent(null));
+        assertThatThrownBy(()->leased(()->lifecycle.applyStatus(USER,prepared.getCommandId(),snapshot(ReservationStatus.CONFIRMED,false)))).isInstanceOf(BillingClientException.class);
+        assertThat(session("new").isAccessRevoked()).isTrue(); assertThat(session("new").isActive()).isFalse();
+        assertThat(op().getActiveGuard()).isTrue();verifyNoInteractions(billing);
+    }
+    @Test void exactConfirmedExceptionMayFinalizeButDoesNotProtectAnotherSession() {
+        var store=revocations();pending();store.accept(revokeEvent("new"));
+        leased(()->lifecycle.applyStatus(USER,prepared.getCommandId(),snapshot(ReservationStatus.CONFIRMED,false)));
+        assertThat(session("new").isAccessRevoked()).isFalse();assertThat(session("new").isActive()).isTrue();
+        assertThat(store.denied(NEW_GROUP,"replacement",USER)).isTrue();
+    }
+    @Test void revokeDenyStillAllowsAuthoritativeCanceledCompensation() {
+        var store=revocations();pending();store.accept(revokeEvent(null));
+        leased(()->lifecycle.applyStatus(USER,prepared.getCommandId(),snapshot(ReservationStatus.CANCELED,true)));
+        assertThat(op().getState()).isEqualTo(ExamCreationState.FAILED_TERMINAL);
+        assertThat(op().getActiveGuard()).isNotEqualTo(true);
+        assertThat(session("new").isActive()).isFalse();assertThat(session("new").isAccessRevoked()).isTrue();
+        verifyNoInteractions(billing);
+    }
+    @Test void concurrentFinalizeAndUnprotectedRevokeCannotLeaveUsableSession() throws Exception {
+        var store=revocations();pending();var gate=new CountDownLatch(1);var pool=Executors.newFixedThreadPool(2);
+        var event=revokeEvent(null);
+        try {
+            var finalize=pool.submit(()->{gate.await();try{leased(()->lifecycle.applyStatus(USER,prepared.getCommandId(),snapshot(ReservationStatus.CONFIRMED,false)));return true;}catch(BillingClientException denied){return false;}});
+            var revoke=pool.submit(()->{gate.await();try {store.accept(event);return true;}
+                catch(web.tosunsaeng.domain.exams.access.AccessEventFailure transientFailure) {
+                    assertThat(transientFailure.status()).isEqualTo(503);
+                    assertThat(transientFailure.code()).isEqualTo("LC_TEMPORARILY_UNAVAILABLE");return false;
+                }});gate.countDown();
+            finalize.get(15,TimeUnit.SECONDS);
+            // A bounded receiver may return 503 during write contention; the sender retries identical bytes.
+            if(!revoke.get(15,TimeUnit.SECONDS)) store.accept(event);
+            assertThat(session("new").isAccessRevoked()).isTrue();assertThat(ExamAcceptedWorkPolicy.processable(session("new"))).isFalse();
+            verifyNoInteractions(billing);
+        }finally{pool.shutdownNow();}
+    }
 
     void memberWaiting() {
         when(billing.reservePaid(anyString(),any())).thenThrow(new BillingClientException(BillingClientException.Category.MEMBER_EVIDENCE_PENDING,1));

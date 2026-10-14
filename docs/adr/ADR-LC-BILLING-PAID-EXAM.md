@@ -1,5 +1,9 @@
 # ADR — LC 유료 시험의 접수 기준 전환과 복구 경계
 
+- P5.1 후속: [ON 구성·전용 TLS 연결](../codex/LC_BILLING_PAID_EXAM_P5_1_IMPLEMENTATION.md)을 구현했다. OFF에서는 키/DB/TLS를 구성하지 않고 ON 구성은 owner writer 및 index 점검을 요구한다. 별도 rollout gate는 P6 legacy/lifecycle/V07 검증 전 실제 ON을 계속 거절한다. 격리 HTTPS 테스트는 배포 완료가 아니다.
+
+- P5 후속: [역방향 revoke 구성요소](../codex/LC_BILLING_PAID_EXAM_P5_IMPLEMENTATION.md). 단일 group fact/event unique와 Session deny projection을 같은 Transaction으로 저장하고 실제 signed fixture·HTTP/격리Mongo로 검증한다. Spring은 OFF404만 등록, ON wiring/TLS connector·legacy/lifecycle/V07 검증은 미완료이므로 startup gate를 유지한다. 과거 owner alias/Session upsert/원장 변경/자동TTL 없음.
+
 - P4.1 후속: [생성 중 삭제 미접수·오류](../codex/LC_BILLING_PAID_EXAM_P4_1_IMPLEMENTATION.md). 동일 owner fence에서 생성guard를 확인하고 삭제row/알림 suppression 전에409로 거절한다. 삭제된 성공replay는 owner/withdrawal/merge 검증 뒤404이며 writer/finalize 우회가 아니다. 신규 삭제 ACK와 원문정리 분리는 후속 설계, 기존 worker 교체·활성화는 미실행이다.
 
 - P4 후속: [기접수 작업 분리](../codex/LC_BILLING_PAID_EXAM_P4_IMPLEMENTATION.md). 신규 Job 접수와 원 durable Job/receipt 기반 후처리를 공통 policy로 구분한다. coverage 전체접수 marker 없이 Summary/COMPLETED를 만들지 않으며 기존 owner/삭제 fence를 우회하지 않는다. 공개 계약/fixture/paid 기동차단은 유지하고 삭제 연결·legacy 전환은 별도 gate다.

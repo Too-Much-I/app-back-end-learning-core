@@ -26,6 +26,13 @@ import java.util.function.Supplier;
 
 @Service
 public class BillingExamCreationTransactionService {
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    private web.tosunsaeng.domain.exams.access.AccessRevocationStore accessRevocations;
+
+    private void requireAccess(ExamCreationOperation operation) {
+        if(accessRevocations!=null && accessRevocations.denied(operation.getAttemptGroupId(),operation.getSessionId(),operation.getUserId()))
+            throw new IllegalStateException("Revoked reservation requires authoritative recovery");
+    }
 
     private static final Duration TERMINAL_RETENTION = Duration.ofDays(7);
 
@@ -90,6 +97,7 @@ public class BillingExamCreationTransactionService {
             if (operation.getState() != ExamCreationState.RESERVED) {
                 throw new IllegalStateException("Exam creation operation is not RESERVED");
             }
+            requireAccess(operation);
 
             for (ExamSession candidate : sessionManager.findInProgressSessions(operation.getUserId())) {
                 if (!Objects.equals(candidate.getExamId(), operation.getSessionId())) {
@@ -133,6 +141,7 @@ public class BillingExamCreationTransactionService {
             if (operation.getState() != ExamCreationState.SESSION_COMMITTED) {
                 throw new IllegalStateException("Exam creation operation is not SESSION_COMMITTED");
             }
+            requireAccess(operation);
             if (execution != null) {
                 var session = sessionRepository.findById(operation.getSessionId()).orElse(null);
                 web.tosunsaeng.domain.exams.billing.reconciliation.ReservationSnapshotValidator.session(operation, session);
@@ -142,7 +151,7 @@ public class BillingExamCreationTransactionService {
             if (updated != 1) {
                 ExamSession existing = sessionRepository.findById(operation.getSessionId())
                         .orElseThrow(() -> new IllegalStateException("Committed ExamSession is missing"));
-                if (existing.getStatus() != ExamSessionStatus.IN_PROGRESS
+                if (existing.isAccessRevoked() || existing.getStatus() != ExamSessionStatus.IN_PROGRESS
                         || existing.getEntitlementState() != ExamEntitlementState.CONFIRMED
                         || !Objects.equals(existing.getCreationOperationId(), operation.getOperationId())) {
                     throw new IllegalStateException("Committed ExamSession cannot be finalized");

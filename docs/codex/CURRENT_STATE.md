@@ -1,5 +1,17 @@
 # Learning Core Current State
 
+- P5.1 최종 검증: clean test/mongoIntegrationTest/bootJar 성공, 단위1,248개(기존1 skip)·Mongo238개 실패/오류0, Node121·fixture hash34·diff check 통과. 격리 TLS 및 별도 Spring chain 검증이며 전체 앱 ON/실환경E2E 완료는 아니다.
+
+- 2026-10-14 — TMI-220 공동 인계 검토: 현재 AccessRevocationStore는 보호ID 외 동일group Session을 accessRevoked로 표시하고 ExamAcceptedWorkPolicy/GradingService는 접수증거보다 먼저 거절한다. Billing PaidAttemptEventService도 ACTIVE 과거Session을 activeSessionId 불일치로 거절함을 정적 확인했다. 기존 기접수 마무리 의도에 맞춰 confirm·재시작전 durable 접수 증거가 있는 S1 작업만 유지하고 신규사용/명시삭제/탈퇴/terminal은 계속 차단하는 좁은 공동 계약 보완 권고. 단일보호ID·불변event 유지 가능성은 공동 검증 필요, 수락/코드변경/배포 아님. TMI-219 병합·1,603테스트는 사용자 보고이며 독립 재실행 안 함. 관련 TMI-220/219/217·LC TMI-116/128/125 및 TMI-218.
+
+- 2026-10-14 — P5.1 Spring ON 구성·전용 TLS 연결 및 기존 writer 차단 구현. 실제 활성화는 legacy/lifecycle/V07 gate로 계속 거절한다. 격리 테스트 결과와 배포 전 조건은 [P5.1 보고](LC_BILLING_PAID_EXAM_P5_1_IMPLEMENTATION.md). 관련 TMI-116/TMI-128/TMI-122, TMI-193/TMI-136·TMI-217. feat/billing-paid-exam-p5 미커밋 유지, 실DB/배포/기능 설정 변경 없음. 아래 P5 최초 기록의 ON wiring 미완료는 이번 변경으로 대체한다.
+
+- 2026-10-14 — PR #40 CI run38541952701 성공 확인 후 develop f59cf284d7f8225e52190116ee13715d7ee06aed 머지. 테스트 자동배포 run38557338164 ECS/health success, 기능설정 불변. feat/billing-paid-exam-p5 생성 후 P5 verifier/strict event/filter·단일 revoke fact/Session deny·paid lifecycle 연결점 구현. 단위1,243개(기존1 skip)·Mongo237개 실패/오류0, bootJar/Node121/fixture34/diff check 통과. [P5 보고](LC_BILLING_PAID_EXAM_P5_IMPLEMENTATION.md). 현재 Spring은 namespace OFF404만 연결하고 ON startup 차단 유지: TLS connector/ON bean 조립·전체 legacy/owner coverage/V07은 후속이며 P5 전체 완료가 아니다. P5 미커밋/미푸시/미배포·실DB 변경 없음. 관련 TMI-116/128/122·TMI-193/136·TMI-217·선행 TMI-218. 기존 사용자 DS_Store/앞선 미커밋 전달기록 보존.
+
+- 2026-10-14 — 전달 작업 종료 hook의 현재 턴 식별자 기록 보완. commit6163374/PR #40 생성 이후 CI 마지막 확인 실행 중, 머지/P5 구현 미실행 상태 유지(이번에는 원격 재조회 없음). 관련 TMI-116/128/122·TMI-193/136·TMI-217. 문서만 변경했다.
+
+- 2026-10-14 — 사용자 승인으로 P4/P4.1 commit6163374 푸시 및 [PR #40](https://github.com/Too-Much-I/app-back-end-learning-core/pull/40) 생성/첨부 완료. CI run38541952701은 마지막 확인 시 실행 중이었다. 작업 중단 시점에 머지·새 P5 브랜치·P5 코드 구현은 미실행이며 기존 feat/billing-paid-exam-p4에 있다. AGENTS에 전달/P5 승인 기록, 기존 사용자 DS_Store 보존. 기능설정/실DB/운영 배포 변경 없음. 관련 TMI-116/128/122·TMI-193/136·TMI-217. 다음 재개 시 CI/PR 최신 상태부터 확인한다.
+
 - 2026-10-14 — P4.1 생성 중 삭제 미접수·공개409/Retry1·삭제된 성공replay404 구현/격리 검증 완료. 같은 owner Transaction에서 검사하고 삭제row/알림suppression0, 삭제선행 생성차단·동시1승자·현재actor/withdrawal/merge 우선 확인. 단위1,164개(기존1 skip)·Mongo224개 실패/오류0, bootJar·Node121·fixture34 hash·diff check 통과. [보고](LC_BILLING_PAID_EXAM_P4_1_IMPLEMENTATION.md). TMI-217 draft-3/48항목은 별도 공동계약/실행gate이며 신규삭제sender/ACK/checkpoint runtime·공개 paid/자동 schema2 scheduler·P5/P6/활성화는 미완료다. 관련 TMI-116/128/122·TMI-193/136·TMI-217. feat/billing-paid-exam-p4의 기존 P4·사용자DS_Store/동시문서 보존, commit/push/실DB/배포/설정 변경 없음.
 
 - 2026-10-14 — P3/P3.1·fixtures-2 commit136602a/PR #39 develop 머지2512c1e 완료. CI run38537796983 첫 시도는 기존 LearningQuotaTransactionTest1개 실패, 동일 커밋 재실행 성공 후 머지. 테스트 배포 run38538663500 ECS/health success, 기능 설정 불변. 머지 결과에서 feat/billing-paid-exam-p4 생성·P4 공통 접수증거 policy/Callback·누락Job·Summary/AttemptGroup gate 구현. 단위1,159개(기존1 skip)·Mongo212개 실패/오류0, bootJar·Node28·fixture34 hash·diff check 통과. [P4 보고](LC_BILLING_PAID_EXAM_P4_IMPLEMENTATION.md). P4는 미커밋/미푸시/미배포, 공개 paid/자동 scheduler 차단 유지. 다음 P4.1 삭제/공개 응답은 TMI-217 최신 계약·legacy P6 gate와 대조 필요. 관련 TMI-116/128/122·선행 TMI-218, 삭제 TMI-193/136. 사용자 DS_Store·동시 TMI-217 문서 기록 보존.
