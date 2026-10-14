@@ -15274,3 +15274,87 @@
 - 제품 코드를 이번 전달 단계에서 추가 수정하지 않았다. 앞서 통과한 최신 develop 합류 검사(Java908개 중 조건부 fixture1 skip, Mongo160개 실패/오류0)와 실제 병합된 소스·테스트·설정의 동일성을 대조한다. 전체 콘텐츠 fixture는 별도 통과했고 프론트 계약 catalogs13/details520/answers1000/contentVersions1 일치. 같은 코드를 대상으로 전체 테스트를 중복 실행하지 않는다.
 - 외부 API/DTO·기존 시험/챌린지 계약 유지. 문서의 로컬 보류 안내를 이번 전달 결정에 맞춰 갱신했다. 이 feature 브랜치 push는 현재 배포 workflow의 main/develop 트리거를 실행하지 않는다. 최종 push 성공은 원격 branch SHA와 로컬 HEAD 일치로 확인한다.
 - 남은 위험/다음: develop PR 검토·머지 및 새 backend 이미지 배포, 실제 로그인 앱의 목록→녹음→제출→채점→완료·계정 통합/삭제 E2E는 별도다. 전달 사실을 테스트 서버 배포 완료로 해석하지 않는다. 현재 증거는 Git 제외 build/answer-learning-push-20261013/에 보관한다.
+
+## 2026-10-14 — TMI-218 PR #37 전달 완료 결과
+
+- P1 a2d16a9를 commit/push하고 최신 develop 통합 e1126e9를 검증했다. 충돌은 WORKLOG/CURRENT_STATE 두 문서뿐이며 양쪽 과거 기록을 모두 보존했다. API/AI/S3/Redis 및 제품 코드는 전달 단계에서 추가 변경하지 않았다. DS_Store 사용자 변경은 제외/보존했다.
+- 통합 로컬 clean test 1085개 중 LearningImportedContentTest 조건부1 skip, 실패/오류0. Mongo172개 실패/오류/skip0; deployment/migration Node23개 통과. GitHub Verify run38528438521 성공 후 PR https://github.com/Too-Much-I/app-back-end-learning-core/pull/37 을 develop에 merge했다. merge SHA989c4ff36c4e730a57eebf93370495f485a5f4b6, KST16:30:18. 로컬 develop fast-forward 완료.
+- 사용자 승인 범위의 기존 테스트 자동 배포 run38528752976가 해당 merge SHA로 in_progress임을 확인했다. 배포 완료/서버 동작 성공을 확인한 것은 아니다. 기능 설정/운영 서버/실DB/Jira 변경 없음. 최종 결과 WORKLOG/CURRENT_STATE 갱신은 로컬 미커밋으로 남겨 별도 develop push를 만들지 않는다. 다음은 배포 결과 확인 및 P2/P3 후속 범위다. Secret/Token 미기록.
+
+## 2026-10-14 — P2 일반 유료 Billing wire·영속 증거 구현
+
+<!-- codex-turn:01a13954-0d39-7d83-87b1-6ba44758151a -->
+
+- 사용자 「좋아 브랜치 파서 다음꺼 구현해줘」로 develop989c4ff에서 `feat/billing-paid-exam-p2`를 생성했다. 이번은 P2 일반 reserve/status reader·request/validator·증거 저장까지다. 관련 TMI-218/TMI-116/TMI-128/TMI-122, PLAN-011/012/013. P2 전용 Jira는 새로 생성하지 않았다. 기존 미커밋 머지 결과 작업기록과 DS_Store는 보존했다.
+- PaidReservationProtocol/Client 확장으로 단일mock·restart3필드와 source/transition/confirmRejection을 검증하고, legacy reader의 source 미포함 호환을 유지했다. 새 paid 경로는 source필수·HTTP200·strict JSON/명시null·exact 원연결·NEW_AFTER_SUBMISSION/COMPLETION replacement금지를 적용한다. 원Session이 있지만 group없는 경우 legacy를 추론하지 않는다. status body/key 및 A workload JWT·16KiB/timeout/redirect 정책은 유지한다.
+- PaidReservationEvidence와 PaidReservationEvidenceStore는 operation paidRequestDigest 및 operation/Session paidReservation.snapshot을 owner Tx로 보존한다. 불변source/전환·terminal충돌·다른owner Session은 rollback하며 짧은 confirm/cancel이 증거를 지우지 않는다. 새collection/TTL/Session 생성·활성화·guard해제는 없다. P0 후보를 이 embedded 경로로 매핑하고 AGENTS/계획/P0/ADR/P2보고/CURRENT_STATE를 동기화했다.
+- 최종 `JAVA_TOOL_OPTIONS=-Dapi.version=1.44 ./gradlew clean test mongoIntegrationTest bootJar` 성공: 단위1102개 실패/오류0·기존 LearningImportedContentTest 조건부1skip, Mongo176개 실패/오류/skip0, JAR빌드 성공. P2 단위17개(원fixture reserve6/status3 실제HTTP 포함)+Mongo4개 추가. optional record null/absent 차이를 보완했고 발신typed request는 absent로 직렬화, 수신object 명시null은 직접 거절한다. A3+R2 13+simplified9개 원본checksum 일치, diff 공백 검사 통과.
+- P2.1 오류/MEMBER/phone paid확장 및 P3 공개saga/worker·lease/상태전이/unknown복구, legacy/삭제/purge/E2E는 미완료다. 기존 P1 paid활성화 차단/schema2격리는 유지한다. 전체28개 공동상태검증 완료로 보고하지 않는다. 기존 API/AI/S3/Redis/fixture 불변. 예상 밖 제품변경·Billing/Identity 저장소/실DB/index/배포/활성화/commit/push 없음. Secret/Token 미기록.
+
+## 2026-10-14 — P2.1 오류·phone 처리 범위 설명
+
+- 사용자 질의에 구현계획 P2.1을 확인했다. Billing의 MEMBER 대기/owner 차단/예약 생성 전 확정 실패를 구분하는 reader·오류 분류와 phone 재가입의 paid-first/free continuation exact 응답 검증을 설명한다. phone은 전화번호 재가입 경로이며 신규 전화번호 인증 구현이 아니다. Billing 권리/복원 책임 및 P3 실제 대기/활성화 연결과 구분한다.
+- 관련 TMI-116/TMI-128/TMI-122, 선행 TMI-218. 이번은 설명과 CURRENT_STATE/WORKLOG 기록만 수행하며 제품 코드·계약·fixture·DB·배포 변경 없음. 테스트는 재실행하지 않았다. Secret/Token 미기록.
+
+## 2026-10-14 — P2.1 설명 현재 턴 기록 보완
+
+<!-- codex-turn:01a13960-9c06-7b30-afa2-cd29d71890e2 -->
+
+- P2.1 오류 분류와 전화번호 재가입 응답 검증 설명에 현재 턴 표식을 보완했다. 관련 TMI-116/TMI-128/TMI-122, 선행 TMI-218. 앞선 WORKLOG 기록은 수정하거나 삭제하지 않았다.
+- CURRENT_STATE를 갱신했다. 추가 제품 코드/계약/fixture/DB/배포 변경 없이 문서 공백 및 표식 단일 출현만 검증하며 테스트 재실행은 하지 않는다. Secret/Token 미기록.
+
+## 2026-10-14 — PLAN-012 환불 exact Session 인계 검토
+
+<!-- codex-turn:01a13961-7012-7611-9235-99cf06be4353 -->
+
+- 사용자 제공 Billing PLAN-012-LC-REFUND-SESSION-HANDOFF-2026-10-14.md를 읽고 LC 현재 상태/P2 구현 보고·PaidReservationProtocol/EvidenceStore 및 P3~P6 계획, src/main 수신 구현 존재 여부를 정적으로 대조했다. 관련 Billing TMI-215/216/217, LC TMI-116/128/122/125 및 선행 TMI-218. Billing 파일은 읽기만 수행했다.
+- confirm 선행 exact S1만 기존 lifecycle 내 보호, 같은 group 새 S2 차단, same-key 응답유실 복구와 의도적 재시작 구분은 기존 계획과 부합한다. 로컬 P2에 ENTITLEMENT_REVOKED confirmRejection reader·검증/evidence 기반은 있으나 공개 saga/worker 연결은 후속이다. confirmedSessionId/revoke endpoint/두409 충돌은 fixture에 존재하며 제품 receiver 구현 완료 증거가 아니다.
+- 구현 연결은 P2.1 오류 분류, P3 status-first·confirm후 마무리/영속거절 보상, P4 제출/Job/lifecycle exact 보호, P5 역방향 JWT·불변 revoke·원자 수신, P6 보존/legacy/과거owner 검증으로 구분한다. H01~H13은 공동 점검표이며 이번에 실행하거나 통과 처리하지 않았다. Billing confirm/refund Tx 승자 테스트와 LC runtime/실Mongo/HTTP 결과는 별도로 관리해야 한다.
+- 인계의 inbox/deny 표현은 이미 승인된 그룹별 단일 revoke 문서의 논리 역할이며 별도 inbox collection을 재도입하지 않는다. command TTL/120일 결과 보존과 revoke·보호/미해결 근거 보존은 별개이고 TMI-217 관련 purge/과거owner 상세는 미확정이다. 신규 정책 선택이나 구현 완료/상대 수락으로 확대하지 않는다.
+- 기존 dirty 코드/문서/DS_Store를 보존했다. CURRENT_STATE/WORKLOG 기록 외 제품 코드·fixture·계획 수정, Jira/외부 메시지, 실제 DB/AWS/배포/활성화/commit/push 없음. 정적 검토이므로 테스트 재실행 없이 diff check와 현재 표식 단일 출현만 검증한다. Secret/Token 기록 없음.
+
+## 2026-10-14 — PLAN-011 진행과 PLAN-012 인계 검토 구분 정정
+
+<!-- codex-turn:01a13964-ebec-7180-8c3f-80b187b99ac5 -->
+
+- 사용자 지적에 따라 현재 작업은 PLAN-011 유료 시험 연동 구현이며 PLAN-012 환불 구현으로 전환하지 않았음을 명확히 했다. 직전 답변은 인계서 후속 접점을 현재 진행처럼 읽히게 설명한 문제이며 실제 환불 코드 변경은 없었다.
+- 현재 P2 reader/증거 저장 기반 완료와 후속 P2.1/P3를 구분한다. confirmRejection을 읽는 준비는 시험 생성·확정 응답 계약의 일부이지 환불 실행/역방향 revoke receiver를 구현했다는 의미가 아니다. 인계서는 향후 호환 경계 참고로 유지하며 이를 새 구현 승인으로 확대하지 않는다.
+- 관련 LC TMI-116/TMI-128/TMI-122, 선행 TMI-218 및 인계 참조 Billing TMI-215/216/217. CURRENT_STATE 갱신·WORKLOG EOF append 외 제품 코드/계획/fixture/DB/AWS/배포/Jira/외부 메시지/commit/push 변경 없음. 기존 기록·dirty 변경 보존, 설명 정정이므로 테스트 재실행 없이 diff check 및 표식 단일 출현 확인. Secret/Token 기록 없음.
+
+## 2026-10-14 — 수정된 환불 exact Session 인계 첨부본 재검토
+
+- 사용자 최신 첨부본 전체를 읽고 Billing 원본 R2 및 단순화 수락 문서의 exact Session/group 멱등성/보존 조항과 대조했다. 단일 revoke 문서의 논리적 inbox 역할, 종전 inbox TTL 전체문서 적용 금지, 단계번호 분리 및 H01~H13 미완료 표시는 이전 피드백을 반영했다. 관련 LC TMI-116/128/122/125·선행 TMI-218, Billing TMI-215/216/217.
+- 정책 충돌보다는 진행상태와 용어 명료화가 필요하다. 회신표 P2를 PLAN-011 reserve/status reader·검증·evidence 기반(confirmRejection 포함)으로 쓰고 현재 PLAN-011 진행/PLAN-012는 검토·후속 경계만임을 명시하도록 권고했다. 중단/실패가 앱 이탈·일시 채점 실패인지 서버 terminal인지 구분하지 않으면 유효 S1 보호를 잘못 차단할 수 있으므로 기존 lifecycle의 종료 상태로 한정하도록 권고했다. same-key 복구 문구는 무기한 replay/삭제 Session 재생성이 아니며120일 보장·lifecycle 경계를 따른다고 보완 권고했다.
+- 인계 원본·Billing 문서·제품 코드·fixture·DB·배포·Jira·외부 메시지는 수정하지 않았다. CURRENT_STATE 갱신과 WORKLOG EOF append만 수행하고 기존 dirty를 보존했다. 테스트 실행 없이 문서 diff check 검증, Secret/Token 미기록. 환불 구현 착수 또는 상대 수락 완료로 기록하지 않는다.
+
+## 2026-10-14 — 인계서 재검토 현재 턴 기록 보완
+
+<!-- codex-turn:01a13965-a3a0-7bb0-89cc-b1138674343c -->
+
+- 최신 첨부 인계서 검토 결과에 현재 턴 식별자를 보완했다. PLAN-011 진행과 PLAN-012 후속 검토 구분, 앱 이탈/일시 실패와 lifecycle 종료 구분, 동일key120일 보장 및 삭제 Session 재생성 금지 보완 권고를 유지한다. 관련 LC TMI-116/TMI-128/TMI-122/TMI-125/TMI-218, Billing TMI-215/TMI-216/TMI-217.
+- 과거 WORKLOG는 수정·삭제하지 않고 EOF에 append했으며 CURRENT_STATE를 갱신했다. 추가 제품 코드/계약/DB/배포/Jira/외부 메시지 변경 없음. diff check 및 식별자 단일 출현 확인, 테스트 재실행 없음. Secret/Token 미기록.
+
+## 2026-10-14 — Billing 인계서 세 보완 반영 확인
+
+<!-- codex-turn:01a13969-6f98-7243-89c2-ad6a864f66ca -->
+
+- 사용자 공유 원본 PLAN-012-LC-REFUND-SESSION-HANDOFF-2026-10-14.md의 수정 문구를 읽기 확인했다. PLAN-011 reserve/status reader·증거 저장 진행과 PLAN-012 미착수, 일시 실패/앱 이탈과 확정 lifecycle 종료 구분,120일 same-key 결과 재현 및 삭제/종료 Session 재생성 금지가 반영됐다. H03/H09 기대값의 대응 보완도 확인했다.
+- 앞선 세 문구 보완 요청은 해소됐다. 현재 PLAN-011 진행을 유지하며 환불 구현 착수·공동 H01~H13 검증 완료·실환경 활성화로 확대하지 않는다. 관련 LC TMI-116/TMI-128/TMI-122/TMI-125/TMI-218, Billing TMI-215/TMI-216/TMI-217.
+- CURRENT_STATE와 WORKLOG EOF만 갱신하고 기존 기록/작업 변경을 보존했다. Billing 원본·제품 코드·테스트·Jira·DB·배포·외부 발송·commit/push 변경 없음. 문서 diff check 및 marker 단일 출현 확인, Secret/Token 미기록.
+
+## 2026-10-14 — PLAN-011 P2.1 오류·phone 구현
+
+<!-- codex-turn:01a13961-a1c8-7c92-bdff-314e016feb11 -->
+
+- 사용자 「어 해줘」로 P2.1 strict 오류·phone 기반을 구현했다. 관련 TMI-116/TMI-128/TMI-122, 선행 P1 TMI-218. 현재 feat/billing-paid-exam-p2의 기존 P2 dirty를 이어 작업했으며 추가 브랜치/commit/push/머지는 수행하지 않았다.
+- paid client의 네필드 오류/HTTP·route·retry 검증과 MEMBER/owner/J3 category·metric, 공개 오류 mapper, 구 worker의 안전 격리 분류를 추가했다. phone six-field 요청, paid INITIAL 새group/free REPLACEMENT 원group·exact echo/transition 없음 검증 및 owner Tx digest/evidence 저장을 연결했다. 실제 MEMBER 재개/J3 terminal·공개 saga/worker 활성화는 P3 후속이며 paid 차단 유지.
+- 공동 E06-owner fixture의 고정 message 불일치1개를 발견했다. 원본 bytes를 유지하고 계약 기준 CONTRACT_ERROR를 검증했으며 나머지21개 오류 기대값은 일치한다. 정확 owner message는 별도 성공 검증했다. 공동 기대값 전부 통과나 기존 oracle을 runtime 증거로 보고하지 않는다. phone11개는 selected-field fixture에 가짜 full DTO envelope를 보완한 범위를 명시했다.
+- clean test/mongoIntegrationTest/bootJar 성공 후 추가 HTTP/raw bytes 테스트를 포함해 재검증 성공. 최종 단위1,141개 실패/오류0·기존 조건부1 skip, 격리 Mongo177개 실패/오류/skip0, bootJar 성공. A3/R2 13/simplified9 checksum 및 diff check 통과. 실제 상태28개·실환경 E2E 전체 완료는 아니다.
+- 상세 파일/동작/위험/배포 gate는 LC_BILLING_PAID_EXAM_P2_1_IMPLEMENTATION.md에 기록했다. AGENTS/계획/ADR/CURRENT_STATE 동기화, 과거 WORKLOG append-only 유지. 기존 DS_Store·P2/인계 검토 기록 보존. 예상 밖 제품 변경 없음. 공개 성공 API/AI/S3/Redis·A/fixture 원본 유지, Billing/Identity/실DB/설정/배포/Jira/외부 메시지 변경 및 Secret/Token 기록 없음.
+
+## 2026-10-14 — E06-owner 정정 대상 설명
+
+<!-- codex-turn:01a1396e-a736-7710-b4fe-fbf580c83415 -->
+
+- 계약 snapshot 표와 E06-owner의 원문 오류 body를 읽기 대조했다. OPERATION_OWNER_MISMATCH에 예약 전 거절 message가 들어 있는 fixture 불일치이며 owner 고정 문구로 정정하는 대상임을 설명했다. HTTP409/code/retryable=false/OWNER_BLOCKED 기대값과 제품 정책은 그대로다. 관련 TMI-116/TMI-128/TMI-122·선행 TMI-218.
+- 기존 fixture는 수정하지 않고 신규 revision/hash로 공동 공유·LC 재검증하는 절차를 안내한다. 실제 Billing 서버가 잘못된 문구를 반환한다고 확인한 것은 아니다. 설명/기록만 수행하며 CURRENT_STATE 갱신·WORKLOG EOF append 외 코드/fixture/DB/배포/외부 메시지 변경 없음. 테스트 재실행 없이 원문 대조·diff check·marker 단일 출현을 검증한다. Secret/Token 미기록.

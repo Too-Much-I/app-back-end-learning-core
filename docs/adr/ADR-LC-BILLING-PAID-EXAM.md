@@ -1,6 +1,9 @@
 # ADR — LC 유료 시험의 접수 기준 전환과 복구 경계
 
+- P2.1 후속: strict 오류 분류·phone paid/free exact 검증과 owner Tx evidence 저장 준비 완료. [P2.1 보고](../codex/LC_BILLING_PAID_EXAM_P2_1_IMPLEMENTATION.md). E06-owner 원본 문구 불일치는 공동 정정 필요. MEMBER 실제 재개/J3 terminal·P3 saga 연결·기능 활성화는 미실행이며 기존 차단을 유지한다.
+
 - 날짜: 2026-10-14
+- P2 후속: 사용자 요청으로 일반 reserve/status wire·source/transition/거절의 embedded evidence 저장을 구현했다. [P2 보고](../codex/LC_BILLING_PAID_EXAM_P2_IMPLEMENTATION.md). P2.1/phone·P3 활성화/복구 연결은 후속이며 기존 default-off/기동 차단을 유지한다.
 - P1 후속: TMI-218 기반 구현·단위/격리 Mongo 검증 완료. [구현 보고](../codex/TMI_218_P1_IMPLEMENTATION.md). 공통 접수 writer와 준비 snapshot은 구현됐으나 공개 유료 생성 연결/활성화 및 P2~P6는 완료하지 않았다.
 - 상태: 사용자 구현계획 승인 후 P0 설계 기록. 제품 구현/공동 잔여 계약/실환경 검증 완료 아님.
 - 2026-10-14 후속 승인: 세 내부 저장 단순화만 반영했다. 별도 생성 결과 receipt·revoke inbox·Session 접수 문항 배열을 추가하지 않는다. MEMBER 관측/격리 자동재개 및 나머지 계약은 유지한다.

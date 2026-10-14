@@ -1,5 +1,18 @@
 # 프로젝트 목적
 
+## 2026-10-14 P2 전달 및 P3 구현 승인
+
+- 사용자 「커밋 푸시 머지한 다음 브랜치 파서 다음꺼 구현해줘」로 P2/P2.1 커밋·푸시·PR/develop 머지와 기존 테스트 자동 배포 트리거, 후속 P3 코드/격리 테스트를 승인했다. 기능 설정·운영 배포·실DB 변경은 제외한다. E06-owner fixture 문구 정정은 추적하며 병행 구현하되 공동 최종 검증·활성화 전 해결한다. 원 fixture는 유지한다.
+- P3는 confirm 성공 후 exact 원 Session 신규접수 차단·새 Session 활성·operation 성공 및 status-first 복구/120일 terminal 보존 경계다. P3.1 MEMBER 제한적 재개, P4~P6와 공개 paid 활성화는 완료로 간주하지 않는다.
+
+## 2026-10-14 P2.1 구현 승인
+
+- 사용자 「어 해줘」로 현재 P2 브랜치에서 strict 오류 분류·phone paid/free 응답/영속 검증·관련 테스트를 승인했다. MEMBER 대기 재개/lease·J3 terminal 원자 처리와 공개 saga/worker 활성화는 P3 후속이다. 기존 paid 기동 차단, fixture 원본 및 API/AI/S3/Redis 계약을 유지한다. 이번은 commit/push/실DB/배포 요청이 아니다.
+
+## 2026-10-14 P2 구현 승인
+
+- 사용자 「좋아 브랜치 파서 다음꺼 구현해줘」로 P2 Billing reserve/status reader·restart 요청·source/transition 영속 및 로컬 테스트를 승인했다. P2.1 오류/phone 확장과 P3 lifecycle/worker 연결은 별도 후속이며 paid 활성화 차단을 유지한다. 기존 A/fixture bytes, 공개/AI/S3/Redis 계약과 기존 reader 경로를 보존한다. 이번은 commit/push/배포 요청이 아니다.
+
 ## 2026-10-14 TMI-218 전달 승인 예외
 
 - 사용자 커밋·푸시·머지 요청과 「머지까지 해줘」 확인으로 이번 P1 변경의 커밋/푸시/PR/develop 머지 및 기존 테스트 서버 자동 배포 트리거를 허용한다. 일반 Git 금지 규칙의 이번 요청 한정 예외다. 기능 설정/운영 배포는 변경하지 않는다.

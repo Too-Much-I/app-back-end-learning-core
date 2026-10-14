@@ -15,6 +15,15 @@ public final class ReservationSnapshotValidator {
     private ReservationSnapshotValidator() { }
 
     public static void status(ExamCreationOperation op, BillingReservationClient.ReservationSnapshot s) {
+        if (op.getPaidSelection() != null) {
+            try {
+                web.tosunsaeng.domain.exams.billing.PaidReservationProtocol.matches(op, s);
+                if (op.getPaidReservation() != null) op.getPaidReservation().observe(s);
+            } catch (web.tosunsaeng.domain.exams.billing.BillingClientException invalid) {
+                throw new ReservationRecoveryException(STATE_INCONSISTENT);
+            }
+            return;
+        }
         require(s != null && s.reservationStatus() != null && s.reservationKind() != null
                 && uuid4(s.reservationId()) && uuid4(s.attemptGroupId())
                 && Objects.equals(op.getOperationId(), s.operationId())
@@ -66,6 +75,8 @@ public final class ReservationSnapshotValidator {
                 && Objects.equals(op.getReservationId(), session.getBillingReservationId())
                 && op.getReservationKind() == session.getBillingReservationKind()
                 && Objects.equals(op.getAttemptGroupId(), session.getAttemptGroupId()));
+        if (op.getPaidSelection() != null) require(op.getPaidReservation() != null
+                && Objects.equals(op.getPaidReservation(), session.getPaidReservation()));
     }
 
     public static boolean uuid4(String value) {

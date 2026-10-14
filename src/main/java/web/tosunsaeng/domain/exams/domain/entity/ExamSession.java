@@ -50,6 +50,20 @@ public class ExamSession {
 
     private String billingReservationId;
 
+    private PaidReservationEvidence paidReservation;
+
+    public void observePaidReservation(PaidReservationEvidence evidence) {
+        var snapshot = evidence.snapshot();
+        web.tosunsaeng.domain.exams.billing.PaidReservationProtocol.require(
+                java.util.Objects.equals(examId, snapshot.sessionId())
+                && java.util.Objects.equals(mockExamId, snapshot.mockExamId())
+                && java.util.Objects.equals(creationOperationId, snapshot.operationId())
+                && java.util.Objects.equals(billingReservationId, snapshot.reservationId())
+                && java.util.Objects.equals(attemptGroupId, snapshot.attemptGroupId())
+                && billingReservationKind == snapshot.reservationKind());
+        paidReservation = paidReservation == null ? evidence : paidReservation.observe(snapshot);
+    }
+
     private BillingReservationKind billingReservationKind;
 
     private String attemptGroupId;

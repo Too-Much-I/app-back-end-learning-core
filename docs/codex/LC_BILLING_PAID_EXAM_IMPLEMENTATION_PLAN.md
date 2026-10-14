@@ -102,6 +102,8 @@ S15/V07을 계획에 보류로 둔 채 독립적인 부분의 설계는 가능�
 
 ### P2 — Billing client와 source/transition 영속
 
+- 2026-10-14 구현: 일반 reserve/status typed wire·exact validator·embedded evidence 저장과 로컬 테스트를 추가했다. [P2 보고](LC_BILLING_PAID_EXAM_P2_IMPLEMENTATION.md). P2.1/phone·공개 saga/worker 연결·P3 lifecycle/활성화는 포함하지 않는다. source/transition/confirmRejection은 `paidReservation.snapshot`으로 매핑하며 실제 상태 전이는 후속이다.
+
 - reserve의 기존3필드에 optional restartContext 세 필드를 확장한다. 부분 객체·명시 null·unknown/duplicate/trailing/coercion을 거절한다. phone 필드와 혼합하지 않는다. operationId는 기존 command header, status는 body userId/operationId/no Idempotency-Key를 유지한다.
 - reserve 성공/status snapshot에 EXAM_PASS/SUBSCRIPTION을 필수 검증한다. PREPARED에는 source 미정 허용. confirm/cancel DTO의 field 생략으로 저장된 값을 null로 덮어쓰지 않는다.
 - 요청 Session/mock exact 일치, REPLACEMENT 원group/mock·transition 없음, restart INITIAL 새group/exact transition, NEW_AFTER_SUBMISSION/COMPLETION의 INITIAL만 허용을 검증한다.
@@ -110,6 +112,8 @@ S15/V07을 계획에 보류로 둔 채 독립적인 부분의 설계는 가능�
 - 완료 기준: fixtures wire/status 예시를 실제 client decoder/validator 테스트에 연결하고 누락/금지조합·응답 유실·잘못된 원대상·구reader 회귀 검증. 성공 예시9개만으로 전체 decoder 검증을 대체하지 않는다.
 
 ### P2.1 — 최신 내부 오류·phone reader 준비 (P3 선행)
+
+- 2026-10-14 구현 결과: [오류·phone 기반 보고](LC_BILLING_PAID_EXAM_P2_1_IMPLEMENTATION.md). strict client/검증/저장·mapper/worker 방어 분류와 로컬 테스트 완료. E06-owner fixture 문구 불일치는 별도 기록했으며 원본을 변경하지 않았다. 아래 실제 MEMBER 재개/J3 terminal 조건 및 공개 saga·worker 연결은 P3/P3.1에서 구현하며 현재 활성화 차단을 유지한다.
 
 - 내부 오류는 code/message/retryable/correlationId 네 필드의 필수·타입·unknown/duplicate/trailing/coercion 및 HTTP/호출별 조합을 검증한다. code-only reader 확장만으로 완료하지 않는다. category에 MEMBER 대기/owner-blocked/J3 terminal을 분리하고 기존 switch/metric/HTTP mapper/worker 분기를 함께 점검한다.
 - reserve/status의503 MEMBER_EVIDENCE_PENDING/true/Retry-After1은 비종료 대기다. 고정 message는 snapshot §3.1을 따른다. 현재 owner deny와 권위 성공/terminal이 대기보다 우선한다. status는 조회만 하며 LC가 원장/예약 생성을 기대하지 않는다.

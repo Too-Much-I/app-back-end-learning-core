@@ -33,6 +33,11 @@ public class BillingClientException extends RuntimeException {
         RATE_LIMITED,
         AUTH_FAILURE,
         TEMPORARILY_UNAVAILABLE,
-        CONTRACT_ERROR
+        CONTRACT_ERROR,
+        MEMBER_EVIDENCE_PENDING,
+        OWNER_BLOCKED,
+        PRE_RESERVE_REJECTED,
+        ENTITLEMENT_REVOKED,
+        TRANSITION_CONTEXT_CONFLICT
     }
 }
