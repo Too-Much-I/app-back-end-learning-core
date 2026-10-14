@@ -1,0 +1,157 @@
+[
+  {
+    "id": "S01-initial",
+    "request": {
+      "userId": "00000002-1111-4111-8111-111111111111",
+      "sessionId": "session-new",
+      "mockExamId": "mock-a"
+    },
+    "response": {
+      "operationId": "00000005-1111-4111-8111-111111111111",
+      "reservationId": "00000006-1111-4111-8111-111111111111",
+      "reservationKind": "INITIAL",
+      "reservationStatus": "RESERVED",
+      "attemptGroupId": "00000007-1111-4111-8111-111111111111",
+      "sessionId": "session-new",
+      "mockExamId": "mock-a",
+      "expiresAt": "2026-10-14T00:05:00.000Z",
+      "entitlementSource": "SUBSCRIPTION"
+    }
+  },
+  {
+    "id": "S02-replacement",
+    "request": {
+      "userId": "00000002-1111-4111-8111-111111111111",
+      "sessionId": "session-new",
+      "mockExamId": "mock-a",
+      "restartContext": {
+        "previousAttemptGroupId": "00000003-1111-4111-8111-111111111111",
+        "previousSessionId": "session-old",
+        "startReason": "RESTART_INCOMPLETE"
+      }
+    },
+    "response": {
+      "operationId": "00000005-1111-4111-8111-111111111111",
+      "reservationId": "00000006-1111-4111-8111-111111111111",
+      "reservationKind": "REPLACEMENT",
+      "reservationStatus": "RESERVED",
+      "attemptGroupId": "00000003-1111-4111-8111-111111111111",
+      "sessionId": "session-new",
+      "mockExamId": "mock-a",
+      "expiresAt": "2026-10-14T00:05:00.000Z",
+      "entitlementSource": "EXAM_PASS"
+    }
+  },
+  {
+    "id": "S02-switch",
+    "request": {
+      "userId": "00000002-1111-4111-8111-111111111111",
+      "sessionId": "session-new",
+      "mockExamId": "mock-a",
+      "restartContext": {
+        "previousAttemptGroupId": "00000003-1111-4111-8111-111111111111",
+        "previousSessionId": "session-old",
+        "startReason": "RESTART_INCOMPLETE"
+      }
+    },
+    "response": {
+      "operationId": "00000005-1111-4111-8111-111111111111",
+      "reservationId": "00000006-1111-4111-8111-111111111111",
+      "reservationKind": "INITIAL",
+      "reservationStatus": "RESERVED",
+      "attemptGroupId": "00000007-1111-4111-8111-111111111111",
+      "sessionId": "session-new",
+      "mockExamId": "mock-a",
+      "expiresAt": "2026-10-14T00:05:00.000Z",
+      "entitlementSource": "SUBSCRIPTION",
+      "transition": {
+        "previousAttemptGroupId": "00000003-1111-4111-8111-111111111111",
+        "previousSessionId": "session-old"
+      }
+    }
+  },
+  {
+    "id": "S03-submitted",
+    "request": {
+      "userId": "00000002-1111-4111-8111-111111111111",
+      "sessionId": "session-new",
+      "mockExamId": "mock-b",
+      "restartContext": {
+        "previousAttemptGroupId": "00000003-1111-4111-8111-111111111111",
+        "previousSessionId": "session-old",
+        "startReason": "NEW_AFTER_SUBMISSION"
+      }
+    },
+    "response": {
+      "operationId": "00000005-1111-4111-8111-111111111111",
+      "reservationId": "00000006-1111-4111-8111-111111111111",
+      "reservationKind": "INITIAL",
+      "reservationStatus": "RESERVED",
+      "attemptGroupId": "00000007-1111-4111-8111-111111111111",
+      "sessionId": "session-new",
+      "mockExamId": "mock-b",
+      "expiresAt": "2026-10-14T00:05:00.000Z",
+      "entitlementSource": "SUBSCRIPTION",
+      "transition": {
+        "previousAttemptGroupId": "00000003-1111-4111-8111-111111111111",
+        "previousSessionId": "session-old"
+      }
+    }
+  },
+  {
+    "id": "S04-completed",
+    "request": {
+      "userId": "00000002-1111-4111-8111-111111111111",
+      "sessionId": "session-new",
+      "mockExamId": "mock-b",
+      "restartContext": {
+        "previousAttemptGroupId": "00000003-1111-4111-8111-111111111111",
+        "previousSessionId": "session-old",
+        "startReason": "NEW_AFTER_COMPLETION"
+      }
+    },
+    "response": {
+      "operationId": "00000005-1111-4111-8111-111111111111",
+      "reservationId": "00000006-1111-4111-8111-111111111111",
+      "reservationKind": "INITIAL",
+      "reservationStatus": "RESERVED",
+      "attemptGroupId": "00000007-1111-4111-8111-111111111111",
+      "sessionId": "session-new",
+      "mockExamId": "mock-b",
+      "expiresAt": "2026-10-14T00:05:00.000Z",
+      "entitlementSource": "SUBSCRIPTION",
+      "transition": {
+        "previousAttemptGroupId": "00000003-1111-4111-8111-111111111111",
+        "previousSessionId": "session-old"
+      }
+    }
+  },
+  {
+    "id": "S04-same-mock-fallback",
+    "request": {
+      "userId": "00000002-1111-4111-8111-111111111111",
+      "sessionId": "session-new",
+      "mockExamId": "mock-a",
+      "restartContext": {
+        "previousAttemptGroupId": "00000003-1111-4111-8111-111111111111",
+        "previousSessionId": "session-old",
+        "startReason": "NEW_AFTER_SUBMISSION"
+      }
+    },
+    "response": {
+      "operationId": "00000005-1111-4111-8111-111111111111",
+      "reservationId": "00000006-1111-4111-8111-111111111111",
+      "reservationKind": "INITIAL",
+      "reservationStatus": "RESERVED",
+      "attemptGroupId": "00000007-1111-4111-8111-111111111111",
+      "sessionId": "session-new",
+      "mockExamId": "mock-a",
+      "expiresAt": "2026-10-14T00:05:00.000Z",
+      "entitlementSource": "SUBSCRIPTION",
+      "transition": {
+        "previousAttemptGroupId": "00000003-1111-4111-8111-111111111111",
+        "previousSessionId": "session-old"
+      }
+    }
+  }
+]

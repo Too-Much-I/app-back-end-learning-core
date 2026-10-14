@@ -93,6 +93,10 @@ public class BillingExamCreationSaga {
     private ExamSessionManager.Assignment runOperation(ExamCreationOperation operation) {
         for (int step = 0; step < MAX_STATE_STEPS; step++) {
             operation = reload(operation.getCommandId());
+            if (operation.getPaidSelection() != null) {
+                // P1 snapshots must never be interpreted as the old three-field reserve request.
+                throw new ExamsException(ErrorStatus._EXAM_CREATION_PROCESSING, 1);
+            }
             if (execution != null && operation.getRecovery() != null
                     && operation.getRecovery().getIntent()
                     == web.tosunsaeng.domain.exams.billing.reconciliation.ReservationRecovery.Intent.CLEANUP_PRECOMMIT

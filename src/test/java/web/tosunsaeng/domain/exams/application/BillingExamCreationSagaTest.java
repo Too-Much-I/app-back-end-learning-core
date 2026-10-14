@@ -91,6 +91,17 @@ class BillingExamCreationSagaTest {
     }
 
     @Test
+    void paidPreparationCannotReachLegacyBillingClient() {
+        var operation = ExamCreationOperation.prepared(USER_ID, OPERATION_ID, SESSION_ID, MOCK_EXAM_ID, 1, NOW);
+        operation.fixPaidSelection(new web.tosunsaeng.domain.exams.domain.entity.PaidExamSelection(
+                web.tosunsaeng.domain.exams.domain.entity.PaidExamSelection.StartReason.NEW_AFTER_SUBMISSION, List.of(1)));
+        when(operationRepository.findByUserIdAndOperationId(USER_ID, OPERATION_ID)).thenReturn(Optional.of(operation));
+        when(operationRepository.findById(operation.getCommandId())).thenReturn(Optional.of(operation));
+        org.junit.jupiter.api.Assertions.assertThrows(ExamsException.class, () -> saga.start(USER_ID, OPERATION_ID));
+        org.mockito.Mockito.verifyNoInteractions(billingClient, transactionService);
+    }
+
+    @Test
     void phoneContinuationSnapshotsDiscoveryBeforeReserve() {
         properties.setPhoneContinuationEnabled(true);
         BillingReservationClient.PhoneContinuationSnapshot continuation =

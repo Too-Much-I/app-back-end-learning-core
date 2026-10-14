@@ -76,6 +76,8 @@ public class ExamGradingService {
     @Autowired(required = false)
     private web.tosunsaeng.domain.notification.NotificationSubmissionTracker notificationSubmissionTracker;
     @Autowired(required = false)
+    private ExamSubmissionEvidence submissionEvidence;
+    @Autowired(required = false)
     private web.tosunsaeng.domain.learningrecorddeletion.application.DeletionAccess deletionAccess;
     private final ThreadLocal<Boolean> publicMutation = new ThreadLocal<>();
 
@@ -85,6 +87,10 @@ public class ExamGradingService {
     public ExamStatus submitQuestion(String examId, Integer questionNumber, Integer retryCount) {
         requirePublicWrite(examId);
         boolean trackSubmission = notificationSubmissionTracker != null && notificationSubmissionTracker.enabled();
+        boolean coveredSubmission = submissionEvidence != null && submissionEvidence.covered(examId);
+        if (coveredSubmission && (userOwnedTransactionExecutor == null || !userOwnedTransactionExecutor.enabled())) {
+            throw new IllegalStateException("Covered submission requires the owner transaction guard");
+        }
         if (!trackSubmission && (userOwnedTransactionExecutor == null || !userOwnedTransactionExecutor.enabled())) {
             return submitQuestionWithoutGuard(examId, questionNumber, retryCount);
         }
@@ -138,7 +144,9 @@ public class ExamGradingService {
         );
         pending.markUserSubmission();
         QuestionGradingJob inserted = questionJobRepository.insert(pending);
-        if (notificationSubmissionTracker != null && notificationSubmissionTracker.enabled() && retryCount == 0) {
+        if (submissionEvidence != null && submissionEvidence.covered(examId) && retryCount == 0) {
+            submissionEvidence.accepted(examId, questionNumber, retryCount, null, now);
+        } else if (notificationSubmissionTracker != null && notificationSubmissionTracker.enabled() && retryCount == 0) {
             notificationSubmissionTracker.accepted(examId, questionNumber, retryCount, expectedQuestionNumbers(examId), now);
         }
         if (hasQuestionResult(examId, questionNumber, retryCount)) {
@@ -1296,6 +1304,10 @@ public class ExamGradingService {
     }
 
     private List<Integer> expectedQuestionNumbers(String examId) {
+        if (submissionEvidence != null) {
+            ExamSession session = examSessionRepository.findById(examId).orElse(null);
+            if (submissionEvidence.covered(session)) return ExamSubmissionEvidence.required(session.getRequiredQuestionNumbers());
+        }
         String mockExamId = resolveMockExamId(examId);
         MockExam mockExam = mockExamCatalogService.getRequiredExam(mockExamId);
         List<Integer> questionNumbers = Optional.ofNullable(mockExam.getQuestions())

@@ -1,5 +1,101 @@
 # Learning Core Current State
 
+- 2026-10-14 — TMI-218 커밋/푸시/PR/develop 머지 요청 접수. 자동 테스트 배포 영향을 안내했고 사용자 「머지까지 해줘」로 진행 승인. 최신 origin/develop의 answer-learning 변경을 보존하여 통합 검증 후 머지 예정. 기능 설정/운영 배포는 범위 밖이다.
+
+- 2026-10-14 — TMI-218 P1 기반 구현/검증 완료. `feat/TMI-218-submission-evidence-exam-selection` 브랜치에서 공통 접수 receipt/완료marker, schema1 알림 독립 Job 접수, 단일mock/시작사유 고정·same-key replay·owner/Session fence를 구현했다. 공개 유료 생성은 미연결, schema2 준비 operation의 구 saga/worker 전송과 paid flag 활성화 차단. clean test 1,036·격리 Mongo 158개 실패/오류/skip0, fixture25개 checksum 일치. [보고](TMI_218_P1_IMPLEMENTATION.md). P2/P3 연결/coverage 설치·전체28상태·실환경 gate 잔여; 실DB/배포/Jira/commit/push 없음, 기존 dirty 보존.
+
+- 2026-10-14 — TMI-218 생성의 현재 턴 기록 보완 완료. P1 이슈는 해야 할 일/담당자 미지정 상태로 유지하며 중복 생성하지 않았다. WORKLOG에 현재 표식을 추가했고 제품/DB/배포 변경 없음. 관련 TMI-116/TMI-128/TMI-122/TMI-125, TMI-193/TMI-136; PLAN-011/012/013.
+
+- 2026-10-14 — P1 Jira TMI-218 생성 완료: [Learning Core P1] 알림 독립 답안 접수 증거 및 전체 접수 기준 문제 선정. 상태 해야 할 일/담당자 미지정, 승인된 접수기록 재사용·동일key 선정 고정·경합/TTL 테스트 및 P2/P3 활성화 의존성을 명시했다. 관련 TMI-116/TMI-128/TMI-122/TMI-125, TMI-193/TMI-136; PLAN-011/012/013. 이번은 Jira 등록·문서 추적만, 제품/DB/배포 미변경.
+
+- 2026-10-14 — 사용자가 전체 계획 설명에 「어 괜찮아 보인다」로 방향을 확인했다(TMI-116/TMI-128/TMI-122/TMI-125, TMI-193/TMI-136; PLAN-011/012/013). 기존 계획과 세 저장 단순화를 유지하며 추가 코드 착수·DB·배포 승인으로 확대하지 않는다. 다음 구현 단위는 P1 접수 증거/문제 선정이며 공동 잔여 계약 경계는 유지한다. 기록만 갱신, 테스트 재실행 없음.
+
+- 2026-10-14 — 최신 전체 계획 설명(TMI-116/TMI-128/TMI-122/TMI-125, TMI-193/TMI-136; PLAN-011/012/013). 세 저장 단순화를 반영한 시험선정/confirm후전환·복구·MEMBER/phone·삭제/revoke·120일/legacy·P0~P6·검증/잔여계약을 확인했다. 이번은 설명과 작업기록만, 계획/코드/fixture/DB/배포 미변경. 기존 검증 수치와 실제 상태28개 미실행을 구분하며 테스트 재실행 없음.
+
+- 2026-10-14 — 사용자 승인한 세 저장 단순화 문서 반영 완료(TMI-116/TMI-128/TMI-122/TMI-125, TMI-193/TMI-136; PLAN-011/012/013). P0 r2/구현계획/ADR/AGENTS·검토서에 operation120일 단일보관, 그룹별 단일 revoke, 기존 접수 receipt/완료marker 재사용 반영. 별도 결과 receipt/inbox/index 및 Session accepted 배열 제안 제거. MEMBER 관측60초안/NEEDS_REVIEW 좁은 자동재개/설정 조합은 유지. T04 저장경로 공동 보완은 미완료이며 원본 fixtures 불변. 문서4개 링크18개/공백 및 fixture25파일 checksum 통과, 제품·DB·Billing·배포 변경/Gradle 실행 없음.
+
+- 2026-10-14 — 단순화3안의 변경 범위 설명(TMI-116/TMI-128, PLAN-011/012/013). operation120일·revoke 단일문서·접수증거 재사용은 LC 내부 저장/reader/테스트 변경이며 이 단순화 자체로 Billing 제품 코드/wire 변경은 필요하지 않다. 기존 공동 문서/T04 등 저장방식 종속 설명은 동기화 필요; Billing 유료연동 본체 구현이 불필요하다는 뜻은 아님. 선택적 NEEDS_REVIEW 정책변경은 포함하지 않음. 기록만 갱신, 구현 미실행.
+
+- 2026-10-14 — P0 단순화 검토의 현재 턴 표식 보완 완료(TMI-116/TMI-128/TMI-122/TMI-125, TMI-193/TMI-136; PLAN-011/012/013). 권고는 사용자 채택 대기이며 기존 계획·ADR/AGENTS·제품/fixture/DB/배포 불변. WORKLOG 과거 기록은 보존하고 현재 턴 항목을 추가했다.
+
+- 2026-10-14 — P0 과설계/단순화 정적 검토 완료(TMI-116/TMI-128/TMI-122/TMI-125, TMI-193/TMI-136; PLAN-011/012/013). LC_BILLING_PAID_EXAM_SIMPLIFICATION_REVIEW.md에 기존 operation120일·revoke 단일문서·기존 receipt/완료marker 재사용 및 MEMBER 확정대기 관측 축소를 권고했다. NEEDS_REVIEW 자동재개 예외 제거는 운영대기 비용과 exact/E02-f 공동변경이 필요한 선택안. 현재 계획/ADR/AGENTS·제품/fixture는 변경하지 않음. 운영용량 미측정·Gradle 미실행, 필수 원자성/owner·삭제 fence/unknown 무TTL 유지.
+
+- 2026-10-14 — 유료 시험 P0 문서 준비 완료(TMI-116/TMI-128/TMI-122/TMI-125, TMI-193/TMI-136; PLAN-011/012/013). LC_BILLING_PAID_EXAM_P0_DESIGN.md와 ADR-LC-BILLING-PAID-EXAM.md 작성, AGENTS 한정 P0 범위 및 구현계획 참조 동기화. active=false 대기/confirm 후 exact 전환, 접수 증거·120일 receipt·MEMBER 관측/인과, index·N/V 추가 flag 조합을 LC 설계안으로 정리했다. 문서 링크9개/공백 검사 및 A3+R2 13+simplified9 파일 checksum 통과. 실제 코드/DB/배포/활성화·Gradle 실행 없음; 공동 잔여 삭제/과거owner/purge 및 설계 검토 gate 유지, P0 전체 공동동결이나 상태28개 runtime 완료 아님.
+
+- 2026-10-14 — 사용자 유료 시험 구현계획 승인 접수(TMI-116/TMI-128/TMI-122/TMI-125, TMI-193/TMI-136; PLAN-011/012/013). 계획에 승인 이력을 추가했다. 다음 단계는 P0 ADR/AGENTS·저장 구조/index·flag 조합 정리와 잔여 계약 경계 확인 후 단계별 구현/검증이다. 이번은 승인 기록/안내만, 제품 코드·DB·배포·활성화 미실행.
+
+- 2026-10-14 — 사용자 확인으로 문제 선정 기준의 질의 해소(TMI-116/TMI-128, PLAN-011/012/013). 기존 계획 유지: 필수 retry0 답안 전체 durable 접수이면 다음 문제 선정, 미접수 문항이 있으면 동일 문제. 문항 채점/요약 완료를 기다리는 변경은 하지 않는다. 다음 문제의 기존 후보 선정/후보 부재 예외와 confirm 후 원자적 전환 유지. 확인 기록만 변경, 제품 구현 승인으로 확대하지 않음.
+
+- 2026-10-14 — 문제 선정 기준 설명의 현재 턴 기록 보완 완료(TMI-116/TMI-128, PLAN-011/012/013). 실제 요약 시작 조건으로 기준을 변경할지는 사용자 확인 대기이며 기존 계획 유지. WORKLOG에 현재 턴 표식을 추가했고 추가 제품/계획/DB/배포 변경 없음.
+
+- 2026-10-14 — 문제 선정 기준/대기 시험 전환 설명: 현 요약 trigger는 필수 문항 completion 조건이며 계획의 전체 답안 접수와 구분된다. 사용자 표현이 실제 요약 trigger 기준으로의 변경인지 확인 필요. Billing confirm 뒤 기존 신규제출 차단/새 Session 활성의 원자적 전환 설명. TMI-116/TMI-128 관련; 계획·코드 변경/테스트 재실행 없음.
+
+- 2026-10-14 — 유료 시험 구현계획 설명 요청: 단일 문제 선정·Billing confirm 후 시험 전환·기접수 채점 보존·MEMBER/삭제/120일 복구와 단계별 검증 범위를 확인했다. PLAN-011/012/013, TMI-116/TMI-128/TMI-122/TMI-125, TMI-193/TMI-136 관련. 계획/제품/fixture 변경 없이 설명 및 작업 기록만 수행; 테스트 재실행 없음, 구현·DB·배포·활성화 승인 별도 유지.
+
+- 2026-10-14 — 최신 exact 구현계획 보완의 현재 턴 기록 추가 완료(PLAN-011/012/013, TMI-116/TMI-128/TMI-122/TMI-125, TMI-193/TMI-136). 계획 최신화·상태28개 매핑 완료 상태 유지, 구현 승인은 별도. WORKLOG 과거 이력 보존 및 현재 표식 단일 출현 확인. 추가 코드/fixture/DB/배포 변경 없음.
+
+- 2026-10-14 — 사용자 요청으로 LC 구현계획 최신화 완료(PLAN-011/012/013, TMI-116/TMI-128/TMI-122/TMI-125, TMI-193/TMI-136). LC_BILLING_PAID_EXAM_IMPLEMENTATION_PLAN.md에 exact draft-3/hash·독립81/전체1,029 기준, P2.1오류/phone·P3.1MEMBER대기/격리재개·P4.1삭제미접수·P6.1120일receipt 및 상태28개 실제테스트/담당 매핑 추가. 기존A/R2/fixtures와제품 불변, 신규삭제route/owner/최종purge는 별도gate. 이번은 계획보완만, ADR/AGENTS/구현/DB/배포 미실행.
+
+- 2026-10-14 — 구현계획 최신화 준비 확인(PLAN-011/012/013, TMI-116/TMI-128/TMI-122/TMI-125, TMI-193/TMI-136). 기존 LC_BILLING_PAID_EXAM_IMPLEMENTATION_PLAN.md 초안을 새로 중복 작성하기보다 simplified exact draft-3/fixtures-1 독립81·전체1,029 검증 기준으로 보완하는 단계. MEMBER대기/cleanup·격리재개, phone예외/삭제미접수,120일receipt/reader 및 상태28개 실제테스트 매핑 필요. 별도삭제route/owner/자료별purge gate 유지. 이번은 준비확인만, 계획/제품구현 미변경.
+
+- 2026-10-14 — simplified exact fixtures-1 LC 인수/독립검증 완료(PLAN-011/012/013, TMI-116/TMI-128/TMI-122/TMI-125, TMI-193/TMI-136). ZIP10파일 exact bytes·계약snapshot원문·9파일checksum/자체hash pin 확인. Java test-only80벡터+범위1=81개, clean test1,029개 실패/오류/skip0. 상태28개는 미실행, HTTP/worker/Transaction 검증 아님. LC_BILLING_SIMPLIFIED_FIXTURES_1_VALIDATION.md 참조. 기존A/R2/fixtures-2/제품/DB/배포 불변, 별도삭제/owner/최종purge gate 유지.
+
+- 2026-10-14 — simplified exact draft-3 원문 확인(PLAN-011/012/013, TMI-116/TMI-128/TMI-122/TMI-125, TMI-193/TMI-136). NEEDS_REVIEW 일반금지/MEMBER원인증명 예외 우선순위·deny우선/원인혼재 운영확인·E02-f 반영, 이전 보완 의견 해소·이번범위 추가이견 없음. 검토서 후속절 갱신. 다음은 공동수락기록/별도승인후 새fixture, 삭제route/owner/자료별보존gate 잔여. 코드/fixture/DB/배포 미변경.
+
+- 2026-10-14 — simplified exact draft-2 검토(PLAN-011/012/013, TMI-116/TMI-128/TMI-122/TMI-125, TMI-193/TMI-136). MEMBER 비종료receipt/status·LC waiting/cleanup분리·같은key재개·E02-a~h 반영 확인. 남은 문구: 현 retry소진은 NEEDS_REVIEW/retry_exhausted라 제한적재개행과 NEEDS_REVIEW금지행이 겹침; MEMBER원인 증명 예외의 우선순위/원인불명 운영확인을 명시 요청. LC_BILLING_SIMPLIFIED_EXACT_R1_REVIEW.md 후속절 참조. 최종수락/fixture제작/구현 미실행.
+
+- 2026-10-14 — 재첨부 단순화 exact R1은 직전 draft-1과 byte 동일(diff 차이없음/SHA256일치). PLAN-011/012/013, TMI-116/TMI-128/TMI-122/TMI-125, TMI-193/TMI-136 관련 MEMBER대기/cleanup분리·same-key재개/E02 보완 의견 유지. 새 보완본 반영·수락/구현으로 처리하지 않음. 기록만 갱신.
+
+- 2026-10-14 — 단순화 exact R1 검토(PLAN-011/012/013, TMI-116/TMI-128/TMI-122/TMI-125, TMI-193/TMI-136). 공개오류/result생략·120일경계·phone INITIAL/target복원 구체화 방향 이견없음. 현 worker가 정체PREPARED에 CLEANUP_PRECOMMIT을 저장하고 HTTP replay를 막아 MEMBER보강 same-key재개가 막힐 수 있음: durable대기사유/cleanup분리·경합/격리재개조건/E02확장 요청. LC_BILLING_SIMPLIFIED_EXACT_R1_REVIEW.md 작성. 별도삭제/보존gate·원본불변 유지, 코드/fixture/배포 미변경.
+
+- 2026-10-14 — 단순화 승인 반영 작업의 현재 턴 기록 보완 완료(PLAN-011/012/013, TMI-116/TMI-128/TMI-122/TMI-125, TMI-193/TMI-136). 아래 정책 동기화 결과 유지, WORKLOG 끝에 현재 표식 추가. 추가 제품/계약/fixture/DB/배포 변경 없음.
+
+- 2026-10-14 — 사용자 단순화 승인 반영(PLAN-011/012/013, TMI-116/TMI-128/TMI-122/TMI-125, TMI-193/TMI-136). LC계획 §3.1 동기화: target paid우선/자격있는 최초trial target복원1회, 생성중삭제미접수·공통fence, MEMBER앱보강/worker새reserve금지, 동일key120일보장/이후재입력위험수용. 이전 purge절대차단 의견은 후속주석으로 대체. 금융/consumption복원unique/권한/미완료 증거는 별도유지, exactwire/오류/기간경계·자료별purge 잔여. 문서만 변경, 기존A/R2/fixtures-2/코드/DB/배포 불변.
+
+- 2026-10-14 — 남은기술안R1 검토(PLAN-011/012/013, TMI-116/TMI-128/TMI-122/TMI-125, 삭제 TMI-193/TMI-136). Billing 승인정책 문서 확인: MEMBER증거보존/탈퇴지연수용·명시삭제재응시포기 방향 접수. LC_BILLING_REMAINING_TECHNICAL_R1_REVIEW.md 작성. M1증거보강오류, 삭제ACK/자료정리checkpoint·생성상호대기·과거성공replay, phone INITIAL echo/owner 표 보완 필요. V07은 과거key 기록폐기뒤 새operation 생성시 age초기화 위험으로120일 제한만으로 purge 불가. 신규route/기간/phone조합·S15/V07 최종수락 미완료, 문서검토만.
+
+- 2026-10-14 — J3/J4 draft-2 diff 재검토(PLAN-011/012/013, TMI-116/TMI-128/TMI-122, TMI-125). J3 PREPARED/신규Session부재·strict4필드/status결속·응답후동일Tx fence/CAS·관측시각·owner-blocked 및 J3-08~12 반영, 이번 보완범위 추가이견 없음. J4는 Identity ACTIVE MEMBER 권위/전달/최신성·탈퇴지연 미확정 유지가 적절. J3 공동수락/별도fixture와 J4 Identity계약 확인을 분리 권고. S15/V07 보류·원본불변, 최종동결/fixture제작/구현 미실행. LC_BILLING_PAID_J3_J4_R1_REVIEW.md 후속절 참조.
+
+- 2026-10-14 — J3/J4 보완안R1 검토(PLAN-011/012/013, TMI-116/TMI-128/TMI-122, TMI-125). J3 status409 별도category 처리 가능하나 현 reader는 code만 읽으므로 strict4필드/HTTP/retryable 검증·PREPARED/신규Session미commit·CAS terminal 조건 보완 필요. J4 owner/version 구분 이견없음, 현 userId/workloadJWT는 ACTIVE MEMBER 증거 아님; Identity 권위·Billing 검증/최신성/worker 연동 미확정. LC_BILLING_PAID_J3_J4_R1_REVIEW.md 참조. S15/V07 보류·fixtures-2 불변, 최종수락/구현/신규fixture 제작 미실행.
+
+- 2026-10-14 — 공동 구현 합의안R1 LC 검토(PLAN-011/012/013, TMI-116/TMI-128/TMI-122, TMI-125). J1 guard/J2 무ack 기존operation복구 요구에 이견 없음(구현검증 완료 아님). J3 예약전terminal실패 status exact 관측/worker수렴과 J4 T2 source별owner/lifecycle표 확인 필요. S15/V07 보류, 원본hash/89·948 수치 일치. LC_BILLING_PAID_IMPLEMENTATION_AGREEMENT_R1_REVIEW.md 작성. 최종동결/구현승인·계획/ADR/AGENTS 동기화는 미실행, 문서검토만.
+
+- 2026-10-14 — LC 유료 시험 구현계획 초안 작성(PLAN-011/012/013, TMI-116/TMI-128/TMI-122, TMI-125). LC_BILLING_PAID_EXAM_IMPLEMENTATION_PLAN.md에 P0계약/schema·승인→P1접수/선정→P2wire/source→P3confirm후마무리/복구→P4기접수Job→P5revoke→P6legacy/운영준비와 검증gate 정리. 현행 tracking의존/confirm전일괄abandon을 확인, S15/V07은 보류 의존성으로 남김. 계획 작성만 승인된 상태로 ADR/AGENTS 동기화·제품구현/DB/배포/활성화는 미실행. 문서만 변경, 테스트 재실행 없음.
+
+- 2026-10-14 — paid 연동 구현계획 작성 준비 확인(PLAN-011/012/013, TMI-116/TMI-128/TMI-122, TMI-125). R2 draft-2/fixtures-2와 LC 독립검증 기록을 근거로 계획서 초안 작성 가능. 공동수락·기준동결/ADR·AGENTS 범위 동기화/별도 구현승인은 착수 전 조건으로 분리한다. S15(phone·삭제 continuation)/V07(보존·purge)은 보류 의존성으로 명시하고 영향을 받는 schema/lifecycle 설계를 임의 확정하지 않는다. 실제HTTP·Transaction·상태26시나리오는 향후 구현 검증 대상이다. 이번은 준비상태 확인·기록만이며 계획서 작성/제품구현/테스트 재실행/배포 없음.
+
+- 2026-10-14 — 사용자 승인 범위의 paid fixtures-2 LC 독립검증 완료(PLAN-011/012/013, TMI-116/TMI-128/TMI-122, TMI-125). 원본14파일 SHA256SUMS 포함 exact bytes 인수, 새 test-only Java/JCA/Jackson/Instant oracle89개 및 최종 clean test948개 실패/오류/skip0. SHA256SUMS 자체 hash pin·13파일hash·양측diff 검증. HTTP12/DTO9는 오프라인/구조검사이고 상태26/실서비스/Transaction은 미실행, S15/V07 보류. LC_BILLING_PAID_FIXTURES_2_VALIDATION.md 참조. 제품/A계약/Billing/DB/배포/활성화 미변경, 공동최종동결 별도.
+
+- 2026-10-14 — Billing paid fixtures-2 재검토 완료(PLAN-011/012/013, TMI-116/TMI-128/TMI-122, TMI-125). 이전 escape/나노초 두 지적 해소 확인. 새13파일 hash, canonical18/clock5/token31/invalid13/HTTP판정표12/wire6/status3 통과. 생성기 serializer만 격리 실행해 문자열14/고립surrogate거절2 확인, 기존1ns 재현도 정확히 통과. fixtures-1 기존 검사도 통과. Billing 검사기 재실행이며 LC 독립검증·실제HTTP/Transaction 검증·최종동결은 아님. 제품/외부계약/Billing파일/DB/배포 미변경. 상세는 LC_BILLING_PAID_FIXTURES_1_INSPECTION.md 후속절.
+
+- 2026-10-14 — Billing paid fixtures-1 읽기 검토 및 기존 오프라인 검사 재현(PLAN-011/012/013, TMI-116/TMI-128/TMI-122, TMI-125). 파일12hash/계약hash 일치, canonical9/invalid13/token22/HTTP판정표12/wire6/status3 통과. 실제HTTP/상태26시나리오·LC독립검증 미실행. 생성기 literal backslash+n escape 의미변형과 검사기 now 나노초정밀도 손실을 비민감 입력으로 재현, 새revision 회귀 보완 권고. LC_BILLING_PAID_FIXTURES_1_INSPECTION.md 참조. Billing파일/fixture/코드/DB/배포 미변경.
+
+- 2026-10-14 — 통합 paid R2 draft-2 diff 검토 완료(PLAN-011/012/013, TMI-116/TMI-128/TMI-122, TMI-125). 권리부족 선종료금지·늦은완료 신규guard 불해제·inboxTTL후 group증거 재전송 규칙과 S09/S12/V01 반영 확인, 추가 이견 없음. 검토서 §10 갱신. 오프라인fixture 세부화 가능, S15/V07·phone/삭제/보존·실환경 gate 미확정 유지. fixture/제품/DB/배포/테스트 미변경.
+
+- 2026-10-14 — 통합 paid 계약 R2 draft-1 검토 완료(PLAN-011/012/013, TMI-116/TMI-128/TMI-122, TMI-125). 회신요청1~3(startReason/단일mock·조합,공통마무리/Billing복원,불변revoke/terminalAt)의 기술내용 추가 이견 없음; 오프라인fixture 기준으로 사용 가능하나 제작실행/최종동결/구현승인 아님. phone·삭제정상분기/보존·삭제gate·실환경은 잔여, 검토서 §9에 담당/fixture회귀 사례 기록. 코드/DB/배포/테스트 변경 없음.
+
+- 2026-10-14 — 단순화 인계 §1/9 문제선정 승인 반영 검토(PLAN-011/012/013, TMI-116/TMI-128/TMI-122, TMI-125). 전체접수·채점/요약대기에서는 직전mock 제외 후 기존선정, 다른적격후보 실제0개일 때만 동일mock 허용, catalog 장애 fallback 금지. tracking독립 증거/최초판정·replay고정 반영 확인, 추가 이견 없음. LC_BILLING_PAID_SIMPLIFICATION_REVIEW.md 갱신. startReason exact/phone·삭제/transition/revoke·보존 및 새정본/fixtures는 미확정·미실행. 코드/DB/배포/테스트 변경 없음.
+
+- 2026-10-14 — 유료 단순화 인계 검토(PLAN-011/012/013, TMI-116/TMI-128/TMI-122, TMI-125). LC_BILLING_PAID_SIMPLIFICATION_REVIEW.md 작성. 단일mock+restartContext.startReason(부분재시작/전체접수후신규/완료후신규) 후보로 BillingOPEN·mock동일 여부와 무관하게 신규INITIAL 구분 권고. 현 receipt/Session 접수완료 marker는 알림tracking 의존이라 독립 증거 보장 필요, 기존 문제선정은 완료count라 요약대기 중 다른문제 보장 아님. 전체전환 기접수완료·공통transition, group최초불변revoke/eventId·group충돌, terminalAt재사용 및 fixture교체 정리. exact명칭/phone·삭제/선정·보존은 공동동결 전이며 제품/DB/배포/테스트 변경 없음.
+
+- 2026-10-14 — draft-3 검토의 현재 턴 표식 보완 완료(TMI-116/TMI-128/TMI-122, TMI-125). 두 문구 해소·보완 범위 추가 이견 없음 유지. WORKLOG 과거 기록 보존, 코드/DB/배포 변경 없음. 공동 fixture/독립검증·최종동결은 후속이다.
+
+- 2026-10-14 — paid wire R1 draft-3 diff 검토 완료(PLAN-011/012/013, TMI-116/TMI-128/TMI-122, TMI-125). status body/command header 범위와 §8 오류 표현 두 의견 모두 반영, 이번 변경 범위 추가 이견 없음. 검토서 후속절 갱신. 공동 fixture 제작·hash/독립검증/최종동결은 아직 미수행이며 제품/DB/배포 변경 없음.
+
+- 2026-10-14 — 재첨부 draft-2 동일성 검토의 현재 턴 표식 보완 완료(TMI-116/TMI-128/TMI-122, TMI-125). 문서 동일·남은 문구2건이라는 결론 유지. 기존 기록 보존 후 append, 코드/계약/배포 변경 없음.
+
+- 2026-10-14 — 재첨부 paid wire 문서는 직전 draft-2와 diff 차이 없음(PLAN-011/012/013, TMI-116/TMI-128/TMI-122, TMI-125). status의 body userId/operationId 예외 및 §8 중간503 문구 정리 의견 유지. 신규 수락/구현/테스트/배포 없음, 기록만 갱신.
+
+- 2026-10-14 — paid wire R1 draft-2 재검토(PLAN-011/012/013, TMI-116/TMI-128/TMI-122, TMI-125). §9에 기존 주요 검토사항 반영, 기술 방향 추가 이견 없음. §1 operationId header 문구는 기존 status body userId/operationId를 예외로 명시해야 하며 §8 중간503 문구는 기존409/503 유지안으로 정리 권고. 검토서 LC_BILLING_PAID_WIRE_R1_REVIEW.md 갱신. fixture/hash/독립실행·최종동결/활성화gate 미완료, 코드/DB/배포/테스트 변경 없음.
+
+- 2026-10-14 — 공동 유료 wire R1 draft-1 검토(PLAN-011/012/013, TMI-116/TMI-128/TMI-122 및 TMI-125). LC_BILLING_PAID_WIRE_R1_REVIEW.md 작성. restartContext/source/transition·기존 operation 후속 마무리 방향은 검토 가능. 기존 operation replay 우선순위, 삭제 continuation의 일반3필드 reserve 매핑, restart누락·OTHER_SOURCE_CHANGE 행동, confirmRejection 상태/시간 일관성, 공개 pending 기존409/503 호환, reason enum 변경과 digest bytes/예외역순을 동결 전 보완 요청. 제품/DB/배포/테스트 변경 없이 문서·기록만 갱신. 최종 공동 수락/구현 승인은 아님.
+
+- 2026-10-13 — 후속 R2 diff 재검토(PLAN-011/012/013, TMI-116/TMI-128/TMI-122, lifecycle TMI-125). prod TRIAL fallback 제거·exact legacy manifest, 기존 operation의 후속 종료 책임·마무리 전 guard/무TTL 유지, 로컬 마무리 commit 뒤 성공 반환, 최초trial→paid 경합 예외 구분 반영 확인. LC_BILLING_PAID_R2_REVIEW.md §8에 갱신했다. 사용자 새 Job 차단과 기접수에서 파생되는 Summary Job 생성/시스템 복구 허용 문구를 구분 권고. 전환 exact wire/중간 오류/역방향 보안·보존/fixtures는 공동 확정 대기. 문서·기록만 변경, 제품/DB/배포/테스트 실행 없음.
+
+- 2026-10-13 — 최신 유료 정책3문서와 LC 코드 대조 완료(PLAN-011/012/013, TMI-116/TMI-128/TMI-122 및 lifecycle TMI-125). 검토서는 LC_BILLING_PAID_R2_REVIEW.md. EXAM_PASS/SUBSCRIPTION, legacy 기존규칙 보존·서버측 경계, 새 제출마감 없음, 최초trial→paid confirm 후 순차종료·기접수 완료 허용을 기준으로 정리했다. 현행 confirm 전 abandon, abandoned callback 무시, replacement 예상 시 INITIAL 거절, SUCCEEDED worker noop/TTL은 전환 구현의 주요 변경점이다. source snapshot·exact 전환 wire/후속복구/역방향인증/보존manifest와 fixtures는 공동 동결 대기. prod1493/active146 및 BillingDB 미구축은 전달자료 기준이며 직접 재조회 없음. 제품·DB·배포 변경/테스트 실행 없이 검토문서와 작업기록만 갱신.
+
+- 2026-10-13 — Billing 유료 시험 인계 초안 R1 정적 검토(PLAN011/PLAN012, 기존 연계 TMI-116/TMI-128/TMI-122). 기존 reserve/상태event v1 재사용·confirm-first exact Session 예외 방향은 구현 검토 가능하나 공동 계약 수락/유료 구현 승인은 아님. 현재 strict decoder는 entitlementSource 미지원, Session/operation source 영속과 legacy 증거 gate 필요, ENTITLEMENT_REVOKED는 현행 CONTRACT_ERROR로 분류된다. 제출 기한은 현행 GRADING30분과 동일하다고 볼 수 없어 기준/기산점/완료 경계 확정 필요. 신규 revoke route/신뢰·flags·version/digest 충돌 순서·owner merge/delete 경합 계약이 남아 있다. 제품·계약·Billing 저장소·배포 변경 없이 WORKLOG/CURRENT_STATE만 갱신. 테스트 재실행 없음.
+
 - 2026-10-13 — 사용자 B 구현 승인으로 LC 두 Billing client workload JWT 전환 완료(TMI-116/TMI-128/TMI-122). default OFF, private key ON 검증/OFF 미파싱, 64조합22허용/42거절, W OFF/P ON drain 허용 및 W OR P 필수 index 검사·publisher 초기화 의존을 구현했다. 단위/계약859, 격리 Mongo146, migration121 통과 및 bootJar 성공. Mongo는 Docker29 API 호환을 위해 실행 시 JAVA_TOOL_OPTIONS=-Dapi.version=1.44 사용. A 계약/fixtures bytes/hash와 API/AI/S3/Redis/업무 retry 계약 유지. 상세 증거·private JWK 입력 형식·미검증 범위는 LC_BILLING_WORKLOAD_JWT_B_VALIDATION.md. Billing HTTP27/양측 실TLS·키 배포/E2E와 C도구·배포/활성화는 별도. 실제 환경 설정·타 저장소·Jira·commit/push 변경 없음. 아래 착수 대기 기록은 과거 이력이다.
 
 - 2026-10-13 — B 착수 가능 여부 안내의 현재 턴 기록 보완(TMI-116/TMI-128/TMI-122). 구현 준비 완료, 별도 착수 승인 대기 상태 유지. 코드·테스트 실행·배포 변경 없이 기록만 검증했다.

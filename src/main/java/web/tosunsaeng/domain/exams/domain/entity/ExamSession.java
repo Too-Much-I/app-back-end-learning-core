@@ -43,6 +43,9 @@ public class ExamSession {
     // Actual last required retry-0 submission, independent of grading completion.
     private Instant submissionCompletedAt;
 
+    private Integer submissionEvidenceVersion;
+    private java.util.List<Integer> requiredQuestionNumbers;
+
     private String creationOperationId;
 
     private String billingReservationId;
