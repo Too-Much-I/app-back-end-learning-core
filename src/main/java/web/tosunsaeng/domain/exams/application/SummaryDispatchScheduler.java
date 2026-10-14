@@ -254,7 +254,7 @@ public class SummaryDispatchScheduler {
 
     private boolean isSessionInProgress(String examId) {
         return examSessionRepository.findById(examId)
-                .map(ExamSession::isInProgress)
+                .map(session -> session.isInProgress() && ExamAcceptedWorkPolicy.summaryAllowed(session))
                 .orElse(false);
     }
 

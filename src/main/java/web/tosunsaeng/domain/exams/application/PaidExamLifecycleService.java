@@ -23,6 +23,8 @@ import static web.tosunsaeng.domain.exams.billing.PaidReservationProtocol.requir
 /** Paid-only local transactions. Caller holds the shared execution lease; never performs HTTP. */
 @Service
 public class PaidExamLifecycleService {
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    private web.tosunsaeng.domain.learningrecorddeletion.application.DeletionAccess deletionAccess;
     private final MongoTemplate mongo;
     private final ExamCreationOperationRepository operations;
     private final ObjectProvider<UserOwnedTransactionExecutor> owners;
@@ -147,15 +149,23 @@ public class PaidExamLifecycleService {
     public ExamCreationOperation replay(String user,String id) {
         UserOwnedTransactionExecutor owner=owners.getIfAvailable();
         require(owner!=null && owner.enabled());
-        return owner.execute(user,()-> {
-            owner.requirePublicWrite(user); execution.requireOwner(user);
+        return owner.executeWithoutGuard(()-> {
+            // Read-only terminal replay still serializes with deletion/merge and validates the current actor.
+            // Do not run the writer deletion gate before mapping an inaccessible old success to 404.
+            owner.touchReservationCoordinationWithinExistingTransaction(user);
+            execution.requireOwner(user);
             ExamCreationOperation op=operations.findById(id).orElseThrow();
             require(Objects.equals(user,op.getUserId()) && op.getPaidSelection()!=null && op.isTerminal());
             if (op.getState()==ExamCreationState.SUCCEEDED) {
                 ExamSession session=mongo.findById(op.getSessionId(),ExamSession.class);
+                if (session==null || (deletionAccess!=null && deletionAccess.hidden(
+                        web.tosunsaeng.domain.learningrecorddeletion.domain.DeletionTarget.Type.EXAM,op.getSessionId(),user)))
+                    throw new web.tosunsaeng.domain.exams.exception.ExamsException(
+                            web.tosunsaeng.global.error.code.status.ErrorStatus._EXAM_NOT_FOUND);
                 ReservationSnapshotValidator.session(op,session);
                 require(session.getEntitlementState()==ExamEntitlementState.CONFIRMED && !session.isAbandoned());
             }
+            owner.requirePublicWrite(user);
             return op;
         });
     }

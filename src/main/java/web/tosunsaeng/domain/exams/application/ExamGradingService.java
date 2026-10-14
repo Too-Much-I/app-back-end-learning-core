@@ -78,6 +78,8 @@ public class ExamGradingService {
     @Autowired(required = false)
     private ExamSubmissionEvidence submissionEvidence;
     @Autowired(required = false)
+    private ExamAcceptedWorkPolicy acceptedWorkPolicy;
+    @Autowired(required = false)
     private web.tosunsaeng.domain.learningrecorddeletion.application.DeletionAccess deletionAccess;
     private final ThreadLocal<Boolean> publicMutation = new ThreadLocal<>();
 
@@ -124,6 +126,9 @@ public class ExamGradingService {
     ) {
         requireNotAbandonedSession(examId);
         String jobId = GradingKeys.questionJobId(examId, questionNumber, retryCount);
+        ExamSession admission=examSessionRepository.findById(examId).orElseThrow();
+        if (admission.getSubmissionsClosedAt()!=null && !acceptedQuestionWork(examId,questionNumber,retryCount))
+            throw new ExamsException(ErrorStatus._EXAM_ABANDONED);
         if (hasQuestionResult(examId, questionNumber, retryCount)) {
             completeQuestionWithoutGuard(examId, questionNumber, retryCount);
             return new SubmitPreparation(ExamStatus.COMPLETED, null);
@@ -276,7 +281,7 @@ public class ExamGradingService {
         }
 
         boolean questionWorkRemains = !retried.isEmpty() || !waiting.isEmpty() || !missing.isEmpty();
-        SummaryAction summaryAction = !questionWorkRemains && allQuestionsComplete(examId, questionNumbers)
+        SummaryAction summaryAction = !questionWorkRemains && acceptedSummaryWork(examId) && allQuestionsComplete(examId, questionNumbers)
                 ? retrySummaryIfEligible(examId)
                 : SummaryAction.NOT_READY;
         ExamStatus overallStatus = calculateAndCacheOverallStatus(examId, questionNumbers);
@@ -314,7 +319,7 @@ public class ExamGradingService {
             Integer questionNumber,
             Integer retryCount
     ) {
-        if (!canProcessSession(examId)) {
+        if (!canProcessSession(examId) || !acceptedQuestionWork(examId,questionNumber,retryCount)) {
             return;
         }
         int canonicalRetryCount = GradingKeys.canonicalRetryCount(retryCount);
@@ -410,7 +415,7 @@ public class ExamGradingService {
     }
 
     private void completeSummaryWithoutGuard(String examId) {
-        if (!canProcessSession(examId)) {
+        if (!acceptedSummaryWork(examId)) {
             return;
         }
         String jobId = GradingKeys.summaryJobId(examId);
@@ -466,7 +471,7 @@ public class ExamGradingService {
     }
 
     private boolean claimSummaryCompletionWithoutGuard(String examId, int generationAttempt) {
-        if (!canProcessSession(examId)) {
+        if (!acceptedSummaryWork(examId)) {
             return false;
         }
         String jobId = GradingKeys.summaryJobId(examId);
@@ -546,7 +551,7 @@ public class ExamGradingService {
     }
 
     private boolean completeSummaryWithoutGuard(String examId, int generationAttempt) {
-        if (!canProcessSession(examId)) {
+        if (!acceptedSummaryWork(examId)) {
             return false;
         }
         String jobId = GradingKeys.summaryJobId(examId);
@@ -612,7 +617,7 @@ public class ExamGradingService {
     }
 
     private void ensureSummaryStartedIfReadyWithoutGuard(String examId) {
-        if (!canProcessSession(examId)) {
+        if (!acceptedSummaryWork(examId)) {
             log.debug(
                     "처리할 수 없는 시험 세션의 요약 채점 시작 무시 "
                             + "event=grading.summary.trigger outcome=ignored "
@@ -662,6 +667,7 @@ public class ExamGradingService {
             try {
                 if (userOwnedTransactionExecutor != null && userOwnedTransactionExecutor.enabled()) {
                     summaryJob = inCurrentOwnerTransaction(examId, () -> {
+                        if (!acceptedSummaryWork(examId)) return null;
                         SummaryGradingJob concurrent = summaryJobRepository.findById(jobId).orElse(null);
                         return concurrent == null ? summaryJobRepository.insert(pending) : concurrent;
                     });
@@ -744,6 +750,10 @@ public class ExamGradingService {
             List<Integer> retried,
             List<Integer> waiting,
             List<Integer> missing) {
+        if (!acceptedQuestionWork(examId,questionNumber,0)) {
+            missing.add(questionNumber);
+            return;
+        }
         String fileKey = GradingKeys.questionFileKey(examId, questionNumber, 0);
         if (!s3ObjectExists(fileKey)) {
             missing.add(questionNumber);
@@ -761,6 +771,7 @@ public class ExamGradingService {
         );
         try {
             QuestionGradingJob inserted = inCurrentOwnerTransaction(examId, () -> {
+                if (!acceptedQuestionWork(examId,questionNumber,0)) return null;
                 if (questionJobRepository.existsById(pending.getJobId())) {
                     return null;
                 }
@@ -849,7 +860,7 @@ public class ExamGradingService {
     }
 
     private DispatchOutcome claimAndDispatchQuestion(QuestionGradingJob job, boolean initialDispatch) {
-        if (!canProcessSession(job.getExamId())) {
+        if (!canProcessSession(job.getExamId()) || !acceptedQuestionWork(job.getExamId(),job.getQuestionNumber(),job.getRetryCount())) {
             return DispatchOutcome.FAILED;
         }
         if (!initialDispatch && job.getDispatchAttempt() >= properties.maxDispatchAttempts()) {
@@ -867,6 +878,7 @@ public class ExamGradingService {
             }
         } else {
             claimed = inCurrentOwnerTransaction(job.getExamId(), () -> {
+            if (!acceptedQuestionWork(job.getExamId(),job.getQuestionNumber(),job.getRetryCount())) return null;
             QuestionGradingJob current = questionJobRepository.findById(job.getJobId()).orElse(null);
             if (current == null || current.getStatus() == GradingJobStatus.COMPLETED
                     || current.getStatus() == GradingJobStatus.PROCESSING) {
@@ -1057,6 +1069,7 @@ public class ExamGradingService {
     private ExamSession requireNotAbandonedSession(String examId) {
         ExamSession session = examSessionRepository.findById(examId)
                 .orElseThrow(() -> new ExamsException(ErrorStatus._EXAM_NOT_FOUND));
+        if (session.isEntitlementConfirming()) throw new ExamsException(ErrorStatus._EXAM_CREATION_PROCESSING,1);
         if (session.isAbandoned()) {
             throw new ExamsException(ErrorStatus._EXAM_ABANDONED);
         }
@@ -1075,11 +1088,22 @@ public class ExamGradingService {
 
     private boolean canProcessSession(String examId) {
         return examSessionRepository.findById(examId)
-                .map(session -> !session.isAbandoned() && !session.isRetakeAvailable())
+                .map(ExamAcceptedWorkPolicy::processable)
                 .orElse(false);
     }
 
+    private boolean acceptedQuestionWork(String examId,Integer question,Integer retry) {
+        ExamSession session=examSessionRepository.findById(examId).orElse(null);
+        return ExamAcceptedWorkPolicy.processable(session) && (!ExamAcceptedWorkPolicy.requiresEvidence(session)
+                || acceptedWorkPolicy!=null && acceptedWorkPolicy.questionAllowed(session,question,retry));
+    }
+
+    private boolean acceptedSummaryWork(String examId) {
+        return ExamAcceptedWorkPolicy.summaryAllowed(examSessionRepository.findById(examId).orElse(null));
+    }
+
     private SummaryAction retrySummaryIfEligible(String examId) {
+        if (!acceptedSummaryWork(examId)) return SummaryAction.NOT_READY;
         if (hasSummaryResult(examId)) {
             completeSummary(examId);
             return SummaryAction.ALREADY_COMPLETED;
@@ -1090,6 +1114,7 @@ public class ExamGradingService {
         if (existing.isEmpty()) {
             try {
                 SummaryGradingJob inserted = inCurrentOwnerTransaction(examId, () -> {
+                    if (!acceptedSummaryWork(examId)) return null;
                     if (summaryJobRepository.existsById(jobId)) {
                         return null;
                     }

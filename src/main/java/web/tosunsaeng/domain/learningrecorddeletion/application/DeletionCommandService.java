@@ -32,6 +32,12 @@ public class DeletionCommandService {
                 if (replay != null) return operationFor(replay);
                 if (mongo.exists(Query.query(Criteria.where("userId").is(owner).and("activeGuard").is(true)), DeletionOperation.class))
                     throw new DeletionFailure(409, "LEARNING_RECORD_DELETION_ALREADY_ACTIVE");
+                // Same owner write fence as creation preparation/finalization; no queue or suppression on rejection.
+                if (mongo.exists(Query.query(Criteria.where("userId").is(owner).orOperator(
+                        Criteria.where("activeGuard").is(true),
+                        Criteria.where("state").in("PREPARED", "RESERVED", "SESSION_COMMITTED", "CANCEL_PENDING"))),
+                        "exam_creation_operations"))
+                    throw new DeletionFailure(409, "EXAM_CREATION_PROCESSING");
                 var now = clock.instant();
                 if (notificationStore != null) notificationStore.suppress(owner, now, "LEARNING_RECORD_DELETION");
                 var operation = DeletionOperation.requested(UUID.randomUUID().toString(), owner, now);

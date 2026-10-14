@@ -152,6 +152,8 @@ S15/V07을 계획에 보류로 둔 채 독립적인 부분의 설계는 가능�
 
 ### P4 — 제출 차단과 기접수 채점/요약의 분리
 
+- 2026-10-14 [P4 구현 보고](LC_BILLING_PAID_EXAM_P4_IMPLEMENTATION.md): 공통 접수증거 policy를 Callback/복구/요약/AttemptGroup 판정에 적용했다. 실제 Job·receipt·완료 marker 재사용, 부분접수의 요약/전체완료 금지 및 격리 경합 검증. P4.1 삭제/공개 연결·legacy P6/실환경 gate는 후속이며 활성화 차단 유지.
+
 - 사용자 신규 제출/새 녹음 Job과 기존 durable 접수의 Callback/재시도/파생 Summary를 구분하는 공통 판단을 적용한다. 공개 submit·retry·upload/read와 내부 Job·Callback 경계별 권한 표를 작성한다.
 - 원 Session 종료 후 신규 사용자 접수는 차단한다. 종료 전에 접수한 Job의 동일 요청 replay는 새 접수로 만들지 않는다. 기존 Presigned URL의 잔여 capability를 임의 취소하는 새 key/nonce 계약은 추가하지 않는다.
 - 기접수 문항 채점·결과 저장·나중의 Summary 최초 생성/시스템 재시도는 원 접수 evidence와 기존 멱등/lifecycle 검증을 통과할 때만 허용한다. 단순 Session abandoned 예외를 모든 Job에 적용하지 않는다.
@@ -160,6 +162,8 @@ S15/V07을 계획에 보류로 둔 채 독립적인 부분의 설계는 가능�
 - 완료 기준: 종료와 접수 양순서, 일부/전체 접수, 늦은 Callback/파생 Summary/시스템 retry·신규 녹음, duplicate/stale callback, 삭제/merge 경합 테스트.
 
 ### P4.1 — 생성 중 삭제 미접수와 공개 응답
+
+- 2026-10-14 [P4.1 구현 보고](LC_BILLING_PAID_EXAM_P4_1_IMPLEMENTATION.md): 삭제 접수의 생성guard 확인·동일 owner Transaction, 정확409/Retry-After, 삭제된 성공 replay404를 구현했다. 새 삭제sender/ACK/checkpoint는 설계와 공동 gate만 기록하며 runtime 연결하지 않았다. 공개 paid/자동 schema2 scheduler·활성화 차단 유지.
 
 - 삭제 command 준비와 생성 operation 준비가 같은 사용자 fence를 조건부 쓰는 Transaction에 참여하도록 바꾼다. 생성 guard가 살아있으면 실행 가능한 삭제 row/inbox/queue를 만들지 않는다. 생성 Session ACTIVE 여부만으로 guard를 대신하지 않는다.
 - 삭제409 EXAM_CREATION_PROCESSING은 “시험 준비 중입니다. 잠시 후 다시 시도해 주세요.”/Retry-After1, 일반 생성409는 기존 같은요청재시도 문구를 유지한다. BaseResponse result=null은 생략하며 내부 retryable/correlationId를 추가하지 않는다.

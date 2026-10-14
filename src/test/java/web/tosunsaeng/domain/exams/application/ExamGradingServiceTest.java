@@ -166,6 +166,8 @@ class ExamGradingServiceTest {
                 clock
         );
         ReflectionTestUtils.setField(service, "bucketName", "test-learning-core-bucket");
+        ReflectionTestUtils.setField(service,"acceptedWorkPolicy",new ExamAcceptedWorkPolicy(questionJobRepository,
+                org.mockito.Mockito.mock(ExamSubmissionEvidence.class)));
     }
 
     @Test
@@ -184,6 +186,48 @@ class ExamGradingServiceTest {
             assertThrows(ExamsException.class,()->service.submitQuestion(EXAM_ID,1,0));
             assertThrows(ExamsException.class,()->service.submitQuestion(EXAM_ID,1,1));
         }
+        verify(questionJobRepository,never()).insert(any(QuestionGradingJob.class));
+    }
+
+    @Test void closedUnsubmittedQuestionCannotBeReconstructedFromS3() {
+        var session=ExamSession.builder().examId(EXAM_ID).mockExamId(GradingKeys.LEGACY_MOCK_EXAM_ID)
+                .status(ExamSessionStatus.IN_PROGRESS).submissionsClosedAt(NOW).build();
+        when(examSessionRepository.findById(EXAM_ID)).thenReturn(Optional.of(session));
+        var result=service.retryExam(EXAM_ID);
+        assertEquals(List.of(1),result.getMissingSubmissionQuestionNumbers());
+        verify(s3Client,never()).headObject(any(HeadObjectRequest.class));
+        verify(questionJobRepository,never()).insert(any(QuestionGradingJob.class));
+    }
+
+    @Test void closedFullyAcceptedSessionCreatesDerivedSummaryOnce() {
+        expectedQuestionNumbers=List.of(1,2);
+        putCompletedQuestions(expectedQuestionNumbers);
+        var session=ExamSession.builder().examId(EXAM_ID).mockExamId(GradingKeys.LEGACY_MOCK_EXAM_ID)
+                .status(ExamSessionStatus.IN_PROGRESS).submissionEvidenceVersion(1).requiredQuestionNumbers(List.of(1,2))
+                .submissionCompletedAt(NOW.minusSeconds(1)).submissionsClosedAt(NOW).build();
+        when(examSessionRepository.findById(EXAM_ID)).thenReturn(Optional.of(session));
+        service.ensureSummaryStartedIfReady(EXAM_ID);
+        service.ensureSummaryStartedIfReady(EXAM_ID);
+        verify(summaryJobRepository,times(1)).insert(any(SummaryGradingJob.class));
+        assertEquals(EXAM_ID,storedSummary().getExamId());
+        verify(summaryDispatchScheduler,times(2)).schedulePending(GradingKeys.summaryJobId(EXAM_ID),1);
+    }
+
+    @Test void closedPartialSubmissionCannotCreateSummaryEvenWithQueryableResults() {
+        putCompletedQuestions(List.of(1));
+        var session=ExamSession.builder().examId(EXAM_ID).status(ExamSessionStatus.IN_PROGRESS)
+                .submissionEvidenceVersion(1).requiredQuestionNumbers(List.of(1)).submissionsClosedAt(NOW).build();
+        when(examSessionRepository.findById(EXAM_ID)).thenReturn(Optional.of(session));
+        service.ensureSummaryStartedIfReady(EXAM_ID);
+        service.completeSummary(EXAM_ID);
+        verify(summaryJobRepository,never()).insert(any(SummaryGradingJob.class));
+        verify(summaryDispatchScheduler,never()).schedulePending(anyString(),anyInt());
+    }
+
+    @Test void closedUnacceptedCallbackCannotManufactureCompletedJob() {
+        when(examSessionRepository.findById(EXAM_ID)).thenReturn(Optional.of(ExamSession.builder().examId(EXAM_ID)
+                .status(ExamSessionStatus.IN_PROGRESS).submissionsClosedAt(NOW).build()));
+        service.completeQuestion(EXAM_ID,1,0);
         verify(questionJobRepository,never()).insert(any(QuestionGradingJob.class));
     }
 
@@ -1551,6 +1595,7 @@ class ExamGradingServiceTest {
 
     private static QuestionGradingJob copy(QuestionGradingJob source, Long version) {
         return QuestionGradingJob.builder()
+                .activityUserSubmission(source.isActivityUserSubmission())
                 .jobId(source.getJobId())
                 .examId(source.getExamId())
                 .questionNumber(source.getQuestionNumber())

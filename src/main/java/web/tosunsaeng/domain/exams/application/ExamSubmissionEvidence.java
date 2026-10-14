@@ -66,6 +66,17 @@ public class ExamSubmissionEvidence {
                 Update.update("expiresAt", Date.from(last.plus(Duration.ofDays(3)))), RECEIPTS);
     }
 
+    /** Read-only evidence lookup; a result or an S3 object alone is never proof of admission. */
+    public boolean acceptedQuestion(ExamSession session,int question,int retry) {
+        if (retry!=0 || !covered(session) || !required(session.getRequiredQuestionNumbers()).contains(question)) return false;
+        if (session.getSubmissionCompletedAt()!=null)
+            return session.getSubmissionsClosedAt()==null || !session.getSubmissionCompletedAt().isAfter(session.getSubmissionsClosedAt());
+        Document receipt=mongo.findById(session.getExamId()+":"+question,Document.class,RECEIPTS);
+        if (receipt==null || !session.getExamId().equals(receipt.getString("examId"))
+                || !Integer.valueOf(question).equals(receipt.getInteger("questionNumber")) || receipt.getDate("acceptedAt")==null) return false;
+        return session.getSubmissionsClosedAt()==null || !receipt.getDate("acceptedAt").toInstant().isAfter(session.getSubmissionsClosedAt());
+    }
+
     /** Same Session write fence as admission; caller must also hold the current owner guard. */
     public boolean completeAndFence(ExamSession session) {
         requireTransaction();
