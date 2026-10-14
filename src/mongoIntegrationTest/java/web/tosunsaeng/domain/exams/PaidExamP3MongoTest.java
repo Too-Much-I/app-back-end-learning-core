@@ -162,10 +162,17 @@ class PaidExamP3MongoTest {
     }
     @Test void concurrentFinalizeAndUnprotectedRevokeCannotLeaveUsableSession() throws Exception {
         var store=revocations();pending();var gate=new CountDownLatch(1);var pool=Executors.newFixedThreadPool(2);
+        var event=revokeEvent(null);
         try {
             var finalize=pool.submit(()->{gate.await();try{leased(()->lifecycle.applyStatus(USER,prepared.getCommandId(),snapshot(ReservationStatus.CONFIRMED,false)));return true;}catch(BillingClientException denied){return false;}});
-            var revoke=pool.submit(()->{gate.await();store.accept(revokeEvent(null));return true;});gate.countDown();
-            finalize.get(15,TimeUnit.SECONDS);assertThat(revoke.get(15,TimeUnit.SECONDS)).isTrue();
+            var revoke=pool.submit(()->{gate.await();try {store.accept(event);return true;}
+                catch(web.tosunsaeng.domain.exams.access.AccessEventFailure transientFailure) {
+                    assertThat(transientFailure.status()).isEqualTo(503);
+                    assertThat(transientFailure.code()).isEqualTo("LC_TEMPORARILY_UNAVAILABLE");return false;
+                }});gate.countDown();
+            finalize.get(15,TimeUnit.SECONDS);
+            // A bounded receiver may return 503 during write contention; the sender retries identical bytes.
+            if(!revoke.get(15,TimeUnit.SECONDS)) store.accept(event);
             assertThat(session("new").isAccessRevoked()).isTrue();assertThat(ExamAcceptedWorkPolicy.processable(session("new"))).isFalse();
             verifyNoInteractions(billing);
         }finally{pool.shutdownNow();}
