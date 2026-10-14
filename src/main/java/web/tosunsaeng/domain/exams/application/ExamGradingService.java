@@ -148,7 +148,7 @@ public class ExamGradingService {
                 resolveMockExamId(examId),
                 now
         );
-        pending.markUserSubmission();
+        pending.markUserSubmission(now);
         QuestionGradingJob inserted = questionJobRepository.insert(pending);
         if (submissionEvidence != null && submissionEvidence.covered(examId) && retryCount == 0) {
             submissionEvidence.accepted(examId, questionNumber, retryCount, null, now);
@@ -193,7 +193,7 @@ public class ExamGradingService {
 
         QuestionGradingJob inserted;
         try {
-            pending.markUserSubmission();
+            pending.markUserSubmission(now);
             inserted = questionJobRepository.insert(pending);
             log.debug(
                     "문항 채점 작업 생성 event=grading.question.job outcome=created "
@@ -795,6 +795,7 @@ public class ExamGradingService {
             QuestionGradingJob job,
             List<Integer> retried,
             List<Integer> waiting) {
+        if (!acceptedQuestionWork(job.getExamId(),job.getQuestionNumber(),job.getRetryCount())) return;
         if (job.getStatus() == GradingJobStatus.COMPLETED) {
             reopenCompletedMissingResult(job, retried, waiting);
             return;
@@ -826,12 +827,14 @@ public class ExamGradingService {
             List<Integer> retried,
             List<Integer> waiting) {
         int currentRecoveryCycle = job.effectiveRecoveryCycle();
-        long reopened = inCurrentOwnerTransaction(job.getExamId(), () ->
-                questionJobRepository.reopenCompletedMissingResult(
+        long reopened = inCurrentOwnerTransaction(job.getExamId(), () -> {
+                if (!acceptedQuestionWork(job.getExamId(),job.getQuestionNumber(),job.getRetryCount())) return 0L;
+                return questionJobRepository.reopenCompletedMissingResult(
                         job.getJobId(),
                         currentRecoveryCycle,
                         clock.instant()
-                ));
+                );
+        });
         if (reopened == 0) {
             waiting.add(job.getQuestionNumber());
             return;
@@ -893,7 +896,7 @@ public class ExamGradingService {
         }
 
         QuestionDispatchClaim claim = QuestionDispatchClaim.from(claimed, resolveMockExamId(claimed));
-        if (!canProcessSession(claim.examId())) {
+        if (!canProcessSession(claim.examId()) || !acceptedQuestionWork(claim.examId(),claim.questionNumber(),claim.retryCount())) {
             failQuestionClaim(claim, EXAM_ABANDONED);
             return DispatchOutcome.FAILED;
         }
@@ -992,6 +995,7 @@ public class ExamGradingService {
         GradingJobStatus fromStatus = job.getStatus();
         try {
             inCurrentOwnerTransaction(job.getExamId(), () -> {
+                if (!acceptedQuestionWork(job.getExamId(),job.getQuestionNumber(),job.getRetryCount())) return null;
                 QuestionGradingJob current = questionJobRepository.findById(job.getJobId())
                         .orElse(null);
                 if (current == null) {
@@ -1018,6 +1022,9 @@ public class ExamGradingService {
     }
 
     private ExamSession requireInProgressSession(String examId) {
+        ExamSession observed = examSessionRepository.findById(examId)
+                .orElseThrow(() -> new ExamsException(ErrorStatus._EXAM_NOT_FOUND));
+        if (observed.permitsRevokedAcceptedWork()) return observed;
         ExamSession session = requireNotAbandonedSession(examId);
         if (!session.isInProgress()) {
             throw new ExamsException(ErrorStatus._EXAM_ALREADY_COMPLETED);

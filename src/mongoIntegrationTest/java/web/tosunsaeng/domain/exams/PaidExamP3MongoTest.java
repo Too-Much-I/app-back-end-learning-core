@@ -373,6 +373,79 @@ class PaidExamP3MongoTest {
             return null;
         });
     }
+    void confirmedOldForRefund() {
+        var old=new ReservationSnapshot(OLD_GROUP,OLD_GROUP,BillingReservationKind.INITIAL,ReservationStatus.CONFIRMED,
+                OLD_GROUP,AttemptGroupStatus.OPEN,"old","mock",null,null,NOW.plusSeconds(300),NOW.minusSeconds(60),
+                PaidReservationProtocol.Source.SUBSCRIPTION,null,null);
+        mongo.updateFirst(Query.query(Criteria.where("_id").is("old")),new Update()
+                .set("creationOperationId",OLD_GROUP).set("billingReservationId",OLD_GROUP)
+                .set("billingReservationKind",BillingReservationKind.INITIAL).set("entitlementState",ExamEntitlementState.CONFIRMED)
+                .set("entitlementConfirmedAt",old.terminalAt()).set("entitlementConfirmedUserId",USER)
+                .set("paidReservation",new PaidReservationEvidence(old)),ExamSession.class);
+    }
+    ReservationSnapshot replacement(ReservationStatus status) {
+        return new ReservationSnapshot(prepared.getOperationId(),RESERVATION,BillingReservationKind.REPLACEMENT,status,
+                OLD_GROUP,status==ReservationStatus.CONFIRMED?AttemptGroupStatus.OPEN:null,"new","mock",null,null,
+                NOW.plusSeconds(300),status==ReservationStatus.CONFIRMED?NOW:null,
+                PaidReservationProtocol.Source.SUBSCRIPTION,null,null);
+    }
+    void finishReplacement() {
+        leased(()->{
+            lifecycle.acceptReserved(USER,prepared.getCommandId(),replacement(ReservationStatus.RESERVED));
+            lifecycle.commitPending(USER,prepared.getCommandId(),ZoneOffset.UTC);
+            return lifecycle.applyStatus(USER,prepared.getCommandId(),replacement(ReservationStatus.CONFIRMED));
+        });
+    }
+    web.tosunsaeng.domain.exams.access.AccessRevocationEvent oldGroupRevoke() {
+        var body=new Document("eventId",UUID.randomUUID().toString()).append("eventType","AttemptGroupAccessRevoked")
+                .append("schemaVersion",1).append("producer","billing").append("consumerScopeId","fixture-test")
+                .append("occurredAt","2026-10-14T00:00:00.000Z").append("userId",USER).append("attemptGroupId",OLD_GROUP)
+                .append("reason","PURCHASE_REFUNDED").append("confirmedSessionId","new");
+        return web.tosunsaeng.domain.exams.access.AccessRevocationEvent.decode(body.toJson().getBytes(java.nio.charset.StandardCharsets.UTF_8),"fixture-test");
+    }
+    @Test void c01h14ActualReplacementThenRevokePreservesOnlyAcceptedOldQuestion() {
+        confirmedOldForRefund();acceptOld(1);finishReplacement();
+        var current=mongo.findById("new",Document.class,"exam_sessions");var operation=op();
+        var store=revocations();var event=oldGroupRevoke();store.accept(event);store.accept(event);
+        assertThat(session("old").permitsRevokedAcceptedWork()).isTrue();
+        assertThat(acceptedPolicy().questionAllowed(session("old"),1,0)).isTrue();
+        assertThat(acceptedPolicy().questionAllowed(session("old"),2,0)).isFalse();
+        assertThat(acceptedPolicy().questionAllowed(session("old"),1,1)).isFalse();
+        assertThat(ExamAcceptedWorkPolicy.summaryAllowed(session("old"))).isFalse();
+        assertThatThrownBy(()->acceptOld(2)).isInstanceOf(RuntimeException.class);
+        assertThat(mongo.findById("new",Document.class,"exam_sessions")).isEqualTo(current);
+        assertThat(op().getState()).isEqualTo(operation.getState());assertThat(op().getActiveGuard()).isEqualTo(operation.getActiveGuard());
+        assertThat(store.denied(OLD_GROUP,"another-session",USER)).isTrue();
+    }
+    @Test void c03h15FullMarkerSurvivesReceiptExpiryAndTerminalChangesOnlyOldSession() {
+        confirmedOldForRefund();acceptOld(1);acceptOld(2);finishReplacement();revocations().accept(oldGroupRevoke());
+        mongo.remove(new Query(),ExamSubmissionEvidence.RECEIPTS);
+        mongo.remove(Query.query(Criteria.where("examId").is("old")),QuestionGradingJob.class);
+        var current=mongo.findById("new",Document.class,"exam_sessions");
+        assertThat(acceptedPolicy().questionAllowed(session("old"),1,0)).isTrue();
+        assertThat(ExamAcceptedWorkPolicy.summaryAllowed(session("old"))).isTrue();
+        owners.executeExamCoordination(USER,"old",()-> {
+            var old=session("old");old.markRevokedAcceptedWorkCompleted(UUID.randomUUID().toString(),NOW,ZoneOffset.UTC);mongo.save(old);return null;
+        });
+        assertThat(session("old").isCompleted()).isTrue();assertThat(ExamAcceptedWorkPolicy.processable(session("old"))).isFalse();
+        assertThat(mongo.findById("new",Document.class,"exam_sessions")).isEqualTo(current);
+    }
+    @Test void c04h16DeletionFenceWinsOverCapturedWorkProof() {
+        org.springframework.test.util.ReflectionTestUtils.setField(owners,"deletionAccess",
+                new web.tosunsaeng.domain.learningrecorddeletion.application.DeletionAccess(mongo));
+        confirmedOldForRefund();acceptOld(1);finishReplacement();revocations().accept(oldGroupRevoke());
+        mongo.insert(new Document("_id","old-deletion").append("targetType","EXAM").append("aggregateId","old")
+                .append("userId",USER).append("callbackFence","SEALED"),"learning_record_deletion_targets");
+        assertThatThrownBy(()->owners.executeExamCoordination(USER,"old",()-> {
+            if(acceptedPolicy().questionAllowed(session("old"),1,0)) throw new AssertionError("Deletion fence bypassed");
+            return null;
+        })).isInstanceOf(RuntimeException.class);
+    }
+    @Test void c06NoConfirmationAtClosureCannotGainExceptionFromReceipt() {
+        acceptOld(1);finishReplacement();revocations().accept(oldGroupRevoke());
+        assertThat(session("old").getAcceptedWorkClosure()).isNull();
+        assertThat(acceptedPolicy().questionAllowed(session("old"),1,0)).isFalse();
+    }
     ExamAcceptedWorkPolicy acceptedPolicy() {
         return new ExamAcceptedWorkPolicy(new MongoRepositoryFactory(mongo).getRepository(QuestionGradingJobRepository.class,
                 org.springframework.data.repository.core.support.RepositoryComposition.RepositoryFragments.just(

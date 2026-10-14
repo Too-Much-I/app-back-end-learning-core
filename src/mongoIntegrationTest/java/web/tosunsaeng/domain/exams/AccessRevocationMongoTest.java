@@ -70,17 +70,38 @@ class AccessRevocationMongoTest {
     @Test void concurrentSameEventHasOneFactAndBothAcknowledge() throws Exception {
         var e=event(UUID.randomUUID().toString(),GROUP,null); var gate=new CountDownLatch(1); var pool=Executors.newFixedThreadPool(2);
         try {
-            var a=pool.submit(()->{gate.await();store.accept(e);return true;});
-            var b=pool.submit(()->{gate.await();store.accept(e);return true;}); gate.countDown();
-            assertThat(a.get(15,TimeUnit.SECONDS)).isTrue(); assertThat(b.get(15,TimeUnit.SECONDS)).isTrue();
+            var a=pool.submit(()->{gate.await();return receive(e);});
+            var b=pool.submit(()->{gate.await();return receive(e);}); gate.countDown();
+            int first=a.get(15,TimeUnit.SECONDS),second=b.get(15,TimeUnit.SECONDS);
+            assertThat(first==503?receive(e):first).isEqualTo(204);
+            assertThat(second==503?receive(e):second).isEqualTo(204);
             assertThat(mongo.count(new Query(),AccessRevocationStore.COLLECTION)).isEqualTo(1);
         } finally {pool.shutdownNow();}
     }
     @Test void concurrentDifferentEventsHaveOneWinnerAndOneConflict() throws Exception {
         var gate=new CountDownLatch(1); var pool=Executors.newFixedThreadPool(2);
-        Callable<Integer> action=()->{var e=event(UUID.randomUUID().toString(),GROUP,null);gate.await();try{store.accept(e);return 204;}catch(AccessEventFailure x){return x.status();}};
-        try {var a=pool.submit(action);var b=pool.submit(action);gate.countDown();assertThat(List.of(a.get(15,TimeUnit.SECONDS),b.get(15,TimeUnit.SECONDS))).containsExactlyInAnyOrder(204,409);}
+        var firstEvent=event(UUID.randomUUID().toString(),GROUP,null);
+        var secondEvent=event(UUID.randomUUID().toString(),GROUP,null);
+        try {
+            var a=pool.submit(()->{gate.await();return receive(firstEvent);});
+            var b=pool.submit(()->{gate.await();return receive(secondEvent);});gate.countDown();
+            int first=a.get(15,TimeUnit.SECONDS),second=b.get(15,TimeUnit.SECONDS);
+            assertThat(List.of(first==503?receive(firstEvent):first,second==503?receive(secondEvent):second))
+                    .containsExactlyInAnyOrder(204,409);
+            assertThat(mongo.count(new Query(),AccessRevocationStore.COLLECTION)).isEqualTo(1);
+        }
         finally{pool.shutdownNow();}
+    }
+    private int receive(AccessRevocationEvent event) {
+        try {store.accept(event);return 204;}
+        catch(AccessEventFailure failure) {
+            if(failure.status()==503) assertThat(failure.code()).isEqualTo("LC_TEMPORARILY_UNAVAILABLE");
+            else {
+                assertThat(failure.status()).isEqualTo(409);
+                assertThat(failure.code()).isEqualTo("GROUP_REVOKE_CONFLICT");
+            }
+            return failure.status();
+        }
     }
     @Test void sessionWriteFailureRollsBackFactAndOwnerTouch(){
         session("blocked",GROUP);

@@ -213,6 +213,53 @@ class ExamGradingServiceTest {
         verify(summaryDispatchScheduler,times(2)).schedulePending(GradingKeys.summaryJobId(EXAM_ID),1);
     }
 
+    @Test void revokedProvenOldSessionAllowsDerivedSummaryButNeverNewRecording() {
+        expectedQuestionNumbers=List.of(1,2);
+        putCompletedQuestions(expectedQuestionNumbers);
+        var session=RevokedAcceptedWorkPolicyTest.confirmed(EXAM_ID,"owner",GradingKeys.LEGACY_MOCK_EXAM_ID);
+        session.closeSubmissions("closing",RevokedAcceptedWorkPolicyTest.NOW);
+        ReflectionTestUtils.setField(session,"accessRevoked",true);
+        ReflectionTestUtils.setField(session,"accessRevocationEventId","event");
+        ReflectionTestUtils.setField(session,"accessRevocationUserId","owner");
+        ReflectionTestUtils.setField(session,"submissionCompletedAt",NOW);
+        when(examSessionRepository.findById(EXAM_ID)).thenReturn(Optional.of(session));
+        service.ensureSummaryStartedIfReady(EXAM_ID);
+        service.ensureSummaryStartedIfReady(EXAM_ID);
+        verify(summaryJobRepository,times(1)).insert(any(SummaryGradingJob.class));
+        assertThrows(ExamsException.class,()->service.submitQuestion(EXAM_ID,1,1));
+    }
+
+    @Test void revokedOldRecoveryDoesNotReconstructUnacceptedQuestion() {
+        var session=RevokedAcceptedWorkPolicyTest.confirmed(EXAM_ID,"owner",GradingKeys.LEGACY_MOCK_EXAM_ID);
+        session.closeSubmissions("closing",RevokedAcceptedWorkPolicyTest.NOW);
+        ReflectionTestUtils.setField(session,"accessRevoked",true);
+        ReflectionTestUtils.setField(session,"accessRevocationEventId","event");
+        ReflectionTestUtils.setField(session,"accessRevocationUserId","owner");
+        when(examSessionRepository.findById(EXAM_ID)).thenReturn(Optional.of(session));
+        var result=service.retryExam(EXAM_ID);
+        assertEquals(List.of(1),result.getMissingSubmissionQuestionNumbers());
+        verify(s3Client,never()).headObject(any(HeadObjectRequest.class));
+        verify(questionJobRepository,never()).insert(any(QuestionGradingJob.class));
+    }
+
+    @Test void revokedOldRecoveryReopensExactCompletedJobWithoutChangingAdmissionTime() {
+        var session=RevokedAcceptedWorkPolicyTest.confirmed(EXAM_ID,"owner",GradingKeys.LEGACY_MOCK_EXAM_ID);
+        session.closeSubmissions("closing",RevokedAcceptedWorkPolicyTest.NOW);
+        ReflectionTestUtils.setField(session,"accessRevoked",true);
+        ReflectionTestUtils.setField(session,"accessRevocationEventId","event");
+        ReflectionTestUtils.setField(session,"accessRevocationUserId","owner");
+        when(examSessionRepository.findById(EXAM_ID)).thenReturn(Optional.of(session));
+        var accepted=NOW.minusSeconds(100);
+        var job=QuestionGradingJob.pending(GradingKeys.questionJobId(EXAM_ID,1,0),EXAM_ID,1,0,"key",
+                GradingKeys.LEGACY_MOCK_EXAM_ID,accepted).markUserSubmission(accepted);
+        job.complete(NOW.minusSeconds(1));
+        questionJobs.put(job.getJobId(),copy(job,0L));
+        service.retryExam(EXAM_ID);
+        verify(questionJobRepository).reopenCompletedMissingResult(eq(job.getJobId()),eq(job.effectiveRecoveryCycle()),any(Instant.class));
+        assertEquals(accepted,questionJobs.get(job.getJobId()).getFirstUserSubmittedAt());
+        assertEquals(NOW,questionJobs.get(job.getJobId()).getPendingAt());
+    }
+
     @Test void closedPartialSubmissionCannotCreateSummaryEvenWithQueryableResults() {
         putCompletedQuestions(List.of(1));
         var session=ExamSession.builder().examId(EXAM_ID).status(ExamSessionStatus.IN_PROGRESS)
@@ -1596,6 +1643,7 @@ class ExamGradingServiceTest {
     private static QuestionGradingJob copy(QuestionGradingJob source, Long version) {
         return QuestionGradingJob.builder()
                 .activityUserSubmission(source.isActivityUserSubmission())
+                .firstUserSubmittedAt(source.getFirstUserSubmittedAt())
                 .jobId(source.getJobId())
                 .examId(source.getExamId())
                 .questionNumber(source.getQuestionNumber())
