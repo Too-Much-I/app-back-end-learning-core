@@ -15358,3 +15358,57 @@
 
 - 계약 snapshot 표와 E06-owner의 원문 오류 body를 읽기 대조했다. OPERATION_OWNER_MISMATCH에 예약 전 거절 message가 들어 있는 fixture 불일치이며 owner 고정 문구로 정정하는 대상임을 설명했다. HTTP409/code/retryable=false/OWNER_BLOCKED 기대값과 제품 정책은 그대로다. 관련 TMI-116/TMI-128/TMI-122·선행 TMI-218.
 - 기존 fixture는 수정하지 않고 신규 revision/hash로 공동 공유·LC 재검증하는 절차를 안내한다. 실제 Billing 서버가 잘못된 문구를 반환한다고 확인한 것은 아니다. 설명/기록만 수행하며 CURRENT_STATE 갱신·WORKLOG EOF append 외 코드/fixture/DB/배포/외부 메시지 변경 없음. 테스트 재실행 없이 원문 대조·diff check·marker 단일 출현을 검증한다. Secret/Token 미기록.
+
+## 2026-10-14 — PLAN-012 최소 구현 방향 공유 접수
+
+<!-- codex-turn:01a13975-4035-7bc1-ae16-2a6dfbf01db6 -->
+
+- 사용자 공유에 따라 Billing은 구매 신규 사용을 우선 차단하고 관련 시험 정리·revoke 전달은 작은 묶음으로 순차 처리하는 방향임을 기록했다. 지연·중복 전달 가능성은 인정하되 기존 불변 이벤트·재시도 계약 및 LC exact Session 보호/새 Session 차단/단일 revoke 문서 규격은 변경하지 않는다. 즉시 LC 전체 반영을 보장하는 것으로 해석하지 않는다.
+- 현재 PLAN-011 및 별도 승인된 구현 진행을 유지한다. 이번 공유는 PLAN-012 착수 요청이 아니며 새 코드/설계 변경·추가 구현을 시작하지 않았다. 관련 Billing TMI-215/TMI-216/TMI-217, LC TMI-116/TMI-128/TMI-122/TMI-125·선행 TMI-218. Billing 실제 구현·검증·배포 상태는 이번에 확인하지 않았다.
+- CURRENT_STATE 갱신과 WORKLOG EOF append만 수행하고 기존/동시 작업 기록을 보존했다. 코드/fixture/계약 원본/Jira/DB/AWS/배포/외부 발송/commit/push 변경 없음. 테스트 실행 없이 diff check와 marker 단일 출현 확인, Secret/Token 미기록.
+
+## 2026-10-14 — P2 전달·머지 후 P3 확정/복구 기반 구현
+
+<!-- codex-turn:01a13971-45ed-7cd1-96f5-9a924d0a1a49 -->
+
+- 사용자 요청으로 P2/P2.1 코드·테스트·문서를 커밋0cdb458/푸시하고 PR #38을 생성·첨부했다. GitHub Verify run38532796134 success 후 develop에 merge commit001b575로 머지했다. 기존 테스트 자동 배포 run38533145337은 health 포함 success. 기능 설정/운영 배포는 변경하지 않았다. DS_Store 사용자 변경은 커밋에서 제외했다.
+- origin/develop 머지 결과에서 feat/billing-paid-exam-p3를 만들고 paid 전용 lifecycle/recovery 서비스를 구현했다. 공유 lease/version·owner Tx 아래 RESERVED evidence/대기 Session(active=false), full CONFIRMED 후 exact 원 접수차단·새 활성·operation 성공, 거절/expiry 안전 보상·J3 증거 조건,120일 terminal 보존·삭제/owner 검증 replay를 추가했다. 신규접수 marker는 grading 상태와 분리하고 기존 Job은 보존한다.
+- HTTP 신규 발신 전 reserve/confirm marker를 영속하고 유실 뒤 status-first로 복구한다. 명시 schema2 worker는 reserve/discovery/Session 생성 없이 최대 status+confirm2회 및 기존 bounded retry를 사용한다. 구 scheduler schema1은 보존한다. P3.1 MEMBER 이력/좁은 재개·schema2 자동 운영 연결/precommit cleanup, P4~P6 전체 검증 및 공개 route/paid 활성화는 후속이다. P3 전체 rollout 완료로 기록하지 않는다.
+- 최종 clean test/mongoIntegrationTest/bootJar 및 공통 confirmed 검증 연결 후 전체 재실행 성공. 단위1,143개 실패/오류0·기존 조건부1 skip, Mongo197개 실패/오류/skip0(신규20개), Node23·fixture25 checksum·diff check 통과. Mongo commit 후 ACK 유실 예외 주입은 실제 failover/E2E와 구분했다. 공동 상태28개 전체 완료는 아니다.
+- 사용자 승인에 따라 E06-owner 문구 정정은 구현과 병행 추적하고 공동 최종 검증·활성화 전 해결한다. 원 계약/fixture bytes/hash 불변. 관련 TMI-116/TMI-128/TMI-122, 선행 TMI-218; 새 Jira는 생성하지 않았다. AGENTS 승인 예외·계획/ADR/보고/CURRENT_STATE 동기화, WORKLOG 과거 기록 append-only 유지.
+- 변경파일/위험/배포 전 gate는 LC_BILLING_PAID_EXAM_P3_IMPLEMENTATION.md에 기록했다. P3 코드는 현재 미커밋·미푸시·미배포다. 공개 URL/Method/body/성공DTO/BaseResponse·AI user_id=examId·retryCount·S3/Redis 불변. 예상 밖 제품 변경 없음. 사용자 DS_Store와 동시 PLAN-012 문서 기록 보존, Billing/Identity 코드·실DB/운영 설정 변경 및 Secret/Token 기록 없음.
+
+## 2026-10-14 — P3.1 MEMBER 영속 대기·제한적 재개 구현 및 후속 검증
+
+<!-- codex-turn:01a1398a-1c5d-73e1-91c6-d65d34ded8f4 -->
+
+- 사용자 「어 구현해줘」「이어서 해줘」 범위로 feat/billing-paid-exam-p3의 이전 미커밋 P3 위 P3.1을 구현/검증했다. 관련 TMI-116/TMI-128/TMI-122·선행 TMI-218. 이번 commit/push/Jira 수정·실DB/배포·활성화 없음.
+- 기존 operation에 MemberWaitEvidence를 저장하고 같은 operation/digest·최초대기/최근권위관측·재개/중단/해결 처분과 과거 소진 증거를 보존한다. HTTP는 현재 strict pending·예약/신규Session/commit/confirm/cancel 증거 부재·owner/lease/version을 확인해 RESUMING을 선기록한 뒤 같은 reserve를 재개한다. worker는 MEMBER에서 status 관측만 수행하고 reserve하지 않는다.
+- 순수대기61~65초 관측/장애시도 비소모·대기시간 제외 및 실제 장애24시간/200회 한도를 적용했다. 최초생성+120일 정각부터 NEEDS_REVIEW/guard/무TTL·기존 경보 pending을 유지한다. CLEANUP_PRECOMMIT 안전복귀, generic retry_exhausted/혼합원인/잘못된결속 거절, 과거 순수 MEMBER 소진의 검증된 영속 증거에 한한1회 재개를 구현했다. 원인불명/auth/owner 차단을 해제하지 않는다. 과거 증거 자동생성/수입 도구는 없고 긍정 테스트는 명시 주입한 감사증거다.
+- 전체 clean test/mongoIntegrationTest/bootJar 성공 후 추가 경계 검사 및 테스트 초기화 수정 뒤 전체 재실행 성공. 최종 XML 단위1,147개 실패/오류0·기존 조건부1 skip, Mongo208개 실패/오류/skip0(이번11개 추가), 이력 단위4개 추가. Node28·fixture25 SHA256SUMS·git diff --check 통과. 중간 실패는 mock 예외 재설정/인증 circuit 테스트 초기화 누락·공개 매핑 기대값을 고쳐 해소했으며 제품 auth 차단은 유지했다.
+- AGENTS 승인·계획/ADR·P3.1 보고·CURRENT_STATE 갱신, WORKLOG EOF append. 상세 변경파일/유지계약/위험/배포gate는 LC_BILLING_PAID_EXAM_P3_1_IMPLEMENTATION.md에 기록했다. 공개 route/자동 schema2 scheduler 미연결·paid 기동차단 유지. 양측 E02 전체/실 TLS·실서버 장애·Sentry 전달은 미완료, P4~P6 및 E06-owner 별도 revision 정정은 후속이다.
+- 공개 API/성공DTO/BaseResponse·AI user_id=examId·retryCount·S3/Redis·원 fixture 불변. 예상 밖 제품 변경 없음. 이전 P3 및 사용자 DS_Store/동시 PLAN-012 기록 보존. Billing/Identity 저장소·실DB/운영설정 수정 없고 Secret/Token 미기록.
+
+## 2026-10-14 — P3.1 완료 기록 식별자 보완
+
+<!-- codex-turn:01a1398a-f377-7491-9c42-56d3b26e642c -->
+
+- 현재 턴 식별자를 EOF 새 항목으로 추가하고 CURRENT_STATE를 갱신했다. 관련 TMI-116/TMI-128/TMI-122·선행 TMI-218. 이전 기록은 수정/삭제하지 않았다.
+- 직전 P3.1 구현/검증 결과(단위1,147개·Mongo208개 실패/오류0, 단위 기존1 skip) 및 공개 연결/자동 scheduler·paid 활성화 차단 상태를 유지한다. 이번 보완은 문서만 변경하며 테스트 재실행·제품 코드·commit/push·실DB·배포 변경 없음. diff check와 marker 단일 출현 확인, Secret/Token 미기록.
+
+## 2026-10-14 — simplified fixtures-2 인수·LC 독립 재검증
+
+<!-- codex-turn:01a13992-ac28-7782-a90d-b9eb3373d052 -->
+
+- Billing 인계서/ZIP을 읽기 확인하고 ZIP10파일을 별도 fixtures-2 경로로 인수했다. ZIP SHA256 206c83a6ba8865650a07db3a56f67b210a0ad795d8b123cce811ef10ab2c6cb2, SHA256SUMS hash4e91332dfa549da63d13f3e07a1ec208018e02a353ccd780f12b8570eb2d4845 및9파일 hash 검증/10파일 Billing 원본 cmp 일치. fixtures-1 bytes 보존. 계약/나머지 데이터 불변이며 업무 delta는 E06-owner message1개, metadata는 README/revision/manifest/hash 갱신뿐이다.
+- LC 기존 독립 Java 검사기를 fixtures-2로 전환하고 owner exact문구 검증/구원본 고정hash·단일delta 검사 추가. offline80벡터+scope/hash1+구원본/delta1=82개 통과. 실제 JwtBillingReservationClient loopback HTTP 검증은 정정된 E06-owner를 OWNER_BLOCKED로 수락하며 기존 잘못된 문구는 별도 CONTRACT_ERROR 부정회귀로 보존했다. client 전체49개 통과. Billing 검사기/생성기는 복사/실행하지 않았다.
+- 선택 테스트 후 ./gradlew test 전체1,149개 실패/오류0·기존 조건부1 skip 및 diff check 통과. 이번 테스트/fixture 변경만으로 Mongo/bootJar는 재실행하지 않았다. 상태28개 전체·실 TLS/실서버/E2E 완료로 주장하지 않는다. 생산자 manifest는 수정하지 않고 LC 검증 증거를 별도 보고서로 남겼다.
+- E06-owner 불일치 해소를 계획/ADR/CURRENT_STATE와 LC_BILLING_SIMPLIFIED_FIXTURES_2_VALIDATION.md에 기록했다. 관련 LC TMI-116/TMI-128/TMI-122·선행 TMI-218, Billing TMI-216. T04/삭제·보존/실환경 공동 gate 및 공개/자동 scheduler/paid 활성화 차단은 유지한다.
+- 이번 변경은 신규 fixture10파일·LC 테스트2파일·문서뿐이다. 제품 코드/공개API/AI/S3/Redis/auth정책·Billing 저장소·실DB·배포·활성화·Jira/외부발송·commit/push 변경 없음. 이전 P3/P3.1 미커밋 제품 변경·사용자 DS_Store/동시 기록 보존, 예상 밖 이번 제품 변경 없음. 과거 WORKLOG 수정/삭제 없으며 Secret/Token 미기록.
+
+## 2026-10-14 — fixtures-2 검증 완료 턴 기록 보완
+
+<!-- codex-turn:01a13992-e621-7873-9af1-7af5178942f4 -->
+
+- 현재 턴 식별자로 EOF 기록을 추가하고 CURRENT_STATE를 갱신했다. 관련 LC TMI-116/TMI-128/TMI-122·선행 TMI-218, Billing TMI-216. 과거 WORKLOG 보존.
+- fixtures-2 독립 재검증 및 E06-owner 해소 결과 유지. 이번 보완은 문서만 변경하며 추가 테스트/제품 코드/DB/배포/commit/push 변경 없음. diff check·marker 단일 출현 확인, Secret/Token 미기록.

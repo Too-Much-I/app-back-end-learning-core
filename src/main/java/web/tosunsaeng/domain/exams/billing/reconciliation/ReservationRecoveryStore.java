@@ -60,16 +60,27 @@ public class ReservationRecoveryStore {
     }
 
     public boolean startAttempt(ReservationOperationExecution.Lease lease, ExamCreationOperation op) {
+        if (!canStartAttempt(lease,op)) return false;
+        ReservationRecovery r=op.getRecovery();
+        Update update = new Update().inc("recovery.attempts", 1).inc("version", 1);
+        if (r.getFirstAt() == null) {
+            update.set("recovery.firstAt", execution.now());
+            update.set("recovery.memberExcludedAtFirstAttempt",r.getMemberWait()==null?0:r.getMemberWait().excludedAt(execution.now()));
+        }
+        check(mongo.updateFirst(execution.owned(lease), update, ExamCreationOperation.class).getModifiedCount());
+        return true;
+    }
+
+    public boolean canStartAttempt(ReservationOperationExecution.Lease lease,ExamCreationOperation op) {
         ReservationRecovery r = op.getRecovery();
         Instant now = execution.now();
         if (r.getAttempts() >= properties.getMaxAttempts()
-                || (r.getFirstAt() != null && !now.isBefore(r.getFirstAt().plus(properties.getMaxAge())))) {
+                || (r.getFirstAt() != null && !now.isBefore(r.getFirstAt().plus(properties.getMaxAge())
+                    .plusMillis(r.getSchemaVersion()==2 && r.getMemberWait()!=null
+                            ? Math.max(0,r.getMemberWait().excludedAt(now)-r.getMemberExcludedAtFirstAttempt()):0)))) {
             quarantine(lease, ReservationRecovery.Status.NEEDS_REVIEW, "retry_exhausted");
             return false;
         }
-        Update update = new Update().inc("recovery.attempts", 1).inc("version", 1);
-        if (r.getFirstAt() == null) update.set("recovery.firstAt", now);
-        check(mongo.updateFirst(execution.owned(lease), update, ExamCreationOperation.class).getModifiedCount());
         return true;
     }
 

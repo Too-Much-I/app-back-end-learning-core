@@ -1,0 +1,334 @@
+[
+  {
+    "id": "P01-paid",
+    "request": {
+      "continuationReason": "PHONE_REJOIN",
+      "continuationId": "00000000-0000-4000-8000-000000000001",
+      "expectedAttemptGroupId": "00000000-0000-4000-8000-000000000002",
+      "sessionId": "fixture-session-new",
+      "mockExamId": "fixture-mock"
+    },
+    "reserveSnapshot": {
+      "reservationKind": "INITIAL",
+      "entitlementSource": "SUBSCRIPTION",
+      "attemptGroupId": "00000000-0000-4000-8000-000000000003",
+      "sessionId": "fixture-session-new",
+      "mockExamId": "fixture-mock",
+      "continuationReason": "PHONE_REJOIN",
+      "continuationId": "00000000-0000-4000-8000-000000000001"
+    },
+    "statusSnapshot": {
+      "reservationKind": "INITIAL",
+      "entitlementSource": "SUBSCRIPTION",
+      "attemptGroupId": "00000000-0000-4000-8000-000000000003",
+      "sessionId": "fixture-session-new",
+      "mockExamId": "fixture-mock",
+      "continuationReason": "PHONE_REJOIN",
+      "continuationId": "00000000-0000-4000-8000-000000000001"
+    },
+    "expectedValid": true,
+    "scope": "SELECTED_IMMUTABLE_FIELDS_ONLY_NOT_FULL_DTO"
+  },
+  {
+    "id": "P02-free",
+    "request": {
+      "continuationReason": "PHONE_REJOIN",
+      "continuationId": "00000000-0000-4000-8000-000000000001",
+      "expectedAttemptGroupId": "00000000-0000-4000-8000-000000000002",
+      "sessionId": "fixture-session-new",
+      "mockExamId": "fixture-mock"
+    },
+    "reserveSnapshot": {
+      "reservationKind": "REPLACEMENT",
+      "entitlementSource": "EXAM_PASS",
+      "attemptGroupId": "00000000-0000-4000-8000-000000000002",
+      "sessionId": "fixture-session-new",
+      "mockExamId": "fixture-mock",
+      "continuationReason": "PHONE_REJOIN",
+      "continuationId": "00000000-0000-4000-8000-000000000001"
+    },
+    "statusSnapshot": {
+      "reservationKind": "REPLACEMENT",
+      "entitlementSource": "EXAM_PASS",
+      "attemptGroupId": "00000000-0000-4000-8000-000000000002",
+      "sessionId": "fixture-session-new",
+      "mockExamId": "fixture-mock",
+      "continuationReason": "PHONE_REJOIN",
+      "continuationId": "00000000-0000-4000-8000-000000000001"
+    },
+    "expectedValid": true,
+    "scope": "SELECTED_IMMUTABLE_FIELDS_ONLY_NOT_FULL_DTO"
+  },
+  {
+    "id": "P05-oldgroup",
+    "request": {
+      "continuationReason": "PHONE_REJOIN",
+      "continuationId": "00000000-0000-4000-8000-000000000001",
+      "expectedAttemptGroupId": "00000000-0000-4000-8000-000000000002",
+      "sessionId": "fixture-session-new",
+      "mockExamId": "fixture-mock"
+    },
+    "reserveSnapshot": {
+      "reservationKind": "INITIAL",
+      "entitlementSource": "SUBSCRIPTION",
+      "attemptGroupId": "00000000-0000-4000-8000-000000000002",
+      "sessionId": "fixture-session-new",
+      "mockExamId": "fixture-mock",
+      "continuationReason": "PHONE_REJOIN",
+      "continuationId": "00000000-0000-4000-8000-000000000001"
+    },
+    "statusSnapshot": {
+      "reservationKind": "INITIAL",
+      "entitlementSource": "SUBSCRIPTION",
+      "attemptGroupId": "00000000-0000-4000-8000-000000000002",
+      "sessionId": "fixture-session-new",
+      "mockExamId": "fixture-mock",
+      "continuationReason": "PHONE_REJOIN",
+      "continuationId": "00000000-0000-4000-8000-000000000001"
+    },
+    "expectedValid": false,
+    "scope": "SELECTED_IMMUTABLE_FIELDS_ONLY_NOT_FULL_DTO"
+  },
+  {
+    "id": "P05-source",
+    "request": {
+      "continuationReason": "PHONE_REJOIN",
+      "continuationId": "00000000-0000-4000-8000-000000000001",
+      "expectedAttemptGroupId": "00000000-0000-4000-8000-000000000002",
+      "sessionId": "fixture-session-new",
+      "mockExamId": "fixture-mock"
+    },
+    "reserveSnapshot": {
+      "reservationKind": "INITIAL",
+      "entitlementSource": "EXAM_PASS",
+      "attemptGroupId": "00000000-0000-4000-8000-000000000003",
+      "sessionId": "fixture-session-new",
+      "mockExamId": "fixture-mock",
+      "continuationReason": "PHONE_REJOIN",
+      "continuationId": "00000000-0000-4000-8000-000000000001"
+    },
+    "statusSnapshot": {
+      "reservationKind": "INITIAL",
+      "entitlementSource": "EXAM_PASS",
+      "attemptGroupId": "00000000-0000-4000-8000-000000000003",
+      "sessionId": "fixture-session-new",
+      "mockExamId": "fixture-mock",
+      "continuationReason": "PHONE_REJOIN",
+      "continuationId": "00000000-0000-4000-8000-000000000001"
+    },
+    "expectedValid": false,
+    "scope": "SELECTED_IMMUTABLE_FIELDS_ONLY_NOT_FULL_DTO"
+  },
+  {
+    "id": "P05-mock",
+    "request": {
+      "continuationReason": "PHONE_REJOIN",
+      "continuationId": "00000000-0000-4000-8000-000000000001",
+      "expectedAttemptGroupId": "00000000-0000-4000-8000-000000000002",
+      "sessionId": "fixture-session-new",
+      "mockExamId": "fixture-mock"
+    },
+    "reserveSnapshot": {
+      "reservationKind": "INITIAL",
+      "entitlementSource": "SUBSCRIPTION",
+      "attemptGroupId": "00000000-0000-4000-8000-000000000003",
+      "sessionId": "fixture-session-new",
+      "mockExamId": "different",
+      "continuationReason": "PHONE_REJOIN",
+      "continuationId": "00000000-0000-4000-8000-000000000001"
+    },
+    "statusSnapshot": {
+      "reservationKind": "INITIAL",
+      "entitlementSource": "SUBSCRIPTION",
+      "attemptGroupId": "00000000-0000-4000-8000-000000000003",
+      "sessionId": "fixture-session-new",
+      "mockExamId": "different",
+      "continuationReason": "PHONE_REJOIN",
+      "continuationId": "00000000-0000-4000-8000-000000000001"
+    },
+    "expectedValid": false,
+    "scope": "SELECTED_IMMUTABLE_FIELDS_ONLY_NOT_FULL_DTO"
+  },
+  {
+    "id": "P05-session",
+    "request": {
+      "continuationReason": "PHONE_REJOIN",
+      "continuationId": "00000000-0000-4000-8000-000000000001",
+      "expectedAttemptGroupId": "00000000-0000-4000-8000-000000000002",
+      "sessionId": "fixture-session-new",
+      "mockExamId": "fixture-mock"
+    },
+    "reserveSnapshot": {
+      "reservationKind": "INITIAL",
+      "entitlementSource": "SUBSCRIPTION",
+      "attemptGroupId": "00000000-0000-4000-8000-000000000003",
+      "sessionId": "different",
+      "mockExamId": "fixture-mock",
+      "continuationReason": "PHONE_REJOIN",
+      "continuationId": "00000000-0000-4000-8000-000000000001"
+    },
+    "statusSnapshot": {
+      "reservationKind": "INITIAL",
+      "entitlementSource": "SUBSCRIPTION",
+      "attemptGroupId": "00000000-0000-4000-8000-000000000003",
+      "sessionId": "different",
+      "mockExamId": "fixture-mock",
+      "continuationReason": "PHONE_REJOIN",
+      "continuationId": "00000000-0000-4000-8000-000000000001"
+    },
+    "expectedValid": false,
+    "scope": "SELECTED_IMMUTABLE_FIELDS_ONLY_NOT_FULL_DTO"
+  },
+  {
+    "id": "P05-echo",
+    "request": {
+      "continuationReason": "PHONE_REJOIN",
+      "continuationId": "00000000-0000-4000-8000-000000000001",
+      "expectedAttemptGroupId": "00000000-0000-4000-8000-000000000002",
+      "sessionId": "fixture-session-new",
+      "mockExamId": "fixture-mock"
+    },
+    "reserveSnapshot": {
+      "reservationKind": "INITIAL",
+      "entitlementSource": "SUBSCRIPTION",
+      "attemptGroupId": "00000000-0000-4000-8000-000000000003",
+      "sessionId": "fixture-session-new",
+      "mockExamId": "fixture-mock",
+      "continuationReason": "PHONE_REJOIN",
+      "continuationId": "different"
+    },
+    "statusSnapshot": {
+      "reservationKind": "INITIAL",
+      "entitlementSource": "SUBSCRIPTION",
+      "attemptGroupId": "00000000-0000-4000-8000-000000000003",
+      "sessionId": "fixture-session-new",
+      "mockExamId": "fixture-mock",
+      "continuationReason": "PHONE_REJOIN",
+      "continuationId": "different"
+    },
+    "expectedValid": false,
+    "scope": "SELECTED_IMMUTABLE_FIELDS_ONLY_NOT_FULL_DTO"
+  },
+  {
+    "id": "P05-transition",
+    "request": {
+      "continuationReason": "PHONE_REJOIN",
+      "continuationId": "00000000-0000-4000-8000-000000000001",
+      "expectedAttemptGroupId": "00000000-0000-4000-8000-000000000002",
+      "sessionId": "fixture-session-new",
+      "mockExamId": "fixture-mock"
+    },
+    "reserveSnapshot": {
+      "reservationKind": "INITIAL",
+      "entitlementSource": "SUBSCRIPTION",
+      "attemptGroupId": "00000000-0000-4000-8000-000000000003",
+      "sessionId": "fixture-session-new",
+      "mockExamId": "fixture-mock",
+      "continuationReason": "PHONE_REJOIN",
+      "continuationId": "00000000-0000-4000-8000-000000000001",
+      "transition": {}
+    },
+    "statusSnapshot": {
+      "reservationKind": "INITIAL",
+      "entitlementSource": "SUBSCRIPTION",
+      "attemptGroupId": "00000000-0000-4000-8000-000000000003",
+      "sessionId": "fixture-session-new",
+      "mockExamId": "fixture-mock",
+      "continuationReason": "PHONE_REJOIN",
+      "continuationId": "00000000-0000-4000-8000-000000000001",
+      "transition": {}
+    },
+    "expectedValid": false,
+    "scope": "SELECTED_IMMUTABLE_FIELDS_ONLY_NOT_FULL_DTO"
+  },
+  {
+    "id": "P05-nulltransition",
+    "request": {
+      "continuationReason": "PHONE_REJOIN",
+      "continuationId": "00000000-0000-4000-8000-000000000001",
+      "expectedAttemptGroupId": "00000000-0000-4000-8000-000000000002",
+      "sessionId": "fixture-session-new",
+      "mockExamId": "fixture-mock"
+    },
+    "reserveSnapshot": {
+      "reservationKind": "INITIAL",
+      "entitlementSource": "SUBSCRIPTION",
+      "attemptGroupId": "00000000-0000-4000-8000-000000000003",
+      "sessionId": "fixture-session-new",
+      "mockExamId": "fixture-mock",
+      "continuationReason": "PHONE_REJOIN",
+      "continuationId": "00000000-0000-4000-8000-000000000001",
+      "transition": null
+    },
+    "statusSnapshot": {
+      "reservationKind": "INITIAL",
+      "entitlementSource": "SUBSCRIPTION",
+      "attemptGroupId": "00000000-0000-4000-8000-000000000003",
+      "sessionId": "fixture-session-new",
+      "mockExamId": "fixture-mock",
+      "continuationReason": "PHONE_REJOIN",
+      "continuationId": "00000000-0000-4000-8000-000000000001",
+      "transition": null
+    },
+    "expectedValid": false,
+    "scope": "SELECTED_IMMUTABLE_FIELDS_ONLY_NOT_FULL_DTO"
+  },
+  {
+    "id": "P05-missing-echo",
+    "request": {
+      "continuationReason": "PHONE_REJOIN",
+      "continuationId": "00000000-0000-4000-8000-000000000001",
+      "expectedAttemptGroupId": "00000000-0000-4000-8000-000000000002",
+      "sessionId": "fixture-session-new",
+      "mockExamId": "fixture-mock"
+    },
+    "reserveSnapshot": {
+      "reservationKind": "INITIAL",
+      "entitlementSource": "SUBSCRIPTION",
+      "attemptGroupId": "00000000-0000-4000-8000-000000000003",
+      "sessionId": "fixture-session-new",
+      "mockExamId": "fixture-mock",
+      "continuationId": "00000000-0000-4000-8000-000000000001"
+    },
+    "statusSnapshot": {
+      "reservationKind": "INITIAL",
+      "entitlementSource": "SUBSCRIPTION",
+      "attemptGroupId": "00000000-0000-4000-8000-000000000003",
+      "sessionId": "fixture-session-new",
+      "mockExamId": "fixture-mock",
+      "continuationId": "00000000-0000-4000-8000-000000000001"
+    },
+    "expectedValid": false,
+    "scope": "SELECTED_IMMUTABLE_FIELDS_ONLY_NOT_FULL_DTO"
+  },
+  {
+    "id": "P05-status-changed",
+    "request": {
+      "continuationReason": "PHONE_REJOIN",
+      "continuationId": "00000000-0000-4000-8000-000000000001",
+      "expectedAttemptGroupId": "00000000-0000-4000-8000-000000000002",
+      "sessionId": "fixture-session-new",
+      "mockExamId": "fixture-mock"
+    },
+    "reserveSnapshot": {
+      "reservationKind": "INITIAL",
+      "entitlementSource": "SUBSCRIPTION",
+      "attemptGroupId": "00000000-0000-4000-8000-000000000003",
+      "sessionId": "fixture-session-new",
+      "mockExamId": "fixture-mock",
+      "continuationReason": "PHONE_REJOIN",
+      "continuationId": "00000000-0000-4000-8000-000000000001"
+    },
+    "statusSnapshot": {
+      "reservationKind": "INITIAL",
+      "entitlementSource": "SUBSCRIPTION",
+      "attemptGroupId": "00000000-0000-4000-8000-000000000003",
+      "sessionId": "fixture-session-new",
+      "mockExamId": "different",
+      "continuationReason": "PHONE_REJOIN",
+      "continuationId": "00000000-0000-4000-8000-000000000001"
+    },
+    "expectedValid": false,
+    "scope": "SELECTED_IMMUTABLE_FIELDS_ONLY_NOT_FULL_DTO"
+  }
+]

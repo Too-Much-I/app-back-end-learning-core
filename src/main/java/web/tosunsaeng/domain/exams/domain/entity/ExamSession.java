@@ -43,6 +43,38 @@ public class ExamSession {
     // Actual last required retry-0 submission, independent of grading completion.
     private Instant submissionCompletedAt;
 
+    // Admission closure is separate from grading/summary lifecycle completion.
+    private Instant submissionsClosedAt;
+    private String submissionsClosedByOperationId;
+
+    public void closeSubmissions(String operationId, Instant now) {
+        if (submissionsClosedAt != null) {
+            if (!java.util.Objects.equals(submissionsClosedByOperationId, operationId))
+                throw new IllegalStateException("Session already replaced by another operation");
+            return;
+        }
+        submissionsClosedAt = java.util.Objects.requireNonNull(now);
+        submissionsClosedByOperationId = java.util.Objects.requireNonNull(operationId);
+        active = false;
+    }
+
+    public void activatePaid(Instant confirmedAt) {
+        if (!isEntitlementConfirming() || entitlementState != ExamEntitlementState.CONFIRMING
+                || submissionsClosedAt != null || completedAt != null)
+            throw new IllegalStateException("Session cannot be activated");
+        entitlementState = ExamEntitlementState.CONFIRMED;
+        entitlementConfirmedAt = confirmedAt;
+        status = ExamSessionStatus.IN_PROGRESS;
+        active = true;
+    }
+
+    public void cancelPaidPending() {
+        if (!isEntitlementConfirming() || entitlementState != ExamEntitlementState.CONFIRMING)
+            throw new IllegalStateException("Only a pending Session can be compensated");
+        status = ExamSessionStatus.ABANDONED;
+        active = false;
+    }
+
     private Integer submissionEvidenceVersion;
     private java.util.List<Integer> requiredQuestionNumbers;
 

@@ -19,6 +19,10 @@ public class ReservationRecovery {
     private Status status = Status.READY;
     private Intent intent = Intent.CONTINUE;
     private Dispatch dispatch = Dispatch.NOT_DISPATCHED;
+    private Dispatch confirmDispatch = Dispatch.NOT_DISPATCHED;
+    private Dispatch cancelDispatch = Dispatch.NOT_DISPATCHED;
+    private MemberWaitEvidence memberWait;
+    private long memberExcludedAtFirstAttempt;
     private Instant nextAt;
     private Instant firstAt;
     private int attempts;

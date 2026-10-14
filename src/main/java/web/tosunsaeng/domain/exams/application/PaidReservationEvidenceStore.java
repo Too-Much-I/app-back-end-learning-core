@@ -23,7 +23,7 @@ public class PaidReservationEvidenceStore {
     private final MongoTemplate mongo;
     private final ObjectProvider<UserOwnedTransactionExecutor> owners;
     private final Clock clock;
-    private final com.fasterxml.jackson.databind.ObjectMapper mapper = new BillingSagaConfiguration().billingContractObjectMapper();
+    private static final com.fasterxml.jackson.databind.ObjectMapper mapper = new BillingSagaConfiguration().billingContractObjectMapper();
 
     public PaidReservationEvidenceStore(ExamCreationOperationRepository operations, MongoTemplate mongo,
             ObjectProvider<UserOwnedTransactionExecutor> owners, Clock clock) {
@@ -85,7 +85,7 @@ public class PaidReservationEvidenceStore {
         return owner;
     }
 
-    private String digest(Object request) {
+    static String digest(Object request) {
         try {
             return java.util.HexFormat.of().formatHex(java.security.MessageDigest.getInstance("SHA-256")
                     .digest(mapper.writeValueAsBytes(request)));

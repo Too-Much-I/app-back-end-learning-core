@@ -132,6 +132,7 @@ public class ExamGradingService {
         if (current != null) {
             return new SubmitPreparation(toExamStatus(current.getStatus()), null);
         }
+        requireNewAdmission(examId);
         Instant now = clock.instant();
         QuestionGradingJob pending = QuestionGradingJob.pending(
                 jobId,
@@ -164,6 +165,7 @@ public class ExamGradingService {
             Integer retryCount
     ) {
         requireNotAbandonedSession(examId);
+        requireNewAdmission(examId);
         int canonicalRetryCount = GradingKeys.canonicalRetryCount(retryCount);
         String mockExamId = resolveMockExamId(examId);
         String jobId = GradingKeys.questionJobId(examId, questionNumber, canonicalRetryCount);
@@ -1062,6 +1064,13 @@ public class ExamGradingService {
             throw new ExamsException(ErrorStatus._EXAM_ALREADY_COMPLETED);
         }
         return session;
+    }
+
+    private void requireNewAdmission(String examId) {
+        ExamSession session=examSessionRepository.findById(examId)
+                .orElseThrow(() -> new ExamsException(ErrorStatus._EXAM_NOT_FOUND));
+        if (session.getSubmissionsClosedAt()!=null) throw new ExamsException(ErrorStatus._EXAM_ABANDONED);
+        if (session.isEntitlementConfirming()) throw new ExamsException(ErrorStatus._EXAM_CREATION_PROCESSING,1);
     }
 
     private boolean canProcessSession(String examId) {
