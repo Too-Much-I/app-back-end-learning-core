@@ -1,5 +1,9 @@
 # ADR — LC 유료 시험의 접수 기준 전환과 복구 경계
 
+- TMI-220 보완: [LC 기접수 구현](../codex/TMI_220_LC_ACCEPTED_WORK_IMPLEMENTATION.md). confirm owner·재시작 closure snapshot 및 immutable Job 최초접수 시각을 사용해 revoked 과거 Session의 exact 기존 작업만 허용한다. 신규사용·삭제/owner/terminal 우선은 유지한다. 공동 경합/E2E 및 활성화 gate는 별도다.
+
+- P6 준비: [읽기 전용 manifest 검증](../codex/LC_BILLING_PAID_EXAM_P6_PREPARATION.md). source 누락 fallback 없이 별도 승인 summary와 exact 목록을 검증한다. membership은 권한이 아니며 상태누락/삭제/owner/revoke 검사를 우회하지 않는다. snapshot과 실제 writer drain을 구분하고 현재 공개 reader/활성화 연결은 하지 않는다.
+
 - P5.1 후속: [ON 구성·전용 TLS 연결](../codex/LC_BILLING_PAID_EXAM_P5_1_IMPLEMENTATION.md)을 구현했다. OFF에서는 키/DB/TLS를 구성하지 않고 ON 구성은 owner writer 및 index 점검을 요구한다. 별도 rollout gate는 P6 legacy/lifecycle/V07 검증 전 실제 ON을 계속 거절한다. 격리 HTTPS 테스트는 배포 완료가 아니다.
 
 - P5 후속: [역방향 revoke 구성요소](../codex/LC_BILLING_PAID_EXAM_P5_IMPLEMENTATION.md). 단일 group fact/event unique와 Session deny projection을 같은 Transaction으로 저장하고 실제 signed fixture·HTTP/격리Mongo로 검증한다. Spring은 OFF404만 등록, ON wiring/TLS connector·legacy/lifecycle/V07 검증은 미완료이므로 startup gate를 유지한다. 과거 owner alias/Session upsert/원장 변경/자동TTL 없음.

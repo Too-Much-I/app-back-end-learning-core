@@ -179,6 +179,8 @@ public class ExamServiceImpl implements ExamService {
 
     private ExamSession requireOwnedInProgressSession(String examId) {
         ExamSession examSession = requireOwnedNotAbandonedSession(examId);
+        // Existing grading recovery only: never used for new recordings or admission.
+        if (examSession.permitsRevokedAcceptedWork()) return examSession;
         requireInProgressSession(examSession);
         return examSession;
     }

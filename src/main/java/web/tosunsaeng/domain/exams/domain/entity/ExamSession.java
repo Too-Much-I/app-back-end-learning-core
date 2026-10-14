@@ -38,6 +38,16 @@ public class ExamSession {
 
     // Durable deny projection. OFF/restart must not restore access to a revoked Session.
     private Boolean accessRevoked;
+    private String accessRevocationEventId;
+    private String accessRevocationUserId;
+    private AcceptedWorkClosure acceptedWorkClosure;
+
+    public boolean permitsRevokedAcceptedWork() {
+        return isAccessRevoked() && isInProgress() && terminalEventId==null && completedAt==null
+                && accessRevocationEventId!=null && !accessRevocationEventId.isBlank()
+                && java.util.Objects.equals(accessRevocationUserId,userId)
+                && acceptedWorkClosure!=null && acceptedWorkClosure.matches(this);
+    }
 
     public boolean isAccessRevoked() { return Boolean.TRUE.equals(accessRevoked); }
 
@@ -58,6 +68,7 @@ public class ExamSession {
                 throw new IllegalStateException("Session already replaced by another operation");
             return;
         }
+        acceptedWorkClosure = AcceptedWorkClosure.capture(this,operationId,now);
         submissionsClosedAt = java.util.Objects.requireNonNull(now);
         submissionsClosedByOperationId = java.util.Objects.requireNonNull(operationId);
         active = false;
@@ -69,6 +80,7 @@ public class ExamSession {
             throw new IllegalStateException("Session cannot be activated");
         entitlementState = ExamEntitlementState.CONFIRMED;
         entitlementConfirmedAt = confirmedAt;
+        entitlementConfirmedUserId = userId;
         status = ExamSessionStatus.IN_PROGRESS;
         active = true;
     }
@@ -108,6 +120,7 @@ public class ExamSession {
     private ExamEntitlementState entitlementState;
 
     private Instant entitlementConfirmedAt;
+    private String entitlementConfirmedUserId;
 
     private AttemptGroupProjectionStatus attemptGroupProjectionStatus;
 
@@ -190,6 +203,16 @@ public class ExamSession {
 
     public void markAttemptGroupCompleted(String eventId, Instant now, java.time.ZoneId zone) {
         requireTerminalAvailable();
+        completeAttemptGroup(eventId,now,zone);
+    }
+
+    /** Called only after full result/summary evaluation inside the existing owner transaction. */
+    public void markRevokedAcceptedWorkCompleted(String eventId, Instant now, java.time.ZoneId zone) {
+        requireRevokedAcceptedTerminal();
+        completeAttemptGroup(eventId,now,zone);
+    }
+
+    private void completeAttemptGroup(String eventId, Instant now, java.time.ZoneId zone) {
         attemptGroupProjectionStatus = AttemptGroupProjectionStatus.COMPLETED;
         attemptGroupProjectionVersion = effectiveProjectionVersion() + 1;
         terminalEventId = eventId;
@@ -201,6 +224,23 @@ public class ExamSession {
 
     public void markAttemptGroupRetakeAvailable(String eventId, AttemptGroupFailureCode code) {
         requireTerminalAvailable();
+        failAttemptGroup(eventId,code);
+    }
+
+    public void markRevokedAcceptedWorkFailed(String eventId, AttemptGroupFailureCode code) {
+        requireRevokedAcceptedTerminal();
+        failAttemptGroup(eventId,code);
+    }
+
+    private void requireRevokedAcceptedTerminal() {
+        if (!permitsRevokedAcceptedWork() || !Integer.valueOf(1).equals(submissionEvidenceVersion)
+                || submissionCompletedAt==null || submissionCompletedAt.isAfter(submissionsClosedAt)
+                || requiredQuestionNumbers==null || requiredQuestionNumbers.isEmpty()
+                || requiredQuestionNumbers.stream().anyMatch(n->n==null || n<1))
+            throw new IllegalStateException("Accepted terminal evidence is not available");
+    }
+
+    private void failAttemptGroup(String eventId, AttemptGroupFailureCode code) {
         attemptGroupProjectionStatus = AttemptGroupProjectionStatus.RETAKE_AVAILABLE;
         attemptGroupProjectionVersion = effectiveProjectionVersion() + 1;
         terminalEventId = eventId;

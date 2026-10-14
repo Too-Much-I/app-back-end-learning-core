@@ -148,9 +148,11 @@ public class AttemptGroupStateCoordinator {
         AttemptGroupEventPayload payload = basePayload(eventId, session, target, evidence, failureCode, now);
         String durableEventId = persistEvent(session, payload, AttemptGroupEventSlot.TERMINAL, now);
         if (target == AttemptGroupEventTarget.COMPLETED) {
-            session.markAttemptGroupCompleted(durableEventId, now, clock.getZone());
+            if(session.isAccessRevoked()) session.markRevokedAcceptedWorkCompleted(durableEventId,now,clock.getZone());
+            else session.markAttemptGroupCompleted(durableEventId, now, clock.getZone());
         } else {
-            session.markAttemptGroupRetakeAvailable(durableEventId, failureCode);
+            if(session.isAccessRevoked()) session.markRevokedAcceptedWorkFailed(durableEventId,failureCode);
+            else session.markAttemptGroupRetakeAvailable(durableEventId, failureCode);
         }
         sessionRepository.save(session);
     }
@@ -201,7 +203,9 @@ public class AttemptGroupStateCoordinator {
     }
 
     private boolean eligible(ExamSession session) {
-        return managed(session) && session.isInProgress();
+        return managed(session) && session.isInProgress()
+                && (!session.isAccessRevoked()
+                    || web.tosunsaeng.domain.exams.application.ExamAcceptedWorkPolicy.summaryAllowed(session));
     }
 
     private boolean managed(ExamSession session) {

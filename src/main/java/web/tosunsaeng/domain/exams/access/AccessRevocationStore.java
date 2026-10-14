@@ -60,7 +60,9 @@ public final class AccessRevocationStore {
                     Criteria denied=Criteria.where("attemptGroupId").is(event.attemptGroupId());
                     if(event.confirmedSessionId()!=null) denied=denied.orOperator(Criteria.where("_id").ne(event.confirmedSessionId()),
                             Criteria.where("userId").ne(event.userId()));
-                    mongo.updateMulti(Query.query(denied),new Update().set("accessRevoked",true).inc("version",1L),"exam_sessions");
+                    mongo.updateMulti(Query.query(denied),new Update().set("accessRevoked",true)
+                            .set("accessRevocationEventId",event.eventId()).set("accessRevocationUserId",event.userId())
+                            .inc("version",1L),"exam_sessions");
                     return null;
                 });
                 return;

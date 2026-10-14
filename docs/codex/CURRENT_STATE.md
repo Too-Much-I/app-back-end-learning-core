@@ -1,5 +1,19 @@
 # Learning Core Current State
 
+- PLAN-012 순서 안내 턴의 WORKLOG 식별자 기록을 보완했다. 추가 구현 승인으로 해석하지 않으며 TMI-219/220/221·LC P6.1/공동 검증의 기존 상태는 그대로 유지한다.
+
+- 2026-10-14 — 후속 순서 문의: “12”를 Billing PLAN-012로 조건부 해석해 문서 확인. 해당 계획은 TMI-219 환불 코어 구현/default-OFF, TMI-220·221 후속으로 기록돼 있어 새로 전체 착수하기보다 잔여 구현/공동 검증을 진행하는 단계다. 최신 Billing 코드 완료 여부는 재검증하지 않았다. LC P6.1 보존/전환 gate는 별도로 남는다. 이번은 안내·기록만, 코드/테스트/외부변경 없음.
+
+- 2026-10-14 — TMI-220 「보완 해줘」 LC 구현: confirm-owner/closure snapshot·Job immutable 최초접수 시각·revoke event/owner 연결로 과거 exact 작업만 허용. Callback·기존 grading retry·Summary·terminal 분기와 삭제/owner 우선 검증 추가. [보고·범위표](TMI_220_LC_ACCEPTED_WORK_IMPLEMENTATION.md). 최종 clean test/mongoIntegrationTest/bootJar 성공: 단위1,264개 실패/오류0·기존1 skip, Mongo252개 실패/오류/skip0. Node121·fixture34 hash 통과. 기존 P6 dirty/사용자 DS_Store 보존, 공개/AI/S3/Redis/Billing wire 불변. C05 포함 전체 공동 경합·HTTP/Billing 검증·P6.1·활성화는 미완료. 실DB/배포/commit/push·Billing/Identity/Jira 변경 없음. 관련 TMI-220/217·LC TMI-116/128/122/125/193/136.
+
+- 2026-10-14 — 사용자 확인으로 TMI-220 문서 합의 완료·추가 정책 결정 없음 기록. Billing은 과거S1 이벤트만 반영/S2·현재group·새guard 유지, LC는 영속 접수 증거가 있는 기존 작업의 채점/Callback/시스템재시도/Summary만 허용하는 분담이다. 보완 구현 및 C01~C06/H14~H16 독립·공동경합 검증은 미완료. 이번 턴은 상태 확인 기록만이며 코드/테스트/배포 착수 없음. 관련 TMI-220/217·LC TMI-116/128/125. 기존 dirty 보존·활성화 차단 유지.
+
+- 2026-10-14 — TMI-220 Billing 수정 인계 재확인: H11~H13 기존항목 보존·새H14~H16으로 번호충돌 해소. pendingAt 최초접수 사용금지, receipt TTL/marker 한계·권위Tx/fence 순서·전체 처리경로 분담이 LC 검토와 문서상 일치한다. [LC 회신](TMI_220_LC_ACCEPTED_WORK_REVIEW.md) 번호/미해결 상태 동기화. 관련 TMI-220/217·LC TMI-116/128/125. 아래 이전 번호중복 요청은 해소됐으나 구현·C01~C06/H14~H16·공동E2E는 미완료. 이번은 문서만 변경, 기존 P6 dirty·사용자파일 보존, 코드/fixture/DB/배포/외부전송 없음.
+
+- 2026-10-14 — TMI-220 사용자 승인 보완본 LC 검토: [회신·C01~C06/새H11~H13 대응](TMI_220_LC_ACCEPTED_WORK_REVIEW.md) 작성. retry0 receipt/전체접수marker·confirm/접수차단 연결은 재사용 가능하나 accessRevoked 선행차단·Job 최초접수순서/귀속·terminal writer까지 좁은 예외 검증이 필요하다. pendingAt은 재시도 중 바뀌므로 최초접수 근거로 사용 불가. Billing 인계서 H11~H13 중복번호 발견, 새 과거Session 사례명으로 구분하며 기존 항목 보존 요청. 정책방향 접수이며 코드/fixture/공동E2E/배포 완료 아님. 관련 TMI-220/217/219·LC TMI-116/128/122/125/193/136. 이번은 문서만, 기존 P6 dirty/사용자파일 보존·외부전송 없음.
+
+- 2026-10-14 — P5/P5.1을28da60e·경합테스트보완cdaae38로 푸시하고 PR #41 CI38561551230 재실행 성공 후 develop e894408bbe3a2d53547cb0aa761b5870fa9f55ad에 머지했다. 테스트 자동배포38562447472는 마지막 확인 ECS 전환 중/health 대기이며 완료로 주장하지 않는다. 기능설정 불변. feat/billing-paid-exam-p6에서 [legacy 읽기 전용 준비](LC_BILLING_PAID_EXAM_P6_PREPARATION.md) 구현: exact 목록 hash·환경/DB/revision·봉인/coverage 및 index 검증, source 누락 fallback 없음. 단위1,252개(기존1 skip)·Mongo248개 실패/오류0, bootJar/Node121/fixture34/diff 통과. P6 미커밋/미푸시, runtime reader·실제목록봉인/적용·P6.1·활성화 미실행. 관련 TMI-116/128/122/125·TMI-193/136/217/220·선행TMI-218. TMI-220 공동 의미 보완 전 기존 차단 유지. 사용자 DS_Store 보존.
+
 - P5.1 최종 검증: clean test/mongoIntegrationTest/bootJar 성공, 단위1,248개(기존1 skip)·Mongo238개 실패/오류0, Node121·fixture hash34·diff check 통과. 격리 TLS 및 별도 Spring chain 검증이며 전체 앱 ON/실환경E2E 완료는 아니다.
 
 - 2026-10-14 — TMI-220 공동 인계 검토: 현재 AccessRevocationStore는 보호ID 외 동일group Session을 accessRevoked로 표시하고 ExamAcceptedWorkPolicy/GradingService는 접수증거보다 먼저 거절한다. Billing PaidAttemptEventService도 ACTIVE 과거Session을 activeSessionId 불일치로 거절함을 정적 확인했다. 기존 기접수 마무리 의도에 맞춰 confirm·재시작전 durable 접수 증거가 있는 S1 작업만 유지하고 신규사용/명시삭제/탈퇴/terminal은 계속 차단하는 좁은 공동 계약 보완 권고. 단일보호ID·불변event 유지 가능성은 공동 검증 필요, 수락/코드변경/배포 아님. TMI-219 병합·1,603테스트는 사용자 보고이며 독립 재실행 안 함. 관련 TMI-220/219/217·LC TMI-116/128/125 및 TMI-218.

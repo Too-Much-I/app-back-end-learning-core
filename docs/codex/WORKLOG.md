@@ -15491,3 +15491,58 @@
 - 권고는 기존 기접수 마무리 정책 의도를 유지하는 좁은 공동 의미 보완이다. 환불전 confirm되고 재시작 전에 durable 접수된 S1 exact 작업의 결과/시스템 재시도만 허용하고 신규제출/새녹음 retry/새Session 허용과 분리한다. 일부접수는 전체완료/Summary 근거가 아니다. owner/삭제/탈퇴/실제terminal 우선, S1 늦은완료로 S2/새guard 변경0을 유지한다. 모든 accessRevoked 우회나 timestamp/현재group 추정만의 허용은 금지하며 confirm/접수/lifecycle 증거 coverage 검증이 필요하다.
 - 단일 confirmedSessionId/event 불변을 유지하는 방향을 우선 검토하되 현재 R2 exact Session만 완료 허용 문구와의 경계를 공동 문서/상태 테스트로 명료화하기 전 임의 수락·구현으로 기록하지 않는다. Billing 이전Session event 수용 및 effect 범위를 함께 확정해야 한다. 실제 LC HTTP/Job+Billing 공동 E2E는 미실행이며 운영 사고 확정도 아니다.
 - CURRENT_STATE 갱신·WORKLOG EOF append만 수행했다. 기존 코드/문서 작업 보존, 제품/fixture/계약원본/Billing/Jira/DB/배포/외부발송/commit/push 변경 없음. 정적 검토로 diff check·marker 단일출현만 검증, Secret/Token 미기록.
+
+## 2026-10-14 — P5 전달·머지와 P6 legacy 읽기 전용 준비
+
+<!-- codex-turn:01a13a4a-2f7e-7981-85eb-9c03877e106e -->
+
+- 사용자 「커밋 푸시 머지한 다음 브랜치 파서 다음꺼 구현해줘」로 P5/P5.1 및 기존 관련기록을28da60e로 푸시하고 PR #41 생성·첨부. AGENTS에 이번 전달/후속P6 범위 기록. 사용자 DS_Store는 제외했다. CI38560906730의 finalize/revoke 동시성 테스트가 계약상 일시503을 즉시성공으로 기대해 실패하여, 같은event 재전송 후 durable 차단 검증으로 보완(cdaae38)했다. 새 CI38561551230에서는 기존 무관한 LearningQuotaTransactionTest 동시성1개 실패, 동일커밋 재실행 성공 후 머지했다. 검사우회/무관한 제품수정 없음. 관련 TMI-116/TMI-128/TMI-122/TMI-125·TMI-193/TMI-136/TMI-217/TMI-220·선행TMI-218.
+- PR #41 develop 머지e894408bbe3a2d53547cb0aa761b5870fa9f55ad 완료, 해당 원격결과에서 feat/billing-paid-exam-p6 생성. 기존 테스트 자동배포38562447472는 마지막 조회 ECS 전환 중/health 대기였다. 기능설정/운영환경을 바꾸지 않았으며 배포최종성공을 주장하지 않는다.
+- P6 LegacyExamManifest·PaidExamCutoverInspector 및 단위4/격리Mongo10개를 구현했다. context-bound length-framed UTF8 SHA256·별도승인summary·exact목록/봉인/read-only snapshot 검증, 신규유료metadata 혼입·미해결operation·잘못된DB/revision·목록누락/변조·TTL/index/collection실패를 fail-closed한다. 없는 source를 legacy로 추론하거나 기존시험 상태/권리/원장을 수정하지 않는다. 목록 membership과 권한은 분리하고 삭제시험 비부활·새writer 목록외 처리를 검증했다. summary 출력은 revision/hash/count만이며 실제ID파일/DB출력/자동설치·봉인·runtime reader 연결은 없다.
+- P6 최초 전체 회귀에서 P5의 다른 동시수신 테스트도 즉시성공 기대 때문에503 실패했다. 이번 브랜치에서 동일event 재전송 후 단일fact/중복204·서로다른event409 수렴을 검증하도록 보완했다. 제품 retry정책/권한변경·검증 제외 없음. 최종 clean test/mongoIntegrationTest/bootJar 및 출력최소화 후 재실행 성공: XML 단위1,252개 실패/오류0·기존1 skip, Mongo248개 실패/오류/skip0. Node mongodb121·공동fixture hash34·diff check 통과. 기존 deprecated/unchecked 경고는 일괄 수정하지 않았다.
+- P6 보고·runbook·계획/ADR/CURRENT_STATE 동기화. 실제writer drain과 snapshot은 다르며 봉인/적용·전체coverage·P6.1 보존/최종purge·TMI-220 공동의미·실환경인증서/ALB는 후속gate다. 기존rollout 차단유지. 이번 P6 커밋/푸시/실DB/index적용/기능활성화/Billing·Identity·Jira 변경 없음. 공개API/DTO/BaseResponse·AI user_id=examId/Callback·retryCount/S3/Redis·Billing wire/fixture 불변. 예상밖 제품변경 없고 사용자파일·동시 TMI-220 기록보존, Secret/Token 미기록.
+
+## 2026-10-14 — TMI-220 승인 보완 접수·LC 근거 및 회귀 대응 검토
+
+<!-- codex-turn:01a13a5e-9d42-7e81-9aec-42051de2f140 -->
+
+- 사용자 전달 Billing TMI-220-REFUND-PROTECTED-SESSION-CLARIFICATION 및 연결된 LC 환불 인계서의 새 H11~H13을 읽고 현재 LC 접수/Job/Callback/summary/terminal/revoke 경로와 대조했다. 관련 TMI-220/TMI-217/TMI-219, LC TMI-116/TMI-128/TMI-122/TMI-125·TMI-193/TMI-136. 사용자 승인 정책 방향을 접수하되 구현/공동E2E/배포 수락으로 확대하지 않았다.
+- retry0 receipt·전체 marker·필수집합·confirm snapshot·접수차단 operation 연결은 재사용 가능하다. accessRevoked 선행 차단은 현재 기접수 처리도 거절하며 terminal writer에도 차단이 있어 policy 한 곳만 수정하면 안 된다. Job 제출표시는 최초 접수 시각/귀속의 충분조건이 아니고 pendingAt은 reopenMissingResult에서 바뀐다. 새 녹음/새사용 거절은 유지하고 exact 기접수·원 owner/source/confirm/lifecycle 검증과 시스템재시도·파생Summary·원Session 상태event 전용 경로를 보완할 범위로 정리했다.
+- TMI_220_LC_ACCEPTED_WORK_REVIEW.md에 Billing 회신용 문안, 변경범위 및 C01~C06/새H11~H13 대응표를 작성했다. 인계서에는 H11~H13의 새 과거Session 사례와 종전 다른권리/TTL/인증 사례가 중복되어 있으므로 사례명을 함께 적고 기존 항목을 보존한 ID 정리를 권고했다. 상대 파일/공동fixture 원본은 수정하지 않았다.
+- 이번은 정적검토·문서3개만 변경하고 Gradle/상태scenario/공동HTTP를 실행하지 않았다. 기존 테스트 건수를 새 정책 검증으로 보고하지 않는다. diff check와 marker 단일출현 확인. CURRENT_STATE 갱신 및 WORKLOG EOF append, 기존 P6 dirty 코드/기록·사용자파일 보존. 공개API/AI/S3/Redis·wire 불변, 예상밖 제품변경·Billing/Identity/Jira/DB/배포/외부전송/commit/push·Secret/Token 기록 없음. 다음은 별도 구현 요청과 양측 처리경로/경합 검증이며 rollout 차단유지.
+
+## 2026-10-14 — TMI-220 수정 인계 재확인·번호 정합 반영
+
+<!-- codex-turn:01a13a6a-a084-7b51-8f6c-e6fa7d39b4ad -->
+
+- 사용자 전달 Billing LC 인계서 전체 및 TMI-220 보완 문서 §3.1을 읽기 확인했다. 기존 H11~H13 유지/새H14~H16 재번호, C01·C02→H14/C03→H15/C04·C05→H16/C06공통음성 매핑을 확인하여 번호충돌 지적을 해소했다. 관련 TMI-220/TMI-217·LC TMI-116/TMI-128/TMI-125.
+- pendingAt 최초접수 증거 금지, retry0 receipt의 전체접수후3일TTL·marker/필수집합 재사용 한계, 기존retry>0 exact근거, Tx/operation·권위저장/fence 순서, Callback/시스템재시도/복구/Summary/terminal/outbox·Billing 과거event 분담이 LC 검토 요청과 문서상 일치함을 확인했다. 새 제품선택/구현완료/공동E2E/배포 수락을 의미하지 않는다.
+- LC 회신 문서의 현재 대응표·요약을 H14~H16으로 동기화하고 CURRENT_STATE 갱신, WORKLOG 끝에 이번 기록을 append했다. 과거 WORKLOG는 불변. 기존 P6 dirty 코드/문서·사용자파일 보존, 이번 제품코드/fixture/Billing·Identity/Jira/DB/배포/외부전송/commit/push 변경 없음. 문서 검토만이므로 Gradle 미실행, diff check·marker 단일출현 확인. Secret/Token 미기록. 다음은 별도 구현 요청 후 좁은 기접수 예외와 양측 실제 회귀 검증이며 rollout 차단 유지.
+
+## 2026-10-14 — TMI-220 문서 합의 완료 상태 확인
+
+<!-- codex-turn:01a13a6e-f86e-71d1-a521-692f14a23262 -->
+
+- 사용자 확인에 따라 양측 문서 합의 완료·추가 정책 결정 없음, 보완 구현/검증 미완료로 상태를 기록했다. Billing의 과거S1 이벤트 한정 반영 및 S2/current group/새guard 보존, LC의 영속 접수 작업 한정 채점/Callback/시스템재시도/Summary 분담을 유지한다. 관련 TMI-220/TMI-217·LC TMI-116/TMI-128/TMI-125.
+- C01~C06/H14~H16 독립 테스트와 공동 경합 테스트는 실제 구현 후 실행할 항목이며 통과로 표시하지 않았다. 이번은 CURRENT_STATE 및 WORKLOG 기록만 변경, 기존 P6 dirty/사용자파일 보존. 코드/fixture/DB/외부전송/Jira/commit/push/배포 변경 없음. 문서만으로 Gradle 미실행, diff check·marker 단일출현 확인. Secret/Token 미기록, rollout 차단 유지.
+
+## 2026-10-14 — TMI-220 과거 Session 기접수 보완 구현·LC 독립 검증
+
+<!-- codex-turn:01a13a70-02fb-72e0-bde1-5fb0970e663a -->
+
+- 사용자 「보완 해줘」 범위로 LC 코드/격리 테스트를 수행했다. 관련 TMI-220/217·LC TMI-116/128/122/125/193/136. 기존 feat/billing-paid-exam-p6와 미커밋 P6 변경·사용자 DS_Store 보존, Billing/Identity/Jira/실DB/배포/활성화/외부발송/commit/push 없음.
+- AcceptedWorkClosure·confirm owner·revoke event/owner projection 및 Job firstUserSubmittedAt으로 원 confirm/owner/source/재시작 경계와 exact 접수를 검증한다. pendingAt/boolean-only Job을 소급 근거로 쓰지 않는다. 기존 retry0 receipt/전체 marker 재사용, 신규녹음 거절·Callback/기존 grading retry/파생Summary·전용 terminal 허용을 분리했다. 삭제/owner/terminal fence와 새 Session/operation guard 유지, 일반 terminal revoke 차단 불변.
+- 새 policy8·service4 및 Mongo4 테스트 추가. 첫 Mongo 삭제 음성 테스트는 fixture에 DeletionAccess가 미주입돼 실패한 것을 실제 fence 주입으로 정정했다. 추가 grading recovery 테스트의 초기 recoveryCycle 기대 오류도 기존 모델값으로 정정했다. 최종 JAVA_TOOL_OPTIONS=-Dapi.version=1.44 ./gradlew clean test mongoIntegrationTest bootJar 성공: 단위1,264개 실패/오류0·기존1skip, 격리Mongo252개 실패/오류/skip0. Node mongodb121개·fixture34 hash·diff check 통과. 기존 deprecation/unchecked 경고는 별도 수정하지 않았다.
+- 구현보고/계획/ADR/AGENTS/CURRENT_STATE 동기화. C01~C06/H14~H16 LC 검증 범위와 남은 C05 동시outbox/Billing group/guard·전체 lifecycle 양순서·HTTP/E2E를 분리했다. 새 증거 없는 과거자료 자동허용/backfill 없음, P6.1 보존/배포 gate 유지. 공개API/DTO/BaseResponse·AI user_id=examId/Callback·retryCount/S3/Redis·Billing wire/fixture 불변, 예상밖 제품수정 없음. 상세 변경파일/위험/후속은 TMI_220_LC_ACCEPTED_WORK_IMPLEMENTATION.md 참조.
+
+## 2026-10-14 — PLAN-012 후속 순서 안내
+
+- 사용자 “그거 한번에 한다고 가정하고 그럼 12 개발하면 되나?”의 12를 Billing PLAN-012로 조건부 해석했다. Billing plan012-refund worktree의 계획 문서상 TMI-219 코어 구현·기본OFF와 TMI-220/221 후속을 확인했다. 최신 제품코드/테스트 재검증 없이 전체 미착수 또는 완료라고 단정하지 않는다. LC 잔여 P6.1과 공동 검증/활성화 gate를 구분해 안내한다.
+- CURRENT_STATE/WORKLOG 기록만 변경. 기존 dirty 보존, 제품/DB/배포/외부전송/commit/push 없음. 분석 안내이므로 Gradle 재실행 없음. 관련 TMI-219/220/221 및 LC TMI-116/128/122.
+
+## 2026-10-14 — PLAN-012 안내 턴 기록 식별자 보완
+
+<!-- codex-turn:01a13a81-7db0-7f41-987d-6c59aaa59f66 -->
+
+- 이번 턴의 PLAN-012 후속 순서 안내를 기록했다. Billing 계획 문서상 TMI-219 코어 구현과 TMI-220/221 후속, LC P6.1 및 공동 검증/활성화 gate를 구분했으며 구현 착수는 하지 않았다. 관련 TMI-219/220/221·LC TMI-116/128/122.
+- WORKLOG 끝에 식별자를 append하고 CURRENT_STATE를 갱신했다. 기존 기록/dirty 파일 보존, 코드/DB/배포/외부변경 없음. 문서 기록만으로 Gradle 미실행, diff와 식별자 단일출현 검사. Secret/Token 미기록.

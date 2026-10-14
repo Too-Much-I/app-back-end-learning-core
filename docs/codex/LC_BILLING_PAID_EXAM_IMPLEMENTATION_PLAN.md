@@ -1,5 +1,9 @@
 # LC–Billing 유료 시험 연동 구현 계획
 
+- TMI-220 보완(2026-10-14): [과거 Session 기접수 코드·독립 검증](TMI_220_LC_ACCEPTED_WORK_IMPLEMENTATION.md)을 추가했다. 공통 policy/Callback/기존 grading retry/파생 Summary·terminal 경로를 보완했으며 근거 없는 과거 데이터 backfill은 하지 않는다. C01~C06/H14~H16 전체 공동 테스트 완료·배포 승인은 아니다.
+
+- P6 준비 후속(2026-10-14): [legacy 목록 검증·읽기 전용 snapshot](LC_BILLING_PAID_EXAM_P6_PREPARATION.md)을 구현했다. 실제 목록 적용/봉인·writer 전환·공개 연결/활성화와 P6.1 최종 purge는 미실행이다. TMI-220 기접수/revoke 공동 보완 gate를 유지한다.
+
 - P5.1 구현 후속(2026-10-14): Spring ON verifier/store 조립·전용 TLS connector·포트 격리 및 기존 생성/접수 writer의 revoke 방어 추가. [상세 보고](LC_BILLING_PAID_EXAM_P5_1_IMPLEMENTATION.md). 실제 ON은 P6 legacy/owner/V07 rollout gate로 차단하며 실DB/index 적용·배포·활성화는 수행하지 않았다.
 
 - 작성일: 2026-10-14

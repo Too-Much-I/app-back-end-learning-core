@@ -13,7 +13,8 @@ public class ExamAcceptedWorkPolicy {
     private final ExamSubmissionEvidence evidence;
 
     public static boolean processable(ExamSession session) {
-        return session!=null && !session.isAccessRevoked() && !session.isAbandoned() && !session.isRetakeAvailable() && !session.isEntitlementConfirming();
+        return session!=null && (!session.isAccessRevoked() || session.permitsRevokedAcceptedWork())
+                && !session.isAbandoned() && !session.isRetakeAvailable() && !session.isEntitlementConfirming();
     }
 
     public static boolean requiresEvidence(ExamSession session) {
@@ -26,6 +27,21 @@ public class ExamAcceptedWorkPolicy {
         if (session.getSubmissionEvidenceVersion()!=null && !Integer.valueOf(1).equals(session.getSubmissionEvidenceVersion())) return false;
         int canonical=GradingKeys.canonicalRetryCount(retry);
         var job=jobs.findById(GradingKeys.questionJobId(session.getExamId(),question,canonical)).orElse(null);
+        if (session.isAccessRevoked()) {
+            if (!Integer.valueOf(1).equals(session.getSubmissionEvidenceVersion())
+                    || session.getRequiredQuestionNumbers()==null || !session.getRequiredQuestionNumbers().contains(question)
+                    || session.getRequiredQuestionNumbers().stream().anyMatch(n->n==null || n<1)) return false;
+            if (job!=null) {
+                if (!java.util.Objects.equals(job.getJobId(),GradingKeys.questionJobId(session.getExamId(),question,canonical))
+                        || !java.util.Objects.equals(job.getExamId(),session.getExamId())
+                        || !java.util.Objects.equals(job.getMockExamId(),session.getMockExamId())
+                        || !java.util.Objects.equals(job.getQuestionNumber(),question)
+                        || !java.util.Objects.equals(job.getRetryCount(),canonical)) return false;
+                if (job.isActivityUserSubmission() && job.getFirstUserSubmittedAt()!=null)
+                    return !job.getFirstUserSubmittedAt().isAfter(session.getSubmissionsClosedAt());
+            }
+            return evidence.acceptedQuestion(session,question,canonical);
+        }
         if (job!=null && job.isActivityUserSubmission()) return true;
         return evidence.acceptedQuestion(session,question,canonical);
     }

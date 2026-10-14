@@ -36,6 +36,14 @@ public class QuestionGradingJob {
     private String failureReason;
     // Distinguishes a new public submission from reconstruction of a missing legacy Job.
     private boolean activityUserSubmission;
+    private Instant firstUserSubmittedAt;
+
+    public QuestionGradingJob markUserSubmission(Instant acceptedAt) {
+        if (!activityUserSubmission && firstUserSubmittedAt==null)
+            firstUserSubmittedAt=java.util.Objects.requireNonNull(acceptedAt);
+        activityUserSubmission=true;
+        return this;
+    }
 
     public QuestionGradingJob markUserSubmission() { activityUserSubmission = true; return this; }
 
