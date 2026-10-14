@@ -61,7 +61,8 @@ public class AttemptGroupEvidenceEvaluator {
                 .map(ExamResult::getQuestionNumber)
                 .filter(required::contains)
                 .forEach(submitted::add);
-        boolean gradingReady = required.stream().allMatch(submitted::contains);
+        boolean gradingReady = required.stream().allMatch(submitted::contains)
+                && web.tosunsaeng.domain.exams.application.ExamAcceptedWorkPolicy.summaryAllowed(session);
 
         ResultEvidence resultEvidence = inspectResults(session, required, allResults);
         SummaryEvidence summaryEvidence = inspectSummary(session);
@@ -69,7 +70,7 @@ public class AttemptGroupEvidenceEvaluator {
                 || resultEvidence.integrityViolation()
                 || summaryEvidence.integrityViolation();
 
-        if (!integrityViolation
+        if (gradingReady && !integrityViolation
                 && resultEvidence.queryable()
                 && summaryEvidence.validScore()
                 && summaryEvidence.queryable()) {
@@ -176,6 +177,11 @@ public class AttemptGroupEvidenceEvaluator {
     }
 
     private List<Integer> requiredQuestionNumbers(ExamSession session) {
+        if (session.getSubmissionEvidenceVersion()!=null) {
+            if (!Integer.valueOf(1).equals(session.getSubmissionEvidenceVersion()))
+                throw new IllegalStateException("Unsupported submission evidence version");
+            return web.tosunsaeng.domain.exams.application.ExamSubmissionEvidence.required(session.getRequiredQuestionNumbers());
+        }
         return catalogService.getRequiredExam(GradingKeys.effectiveMockExamId(session.getMockExamId()))
                 .getQuestions().stream()
                 .filter(Objects::nonNull)

@@ -39,6 +39,19 @@ class DeletionApiTest {
         mvc.perform(delete("/api/v1/learning-records?userId=not-allowed")) .andExpect(status().isBadRequest());
         verifyNoInteractions(service);
     }
+    @Test void creationInProgressRejectsWithoutResultAndWithExactRetryAdvice() throws Exception {
+        when(service.request(OWNER, KEY)).thenThrow(new DeletionFailure(409,"EXAM_CREATION_PROCESSING"));
+        mvc.perform(delete("/api/v1/learning-records").header("Idempotency-Key",KEY))
+                .andExpect(status().isConflict()).andExpect(header().string("Retry-After","1"))
+                .andExpect(content().json("{\"isSuccess\":false,\"code\":\"EXAM_CREATION_PROCESSING\",\"message\":\"시험 준비 중입니다. 잠시 후 다시 시도해 주세요.\"}",true));
+    }
+    @Test void existingDeletionErrorDoesNotGainRetryHeader() throws Exception {
+        when(service.request(OWNER, KEY)).thenThrow(DeletionFailure.blocked());
+        mvc.perform(delete("/api/v1/learning-records").header("Idempotency-Key",KEY))
+                .andExpect(status().isConflict()).andExpect(header().doesNotExist("Retry-After"))
+                .andExpect(jsonPath("$.code").value("LEARNING_RECORD_DELETION_IN_PROGRESS"))
+                .andExpect(jsonPath("$.result").doesNotExist());
+    }
     @Test void disablingNewCommandsKeepsStatusAvailable() throws Exception {
         ReflectionTestUtils.setField(controller, "commandEnabled", false);
         mvc.perform(delete("/api/v1/learning-records").header("Idempotency-Key", KEY)).andExpect(status().isServiceUnavailable());

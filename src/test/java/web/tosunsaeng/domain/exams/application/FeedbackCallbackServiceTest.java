@@ -138,6 +138,31 @@ class FeedbackCallbackServiceTest {
                 .thenReturn(true);
     }
 
+    @Test void closedUnacceptedCallbackDoesNotWriteFeedback() throws Exception {
+        var session=examSession(); session.closeSubmissions("operation",java.time.Instant.now());
+        when(examSessionRepository.findById(EXAM_ID)).thenReturn(Optional.of(session));
+        var req=objectMapper.readValue("{\"user_id\":\"ex_callback_001\",\"question_number\":1,\"retry_count\":0,\"score\":1}",ExamRequestDTO.AiResultReq.class);
+        examService.updateExamResult(req);
+        verify(examResultRepository,never()).insert(any(ExamResult.class));
+        verify(gradingService,never()).completeQuestion(any(),any(),any());
+    }
+
+    @Test void closedAcceptedCallbackStoresResultOnOriginalSession() throws Exception {
+        var session=examSession(); session.closeSubmissions("operation",java.time.Instant.now());
+        when(examSessionRepository.findById(EXAM_ID)).thenReturn(Optional.of(session));
+        var jobs=org.mockito.Mockito.mock(web.tosunsaeng.domain.exams.domain.repository.QuestionGradingJobRepository.class);
+        var job=web.tosunsaeng.domain.exams.domain.entity.QuestionGradingJob.pending(GradingKeys.questionJobId(EXAM_ID,1,0),EXAM_ID,1,0,"key",java.time.Instant.EPOCH).markUserSubmission();
+        when(jobs.findById(job.getJobId())).thenReturn(Optional.of(job));
+        ReflectionTestUtils.setField(examService,"acceptedWorkPolicy",new ExamAcceptedWorkPolicy(jobs,org.mockito.Mockito.mock(ExamSubmissionEvidence.class)));
+        var req=objectMapper.readValue("{\"user_id\":\"ex_callback_001\",\"question_number\":1,\"retry_count\":0,\"score\":1}",ExamRequestDTO.AiResultReq.class);
+        examService.updateExamResult(req);
+        var captured=ArgumentCaptor.forClass(ExamResult.class);
+        verify(examResultRepository).insert(captured.capture());
+        assertEquals(EXAM_ID,captured.getValue().getExamId());
+        assertEquals(USER_ID,captured.getValue().getUserId());
+        verify(gradingService).completeQuestion(EXAM_ID,1,0);
+    }
+
     @Test
     void itemFeedbackCallbackSavesSessionUserIdWithoutChangingExistingMappings() throws Exception {
         ExamRequestDTO.AiResultReq req = objectMapper.readValue("""

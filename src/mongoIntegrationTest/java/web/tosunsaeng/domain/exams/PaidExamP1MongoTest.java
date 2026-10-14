@@ -20,6 +20,9 @@ import web.tosunsaeng.domain.exams.domain.repository.*;
 import web.tosunsaeng.domain.usermerge.application.*;
 import web.tosunsaeng.domain.usermerge.config.UserMergedProperties;
 import web.tosunsaeng.domain.usermerge.repository.UserOwnershipGuardRepository;
+import web.tosunsaeng.domain.learningrecorddeletion.application.*;
+import web.tosunsaeng.domain.learningrecorddeletion.domain.*;
+import org.springframework.test.util.ReflectionTestUtils;
 
 import java.time.*;
 import java.util.*;
@@ -39,13 +42,15 @@ class PaidExamP1MongoTest {
     UserOwnedTransactionExecutor owners;
     ExamCreationOperationRepository operations;
     PaidReservationEvidenceStore paidStore;
+    DeletionCommandService deletion;
     @BeforeAll static void connect() { client = MongoClients.create(MONGO.getReplicaSetUrl()); }
     @AfterAll static void close() { client.close(); }
     @BeforeEach void setup() {
         var factory = new SimpleMongoClientDatabaseFactory(client, "isolated-paid-p1");
         mongo = new MongoTemplate(factory);
         for (String c : List.of("exam_sessions", "exam_creation_operations", "exam_submission_receipts", "mock_exams",
-                "user_ownership_guards", "withdrawn_user_access_denies", "learning_record_billing_continuations", "question_grading_jobs")) {
+                "user_ownership_guards", "withdrawn_user_access_denies", "learning_record_billing_continuations", "question_grading_jobs",
+                "learning_record_deletion_operations", "learning_record_deletion_commands", "learning_record_deletion_targets")) {
             if (!mongo.collectionExists(c)) mongo.createCollection(c);
             mongo.remove(new Query(), c);
         }
@@ -61,6 +66,9 @@ class PaidExamP1MongoTest {
         owners = new UserOwnedTransactionExecutor(properties, new UserOwnershipGuardService(mongo,
                 repositories.getRepository(UserOwnershipGuardRepository.class)), beans.getBeanProvider(TransactionOperations.class), Clock.fixed(NOW,ZoneOffset.UTC));
         beans.addBean("owners",owners);
+        ReflectionTestUtils.setField(owners,"deletionAccess",new DeletionAccess(mongo));
+        deletion=new DeletionCommandService(mongo,new DeletionTransactions(factory),new UserOwnershipGuardService(mongo,
+                repositories.getRepository(UserOwnershipGuardRepository.class)),Clock.fixed(NOW,ZoneOffset.UTC));
         paidStore = new PaidReservationEvidenceStore(operations, mongo, beans.getBeanProvider(UserOwnedTransactionExecutor.class), Clock.fixed(NOW,ZoneOffset.UTC));
         evidence = new ExamSubmissionEvidence(mongo);
         preparation = new PaidExamPreparationService(mongo, operations,
@@ -75,6 +83,58 @@ class PaidExamP1MongoTest {
             .status(ExamSessionStatus.IN_PROGRESS).active(true).submissionEvidenceVersion(covered ? 1 : null)
             .requiredQuestionNumbers(covered ? List.of(1,2) : null).build()); }
     String key() { return UUID.randomUUID().toString(); }
+    @Test void creationFirstRejectsDeletionWithoutRowsOrNotificationSuppression() {
+        preparation.prepare(OWNER,key());
+        var notifications=org.mockito.Mockito.mock(web.tosunsaeng.domain.notification.NotificationStore.class);
+        ReflectionTestUtils.setField(deletion,"notificationStore",notifications);
+        for (String state:List.of("PREPARED","RESERVED","SESSION_COMMITTED","CANCEL_PENDING")) {
+            mongo.updateFirst(new Query(),Update.update("state",state).set("recovery.status","NEEDS_REVIEW"),ExamCreationOperation.class);
+            assertThatThrownBy(()->deletion.request(OWNER,key())).isInstanceOfSatisfying(DeletionFailure.class,
+                    e->{assertThat(e.status()).isEqualTo(409); assertThat(e.code()).isEqualTo("EXAM_CREATION_PROCESSING");});
+        }
+        assertThat(mongo.count(new Query(),DeletionOperation.class)).isZero();
+        assertThat(mongo.count(new Query(),DeletionCommand.class)).isZero();
+        assertThat(mongo.count(new Query(),DeletionTarget.class)).isZero();
+        org.mockito.Mockito.verifyNoInteractions(notifications);
+    }
+    @Test void nonterminalStateWithoutGuardStillCannotDelete() {
+        preparation.prepare(OWNER,key());
+        mongo.updateFirst(new Query(),Update.update("activeGuard",false),ExamCreationOperation.class);
+        assertThatThrownBy(()->deletion.request(OWNER,key())).isInstanceOfSatisfying(DeletionFailure.class,
+                e->assertThat(e.code()).isEqualTo("EXAM_CREATION_PROCESSING"));
+        assertThat(mongo.count(new Query(),DeletionOperation.class)).isZero();
+    }
+    @Test void deletionFirstBlocksCreationAndSameDeletionKeyReplays() {
+        String key=key(); var accepted=deletion.request(OWNER,key);
+        assertThatThrownBy(()->preparation.prepare(OWNER,key())).isInstanceOfSatisfying(DeletionFailure.class,
+                e->assertThat(e.code()).isEqualTo("LEARNING_RECORD_DELETION_IN_PROGRESS"));
+        assertThat(mongo.count(new Query(),ExamCreationOperation.class)).isZero();
+        assertThat(deletion.request(OWNER,key).getDeletionId()).isEqualTo(accepted.getDeletionId());
+    }
+    @Test void terminalCreationDoesNotPreventDeletionOfNormalActiveSession() {
+        session(true); preparation.prepare(OWNER,key());
+        mongo.updateFirst(new Query(),Update.update("state","SUCCEEDED").set("activeGuard",false),ExamCreationOperation.class);
+        assertThat(deletion.request(OWNER,key())).isNotNull();
+        assertThat(mongo.count(new Query(),DeletionCommand.class)).isEqualTo(1);
+    }
+    @Test void alreadyAcceptedDeletionReplayPrecedesCreationAdmissionCheck() {
+        String key=key(); var accepted=deletion.request(OWNER,key);
+        mongo.insert(ExamCreationOperation.prepared(OWNER,key(),"future","mock_1",1,null,null,null,NOW));
+        assertThat(deletion.request(OWNER,key).getDeletionId()).isEqualTo(accepted.getDeletionId());
+        assertThat(mongo.count(new Query(),DeletionCommand.class)).isEqualTo(1);
+    }
+    @Test void concurrentCreationAndDeletionCannotBothBeAdmitted() throws Exception {
+        var pool=Executors.newFixedThreadPool(2); var start=new CountDownLatch(1);
+        try {
+            var create=pool.submit(()->{start.await(); try {preparation.prepare(OWNER,key()); return true;} catch(RuntimeException denied){return false;}});
+            var delete=pool.submit(()->{start.await(); try {deletion.request(OWNER,key()); return true;} catch(RuntimeException denied){return false;}});
+            start.countDown();
+            boolean created=create.get(15,TimeUnit.SECONDS), deleted=delete.get(15,TimeUnit.SECONDS);
+            assertThat(created || deleted).isTrue(); assertThat(created && deleted).isFalse();
+            assertThat(mongo.count(new Query(),ExamCreationOperation.class)+mongo.count(new Query(),DeletionOperation.class)).isEqualTo(1);
+            assertThat(mongo.count(new Query(),DeletionCommand.class)).isEqualTo(deleted?1:0);
+        } finally {pool.shutdownNow();}
+    }
     void submit(int q,int retry) { owners.execute(OWNER,()->{
         String id=GradingKeys.questionJobId("old",q,retry);
         if (!mongo.exists(Query.query(Criteria.where("_id").is(id)),QuestionGradingJob.class)) {

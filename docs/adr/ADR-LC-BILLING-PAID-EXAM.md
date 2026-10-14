@@ -1,5 +1,9 @@
 # ADR — LC 유료 시험의 접수 기준 전환과 복구 경계
 
+- P4.1 후속: [생성 중 삭제 미접수·오류](../codex/LC_BILLING_PAID_EXAM_P4_1_IMPLEMENTATION.md). 동일 owner fence에서 생성guard를 확인하고 삭제row/알림 suppression 전에409로 거절한다. 삭제된 성공replay는 owner/withdrawal/merge 검증 뒤404이며 writer/finalize 우회가 아니다. 신규 삭제 ACK와 원문정리 분리는 후속 설계, 기존 worker 교체·활성화는 미실행이다.
+
+- P4 후속: [기접수 작업 분리](../codex/LC_BILLING_PAID_EXAM_P4_IMPLEMENTATION.md). 신규 Job 접수와 원 durable Job/receipt 기반 후처리를 공통 policy로 구분한다. coverage 전체접수 marker 없이 Summary/COMPLETED를 만들지 않으며 기존 owner/삭제 fence를 우회하지 않는다. 공개 계약/fixture/paid 기동차단은 유지하고 삭제 연결·legacy 전환은 별도 gate다.
+
 - 2026-10-14 정정 수락: simplified fixtures-2의 E06-owner 문구를 LC 독립 재검증했다. [검증 기록](../codex/LC_BILLING_SIMPLIFIED_FIXTURES_2_VALIDATION.md). 아래 과거 E06-owner 미해결 gate는 이 정정 건에 한해 해소됐으며 나머지 공동 검증/활성화 gate는 유지한다. fixtures-1 및 제품 auth 정책 불변.
 
 - P3.1 후속: [MEMBER 영속 대기·HTTP same-key 재개](../codex/LC_BILLING_PAID_EXAM_P3_1_IMPLEMENTATION.md)를 내부 서비스에 구현했다. worker는 status-only, 순수 대기는 장애 budget에서 제외한다. NEEDS_REVIEW는 검증된 과거 순수 MEMBER 소진 증거와 현재 안전 조건을 모두 충족할 때만1회 재개한다. 원인 불명/auth/owner 차단·120일 경계·paid 기동 차단은 유지한다. 공개/자동 scheduler 및 실환경 공동 검증은 후속이다.

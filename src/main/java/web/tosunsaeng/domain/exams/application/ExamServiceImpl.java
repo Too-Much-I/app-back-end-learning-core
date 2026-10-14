@@ -71,6 +71,9 @@ public class ExamServiceImpl implements ExamService {
     @Autowired(required = false)
     private UserOwnedTransactionExecutor userOwnedTransactionExecutor;
 
+    @Autowired(required = false)
+    private ExamAcceptedWorkPolicy acceptedWorkPolicy;
+
     @Value("${spring.cloud.aws.s3.bucket}")
     private String bucketName;
 
@@ -195,7 +198,12 @@ public class ExamServiceImpl implements ExamService {
             Integer questionNumber,
             Integer retryCount,
             String jobId) {
-        if (!examSession.isAbandoned() && !examSession.isRetakeAvailable()) {
+        boolean accepted=GradingKeys.summaryJobId(examSession.getExamId()).equals(jobId)
+                ? ExamAcceptedWorkPolicy.summaryAllowed(examSession)
+                : ExamAcceptedWorkPolicy.processable(examSession)
+                    && (!ExamAcceptedWorkPolicy.requiresEvidence(examSession)
+                        || acceptedWorkPolicy!=null && acceptedWorkPolicy.questionAllowed(examSession,questionNumber,retryCount));
+        if (accepted) {
             return false;
         }
         log.debug(

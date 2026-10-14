@@ -15412,3 +15412,36 @@
 
 - 현재 턴 식별자로 EOF 기록을 추가하고 CURRENT_STATE를 갱신했다. 관련 LC TMI-116/TMI-128/TMI-122·선행 TMI-218, Billing TMI-216. 과거 WORKLOG 보존.
 - fixtures-2 독립 재검증 및 E06-owner 해소 결과 유지. 이번 보완은 문서만 변경하며 추가 테스트/제품 코드/DB/배포/commit/push 변경 없음. diff check·marker 단일 출현 확인, Secret/Token 미기록.
+
+## 2026-10-14 — TMI-217 삭제 기술 인계 정적 검토
+
+<!-- codex-turn:01a1399c-7f4a-7002-8f14-e05445df4291 -->
+
+- 사용자 제공 Billing TMI-217-LC-TECHNICAL-HANDOFF와 공동R1/45검증 계획을 읽고 LC DeletionController/CommandService/Worker/Target/Operation, DeletedExamContinuationStore, UserMergedTransactionService, BillingWorkloadTokenIssuer 및 기존 계획을 대조했다. PR21 머지 여부를 원격 독립 검증하거나 PR 수정/메시지 발송하지 않았다. 관련 TMI-217/TMI-193/TMI-136/TMI-116/TMI-128/TMI-122/TMI-125·선행 TMI-218.
+- 수정필요: owner표의 targetB→과거A Session 거절은 phone continuation에 한정하고 실제 UserMerged로 동일Session userId가B로 이전된 경우를 별도 규정해야 한다. 현 LC는 UserMerged에서 Session/결과 소유권을 이전하고 삭제 inventory는 현재 userId 기준이므로 creationOwner만으로 거절하면 정당한 target 삭제 ACK가 막힌다. 검증된 이전근거/legacy coverage는 미확인이다.
+- 구현차이: 삭제 request는 현재 생성guard 조회 없이 operation을 insert하고 worker inventory/prepare에서 pendingCreation을 기다린다. 새 미접수409 정책은 요청 Transaction에서 생성과 같은 fence·guard 판정으로 연결해야 한다. 기존 prepare는 continuation retain/root삭제 뒤 Billing ACK 없이 allowNewLearning하며 이후 물리정리한다. 새 계약은 최소 불변fact 저장, ACK대기와 원문정리 분리, 새생성 차단 및 삭제후 INITIAL restart context 연결이 필요하다. ACK대기를 현재 prepare에 단순 삽입하면 원문정리도 정지할 수 있다.
+- 7필드 payload/eventId/digest/전달ACK은 기존 DeletionTarget에 없고 JWT signer는 RESERVATIONS/ATTEMPT_GROUP_EVENTS만 지원한다. audience/route/false gate·auth matrix 추가는 신규 구현이며 현재 호환 완료로 볼 수 없다. 다른event 동일Session409는 retained event 분실·TTL·새 삭제operation 경계 검증 조건으로 검토한다. 새 공개 삭제API가 아니라 기존 DELETE /api/v1/learning-records를 유지하는 내부 발신 확장이다.
+- 문서보완: ON조건 LC receiver는 LC sender/Billing receiver로 방향 명료화 권고.120일 자동복구 상한 문구는 기존24시간/200회 장애격리를 연장하지 않도록 대기재개 상한·보존기간과 분리 권고. 개인정보 최종연결/무기한권리 purge·legacy owner coverage는 미확인으로 유지한다.45개 계획은 실행PASS가 아니다.
+- 정책 재선택·제품 구현 착수·공동규격 전체수락을 선언하지 않았다. CURRENT_STATE/WORKLOG 기록 외 코드/fixture/Billing원본/DB/AWS/배포/Jira/외부회신/commit/push 변경 없음. 기존 dirty 보존, 정적 검토로 테스트 미실행; diff check 및 marker 단일 출현 검증. Secret/Token 미기록.
+
+## 2026-10-14 — P3 전달·머지 후 P4 기접수 작업 분리
+
+<!-- codex-turn:01a13998-91b0-7882-8d16-e8d8ee64b227 -->
+
+- 사용자 「커밋 푸시 머지한 다음 브랜치 파서 다음꺼 구현해줘」 승인으로 P3/P3.1·fixtures-2를 commit136602a로 푸시, PR #39 생성/첨부 후 develop2512c1e21e03302e2ea897de76ee5ce1ca47aff5에 머지했다. CI run38537796983 첫 시도는 변경 없는 LearningQuotaTransactionTest 동시성1개 실패, 동일 커밋 재실행에서 통과했다. 검사를 우회하지 않았으며 해당 기존 불안정성 근본 수정은 범위 밖으로 기록했다.
+- 기존 테스트 자동 배포 run38538663500은 ECS/health success. 운영 환경/기능 설정은 바꾸지 않았다. 머지 결과에서 feat/billing-paid-exam-p4 생성, P4 제품/로컬·격리 테스트 구현. P4 자체 commit/push/배포는 수행하지 않았다.
+- ExamAcceptedWorkPolicy 및 기존 receipt/완료marker 읽기를 추가하고 신규접수·기접수 Job replay/Callback/누락Job복구/파생Summary를 구분했다. coverage 또는 접수차단 Session에는 실제 Job 접수표시·retry0 receipt/전체접수marker를 요구하며 S3/결과만으로 접수 근거를 만들지 않는다. Summary/AttemptGroup은 전체접수 증거·필수집합 snapshot을 확인하고 partial을 COMPLETED로 승격하지 않는다. owner/삭제/terminal/대기Session 차단을 우회하지 않는다.
+- 전체 clean test/mongoIntegrationTest/bootJar 실행 중 테스트용 Job 복사 표시 누락과 Mongo factory custom fragment 연결을 보완했다. 최종 test/mongoIntegrationTest/bootJar 및 강화 부정테스트 후 test 성공: 단위1,159개 실패/오류0·기존1 skip, Mongo212개 실패/오류/skip0(이번 단위10·Mongo4 추가). 접수/finalize 동시경합, 원Session 부분/전체접수·TTL후 복구·늦은 잘못된receipt, Callback 원시험 저장/무접수거절·파생Summary 중복 등을 검증했다. Node28·fixture34 SHA256SUMS·diff check 통과. 실제 Billing/AI/DB/E2E 공동완료를 주장하지 않는다.
+- 변경 파일/권한표/유지계약/배포gate는 LC_BILLING_PAID_EXAM_P4_IMPLEMENTATION.md. AGENTS 승인·계획/ADR/CURRENT_STATE 동기화, WORKLOG 과거기록 보존. 관련 TMI-116/TMI-128/TMI-122·선행 TMI-218. 다음 P4.1 삭제 미접수·공개응답은 TMI-193/TMI-136 및 공동 TMI-217 최신 계약 확인 후 별도 단계다. 공개 paid/자동 schema2 worker·legacy P6/실환경 gate 차단 유지.
+- 공개 URL/Method/DTO/BaseResponse·AI user_id=examId·Callback JSON·retryCount·S3/Redis·Billing wire/fixture bytes 불변. 신규collection/문항목록 중복 저장 없음. 예상 밖 이번 제품 변경 없음. 사용자 DS_Store·동시 TMI-217 문서 기록 보존. Billing/Identity 코드·실DB·운영 설정 변경, Secret/Token 기록 없음.
+
+## 2026-10-14 — P4.1 생성 중 삭제 미접수와 공개 오류
+
+<!-- codex-turn:01a139ac-93a2-79b0-b337-c13e20ca5a4f -->
+
+- 사용자 「어 구현해줘」로 기존 feat/billing-paid-exam-p4에서 P4.1을 구현했다. 관련 TMI-116/TMI-128/TMI-122, 삭제 TMI-193/TMI-136·공동 TMI-217. AGENTS에 제한 승인 기록, 기존 P4와 사용자 DS_Store/동시 문서 기록 보존. commit/push/실DB/index 적용/배포/활성화 없음.
+- DeletionCommandService는 동일 owner write Transaction에서 기존 command replay 이후 생성 activeGuard/nonterminal을 확인한다. 진행 중이면 삭제 operation/command/target·알림 suppression 전에409 EXAM_CREATION_PROCESSING으로 거절한다. 새 queue/자동 삭제 재실행 없음. 기존 정상 활성시험은 생성 terminal 이후 삭제 가능하다.
+- DeletionExceptionAdvice에 삭제전용 문구 “시험 준비 중입니다. 잠시 후 다시 시도해 주세요.”/Retry-After1 추가. 일반 생성409 문구·MEMBER503/Retry1·삭제선행 오류는 유지하고 BaseResponse null result 생략 확인. PaidExamLifecycleService terminal replay는 owner guard/탈퇴/merge·exact actor 검증을 먼저 수행하고 Session 부재/삭제 hidden이면404 EXAM_4004·Retry 없음. 성공 operation/금융증거 변경·Session 재생성·Billing cancel 없음. finalize 삭제deny 우회가 아니다.
+- 실제 격리 Mongo 생성/삭제 양순서·동시1승자·NEEDS_REVIEW/nonterminal row0·accepted same-key 우선·삭제전/후404·다른actor/탈퇴/merge 거절을 검증했다. 단위5/Mongo12 추가. clean test/mongoIntegrationTest/bootJar 성공 및 추가 부정테스트 후 재실행 성공. 최종 XML 단위1,164개 실패/오류0·기존1 skip, Mongo224개 실패/오류/skip0. Node mongodb121개 성공, fixture SHA256SUMS34항목 불변, diff check 성공. 기존 deprecated/unchecked 경고는 범위 밖 일괄 수정하지 않았다.
+- Billing TMI-217 handoff draft-3/48개 계획을 읽기 확인했다. 새sender/body/audience/owner증거/ACK/최종purge 공동수락·fixture 및 실제 구현은 미완료다. 후속 checkpoint 설계는 원문전 최소fact 보존, 원문정리/전달 독립, 필수ACK 전 새시험차단으로 기록했으며 기존worker runtime을 임의 교체하지 않았다. 상세 LC_BILLING_PAID_EXAM_P4_1_IMPLEMENTATION.md 및 계획/ADR/CURRENT_STATE 동기화.
+- 공개 URL/Method/body/성공DTO/BaseResponse, AI user_id=examId/Callback, retryCount/S3/Redis·Billing wire/fixture 원본 불변. 예상 밖 이번 제품 변경 없음. 공개 paid/자동schema2 scheduler 및 paid 기동차단 유지. 다음은 P5/P6와 신규삭제 공동 gate 확인이며 이번 결과를 실환경E2E/활성화 완료로 보고하지 않는다. Billing/Identity 파일·Jira·외부전송·Secret/Token 기록 없음.

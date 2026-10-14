@@ -57,7 +57,7 @@ class PaidExamP3MongoTest {
         var factory=new SimpleMongoClientDatabaseFactory(client,"isolated-paid-p3");
         mongo=new MongoTemplate(factory);
         for (String name:List.of("exam_sessions","exam_creation_operations","user_ownership_guards","withdrawn_user_access_denies",
-                "question_grading_jobs","exam_submission_receipts",ReservationAuthCircuit.COLLECTION)) {
+                "question_grading_jobs","exam_submission_receipts","learning_record_deletion_operations","learning_record_deletion_targets",ReservationAuthCircuit.COLLECTION)) {
             if (!mongo.collectionExists(name)) mongo.createCollection(name);
             mongo.remove(new Query(),name);
         }
@@ -106,6 +106,57 @@ class PaidExamP3MongoTest {
         when(billing.reservePaid(anyString(),any())).thenThrow(new BillingClientException(BillingClientException.Category.MEMBER_EVIDENCE_PENDING,1));
         assertThatThrownBy(()->recovery.resumeHttp(USER,prepared.getCommandId(),ZoneOffset.UTC)).isInstanceOf(RuntimeException.class);
         when(billing.statusPaid(USER,prepared.getOperationId())).thenThrow(new BillingClientException(BillingClientException.Category.MEMBER_EVIDENCE_PENDING,1));
+    }
+    void succeededForReplay() {
+        pending(); leased(()->lifecycle.applyStatus(USER,prepared.getCommandId(),snapshot(ReservationStatus.CONFIRMED,false)));
+        var access=new web.tosunsaeng.domain.learningrecorddeletion.application.DeletionAccess(mongo);
+        org.springframework.test.util.ReflectionTestUtils.setField(owners,"deletionAccess",access);
+        org.springframework.test.util.ReflectionTestUtils.setField(lifecycle,"deletionAccess",access);
+    }
+    void assertDeletedReplay() {
+        assertThatThrownBy(()->lifecycle.replay(USER,prepared.getCommandId()))
+                .isInstanceOfSatisfying(web.tosunsaeng.domain.exams.exception.ExamsException.class,e->{
+                    assertThat(e.getCode()).isEqualTo(web.tosunsaeng.global.error.code.status.ErrorStatus._EXAM_NOT_FOUND);
+                    assertThat(e.getRetryAfterSeconds()).isNull();
+                });
+        assertThat(op().getState()).isEqualTo(ExamCreationState.SUCCEEDED);
+        verifyNoInteractions(billing);
+    }
+    @Test void physicallyDeletedSuccessIsNotRecreatedOrCanceledOnReplay() {
+        succeededForReplay(); mongo.remove(Query.query(Criteria.where("_id").is("new")),ExamSession.class);
+        assertDeletedReplay(); assertThat(session("new")).isNull();
+    }
+    @Test void deletionAdmissionHidesSuccessBeforePhysicalCleanup() {
+        succeededForReplay();
+        mongo.insert(web.tosunsaeng.domain.learningrecorddeletion.domain.DeletionOperation.requested(UUID.randomUUID().toString(),USER,NOW));
+        assertDeletedReplay(); assertThat(session("new")).isNotNull();
+    }
+    @Test void sealedTargetHidesSuccessAfterActiveDeletionIsGone() {
+        succeededForReplay();
+        mongo.insert(new Document("_id","target").append("targetType","EXAM").append("aggregateId","new")
+                .append("userId",USER).append("callbackFence","SEALED"),"learning_record_deletion_targets");
+        assertDeletedReplay();
+    }
+    @Test void withdrawnActorCannotUseDeletedSuccessReplay() {
+        succeededForReplay(); mongo.remove(Query.query(Criteria.where("_id").is("new")),ExamSession.class);
+        mongo.insert(new Document("_id",USER).append("blockedUntil",Date.from(NOW.plusSeconds(60))),"withdrawn_user_access_denies");
+        assertThatThrownBy(()->lifecycle.replay(USER,prepared.getCommandId()))
+                .isNotInstanceOf(web.tosunsaeng.domain.exams.exception.ExamsException.class);
+        assertThat(op().getState()).isEqualTo(ExamCreationState.SUCCEEDED);
+    }
+    @Test void differentActorCannotDiscoverDeletedSuccess() {
+        succeededForReplay(); mongo.remove(Query.query(Criteria.where("_id").is("new")),ExamSession.class);
+        assertThatThrownBy(()->lifecycle.replay("30000000-0000-4000-8000-000000000099",prepared.getCommandId()))
+                .isInstanceOf(BillingClientException.class);
+        assertThat(op().getState()).isEqualTo(ExamCreationState.SUCCEEDED);
+        verifyNoInteractions(billing);
+    }
+    @Test void mergedSourceCannotReplayDeletedSuccess() {
+        succeededForReplay(); mongo.remove(Query.query(Criteria.where("_id").is("new")),ExamSession.class);
+        mongo.updateFirst(Query.query(Criteria.where("_id").is(USER)),Update.update("state","MERGED"),"user_ownership_guards");
+        assertThatThrownBy(()->lifecycle.replay(USER,prepared.getCommandId())).isInstanceOf(UserOwnershipGuardException.class);
+        assertThat(op().getState()).isEqualTo(ExamCreationState.SUCCEEDED);
+        verifyNoInteractions(billing);
     }
     void due() {
         mongo.updateFirst(Query.query(Criteria.where("_id").is(prepared.getCommandId())),Update.update("recovery.nextAt",NOW),ExamCreationOperation.class);
@@ -238,6 +289,71 @@ class PaidExamP3MongoTest {
         assertThatThrownBy(()->recovery.resumeHttp(USER,prepared.getCommandId(),ZoneOffset.UTC)).isInstanceOf(BillingClientException.class);
         assertThat(op().getRecovery().getMemberWait().phase()).isEqualTo(MemberWaitEvidence.Phase.INTERRUPTED);
         assertThat(op().getRecovery().getMemberWait().exhaustion()).isNull();
+    }
+    void acceptOld(int question) {
+        owners.execute(USER,()-> {
+            mongo.insert(QuestionGradingJob.pending(GradingKeys.questionJobId("old",question,0),"old",question,0,"key","mock",NOW).markUserSubmission());
+            new ExamSubmissionEvidence(mongo).accepted("old",question,0,null,NOW);
+            return null;
+        });
+    }
+    ExamAcceptedWorkPolicy acceptedPolicy() {
+        return new ExamAcceptedWorkPolicy(new MongoRepositoryFactory(mongo).getRepository(QuestionGradingJobRepository.class,
+                org.springframework.data.repository.core.support.RepositoryComposition.RepositoryFragments.just(
+                        new QuestionGradingJobRecoveryImpl(mongo))),new ExamSubmissionEvidence(mongo));
+    }
+    @Test void p4AdmissionAndFinalizeRaceNeverLeavesUnprovenJob() throws Exception {
+        pending(); var gate=new CountDownLatch(1);
+        try(var pool=Executors.newFixedThreadPool(2)) {
+            var admission=pool.submit(()-> {
+                gate.await();
+                try { acceptOld(1); return true; }
+                catch(IllegalStateException closed) { return false; }
+            });
+            var finalize=pool.submit(()-> {
+                gate.await();
+                return leased(()->lifecycle.applyStatus(USER,prepared.getCommandId(),snapshot(ReservationStatus.CONFIRMED,false)));
+            });
+            gate.countDown();
+            boolean accepted=admission.get(15,TimeUnit.SECONDS);
+            assertThat(finalize.get(15,TimeUnit.SECONDS).getState()).isEqualTo(ExamCreationState.SUCCEEDED);
+            assertThat(mongo.findById(GradingKeys.questionJobId("old",1,0),QuestionGradingJob.class)!=null).isEqualTo(accepted);
+            assertThat(acceptedPolicy().questionAllowed(session("old"),1,0)).isEqualTo(accepted);
+            assertThat(session("new").isActive()).isTrue();
+            assertThat(ExamAcceptedWorkPolicy.summaryAllowed(session("old"))).isFalse();
+        }
+    }
+    @Test void p4PartialAcceptedWorkSurvivesTransitionButMissingQuestionAndSummaryStayBlocked() {
+        acceptOld(1); pending();
+        leased(()->lifecycle.applyStatus(USER,prepared.getCommandId(),snapshot(ReservationStatus.CONFIRMED,false)));
+        assertThat(acceptedPolicy().questionAllowed(session("old"),1,0)).isTrue();
+        assertThat(acceptedPolicy().questionAllowed(session("old"),2,0)).isFalse();
+        assertThat(acceptedPolicy().questionAllowed(session("old"),1,1)).isFalse();
+        assertThat(ExamAcceptedWorkPolicy.summaryAllowed(session("old"))).isFalse();
+        assertThatThrownBy(()->acceptOld(2)).isInstanceOf(RuntimeException.class);
+        assertThat(mongo.findById(GradingKeys.questionJobId("old",2,0),QuestionGradingJob.class)).isNull();
+        assertThat(op().getState()).isEqualTo(ExamCreationState.SUCCEEDED);
+        assertThat(session("new").isActive()).isTrue();
+    }
+    @Test void p4FullMarkerOutlivesReceiptTtlAndPermitsDerivedSummaryOnlyOnOldSession() {
+        acceptOld(1); acceptOld(2); pending();
+        leased(()->lifecycle.applyStatus(USER,prepared.getCommandId(),snapshot(ReservationStatus.CONFIRMED,false)));
+        mongo.remove(new Query(),ExamSubmissionEvidence.RECEIPTS);
+        mongo.remove(Query.query(Criteria.where("examId").is("old")),QuestionGradingJob.class);
+        assertThat(ExamAcceptedWorkPolicy.summaryAllowed(session("old"))).isTrue();
+        assertThat(acceptedPolicy().questionAllowed(session("old"),1,0)).isTrue();
+        assertThat(acceptedPolicy().questionAllowed(session("old"),3,0)).isFalse();
+        assertThat(ExamAcceptedWorkPolicy.summaryAllowed(session("new"))).isFalse();
+        assertThat(op().getState()).isEqualTo(ExamCreationState.SUCCEEDED);
+    }
+    @Test void p4LostJobRequiresReceiptAndForgedPostClosureReceiptDoesNotAuthorizeWork() {
+        acceptOld(1); pending();
+        leased(()->lifecycle.applyStatus(USER,prepared.getCommandId(),snapshot(ReservationStatus.CONFIRMED,false)));
+        mongo.remove(new Query(),QuestionGradingJob.class);
+        assertThat(acceptedPolicy().questionAllowed(session("old"),1,0)).isTrue();
+        mongo.insert(new Document("_id","old:2").append("examId","old").append("questionNumber",2)
+                .append("acceptedAt",Date.from(NOW.plusSeconds(1))),ExamSubmissionEvidence.RECEIPTS);
+        assertThat(acceptedPolicy().questionAllowed(session("old"),2,0)).isFalse();
     }
     @Test void reserveDoesNotCloseOldAndConfirmAtomicallyActivatesNewWith120DayReceipt() {
         pending();
