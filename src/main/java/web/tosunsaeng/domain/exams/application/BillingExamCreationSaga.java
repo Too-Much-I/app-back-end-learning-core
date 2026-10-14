@@ -786,6 +786,9 @@ public class BillingExamCreationSaga {
             try { authCircuit.blockFromHttp(); } catch (RuntimeException ignored) { /* Preserve the original public failure. */ }
         }
         return switch (failure.category()) {
+            case ENTITLEMENT_REVOKED -> new ExamsException(ErrorStatus._ENTITLEMENT_REVOKED);
+            case TRANSITION_CONTEXT_CONFLICT -> new ExamsException(ErrorStatus._EXAM_TRANSITION_CONFLICT);
+            case MEMBER_EVIDENCE_PENDING -> new ExamsException(ErrorStatus._BILLING_TEMPORARILY_UNAVAILABLE, 1);
             case ENTITLEMENT_INSUFFICIENT ->
                     new ExamsException(ErrorStatus._ENTITLEMENT_INSUFFICIENT);
             case PROCESSING -> new ExamsException(

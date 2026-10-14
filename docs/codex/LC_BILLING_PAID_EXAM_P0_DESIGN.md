@@ -46,6 +46,8 @@
 
 ### 5.1 기존 aggregate 확장
 
+2026-10-14 P2 구현 매핑: 아래 후보의 source/transition/confirmRejection 및 예약 귀속 증거는 기존 operation/Session의 `paidReservation.snapshot`에 함께 저장한다. requestDigest는 `paidRequestDigest`, startReason은 P1 `paidSelection.startReason`이다. 추가 collection은 없고 coverage는 P1 marker/schema2를 유지한다. `paidSchemaVersion` 등 나머지 lifecycle/120일 후보는 아직 구현하지 않았다. [상세](LC_BILLING_PAID_EXAM_P2_IMPLEMENTATION.md).
+
 | 저장 위치 | 신규/재사용 필드 | 불변식·reader |
 | --- | --- | --- |
 | exam_sessions | 신규 paidSchemaVersion=1, entitlementSource | 신규 예약 성공부터 EXAM_PASS/SUBSCRIPTION 필수; legacy 판정용 누락 fallback 금지 |

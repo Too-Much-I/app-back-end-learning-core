@@ -170,7 +170,10 @@ public class BillingReservationReconciliationService {
     private String handleBilling(ReservationOperationExecution.Lease lease, BillingClientException failure) {
         return switch (failure.category()) {
             case AUTH_FAILURE -> { circuit.block(); store.blockAuth(lease); yield "blocked_auth"; }
-            case CONTRACT_ERROR, INVALID_REQUEST, IDEMPOTENCY_CONFLICT, ENTITLEMENT_INSUFFICIENT ->
+            case OWNER_BLOCKED -> quarantine(lease, ReservationRecovery.Status.BLOCKED_OWNER, "owner_blocked");
+            // Paid lifecycle evidence needs P3's owner/lease/commit checks; never release a guard here.
+            case MEMBER_EVIDENCE_PENDING, PRE_RESERVE_REJECTED, ENTITLEMENT_REVOKED, TRANSITION_CONTEXT_CONFLICT,
+                    CONTRACT_ERROR, INVALID_REQUEST, IDEMPOTENCY_CONFLICT, ENTITLEMENT_INSUFFICIENT ->
                     quarantine(lease, ReservationRecovery.Status.NEEDS_REVIEW, "state_inconsistent");
             default -> retry(lease, failure.retryAfterSeconds());
         };

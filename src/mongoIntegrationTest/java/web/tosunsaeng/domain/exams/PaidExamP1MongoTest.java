@@ -38,6 +38,7 @@ class PaidExamP1MongoTest {
     PaidExamPreparationService preparation;
     UserOwnedTransactionExecutor owners;
     ExamCreationOperationRepository operations;
+    PaidReservationEvidenceStore paidStore;
     @BeforeAll static void connect() { client = MongoClients.create(MONGO.getReplicaSetUrl()); }
     @AfterAll static void close() { client.close(); }
     @BeforeEach void setup() {
@@ -60,6 +61,7 @@ class PaidExamP1MongoTest {
         owners = new UserOwnedTransactionExecutor(properties, new UserOwnershipGuardService(mongo,
                 repositories.getRepository(UserOwnershipGuardRepository.class)), beans.getBeanProvider(TransactionOperations.class), Clock.fixed(NOW,ZoneOffset.UTC));
         beans.addBean("owners",owners);
+        paidStore = new PaidReservationEvidenceStore(operations, mongo, beans.getBeanProvider(UserOwnedTransactionExecutor.class), Clock.fixed(NOW,ZoneOffset.UTC));
         evidence = new ExamSubmissionEvidence(mongo);
         preparation = new PaidExamPreparationService(mongo, operations,
                 new MockExamCatalogService(repositories.getRepository(MockExamRepository.class)),
@@ -166,6 +168,103 @@ class PaidExamP1MongoTest {
                 new web.tosunsaeng.domain.exams.billing.reconciliation.ReservationReconciliationProperties());
         assertThat(store.due()).extracting(ExamCreationOperation::getCommandId).containsExactly(legacy.getCommandId());
         assertThat(store.dueCount()).isEqualTo(1);
+    }
+    private web.tosunsaeng.domain.exams.billing.BillingReservationClient.ReservationSnapshot paidSnapshot(
+            ExamCreationOperation op, web.tosunsaeng.domain.exams.billing.BillingReservationClient.ReservationStatus status,
+            web.tosunsaeng.domain.exams.billing.PaidReservationProtocol.Source source) {
+        return new web.tosunsaeng.domain.exams.billing.BillingReservationClient.ReservationSnapshot(op.getOperationId(),
+                "00000006-1111-4111-8111-111111111111", BillingReservationKind.INITIAL, status,
+                "00000007-1111-4111-8111-111111111111",
+                status == web.tosunsaeng.domain.exams.billing.BillingReservationClient.ReservationStatus.CONFIRMED
+                        ? web.tosunsaeng.domain.exams.billing.BillingReservationClient.AttemptGroupStatus.OPEN : null,
+                op.getSessionId(),op.getMockExamId(),null,null,NOW.plusSeconds(300),
+                status == web.tosunsaeng.domain.exams.billing.BillingReservationClient.ReservationStatus.RESERVED ? null : NOW,
+                source,null,status == web.tosunsaeng.domain.exams.billing.BillingReservationClient.ReservationStatus.CANCELED
+                ? new web.tosunsaeng.domain.exams.billing.PaidReservationProtocol.ConfirmRejection("ENTITLEMENT_REVOKED") : null);
+    }
+    @Test void paidRequestAndEvidenceRoundTripWithoutChangingLifecycleOrCreatingSession() {
+        var op=preparation.prepare(OWNER,key());
+        var request=paidStore.prepareRequest(OWNER,op.getCommandId());
+        String digest=operations.findById(op.getCommandId()).orElseThrow().getPaidRequestDigest();
+        assertThat(digest).matches("[0-9a-f]{64}");
+        assertThat(paidStore.prepareRequest(OWNER,op.getCommandId())).isEqualTo(request);
+        var snapshot=paidSnapshot(op,web.tosunsaeng.domain.exams.billing.BillingReservationClient.ReservationStatus.RESERVED,
+                web.tosunsaeng.domain.exams.billing.PaidReservationProtocol.Source.SUBSCRIPTION);
+        paidStore.observe(OWNER,op.getCommandId(),snapshot);
+        var stored=operations.findById(op.getCommandId()).orElseThrow();
+        assertThat(stored.getPaidReservation().snapshot()).isEqualTo(snapshot);
+        assertThat(stored.getState()).isEqualTo(ExamCreationState.PREPARED);
+        assertThat(stored.getActiveGuard()).isTrue(); assertThat(stored.getPurgeAt()).isNull();
+        assertThat(mongo.findById(op.getSessionId(),ExamSession.class)).isNull();
+        var changed=paidSnapshot(op, snapshot.reservationStatus(),web.tosunsaeng.domain.exams.billing.PaidReservationProtocol.Source.EXAM_PASS);
+        assertThatThrownBy(()->paidStore.observe(OWNER,op.getCommandId(),changed)).isInstanceOf(RuntimeException.class);
+        assertThat(operations.findById(op.getCommandId()).orElseThrow().getPaidReservation().snapshot()).isEqualTo(snapshot);
+    }
+    @Test void phonePaidNewGroupAndFreeOldGroupPersistWithoutOverwritingDiscovery() {
+        for (boolean paid : List.of(true, false)) {
+            String user = UUID.randomUUID().toString(), oldGroup = key(), continuation = key();
+            var op = ExamCreationOperation.prepared(user,key(),"phone-"+paid,"mock_1",1,null,oldGroup,"mock_1",
+                    BillingContinuationReason.PHONE_REJOIN,continuation,NOW);
+            op.fixPaidSelection(new PaidExamSelection(null,List.of(1,2)));
+            operations.insert(op);
+            var request = paidStore.preparePhoneRequest(user,op.getCommandId());
+            assertThat(paidStore.preparePhoneRequest(user,op.getCommandId())).isEqualTo(request);
+            String actualGroup = paid ? key() : oldGroup;
+            var snapshot = new web.tosunsaeng.domain.exams.billing.BillingReservationClient.ReservationSnapshot(
+                    op.getOperationId(),key(),paid ? BillingReservationKind.INITIAL : BillingReservationKind.REPLACEMENT,
+                    web.tosunsaeng.domain.exams.billing.BillingReservationClient.ReservationStatus.RESERVED,
+                    actualGroup,null,op.getSessionId(),op.getMockExamId(),BillingContinuationReason.PHONE_REJOIN,continuation,
+                    NOW.plusSeconds(300),null,paid ? web.tosunsaeng.domain.exams.billing.PaidReservationProtocol.Source.SUBSCRIPTION
+                    : web.tosunsaeng.domain.exams.billing.PaidReservationProtocol.Source.EXAM_PASS,null,null);
+            paidStore.observe(user,op.getCommandId(),snapshot);
+            paidStore.observe(user,op.getCommandId(),snapshot);
+            var stored = operations.findById(op.getCommandId()).orElseThrow();
+            assertThat(stored.getExpectedAttemptGroupId()).isEqualTo(oldGroup);
+            assertThat(stored.getPaidReservation().snapshot()).isEqualTo(snapshot);
+            assertThat(stored.getState()).isEqualTo(op.getState());
+            assertThat(stored.getActiveGuard()).isTrue();
+            assertThat(mongo.findById(op.getSessionId(),ExamSession.class)).isNull();
+            // An owner mismatch must roll back any subsequent observation.
+            mongo.insert(ExamSession.builder().examId(op.getSessionId()).userId(OWNER).build());
+            assertThatThrownBy(() -> paidStore.observe(user,op.getCommandId(),snapshot)).isInstanceOf(RuntimeException.class);
+            assertThat(operations.findById(op.getCommandId()).orElseThrow().getPaidReservation().snapshot()).isEqualTo(snapshot);
+        }
+    }
+    @Test void paidRejectionPersistsToExactSessionAndTerminalCannotRegress() {
+        var op=preparation.prepare(OWNER,key()); paidStore.prepareRequest(OWNER,op.getCommandId());
+        var snapshot=paidSnapshot(op,web.tosunsaeng.domain.exams.billing.BillingReservationClient.ReservationStatus.CANCELED,
+                web.tosunsaeng.domain.exams.billing.PaidReservationProtocol.Source.SUBSCRIPTION);
+        mongo.insert(ExamSession.builder().examId(op.getSessionId()).userId(OWNER).mockExamId(op.getMockExamId())
+                .creationOperationId(op.getOperationId()).billingReservationId(snapshot.reservationId())
+                .attemptGroupId(snapshot.attemptGroupId()).billingReservationKind(snapshot.reservationKind()).active(false).build());
+        paidStore.observe(OWNER,op.getCommandId(),snapshot);
+        assertThat(mongo.findById(op.getSessionId(),ExamSession.class).getPaidReservation().snapshot()).isEqualTo(snapshot);
+        assertThat(mongo.findById(op.getSessionId(),ExamSession.class).getActive()).isFalse();
+        var confirmed=paidSnapshot(op,web.tosunsaeng.domain.exams.billing.BillingReservationClient.ReservationStatus.CONFIRMED,snapshot.entitlementSource());
+        assertThatThrownBy(()->paidStore.observe(OWNER,op.getCommandId(),confirmed)).isInstanceOf(RuntimeException.class);
+        assertThat(operations.findById(op.getCommandId()).orElseThrow().getPaidReservation().snapshot()).isEqualTo(snapshot);
+    }
+    @Test void abbreviatedConfirmCannotEraseFullPaidEvidence() {
+        var op=preparation.prepare(OWNER,key()); paidStore.prepareRequest(OWNER,op.getCommandId());
+        var snapshot=paidSnapshot(op,web.tosunsaeng.domain.exams.billing.BillingReservationClient.ReservationStatus.RESERVED,
+                web.tosunsaeng.domain.exams.billing.PaidReservationProtocol.Source.SUBSCRIPTION);
+        paidStore.observe(OWNER,op.getCommandId(),snapshot);
+        var abbreviated=new web.tosunsaeng.domain.exams.billing.BillingReservationClient.ReservationSnapshot(
+                op.getOperationId(),snapshot.reservationId(),null,
+                web.tosunsaeng.domain.exams.billing.BillingReservationClient.ReservationStatus.CONFIRMED,
+                snapshot.attemptGroupId(),web.tosunsaeng.domain.exams.billing.BillingReservationClient.AttemptGroupStatus.OPEN,
+                op.getSessionId(),null,null,NOW);
+        assertThatThrownBy(()->paidStore.observe(OWNER,op.getCommandId(),abbreviated)).isInstanceOf(RuntimeException.class);
+        assertThat(operations.findById(op.getCommandId()).orElseThrow().getPaidReservation().snapshot()).isEqualTo(snapshot);
+    }
+    @Test void paidEvidenceWrongSessionOwnerRollsBackBothDocuments() {
+        var op=preparation.prepare(OWNER,key()); paidStore.prepareRequest(OWNER,op.getCommandId());
+        var snapshot=paidSnapshot(op,web.tosunsaeng.domain.exams.billing.BillingReservationClient.ReservationStatus.RESERVED,
+                web.tosunsaeng.domain.exams.billing.PaidReservationProtocol.Source.SUBSCRIPTION);
+        mongo.insert(ExamSession.builder().examId(op.getSessionId()).userId("other").build());
+        assertThatThrownBy(()->paidStore.observe(OWNER,op.getCommandId(),snapshot)).isInstanceOf(RuntimeException.class);
+        assertThat(operations.findById(op.getCommandId()).orElseThrow().getPaidReservation()).isNull();
+        assertThat(mongo.findById(op.getSessionId(),ExamSession.class).getPaidReservation()).isNull();
     }
     @Test void simultaneousLastSubmissionAndPreparationConvergeToOneFrozenDecision() throws Exception {
         session(true); submit(1,0); String key=key(); var start=new CountDownLatch(1);

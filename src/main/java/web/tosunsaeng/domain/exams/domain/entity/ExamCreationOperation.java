@@ -48,6 +48,8 @@ public class ExamCreationOperation {
     private Instant purgeAt;
     private ReservationRecovery recovery;
     private PaidExamSelection paidSelection;
+    private String paidRequestDigest;
+    private PaidReservationEvidence paidReservation;
 
     @Version
     private Long version;
@@ -98,7 +100,7 @@ public class ExamCreationOperation {
                 cycleNumber, ExamCreationState.PREPARED, null, null, null,
                 replacementSourceSessionId, expectedAttemptGroupId, expectedMockExamId,
                 continuationReason, continuationId, null,
-                null, null, null, true, now, now, null, null, ReservationRecovery.prepared(now), null, null
+                null, null, null, true, now, now, null, null, ReservationRecovery.prepared(now), null, null, null, null
         );
     }
 
@@ -112,6 +114,19 @@ public class ExamCreationOperation {
         paidSelection = java.util.Objects.requireNonNull(selection);
         // P2/P3 must explicitly adopt this format; legacy status/cancel workers must not claim it.
         recovery.setSchemaVersion(2);
+    }
+
+    public void fixPaidRequestDigest(String digest) {
+        web.tosunsaeng.domain.exams.billing.PaidReservationProtocol.require(paidSelection != null
+                && digest != null && digest.matches("[0-9a-f]{64}")
+                && (paidRequestDigest == null || paidRequestDigest.equals(digest)));
+        paidRequestDigest = digest;
+    }
+
+    public void observePaidReservation(web.tosunsaeng.domain.exams.billing.BillingReservationClient.ReservationSnapshot snapshot) {
+        web.tosunsaeng.domain.exams.billing.PaidReservationProtocol.require(paidRequestDigest != null);
+        web.tosunsaeng.domain.exams.billing.PaidReservationProtocol.matches(this, snapshot);
+        paidReservation = paidReservation == null ? new PaidReservationEvidence(snapshot) : paidReservation.observe(snapshot);
     }
 
     /** Preserve the durable lease after the transaction fence increments @Version. */

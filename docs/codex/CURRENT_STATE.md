@@ -1,5 +1,29 @@
 # Learning Core Current State
 
+- 2026-10-14 — 사용자 P2/P2.1 커밋·푸시·develop 머지 및 다음 P3 브랜치 구현 승인. E06-owner 정정은 병행 추적하며 최종 공동 검증·활성화 전 해결한다. 테스트 자동 배포 트리거는 허용하되 기능 설정은 유지한다. 관련 TMI-116/TMI-128/TMI-122·선행 TMI-218. 전달/후속 진행 결과는 아래 신규 기록으로 갱신한다.
+
+- 2026-10-14 — P2.1 E06-owner 정정 대상 설명: 공동 fixture의 OPERATION_OWNER_MISMATCH message에 예약 전 거절 문구가 들어 있어 계약의 owner 불일치 고정 문구로 정정할 필요가 있다. HTTP409/code/retryable=false/OWNER_BLOCKED 기대값 및 제품 정책 변경은 필요 없다. 신규 revision/hash로 공유 후 LC 재대조할 사항이며 실제 Billing 응답 오류 여부는 이번에 확인하지 않았다. 관련 TMI-116/TMI-128/TMI-122·선행 TMI-218. 문서 기록만, 코드/fixture/배포 변경 없음.
+
+- 2026-10-14 — PLAN-011 P2.1 오류·phone 기반 구현 완료(`feat/billing-paid-exam-p2`). strict 네필드 오류/MEMBER·owner·J3 분류, phone paid/free exact 응답·owner Tx 저장, mapper/worker 방어 분류 추가. 단위1,141개(조건부1 skip)·Mongo177개 실패/오류0, bootJar 및 fixture25 checksum 통과. E06-owner 고정 문구 불일치1개는 계약 기준 거절로 기록하며 공동 기대값 전부 일치를 주장하지 않는다. [보고](LC_BILLING_PAID_EXAM_P2_1_IMPLEMENTATION.md). P3 MEMBER 재개/J3 terminal/공개 saga 연결·배포는 후속, paid 차단 유지. 관련 TMI-116/TMI-128/TMI-122·선행 TMI-218. 기존 dirty 보존, commit/push/실DB/외부 전송 없음.
+
+- 2026-10-14 — Billing LC 환불 인계서의 세 보완 반영 확인: PLAN-011 현재 진행/PLAN-012 미착수 명시, 앱 이탈·일시 실패와 확정 종료 구분,120일 same-key 결과 복구와 현재 이용권한/Session 재생성 구분. H03/H09 기대값도 확인했다. 이전 문구 보완 요청은 해소됐으며 공동 테스트 완료/환불 구현 승인은 아니다. 관련 LC TMI-116/128/122/125·TMI-218, Billing TMI-215/216/217. 코드/배포/외부 발송 변경 없음.
+
+- 2026-10-14 — 수정 인계서 재검토 턴의 WORKLOG 식별자 보완 완료. PLAN-011 진행/PLAN-012 검토만, lifecycle 종료와 앱 이탈 구분,120일 복구 경계 보완 권고를 유지한다. 관련 LC TMI-116/TMI-128/TMI-122/TMI-125/TMI-218, Billing TMI-215/TMI-216/TMI-217. 추가 구현·배포·외부 회신 없음.
+
+- 2026-10-14 — 수정된 PLAN-012 인계 첨부본 재검토. 단일 revoke 문서/TTL 분리/공동 H01~H13 미완료/LC·Billing 단계번호 구분 보완을 확인했다. PLAN-011 진행 유지·PLAN-012 검토만이라는 명시와 P2를 reserve/status reader 기반으로 표현하는 보완, 앱 이탈과 서버 lifecycle 종료인 중단/실패 구분을 권고했다. same-key 복구는 lifecycle 및120일 보장 경계 내임을 함께 명시 권고. 관련 TMI-116/128/122/125·TMI-218, Billing TMI-215/216/217. 문서 검토·기록만, 제품/배포/외부 회신 변경 없음.
+
+- 2026-10-14 — 진행 범위 정정: 현재는 PLAN-011 유료 시험 연동 구현(P2 기반 완료, P2.1/P3 후속)이며 PLAN-012 환불 구현으로 전환하지 않았다. 직전 환불 인계서는 향후 연동 경계 정적 검토만 수행했다. P2의 confirmRejection reader는 생성/확정 응답 계약 준비이지 환불 processor·revoke receiver 구현 완료/착수 의미가 아니다. 관련 LC TMI-116/128/122 및 선행 TMI-218, 인계 참조 Billing TMI-215/216/217. 이번은 설명·기록만, 제품 코드/계획/테스트/배포 변경 없음.
+
+- 2026-10-14 — PLAN-012 LC 환불·Session 인계서 정적 검토. 관련 Billing TMI-215/216/217, LC TMI-116/128/122/125 및 선행 TMI-218. 환불 전 Billing confirm이 확정된 exact Session만 기존 lifecycle 내 보호/동일group 새Session 예외 승계 금지/same-key 복구 정책은 기존 P3~P6 계획과 부합한다. 현재 로컬 P2는 confirmRejection reader·embedded evidence 기반이며 실제 saga/worker·보호 lifecycle·역방향 revoke receiver는 후속. H01~H13 통합 완료로 간주하지 않는다. inbox/deny는 승인된 그룹별 단일 revoke 문서의 논리 역할로 해석하며 별도 inbox 재추가하지 않는다. 코드/테스트 실행/상대 수락·발송/실DB/배포 변경 없음.
+
+- 2026-10-14 — P2.1 범위 설명의 현재 턴 WORKLOG 표식 보완 완료. 관련 TMI-116/TMI-128/TMI-122, 선행 TMI-218. 오류 분류·재가입 검증과 P3 실행 경계 설명 상태를 유지하며 추가 구현/배포는 하지 않았다.
+
+- 2026-10-14 — P2.1 범위 설명: Billing 오류의 MEMBER 대기/owner 차단/예약 생성 전 확정 실패 구분과 phone 재가입 paid-first/free continuation 응답 검증 준비다. 전화번호 인증 구현이나 Billing 권리·복원 재구현이 아니며 실제 대기 재개/시험 활성화는 P3 후속이다. 관련 TMI-116/TMI-128/TMI-122, 선행 TMI-218. 설명·기록만, 코드/테스트/배포 변경 없음.
+
+- 2026-10-14 — `feat/billing-paid-exam-p2`에서 일반 유료 reserve/status·restartContext/source/transition/confirmRejection reader/validator 및 기존 operation/Session embedded evidence 저장 구현/검증 완료. 로컬 digest 고정, 불변 snapshot/terminal 대조·owner Tx rollback, fixture9개 실제 HTTP client 검증. clean test1102개(기존 콘텐츠조건부1 skip)·Mongo176개 실패0, bootJar 및 fixture25 checksum/diff검사 통과. [P2 보고](LC_BILLING_PAID_EXAM_P2_IMPLEMENTATION.md). P2.1/phone/MEMBER 오류·P3 saga/worker/lifecycle 연결·P6 legacy/purge·배포는 후속, 기능OFF 유지. 기존 TMI-218/TMI-116/TMI-128/TMI-122 관련이며 새 Jira/commit/push/실DB/배포 없음.
+
+- 2026-10-14 — TMI-218 PR #37 develop 머지 완료(989c4ff, KST16:30). P1 커밋 a2d16a9, 최신 develop 통합 e1126e9, GitHub Verify 성공. 통합 로컬 단위1085개/조건부 콘텐츠1 skip·실패0, Mongo172개/skip0·실패0, Node23개 통과. 테스트 자동 배포 run38528752976 시작/in_progress 확인(배포 완료 미확인). 기능 설정 변경 없음. 로컬 develop도 fast-forward했으며 최종 전달 결과 기록만 미커밋이다. P2/P3 제품 구현은 이번 머지 단계에서 추가하지 않았다.
+
 - 2026-10-14 — TMI-218 커밋/푸시/PR/develop 머지 요청 접수. 자동 테스트 배포 영향을 안내했고 사용자 「머지까지 해줘」로 진행 승인. 최신 origin/develop의 answer-learning 변경을 보존하여 통합 검증 후 머지 예정. 기능 설정/운영 배포는 범위 밖이다.
 
 - 2026-10-14 — TMI-218 P1 기반 구현/검증 완료. `feat/TMI-218-submission-evidence-exam-selection` 브랜치에서 공통 접수 receipt/완료marker, schema1 알림 독립 Job 접수, 단일mock/시작사유 고정·same-key replay·owner/Session fence를 구현했다. 공개 유료 생성은 미연결, schema2 준비 operation의 구 saga/worker 전송과 paid flag 활성화 차단. clean test 1,036·격리 Mongo 158개 실패/오류/skip0, fixture25개 checksum 일치. [보고](TMI_218_P1_IMPLEMENTATION.md). P2/P3 연결/coverage 설치·전체28상태·실환경 gate 잔여; 실DB/배포/Jira/commit/push 없음, 기존 dirty 보존.

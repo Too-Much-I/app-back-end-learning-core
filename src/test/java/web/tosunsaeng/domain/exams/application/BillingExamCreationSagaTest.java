@@ -101,6 +101,27 @@ class BillingExamCreationSagaTest {
         org.mockito.Mockito.verifyNoInteractions(billingClient, transactionService);
     }
 
+    @Test void paidErrorMappingDoesNotTurnOwnerOrContractFailureIntoAutomaticRetry() {
+        var circuit = org.mockito.Mockito.mock(web.tosunsaeng.domain.exams.billing.reconciliation.ReservationAuthCircuit.class);
+        org.springframework.test.util.ReflectionTestUtils.setField(saga, "authCircuit", circuit);
+        for (var category : List.of(BillingClientException.Category.OWNER_BLOCKED,
+                BillingClientException.Category.PRE_RESERVE_REJECTED, BillingClientException.Category.CONTRACT_ERROR)) {
+            ExamsException mapped = org.springframework.test.util.ReflectionTestUtils.invokeMethod(saga,"publicFailure",new BillingClientException(category,1));
+            assertEquals(ErrorStatus._BILLING_TEMPORARILY_UNAVAILABLE,mapped.getCode());
+            assertEquals(null,mapped.getRetryAfterSeconds());
+        }
+        ExamsException member = org.springframework.test.util.ReflectionTestUtils.invokeMethod(saga,"publicFailure",
+                new BillingClientException(BillingClientException.Category.MEMBER_EVIDENCE_PENDING,1));
+        assertEquals(1,member.getRetryAfterSeconds());
+        for (var category : List.of(BillingClientException.Category.ENTITLEMENT_REVOKED,BillingClientException.Category.TRANSITION_CONTEXT_CONFLICT)) {
+            ExamsException mapped = org.springframework.test.util.ReflectionTestUtils.invokeMethod(saga,"publicFailure",new BillingClientException(category,null));
+            assertEquals(category == BillingClientException.Category.ENTITLEMENT_REVOKED
+                    ? ErrorStatus._ENTITLEMENT_REVOKED : ErrorStatus._EXAM_TRANSITION_CONFLICT,mapped.getCode());
+            assertEquals(null,mapped.getRetryAfterSeconds());
+        }
+        verifyNoInteractions(circuit,operationRepository,sessionRepository,billingClient);
+    }
+
     @Test
     void phoneContinuationSnapshotsDiscoveryBeforeReserve() {
         properties.setPhoneContinuationEnabled(true);

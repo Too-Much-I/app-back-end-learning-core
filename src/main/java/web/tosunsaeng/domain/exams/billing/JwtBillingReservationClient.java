@@ -102,6 +102,64 @@ public class JwtBillingReservationClient implements BillingReservationClient {
     }
 
     @Override
+    public ReservationSnapshot reservePaid(String operationId, PaidReservationProtocol.Request request) {
+        PaidReservationProtocol.uuid(operationId, true);
+        PaidReservationProtocol.require(request != null);
+        ReservationSnapshot snapshot = postPaid("/internal/v1/reservations", operationId,
+                request, ReserveResponse.class, "billing_reservation_reserve").toSnapshot();
+        PaidReservationProtocol.require(snapshot.reservationStatus() == ReservationStatus.RESERVED);
+        PaidReservationProtocol.matches(operationId, request, snapshot);
+        return snapshot;
+    }
+
+    @Override
+    public ReservationSnapshot statusPaid(String userId, String operationId) {
+        PaidReservationProtocol.uuid(userId, false);
+        PaidReservationProtocol.uuid(operationId, true);
+        ReservationSnapshot snapshot = postPaid("/internal/v1/reservations/status", null,
+                new StatusRequest(userId, operationId), StatusResponse.class, "billing_reservation_status").toSnapshot();
+        PaidReservationProtocol.snapshot(snapshot);
+        PaidReservationProtocol.require(operationId.equals(snapshot.operationId()));
+        return snapshot;
+    }
+
+    @Override
+    public ReservationSnapshot reservePaidPhone(String operationId, PaidReservationProtocol.PhoneRequest request) {
+        PaidReservationProtocol.uuid(operationId, true);
+        PaidReservationProtocol.require(request != null);
+        ReservationSnapshot snapshot = postPaid("/internal/v1/reservations", operationId, request,
+                ReserveResponse.class, "billing_reservation_reserve").toSnapshot();
+        PaidReservationProtocol.require(snapshot.reservationStatus() == ReservationStatus.RESERVED);
+        PaidReservationProtocol.matchesPhone(operationId, request, snapshot);
+        return snapshot;
+    }
+
+    @Override
+    public ReservationSnapshot confirmPaid(String operationId, String reservationId, String userId,
+            String sessionId, Instant committedAt) {
+        PaidReservationProtocol.uuid(operationId, true); PaidReservationProtocol.uuid(reservationId, true);
+        PaidReservationProtocol.uuid(userId, false); PaidReservationProtocol.opaque(sessionId);
+        PaidReservationProtocol.require(committedAt != null);
+        ReservationSnapshot snapshot = postPaid("/internal/v1/reservations/" + reservationId + "/confirm", operationId,
+                new ConfirmRequest(userId, sessionId, UTC_MILLIS.format(committedAt)), ConfirmResponse.class,
+                "billing_reservation_confirm").toSnapshot();
+        PaidReservationProtocol.require(operationId.equals(snapshot.operationId()) && reservationId.equals(snapshot.reservationId())
+                && sessionId.equals(snapshot.sessionId()) && snapshot.reservationStatus() == ReservationStatus.CONFIRMED);
+        return snapshot;
+    }
+
+    @Override
+    public ReservationSnapshot cancelPaid(String operationId, String reservationId, String userId) {
+        PaidReservationProtocol.uuid(operationId, true); PaidReservationProtocol.uuid(reservationId, true);
+        PaidReservationProtocol.uuid(userId, false);
+        ReservationSnapshot snapshot = postPaid("/internal/v1/reservations/" + reservationId + "/cancel", operationId,
+                new CancelRequest(userId, "SESSION_COMMIT_FAILED"), CancelResponse.class, "billing_reservation_cancel").toSnapshot();
+        PaidReservationProtocol.require(operationId.equals(snapshot.operationId()) && reservationId.equals(snapshot.reservationId())
+                && snapshot.reservationStatus() == ReservationStatus.CANCELED);
+        return snapshot;
+    }
+
+    @Override
     public ReservationSnapshot reserve(
             String operationId,
             String userId,
@@ -143,11 +201,21 @@ public class JwtBillingReservationClient implements BillingReservationClient {
 
     @Override
     public Optional<PhoneContinuationSnapshot> findPhoneContinuation(String userId) {
+        return findPhoneContinuation(userId, false);
+    }
+
+    @Override
+    public Optional<PhoneContinuationSnapshot> findPaidPhoneContinuation(String userId) {
+        PaidReservationProtocol.uuid(userId, false);
+        return findPhoneContinuation(userId, true);
+    }
+
+    private Optional<PhoneContinuationSnapshot> findPhoneContinuation(String userId, boolean paid) {
         RawResponse response = exchange(
                 "/internal/v1/reservations/continuations/phone",
                 null,
                 new PhoneContinuationRequest(userId),
-                "billing_phone_continuation"
+                "billing_phone_continuation", paid ? PaidBillingErrorDecoder.Endpoint.PHONE_DISCOVERY : null
         );
         if (response.statusCode() == 204) {
             if (response.body().length != 0) {
@@ -169,6 +237,7 @@ public class JwtBillingReservationClient implements BillingReservationClient {
                     response.retryAfterSeconds()
             );
         }
+        if (paid) throw paidError(PaidBillingErrorDecoder.Endpoint.PHONE_DISCOVERY, response);
         throw mapError(
                 response.statusCode(), response.body(), response.retryAfterSeconds()
         );
@@ -224,6 +293,21 @@ public class JwtBillingReservationClient implements BillingReservationClient {
         return response.toSnapshot();
     }
 
+    private <T> T postPaid(String path, String operationId, Object body, Class<T> responseType, String telemetryOperation) {
+        PaidBillingErrorDecoder.Endpoint endpoint = responseType == ReserveResponse.class ? PaidBillingErrorDecoder.Endpoint.RESERVE
+                : responseType == StatusResponse.class ? PaidBillingErrorDecoder.Endpoint.STATUS
+                : responseType == ConfirmResponse.class ? PaidBillingErrorDecoder.Endpoint.CONFIRM : PaidBillingErrorDecoder.Endpoint.CANCEL;
+        RawResponse response = exchange(path, operationId, body, telemetryOperation, endpoint);
+        if (response.statusCode() == 200) return decodeSuccess(response.body(), responseType);
+        if (response.statusCode() >= 200 && response.statusCode() < 300)
+            throw new BillingClientException(BillingClientException.Category.CONTRACT_ERROR, null);
+        throw paidError(endpoint, response);
+    }
+
+    private BillingClientException paidError(PaidBillingErrorDecoder.Endpoint endpoint, RawResponse response) {
+        return new PaidBillingErrorDecoder(objectMapper).decode(endpoint, response.statusCode(), response.body(), response.rawRetryAfter());
+    }
+
     private <T> T post(
             String path,
             String operationId,
@@ -244,6 +328,11 @@ public class JwtBillingReservationClient implements BillingReservationClient {
             Object body,
             String telemetryOperation
     ) {
+        return exchange(path, operationId, body, telemetryOperation, null);
+    }
+
+    private RawResponse exchange(String path, String operationId, Object body, String telemetryOperation,
+            PaidBillingErrorDecoder.Endpoint paidEndpoint) {
         URI uri = endpoint(path);
         byte[] requestBody;
         try {
@@ -294,7 +383,12 @@ public class JwtBillingReservationClient implements BillingReservationClient {
             }
             outcome = (response.statusCode() == 200 || response.statusCode() == 204)
                     ? "success" : httpOutcome(response.statusCode());
-            return new RawResponse(response.statusCode(), responseBody, retryAfter(response));
+            var retryHeaders = response.headers().allValues("Retry-After");
+            String rawRetryAfter = retryHeaders.isEmpty() ? null : retryHeaders.size() == 1 ? retryHeaders.getFirst() : "INVALID";
+            RawResponse raw = new RawResponse(response.statusCode(), responseBody, retryAfter(response), rawRetryAfter);
+            if (paidEndpoint != null && response.statusCode() >= 300)
+                outcome = categoryOutcome(paidError(paidEndpoint, raw).category());
+            return raw;
         } catch (BillingClientException known) {
             outcome = categoryOutcome(known.category());
             throw known;
@@ -391,6 +485,10 @@ public class JwtBillingReservationClient implements BillingReservationClient {
     private static String categoryOutcome(BillingClientException.Category category) {
         return switch (category) {
             case AUTH_FAILURE -> "auth_failure";
+            case OWNER_BLOCKED -> "blocked_owner";
+            case MEMBER_EVIDENCE_PENDING -> "waiting_member";
+            case PRE_RESERVE_REJECTED -> "pre_reserve_rejected";
+            case ENTITLEMENT_REVOKED, TRANSITION_CONTEXT_CONFLICT -> "business_rejected";
             case RATE_LIMITED -> "rate_limited";
             case TEMPORARILY_UNAVAILABLE, PROCESSING, OPERATION_NOT_FOUND ->
                     "temporary_failure";
@@ -403,6 +501,17 @@ public class JwtBillingReservationClient implements BillingReservationClient {
             throw new BillingClientException(BillingClientException.Category.CONTRACT_ERROR, null);
         }
         try {
+            if (responseType == ReserveResponse.class || responseType == StatusResponse.class) {
+                JsonNode tree = objectMapper.readTree(body);
+                if (tree == null || !tree.isObject()) {
+                    throw new BillingClientException(BillingClientException.Category.CONTRACT_ERROR, null);
+                }
+                for (String field : java.util.List.of("entitlementSource", "transition", "confirmRejection")) {
+                    if (tree.has(field) && tree.get(field).isNull()) {
+                        throw new BillingClientException(BillingClientException.Category.CONTRACT_ERROR, null);
+                    }
+                }
+            }
             T decoded = objectMapper.readValue(body, responseType);
             if (decoded == null) {
                 throw new BillingClientException(
@@ -517,7 +626,7 @@ public class JwtBillingReservationClient implements BillingReservationClient {
     private record StatusRequest(String userId, String operationId) {
     }
 
-    private record RawResponse(int statusCode, byte[] body, Integer retryAfterSeconds) {
+    private record RawResponse(int statusCode, byte[] body, Integer retryAfterSeconds, String rawRetryAfter) {
     }
 
     private record PhoneContinuationResponse(
@@ -552,7 +661,9 @@ public class JwtBillingReservationClient implements BillingReservationClient {
             String mockExamId,
             BillingContinuationReason continuationReason,
             String continuationId,
-            Instant expiresAt
+            Instant expiresAt,
+            PaidReservationProtocol.Source entitlementSource,
+            PaidReservationProtocol.Transition transition
     ) {
         private ReserveResponse {
             requireText(operationId, "operationId");
@@ -564,13 +675,16 @@ public class JwtBillingReservationClient implements BillingReservationClient {
             requireText(mockExamId, "mockExamId");
             requireContinuationPair(continuationReason, continuationId);
             requireValue(expiresAt, "expiresAt");
+            if (transition != null && (entitlementSource == null
+                    || reservationKind != web.tosunsaeng.domain.exams.domain.enums.BillingReservationKind.INITIAL))
+                throw new IllegalArgumentException("Invalid paid transition");
         }
 
         ReservationSnapshot toSnapshot() {
             return new ReservationSnapshot(
                     operationId, reservationId, reservationKind, reservationStatus,
                     attemptGroupId, null, sessionId, mockExamId,
-                    continuationReason, continuationId, expiresAt, null
+                    continuationReason, continuationId, expiresAt, null, entitlementSource, transition, null
             );
         }
     }
@@ -636,9 +750,17 @@ public class JwtBillingReservationClient implements BillingReservationClient {
             BillingContinuationReason continuationReason,
             String continuationId,
             Instant expiresAt,
-            Instant terminalAt
+            Instant terminalAt,
+            PaidReservationProtocol.Source entitlementSource,
+            PaidReservationProtocol.Transition transition,
+            PaidReservationProtocol.ConfirmRejection confirmRejection
     ) {
         private StatusResponse {
+            if (transition != null && (entitlementSource == null
+                    || reservationKind != web.tosunsaeng.domain.exams.domain.enums.BillingReservationKind.INITIAL))
+                throw new IllegalArgumentException("Invalid paid transition");
+            if (confirmRejection != null && (entitlementSource == null || reservationStatus != ReservationStatus.CANCELED))
+                throw new IllegalArgumentException("Invalid confirm rejection");
             requireText(operationId, "operationId");
             requireText(reservationId, "reservationId");
             requireValue(reservationKind, "reservationKind");
@@ -661,7 +783,7 @@ public class JwtBillingReservationClient implements BillingReservationClient {
             return new ReservationSnapshot(
                     operationId, reservationId, reservationKind, reservationStatus,
                     attemptGroupId, attemptGroupStatus, sessionId, mockExamId,
-                    continuationReason, continuationId, expiresAt, terminalAt
+                    continuationReason, continuationId, expiresAt, terminalAt, entitlementSource, transition, confirmRejection
             );
         }
     }

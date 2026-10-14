@@ -42,6 +42,8 @@ public enum ErrorStatus implements BaseErrorCode {
     _EXAM_SESSION_CONFIGURATION_ERROR(HttpStatus.INTERNAL_SERVER_ERROR, "EXAM_5002", "모의고사 세션 데이터 설정이 올바르지 않습니다."),
     _IDEMPOTENCY_KEY_INVALID(HttpStatus.BAD_REQUEST, "IDEMPOTENCY_KEY_INVALID", "Idempotency-Key가 올바르지 않습니다."),
     _ENTITLEMENT_INSUFFICIENT(HttpStatus.PAYMENT_REQUIRED, "ENTITLEMENT_INSUFFICIENT", "사용 가능한 시험 응시권이 없습니다."),
+    _ENTITLEMENT_REVOKED(HttpStatus.CONFLICT, "ENTITLEMENT_REVOKED", "환불 또는 취소된 이용권으로는 시험을 시작할 수 없습니다."),
+    _EXAM_TRANSITION_CONFLICT(HttpStatus.CONFLICT, "EXAM_TRANSITION_CONFLICT", "시험 상태가 변경되었습니다. 다시 확인해 주세요."),
     _EXAM_CREATION_PROCESSING(HttpStatus.CONFLICT, "EXAM_CREATION_PROCESSING", "시험 생성이 처리 중입니다. 같은 요청으로 다시 시도해 주세요."),
     _IDEMPOTENCY_KEY_CONFLICT(HttpStatus.CONFLICT, "IDEMPOTENCY_KEY_CONFLICT", "Idempotency-Key가 기존 요청과 충돌합니다."),
     _BILLING_RATE_LIMITED(HttpStatus.TOO_MANY_REQUESTS, "BILLING_RATE_LIMITED", "시험 사용권 확인 요청이 많습니다. 잠시 후 다시 시도해 주세요."),
