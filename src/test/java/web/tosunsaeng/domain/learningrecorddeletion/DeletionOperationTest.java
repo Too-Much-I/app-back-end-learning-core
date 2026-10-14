@@ -117,6 +117,11 @@ class DeletionOperationTest {
         var challenge = DeletionTarget.draining(ID, OWNER, DeletionTarget.Type.CHALLENGE, ID);
         assertThat(challenge.s3Prefix()).isEqualTo("temp/challenges/" + ID + "/");
         assertThat(challenge.redisKey()).isNull();
+        String legacyId="10000000-0000-1000-8000-000000000001";
+        assertThat(DeletionTarget.draining(ID, OWNER, DeletionTarget.Type.LEARNING_SUBMISSION, legacyId).s3Prefix())
+                .isEqualTo("answer-learning-submissions/"+legacyId+"/");
+        assertThatThrownBy(()->DeletionTarget.draining(ID,OWNER,DeletionTarget.Type.LEARNING_SUBMISSION,"not-a-uuid"))
+                .isInstanceOf(IllegalArgumentException.class);
     }
 
     private static DeletionOperation preparing() {

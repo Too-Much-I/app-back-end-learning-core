@@ -1,0 +1,69 @@
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Sid": "ReadPublishedLearningMedia",
+      "Effect": "Allow",
+      "Action": [
+        "s3:GetObject",
+        "s3:GetObjectVersion"
+      ],
+      "Resource": "arn:aws:s3:::tosunsaeng-app-audio/answer-learning/ts-level-bank-40-per-part-20261007-v1/20261012-cda52eb5001a/media/*"
+    },
+    {
+      "Sid": "LearningRecordingStaging",
+      "Effect": "Allow",
+      "Action": [
+        "s3:GetObject",
+        "s3:PutObject"
+      ],
+      "Resource": "arn:aws:s3:::tosunsaeng-app-audio/answer-learning-uploads/*"
+    },
+    {
+      "Sid": "CreateAndVerifyFrozenLearningRecording",
+      "Effect": "Allow",
+      "Action": [
+        "s3:GetObject",
+        "s3:PutObject"
+      ],
+      "Resource": "arn:aws:s3:::tosunsaeng-app-audio/answer-learning-submissions/*"
+    },
+    {
+      "Sid": "InspectLearningRecordingVersioning",
+      "Effect": "Allow",
+      "Action": [
+        "s3:GetBucketVersioning"
+      ],
+      "Resource": "arn:aws:s3:::tosunsaeng-app-audio"
+    },
+    {
+      "Sid": "ListOnlyLearningRecordingPrefixes",
+      "Effect": "Allow",
+      "Action": [
+        "s3:ListBucket",
+        "s3:ListBucketVersions"
+      ],
+      "Resource": "arn:aws:s3:::tosunsaeng-app-audio",
+      "Condition": {
+        "StringLike": {
+          "s3:prefix": [
+            "answer-learning-uploads/*",
+            "answer-learning-submissions/*"
+          ]
+        }
+      }
+    },
+    {
+      "Sid": "PurgeLearningRecordingVersions",
+      "Effect": "Allow",
+      "Action": [
+        "s3:DeleteObject",
+        "s3:DeleteObjectVersion"
+      ],
+      "Resource": [
+        "arn:aws:s3:::tosunsaeng-app-audio/answer-learning-uploads/*",
+        "arn:aws:s3:::tosunsaeng-app-audio/answer-learning-submissions/*"
+      ]
+    }
+  ]
+}

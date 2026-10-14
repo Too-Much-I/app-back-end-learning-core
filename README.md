@@ -313,3 +313,8 @@ ECS는 위 로컬 Profile·SSO 절차와 무관하다. AWS Profile을 mount하�
 ```bash
 ./gradlew clean test
 ```
+
+## 답변 익히기
+
+`/api/v1/learning` 기반의 학습 콘텐츠·녹음 제출·Lambda 체크리스트 채점은 기본 비활성이다.
+설정, 준비된 데이터, API 계약, IAM 권한과 검증 방법은 [백엔드 인수인계](docs/answer-learning/README.md)를 참고한다.

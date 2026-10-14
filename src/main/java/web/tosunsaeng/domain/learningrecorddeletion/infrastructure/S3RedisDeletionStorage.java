@@ -13,13 +13,32 @@ public final class S3RedisDeletionStorage implements DeletionStorage {
     private final S3Client s3;
     private final RedisTemplate<String, String> redis;
     private final String bucket;
-    public S3RedisDeletionStorage(S3Client s3, RedisTemplate<String, String> redis, String bucket) {
+    private final String learningBucket;
+    private final java.util.function.Consumer<String> purgeLearning;
+    public S3RedisDeletionStorage(S3Client s3, RedisTemplate<String, String> redis, String bucket,
+                                 String learningBucket, java.util.function.Consumer<String> purgeLearning) {
         if (bucket == null || bucket.isBlank()) throw new IllegalArgumentException("Deletion bucket is required");
-        this.s3 = s3; this.redis = redis; this.bucket = bucket;
+        this.s3=s3; this.redis=redis; this.bucket=bucket; this.learningBucket=learningBucket; this.purgeLearning=purgeLearning;
+    }
+    public S3RedisDeletionStorage(S3Client s3, RedisTemplate<String, String> redis, String bucket) {
+        this(s3, redis, bucket, "", null);
     }
     @Override public boolean sweep(DeletionTarget target) {
         // Revalidate fields read from persistence as well as fields constructed by the application.
-        String prefix = DeletionTarget.draining(target.getDeletionId(), target.getUserId(), target.getTargetType(), target.getAggregateId()).s3Prefix();
+        var validated = DeletionTarget.draining(target.getDeletionId(), target.getUserId(), target.getTargetType(), target.getAggregateId());
+        if (validated.getTargetType() == DeletionTarget.Type.LEARNING_COMPLETION) return true;
+        if (validated.getTargetType() == DeletionTarget.Type.LEARNING_SUBMISSION) {
+            if (learningBucket == null || learningBucket.isBlank() || purgeLearning == null)
+                throw new IllegalStateException("Learning cleanup configuration is required");
+            // Remote tombstones fence delayed requests and strip transcripts before sweeping audio.
+            purgeLearning.accept(validated.getAggregateId());
+            boolean staging = sweepPrefix(learningBucket, "answer-learning-uploads/" + validated.getAggregateId() + "/");
+            boolean frozen = sweepPrefix(learningBucket, validated.s3Prefix());
+            return staging && frozen;
+        }
+        return sweepPrefix(bucket, validated.s3Prefix());
+    }
+    private boolean sweepPrefix(String bucket, String prefix) {
         var versioning = s3.getBucketVersioning(GetBucketVersioningRequest.builder().bucket(bucket)
                 .overrideConfiguration(c -> c.apiCallTimeout(Duration.ofSeconds(5))).build());
         List<ObjectIdentifier> objects = new ArrayList<>();
@@ -51,7 +70,7 @@ public final class S3RedisDeletionStorage implements DeletionStorage {
         return ObjectIdentifier.builder().key(key).versionId(version).build();
     }
     @Override public boolean clearCache(DeletionTarget target) {
-        if (target.getTargetType() == DeletionTarget.Type.CHALLENGE) return true;
+        if (target.getTargetType() != DeletionTarget.Type.EXAM) return true;
         String key = DeletionTarget.draining(target.getDeletionId(), target.getUserId(), target.getTargetType(), target.getAggregateId()).redisKey();
         redis.delete(key);
         return Boolean.FALSE.equals(redis.hasKey(key));

@@ -101,7 +101,7 @@ public class DeletionWorker {
     }
     private void inventory(DeletionOperation op) {
         if (pendingCreation(op)) { waitForCoordination(op); return; }
-        var type = op.getInventoryType(); String collection = type == DeletionTarget.Type.EXAM ? "exam_sessions" : "challenge_10s_attempts";
+        var type = op.getInventoryType(); String collection = type.rootCollection();
         Criteria criteria = Criteria.where("userId").is(op.getUserId());
         if (op.getInventoryCursor() != null) criteria.and("_id").gt(op.getInventoryCursor());
         List<Document> roots = mongo.find(Query.query(criteria).with(Sort.by("_id")).limit(BATCH), Document.class, collection);
@@ -113,7 +113,13 @@ public class DeletionWorker {
             digest = DeletionIdentifiers.sha256(digest + ":" + type + ":" + id);
         }
         if (!roots.isEmpty()) { op.inventoryProgress(type, cursor, count, digest); return; }
-        if (type == DeletionTarget.Type.EXAM) { op.inventoryProgress(DeletionTarget.Type.CHALLENGE, null, count, digest); return; }
+        DeletionTarget.Type next = switch (type) {
+            case EXAM -> DeletionTarget.Type.CHALLENGE;
+            case CHALLENGE -> DeletionTarget.Type.LEARNING_SUBMISSION;
+            case LEARNING_SUBMISSION -> DeletionTarget.Type.LEARNING_COMPLETION;
+            case LEARNING_COMPLETION -> null;
+        };
+        if (next != null) { op.inventoryProgress(next, null, count, digest); return; }
         for (String child : List.of("exam_results", "exam_summaries")) {
             var orphan = mongo.getCollection(child).aggregate(List.of(new Document("$match", new Document("userId", op.getUserId())),
                     new Document("$lookup", new Document("from", "exam_sessions").append("localField", "examId").append("foreignField", "_id").append("as", "parent")),
@@ -143,6 +149,11 @@ public class DeletionWorker {
                 && (session.getBillingReservationId() != null || session.getCreationOperationId() != null || session.getEntitlementState() != null))
             throw new UnsafeEvidence(); // Partial Billing metadata is not an unlinked/free Session.
         if (session != null && session.getAttemptGroupProjectionStatus() == AttemptGroupProjectionStatus.GRADING) { waitForCoordination(op); return; }
+        if (target.getTargetType() == DeletionTarget.Type.LEARNING_SUBMISSION) {
+            Document source = mongo.findById(target.getAggregateId(), Document.class, root);
+            Date until = source == null ? null : source.getDate("externalWriteUntil");
+            if (until != null && clock.instant().isBefore(until.toInstant())) return;
+        }
         target.sealCallbacks(true, true, clock.instant()); mongo.save(target);
         if (session != null && session.getAttemptGroupId() != null) continuations.retainAndDeleteSession(op.getDeletionId(), session.getExamId());
         else {
@@ -217,13 +228,14 @@ public class DeletionWorker {
                 .and("activeGuard").is(true)), DeletionOperation.class);
     }
     private List<String> children(DeletionTarget target) {
-        return target.getTargetType() == DeletionTarget.Type.EXAM
-                ? List.of("exam_results", "exam_summaries", "question_grading_jobs", "summary_grading_jobs", "azure_results", "speechace_results", "exam_submission_receipts")
-                : List.of("challenge_10s_grading_jobs", "challenge_10s_submit_receipts", "challenge_10s_callback_receipts");
+        return switch (target.getTargetType()) {
+            case EXAM -> List.of("exam_results", "exam_summaries", "question_grading_jobs", "summary_grading_jobs", "azure_results", "speechace_results", "exam_submission_receipts");
+            case CHALLENGE -> List.of("challenge_10s_grading_jobs", "challenge_10s_submit_receipts", "challenge_10s_callback_receipts");
+            // Completions are inventoried roots, including Part 1 which has no remote submission.
+            case LEARNING_SUBMISSION, LEARNING_COMPLETION -> List.of();
+        };
     }
-    private String rootCollection(DeletionTarget target) {
-        return target.getTargetType() == DeletionTarget.Type.EXAM ? "exam_sessions" : "challenge_10s_attempts";
-    }
+    private String rootCollection(DeletionTarget target) { return target.getTargetType().rootCollection(); }
     private void retainCompletedTargets() {
         var done = mongo.find(Query.query(Criteria.where("status").is(DeletionOperation.Status.COMPLETED)
                 .and("retentionFinalized").ne(true)).with(Sort.by("completedAt", "_id")).limit(1), DeletionOperation.class);

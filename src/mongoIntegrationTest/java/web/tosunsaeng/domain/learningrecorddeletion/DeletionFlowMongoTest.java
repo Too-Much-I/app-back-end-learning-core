@@ -108,6 +108,31 @@ class DeletionFlowMongoTest {
         assertThat(commands.request(OWNER, KEY).getStatus()).isEqualTo(DeletionOperation.Status.COMPLETED);
     }
 
+    @Test void answerLearningDeletionIncludesPartOneAndCannotEraseNewCompletionOrReviveOldResult() {
+        var store = new web.tosunsaeng.domain.answerlearning.LearningStore(mongo, null, access); store.indexes();
+        var s = new web.tosunsaeng.domain.answerlearning.LearningModels.Submission();
+        s.id=UUID.randomUUID().toString(); s.userId=OWNER; s.lessonId="graded"; s.level="IH"; s.contentVersion="v1";
+        s.status="completed"; s.completionPending=true; s.result=new Document("transcript","test");
+        s.nextRunAt=clock.instant(); s.leaseUntil=Instant.EPOCH;
+        mongo.insert(s); var claim=store.claim(s,clock.instant());
+        store.complete(OWNER,"reading","common","v1",null,clock.instant());
+        String oldCompletion=mongo.findAll(Document.class,"learning_completions").getFirst().getString("_id");
+        commands.request(OWNER,KEY); progressToCheckpoint();
+        assertThat(store.find(s.id)).isNull();
+        store.completeClaim(claim,clock.instant());
+        assertThatThrownBy(()->store.complete(OWNER,"graded","IH","v1",s.id,clock.instant())).hasMessage("COMPLETION_NOT_READY");
+        assertThatThrownBy(()->store.create(s,60)).hasMessage("LEARNING_NOT_FOUND");
+        store.complete(OWNER,"reading","common","v1",null,clock.instant());
+        String fresh=mongo.findAll(Document.class,"learning_completions").getFirst().getString("_id");
+        assertThat(fresh).isNotEqualTo(oldCompletion);
+        clock.now=clock.now.plusSeconds(360);
+        for(int i=0;i<80 && commands.latest(OWNER).isActiveGuard();i++) step();
+        assertThat(commands.latest(OWNER).getStatus()).isEqualTo(DeletionOperation.Status.COMPLETED);
+        assertThat(mongo.findAll(Document.class,"learning_completions")).hasSize(1);
+        assertThat(mongo.findById(fresh,Document.class,"learning_completions")).isNotNull();
+        verify(storage,atLeastOnce()).sweep(argThat(t->t.getTargetType()==DeletionTarget.Type.LEARNING_SUBMISSION && t.getAggregateId().equals(s.id)));
+    }
+
     @Test void orphanNeverGetsAFalseSafeCheckpoint() {
         mongo.insert(new Document("_id", "orphan").append("userId", OWNER).append("examId", "missing"), "exam_results");
         commands.request(OWNER, KEY);

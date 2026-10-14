@@ -119,6 +119,7 @@ public class UserMergedTransactionService {
         migrateOwner(ExamResult.class, event.sourceUserId(), event.targetUserId());
         migrateOwner(ExamSummary.class, event.sourceUserId(), event.targetUserId());
         migrateOwner(ExamSession.class, event.sourceUserId(), event.targetUserId());
+        web.tosunsaeng.domain.answerlearning.LearningOwnership.merge(mongoTemplate, event.sourceUserId(), event.targetUserId(), event.receivedAt());
 
         guardService.markMerged(
                 event.sourceUserId(),

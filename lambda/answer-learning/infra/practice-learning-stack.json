@@ -1,0 +1,486 @@
+{
+  "AWSTemplateFormatVersion": "2010-09-09",
+  "Description": "Seoul staging answer-learning grading; IAM intake, SQS worker and seven-day job receipts. No public or S3 notification trigger.",
+  "Parameters": {
+    "CodeBucket": {
+      "Type": "String"
+    },
+    "CodeKey": {
+      "Type": "String"
+    },
+    "AudioBucket": {
+      "Type": "String",
+      "Default": "tosunsaeng-app-audio"
+    },
+    "RuntimeSecretArn": {
+      "Type": "String"
+    }
+  },
+  "Resources": {
+    "Jobs": {
+      "Type": "AWS::DynamoDB::Table",
+      "DeletionPolicy": "Retain",
+      "UpdateReplacePolicy": "Retain",
+      "Properties": {
+        "BillingMode": "PAY_PER_REQUEST",
+        "AttributeDefinitions": [
+          {
+            "AttributeName": "id",
+            "AttributeType": "S"
+          }
+        ],
+        "KeySchema": [
+          {
+            "AttributeName": "id",
+            "KeyType": "HASH"
+          }
+        ],
+        "SSESpecification": {
+          "SSEEnabled": true
+        },
+        "TimeToLiveSpecification": {
+          "AttributeName": "expiresAt",
+          "Enabled": true
+        },
+        "PointInTimeRecoverySpecification": {
+          "PointInTimeRecoveryEnabled": true
+        }
+      }
+    },
+    "DeadLetter": {
+      "Type": "AWS::SQS::Queue",
+      "Properties": {
+        "MessageRetentionPeriod": 1209600,
+        "SqsManagedSseEnabled": true
+      }
+    },
+    "Queue": {
+      "Type": "AWS::SQS::Queue",
+      "Properties": {
+        "VisibilityTimeout": 720,
+        "MessageRetentionPeriod": 86400,
+        "SqsManagedSseEnabled": true,
+        "RedrivePolicy": {
+          "deadLetterTargetArn": {
+            "Fn::GetAtt": [
+              "DeadLetter",
+              "Arn"
+            ]
+          },
+          "maxReceiveCount": 4
+        }
+      }
+    },
+    "IntakeLog": {
+      "Type": "AWS::Logs::LogGroup",
+      "Properties": {
+        "LogGroupName": "/aws/lambda/tosunsaeng-learning-intake-staging",
+        "RetentionInDays": 14
+      }
+    },
+    "IntakeRole": {
+      "Type": "AWS::IAM::Role",
+      "Properties": {
+        "AssumeRolePolicyDocument": {
+          "Version": "2012-10-17",
+          "Statement": [
+            {
+              "Effect": "Allow",
+              "Principal": {
+                "Service": "lambda.amazonaws.com"
+              },
+              "Action": "sts:AssumeRole"
+            }
+          ]
+        },
+        "Policies": [
+          {
+            "PolicyName": "learning-only",
+            "PolicyDocument": {
+              "Version": "2012-10-17",
+              "Statement": [
+                {
+                  "Effect": "Allow",
+                  "Action": [
+                    "logs:CreateLogStream",
+                    "logs:PutLogEvents"
+                  ],
+                  "Resource": {
+                    "Fn::GetAtt": [
+                      "IntakeLog",
+                      "Arn"
+                    ]
+                  }
+                },
+                {
+                  "Effect": "Allow",
+                  "Action": [
+                    "dynamodb:GetItem",
+                    "dynamodb:PutItem",
+                    "dynamodb:UpdateItem"
+                  ],
+                  "Resource": {
+                    "Fn::GetAtt": [
+                      "Jobs",
+                      "Arn"
+                    ]
+                  }
+                },
+                {
+                  "Effect": "Allow",
+                  "Action": [
+                    "s3:GetObject"
+                  ],
+                  "Resource": {
+                    "Fn::Sub": "arn:${AWS::Partition}:s3:::${AudioBucket}/answer-learning-submissions/*"
+                  }
+                },
+                {
+                  "Effect": "Allow",
+                  "Action": [
+                    "sqs:SendMessage"
+                  ],
+                  "Resource": {
+                    "Fn::GetAtt": [
+                      "Queue",
+                      "Arn"
+                    ]
+                  }
+                }
+              ]
+            }
+          }
+        ]
+      }
+    },
+    "Intake": {
+      "Type": "AWS::Lambda::Function",
+      "Properties": {
+        "FunctionName": "tosunsaeng-learning-intake-staging",
+        "Runtime": "python3.12",
+        "Architectures": [
+          "x86_64"
+        ],
+        "Handler": "app.practice_lambda.handler.intake",
+        "Role": {
+          "Fn::GetAtt": [
+            "IntakeRole",
+            "Arn"
+          ]
+        },
+        "Code": {
+          "S3Bucket": {
+            "Ref": "CodeBucket"
+          },
+          "S3Key": {
+            "Ref": "CodeKey"
+          }
+        },
+        "MemorySize": 512,
+        "Timeout": 20,
+        "ReservedConcurrentExecutions": 2,
+        "Environment": {
+          "Variables": {
+            "PRACTICE_TABLE": {
+              "Ref": "Jobs"
+            },
+            "PRACTICE_QUEUE_URL": {
+              "Ref": "Queue"
+            },
+            "PRACTICE_AUDIO_BUCKET": {
+              "Ref": "AudioBucket"
+            },
+            "PRACTICE_AUDIO_PREFIX": "answer-learning-submissions/",
+            "PRACTICE_SECRET_ARN": {
+              "Ref": "RuntimeSecretArn"
+            },
+            "PRACTICE_STT_MODEL": "gpt-transcribe"
+          }
+        },
+        "Tags": [
+          {
+            "Key": "Service",
+            "Value": "answer-learning"
+          },
+          {
+            "Key": "Stage",
+            "Value": "staging"
+          }
+        ]
+      },
+      "DependsOn": "IntakeLog"
+    },
+    "WorkerLog": {
+      "Type": "AWS::Logs::LogGroup",
+      "Properties": {
+        "LogGroupName": "/aws/lambda/tosunsaeng-learning-worker-staging",
+        "RetentionInDays": 14
+      }
+    },
+    "WorkerRole": {
+      "Type": "AWS::IAM::Role",
+      "Properties": {
+        "AssumeRolePolicyDocument": {
+          "Version": "2012-10-17",
+          "Statement": [
+            {
+              "Effect": "Allow",
+              "Principal": {
+                "Service": "lambda.amazonaws.com"
+              },
+              "Action": "sts:AssumeRole"
+            }
+          ]
+        },
+        "Policies": [
+          {
+            "PolicyName": "learning-only",
+            "PolicyDocument": {
+              "Version": "2012-10-17",
+              "Statement": [
+                {
+                  "Effect": "Allow",
+                  "Action": [
+                    "logs:CreateLogStream",
+                    "logs:PutLogEvents"
+                  ],
+                  "Resource": {
+                    "Fn::GetAtt": [
+                      "WorkerLog",
+                      "Arn"
+                    ]
+                  }
+                },
+                {
+                  "Effect": "Allow",
+                  "Action": [
+                    "dynamodb:GetItem",
+                    "dynamodb:PutItem",
+                    "dynamodb:UpdateItem"
+                  ],
+                  "Resource": {
+                    "Fn::GetAtt": [
+                      "Jobs",
+                      "Arn"
+                    ]
+                  }
+                },
+                {
+                  "Effect": "Allow",
+                  "Action": [
+                    "s3:GetObject"
+                  ],
+                  "Resource": {
+                    "Fn::Sub": "arn:${AWS::Partition}:s3:::${AudioBucket}/answer-learning-submissions/*"
+                  }
+                },
+                {
+                  "Effect": "Allow",
+                  "Action": [
+                    "sqs:ReceiveMessage",
+                    "sqs:DeleteMessage",
+                    "sqs:GetQueueAttributes"
+                  ],
+                  "Resource": {
+                    "Fn::GetAtt": [
+                      "Queue",
+                      "Arn"
+                    ]
+                  }
+                },
+                {
+                  "Effect": "Allow",
+                  "Action": [
+                    "secretsmanager:GetSecretValue"
+                  ],
+                  "Resource": {
+                    "Ref": "RuntimeSecretArn"
+                  }
+                }
+              ]
+            }
+          }
+        ]
+      }
+    },
+    "Worker": {
+      "Type": "AWS::Lambda::Function",
+      "Properties": {
+        "FunctionName": "tosunsaeng-learning-worker-staging",
+        "Runtime": "python3.12",
+        "Architectures": [
+          "x86_64"
+        ],
+        "Handler": "app.practice_lambda.handler.worker",
+        "Role": {
+          "Fn::GetAtt": [
+            "WorkerRole",
+            "Arn"
+          ]
+        },
+        "Code": {
+          "S3Bucket": {
+            "Ref": "CodeBucket"
+          },
+          "S3Key": {
+            "Ref": "CodeKey"
+          }
+        },
+        "MemorySize": 1024,
+        "Timeout": 120,
+        "ReservedConcurrentExecutions": 2,
+        "Environment": {
+          "Variables": {
+            "PRACTICE_TABLE": {
+              "Ref": "Jobs"
+            },
+            "PRACTICE_QUEUE_URL": {
+              "Ref": "Queue"
+            },
+            "PRACTICE_AUDIO_BUCKET": {
+              "Ref": "AudioBucket"
+            },
+            "PRACTICE_AUDIO_PREFIX": "answer-learning-submissions/",
+            "PRACTICE_SECRET_ARN": {
+              "Ref": "RuntimeSecretArn"
+            },
+            "PRACTICE_STT_MODEL": "gpt-transcribe"
+          }
+        },
+        "Tags": [
+          {
+            "Key": "Service",
+            "Value": "answer-learning"
+          },
+          {
+            "Key": "Stage",
+            "Value": "staging"
+          }
+        ]
+      },
+      "DependsOn": "WorkerLog"
+    },
+    "Url": {
+      "Type": "AWS::Lambda::Url",
+      "Properties": {
+        "TargetFunctionArn": {
+          "Fn::GetAtt": [
+            "Intake",
+            "Arn"
+          ]
+        },
+        "AuthType": "AWS_IAM"
+      }
+    },
+    "Mapping": {
+      "Type": "AWS::Lambda::EventSourceMapping",
+      "Properties": {
+        "EventSourceArn": {
+          "Fn::GetAtt": [
+            "Queue",
+            "Arn"
+          ]
+        },
+        "FunctionName": {
+          "Ref": "Worker"
+        },
+        "BatchSize": 1,
+        "FunctionResponseTypes": [
+          "ReportBatchItemFailures"
+        ],
+        "ScalingConfig": {
+          "MaximumConcurrency": 2
+        },
+        "Enabled": true
+      }
+    },
+    "BackendInvokePolicy": {
+      "Type": "AWS::IAM::ManagedPolicy",
+      "Properties": {
+        "Description": "Attach to the learning backend role; grants only this learning Function URL.",
+        "PolicyDocument": {
+          "Version": "2012-10-17",
+          "Statement": [
+            {
+              "Effect": "Allow",
+              "Action": [
+                "lambda:InvokeFunctionUrl"
+              ],
+              "Resource": {
+                "Fn::GetAtt": [
+                  "Intake",
+                  "Arn"
+                ]
+              },
+              "Condition": {
+                "StringEquals": {
+                  "lambda:FunctionUrlAuthType": "AWS_IAM"
+                }
+              }
+            },
+            {
+              "Effect": "Allow",
+              "Action": [
+                "lambda:InvokeFunction"
+              ],
+              "Resource": {
+                "Fn::GetAtt": [
+                  "Intake",
+                  "Arn"
+                ]
+              },
+              "Condition": {
+                "Bool": {
+                  "lambda:InvokedViaFunctionUrl": "true"
+                }
+              }
+            }
+          ]
+        }
+      }
+    }
+  },
+  "Outputs": {
+    "FunctionUrl": {
+      "Value": {
+        "Fn::GetAtt": [
+          "Url",
+          "FunctionUrl"
+        ]
+      }
+    },
+    "BackendInvokePolicyArn": {
+      "Value": {
+        "Ref": "BackendInvokePolicy"
+      }
+    },
+    "IntakeFunction": {
+      "Value": {
+        "Ref": "Intake"
+      }
+    },
+    "WorkerFunction": {
+      "Value": {
+        "Ref": "Worker"
+      }
+    },
+    "JobsTable": {
+      "Value": {
+        "Ref": "Jobs"
+      }
+    },
+    "QueueUrl": {
+      "Value": {
+        "Ref": "Queue"
+      }
+    },
+    "DeadLetterQueueUrl": {
+      "Value": {
+        "Ref": "DeadLetter"
+      }
+    },
+    "AudioPrefix": {
+      "Value": "answer-learning-submissions/"
+    }
+  }
+}

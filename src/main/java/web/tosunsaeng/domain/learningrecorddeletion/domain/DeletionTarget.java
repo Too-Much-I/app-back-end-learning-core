@@ -11,7 +11,16 @@ import java.time.Instant;
 @Getter
 @NoArgsConstructor
 public class DeletionTarget {
-    public enum Type { EXAM, CHALLENGE }
+    public enum Type { EXAM, CHALLENGE, LEARNING_SUBMISSION, LEARNING_COMPLETION;
+        public String rootCollection() {
+            return switch (this) {
+                case EXAM -> "exam_sessions";
+                case CHALLENGE -> "challenge_10s_attempts";
+                case LEARNING_SUBMISSION -> "learning_submissions";
+                case LEARNING_COMPLETION -> "learning_completions";
+            };
+        }
+    }
     public enum CallbackFence { DRAINING, SEALED }
     @Id private String id;
     @Version private Long version;
@@ -54,6 +63,9 @@ public class DeletionTarget {
             throw new IllegalArgumentException("Invalid deletion target");
         }
         if (type == Type.CHALLENGE) DeletionIdentifiers.uuidV4(aggregateId);
+        // The learning submission API accepts canonical UUIDs, including existing non-v4 IDs.
+        if (type == Type.LEARNING_SUBMISSION && !java.util.UUID.fromString(aggregateId).toString().equals(aggregateId))
+            throw new IllegalArgumentException("Invalid learning submission ID");
         target.targetType = type;
         target.aggregateId = aggregateId;
         target.id = deletionId + ":" + type + ":" + aggregateId;
@@ -62,7 +74,12 @@ public class DeletionTarget {
     }
 
     public String s3Prefix() {
-        return (targetType == Type.EXAM ? "temp/" : "temp/challenges/") + aggregateId + "/";
+        return switch (targetType) {
+            case EXAM -> "temp/" + aggregateId + "/";
+            case CHALLENGE -> "temp/challenges/" + aggregateId + "/";
+            case LEARNING_SUBMISSION -> "answer-learning-submissions/" + aggregateId + "/";
+            case LEARNING_COMPLETION -> throw new IllegalStateException("Completion has no audio");
+        };
     }
 
     public String redisKey() {
