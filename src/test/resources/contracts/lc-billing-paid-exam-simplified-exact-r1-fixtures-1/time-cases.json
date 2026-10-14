@@ -1,0 +1,110 @@
+[
+  {
+    "id": "T01-normal--1",
+    "firstAcceptedAt": "2026-10-14T00:00:00.000Z",
+    "now": "2027-02-10T23:59:59.999Z",
+    "expectedGuaranteeUntil": "2027-02-11T00:00:00.000Z",
+    "expectedWithin": true
+  },
+  {
+    "id": "T01-normal-0",
+    "firstAcceptedAt": "2026-10-14T00:00:00.000Z",
+    "now": "2027-02-11T00:00:00.000Z",
+    "expectedGuaranteeUntil": "2027-02-11T00:00:00.000Z",
+    "expectedWithin": false
+  },
+  {
+    "id": "T01-normal-1",
+    "firstAcceptedAt": "2026-10-14T00:00:00.000Z",
+    "now": "2027-02-11T00:00:00.001Z",
+    "expectedGuaranteeUntil": "2027-02-11T00:00:00.000Z",
+    "expectedWithin": false
+  },
+  {
+    "id": "T01-leap--1",
+    "firstAcceptedAt": "2028-02-29T23:59:59.999Z",
+    "now": "2028-06-28T23:59:59.998Z",
+    "expectedGuaranteeUntil": "2028-06-28T23:59:59.999Z",
+    "expectedWithin": true
+  },
+  {
+    "id": "T01-leap-0",
+    "firstAcceptedAt": "2028-02-29T23:59:59.999Z",
+    "now": "2028-06-28T23:59:59.999Z",
+    "expectedGuaranteeUntil": "2028-06-28T23:59:59.999Z",
+    "expectedWithin": false
+  },
+  {
+    "id": "T01-leap-1",
+    "firstAcceptedAt": "2028-02-29T23:59:59.999Z",
+    "now": "2028-06-29T00:00:00.000Z",
+    "expectedGuaranteeUntil": "2028-06-28T23:59:59.999Z",
+    "expectedWithin": false
+  },
+  {
+    "id": "T01-year--1",
+    "firstAcceptedAt": "2026-12-31T23:59:59.999Z",
+    "now": "2027-04-30T23:59:59.998Z",
+    "expectedGuaranteeUntil": "2027-04-30T23:59:59.999Z",
+    "expectedWithin": true
+  },
+  {
+    "id": "T01-year-0",
+    "firstAcceptedAt": "2026-12-31T23:59:59.999Z",
+    "now": "2027-04-30T23:59:59.999Z",
+    "expectedGuaranteeUntil": "2027-04-30T23:59:59.999Z",
+    "expectedWithin": false
+  },
+  {
+    "id": "T01-year-1",
+    "firstAcceptedAt": "2026-12-31T23:59:59.999Z",
+    "now": "2027-05-01T00:00:00.000Z",
+    "expectedGuaranteeUntil": "2027-04-30T23:59:59.999Z",
+    "expectedWithin": false
+  },
+  {
+    "id": "T03-before",
+    "terminalAt": "2026-10-20T01:02:03.004Z",
+    "now": "2027-02-17T01:02:03.003Z",
+    "unresolved": false,
+    "hold": false,
+    "expectedPurgeEligible": false,
+    "scope": "DETAIL_RECEIPT_ONLY_NOT_MINIMUM_EVIDENCE"
+  },
+  {
+    "id": "T03-exact",
+    "terminalAt": "2026-10-20T01:02:03.004Z",
+    "now": "2027-02-17T01:02:03.004Z",
+    "unresolved": false,
+    "hold": false,
+    "expectedPurgeEligible": true,
+    "scope": "DETAIL_RECEIPT_ONLY_NOT_MINIMUM_EVIDENCE"
+  },
+  {
+    "id": "T03-after",
+    "terminalAt": "2026-10-20T01:02:03.004Z",
+    "now": "2027-02-17T01:02:03.005Z",
+    "unresolved": false,
+    "hold": false,
+    "expectedPurgeEligible": true,
+    "scope": "DETAIL_RECEIPT_ONLY_NOT_MINIMUM_EVIDENCE"
+  },
+  {
+    "id": "T03-unresolved",
+    "terminalAt": "2026-10-20T01:02:03.004Z",
+    "now": "2027-02-17T01:02:03.005Z",
+    "unresolved": true,
+    "hold": false,
+    "expectedPurgeEligible": false,
+    "scope": "DETAIL_RECEIPT_ONLY_NOT_MINIMUM_EVIDENCE"
+  },
+  {
+    "id": "T03-hold",
+    "terminalAt": "2026-10-20T01:02:03.004Z",
+    "now": "2027-02-17T01:02:03.005Z",
+    "unresolved": false,
+    "hold": true,
+    "expectedPurgeEligible": false,
+    "scope": "DETAIL_RECEIPT_ONLY_NOT_MINIMUM_EVIDENCE"
+  }
+]

@@ -14786,6 +14786,370 @@
 - AGENTS/ADR/B계획의 착수 승인 상태를 갱신하고 LC_BILLING_WORKLOAD_JWT_B_VALIDATION.md에 실제 증거와 private JWK 입력 형식, Billing HTTP27/양측 TLS·배포키/E2E 미검증을 분리 기록했다. fixtures-1 세JSON hash OK 및 원문 bytes 유지. A 계약/API/AI/S3/Redis/업무 wire 변경 없음.
 - C도구·Billing 저장소·실제 DB/AWS/배포/활성화·Jira 변경/commit/push 미수행. Secret/Token 원문 기록 없음. 기존 사용자 dirty 파일 보존, git diff --check 및 현재 marker 단일 출현 확인. CURRENT_STATE 갱신.
 
+## 2026-10-13 — Billing 유료 시험 연동 인계 초안 R1 검토
+
+<!-- codex-turn:01a13433-6a0b-7e03-bdf3-ab94c3bafd86 -->
+
+- 사용자 첨부 PLAN011 유료 reserve/이용 증거·PLAN012 환불 전달 초안을 읽고 LC 현행 코드와 정적 대조했다. 기존 연계 Jira TMI-116/TMI-128/TMI-122를 참조하며 신규 Jira/외부 회신 전송은 수행하지 않았다. 첨부를 공동 확정/유료 코드 착수 승인으로 확대하지 않는다.
+- 기존 API·상태event v1 재사용 및 confirm-first exact Session 방향은 검토 가능하다. 그러나 strict unknown-field decoder와 reserve/status DTO는 entitlementSource 미지원이며 먼저 Billing 응답을 확장하면 계약 오류가 된다. Session뿐 아니라 operation/reservation 복구 snapshot의 source 보존·검증과 제한된 legacy무료 판정 근거를 확정해야 한다. 현재 ENTITLEMENT_REVOKED는 별도 분류가 없어 CONTRACT_ERROR로 수렴하므로 새 업무 분류/공개 오류 mapping/보상 회귀가 필요하다.
+- 현행 Session에서 제출 deadline 필드를 확인하지 못했고 GRADING 제한30분은 gradingStartedAt 기반이므로 초안의 기존 제출 기한을 자동 충족한다고 판단하지 않았다. 기산점·마감·Job/Callback 완료 허용·guard 해제 신호를 확정할 것을 제안한다. 신규 revoke route/DTO는 검색 범위의 LC runtime에 없으며 역방향 JWT trust/flags/키·fixture는 기존 LC 발신 A 계약과 별도다.
+- duplicate/stale204와 eventId/version 의미충돌409 우선순위·보존 기준, version scope, merge/탈퇴/학습삭제와 지연 revoke의 owner 경합, 최대16KiB 의미를 공동 계약에서 명확히 할 것을 정리했다. 실제 양측 기능/테스트 완료를 주장하지 않는다.
+- WORKLOG append/CURRENT_STATE만 갱신. 제품·A계약/fixture·타 저장소·실DB/AWS/배포·Jira·commit/push 변경 및 Secret/Token 기록 없음. 기존 dirty 변경 보존. 분석 작업으로 테스트 재실행 생략, git diff --check 및 현재 marker 단일 출현 확인.
+
+## 2026-10-13 — 유료 시험 R2·무료권 복원·legacy 보존 정책 LC 변경 검토
+
+<!-- codex-turn:01a13474-6b4b-7b02-9b02-95beb1c01bfd -->
+
+- 사용자 전달 최신3문서를 읽고 PLAN-011/012/013 및 기존 TMI-116/TMI-128/TMI-122, lifecycle TMI-125 관련 LC 코드를 정적 검토했다. LC_BILLING_PAID_R2_REVIEW.md에 확정 제품정책/현행 차이/변경 제안/공동 동결 과제를 분리 작성했다. prod Session1493/active146·BillingDB 미구축은 전달자료이며 이번 독립 조회 결과로 보고하지 않는다.
+- EXAM_PASS/SUBSCRIPTION strict source reader·operation/Session 영속, legacy source누락 fallback 금지·서버측 대상경계, 신규 Billing 적용과 기존 기록/접수복구 보존을 정리했다. TRIAL fallback 잔여 문구는 현 production 연결증거 부재와 최신 분류에 맞춰 정리하도록 제안했다. 기존 데이터를 무료권 소비/복원 근거로 만들지 않는다.
+- 현행 commitReservedSession의 confirm 전 abandon, callback의 abandoned/retake 무시, replacement 예상 중 INITIAL 거절, SUCCEEDED terminal worker noop/TTL을 구체적 변경점으로 확인했다. confirm 성공 후 exact 이전대상 순차종료·기접수 Job 완료·종료 뒤 신규접수 차단·durable 후속복구를 제안하며 새 분산 lock/제출timeout을 도입하지 않는다. source enum만으로 최초trial/같은구매를 판정하지 않는다.
+- exact 전환 응답/status·mock 선택, 공개오류/보상증거, 신규역방향JWT·connector/flags, digest/version·비식별 보존과 deletion/merge/withdrawal 경합, reader-first/drain/rollback·공동fixture를 미확정으로 명시했다. 제품정책 전달을 exact 계약 수락이나 코드/배포 승인으로 확대하지 않았다.
+- 검토서와 CURRENT_STATE/WORKLOG만 변경. 제품/A계약/fixtures/AGENTS·Billing 저장소·실DB/AWS/배포/Jira/commit/push 변경 없음. Secret/Token 기록 없음. 기존 dirty 파일 보존, 정적 검토로 테스트 재실행 생략. git diff --check 및 현재 marker 단일 출현 확인.
+
+## 2026-10-13 — 후속 R2 manifest·LC 마무리 결정 재검토
+
+<!-- codex-turn:01a13482-4c1d-7511-90df-5ee7e539c7db -->
+
+- PLAN-011/012/013, 기존 TMI-116/TMI-128/TMI-122 및 lifecycle TMI-125 관련 새 첨부를 직전 R2와 diff 대조했다. §1/6 proven-TRIAL fallback 제거·서버 exact Session manifest, §8 최초trial→paid 예외, §10 기존 operation 후속 종료/마무리 commit 뒤 성공 반환·미완료 guard/무TTL 반영 확인. 보완 방향 추가 이견 없음이며 기존 대안을 계속 미정으로 보고하지 않는다.
+- LC_BILLING_PAID_R2_REVIEW.md §8과 CURRENT_STATE를 갱신했다. 새 Job 금지는 사용자 새 제출에 한정하고 기접수에서 파생되는 Summary Job 최초 생성·시스템 복구는 허용하도록 문구 구분 권고. 전환 reserve/status 근거·mock 선택·권위 거절증거·중간 HTTP/code·역방향 보안/보존/공동fixture는 미확정으로 유지한다.
+- 문서/기록만 변경, 제품/A계약/fixture/AGENTS/타 저장소/DB/AWS/배포/Jira/commit/push 변경 및 Secret/Token 기록 없음. 기존 dirty 변경 보존. 테스트·prod 조회 재실행 없음. git diff --check와 현재 marker 단일 출현 확인.
+
+## 2026-10-14 — LC–Billing 유료 공동 wire R1 draft-1 검토
+
+<!-- codex-turn:01a137ea-5189-7e93-879e-ad6c7afca4a6 -->
+
+- PLAN-011/012/013, TMI-116/TMI-128/TMI-122 및 lifecycle TMI-125 관련 사용자 초안과 LC 실제 삭제continuation/오류/status DTO를 대조하고 LC_BILLING_PAID_WIRE_R1_REVIEW.md를 작성했다. restartContext·immutable source/transition·기존 operation 마무리 구조와 파생Summary 허용은 수용 가능한 방향이나 최종 공동 동결은 아님.
+- 삭제 continuation은 phone이 아닌 일반3필드 reserve이며 로컬 sourceExam/group/mock 증거를 사용하고 Session commit에서 transfer한다는 현재 매핑을 확인했다. restart누락/삭제·phone 충돌, replay 전 가변stale 검사 금지, type/source/mock 조합·OTHER_SOURCE_CHANGE 행동, CANCELED+거절 일관성·terminal replay, 새 공개503과 기존409/503 경계, PAYMENT→PURCHASE reason 후보 변경·digest golden bytes/예외Session 역순을 보완 과제로 정리했다.
+- CURRENT_STATE/WORKLOG와 신규 검토서만 변경. 제품/API/A계약/fixtures/AGENTS/타 저장소/실DB/AWS/배포/Jira/commit/push 변경 없음. Secret/Token 기록 없음. 기존 dirty 변경 보존. 정적 검토로 테스트 재실행 생략, git diff --check 및 현재 marker 단일 출현 확인.
+
+## 2026-10-14 — paid wire draft-2 보완 재검토
+
+<!-- codex-turn:01a137f2-90f5-7c50-bc6d-13680274df61 -->
+
+- PLAN-011/012/013, TMI-116/TMI-128/TMI-122 및 TMI-125 관련 사용자 첨부 draft-2 전체를 읽고 앞선 요청 반영을 확인했다. replay/실패receipt·삭제claim/transfer·미확정전환 제외·거절정합성·기존409/503·enum/bytes/역순/namespace·추가fixture 보완 방향에 추가 이견 없음. 최종 공동동결/구현 승인으로 해석하지 않았다.
+- 현행 status client는 header operationId가 아닌 body userId/operationId임을 읽기 재확인해 §1의 공통 header 문구 범위 한정 및 §8 중간503 잔여표현 정리를 권고했다. 검토서 후속절과 CURRENT_STATE 갱신. fixture/hash/독립실행·제품영향/보존/실배포gate는 아직 미완료다.
+- 문서/기록만 변경. 코드/API/A계약/fixtures/AGENTS/타저장소/DB/AWS/배포/Jira/commit/push 변경 및 Secret/Token 기록 없음. 기존 dirty 보존. 정적검토로 테스트 재실행 생략, git diff --check 및 현재 marker 단일 출현 확인.
+
+## 2026-10-14 — 재첨부 paid wire draft-2 동일성 확인
+
+- PLAN-011/012/013, TMI-116/TMI-128/TMI-122 및 TMI-125 관련 재첨부를 직전 draft-2와 diff 대조해 차이 없음을 확인했다. status operationId body 예외와 §8 중간503 표현 정리 의견을 유지한다. 신규 계약 수락/구현 지시로 해석하지 않았다.
+- CURRENT_STATE/WORKLOG 기록만 갱신. 코드/계약/fixture/DB/배포/Jira/commit/push 및 Secret/Token 기록 없음. 기존 변경 보존, 테스트 재실행 생략, git diff --check 확인. 직전 턴 marker는 추가 복제하지 않았다.
+
+## 2026-10-14 — 재첨부 동일성 검토의 현재 턴 기록 보완
+
+<!-- codex-turn:01a137f5-3fc3-7f50-a86b-8dc88a359c4a -->
+
+- TMI-116/TMI-128/TMI-122 및 TMI-125 관련 재첨부 paid wire draft-2가 직전 첨부와 동일하다는 검토 결과에 현재 턴 표식을 보완했다. status body 예외·§8 오류 표현 정리 의견은 유지한다.
+- 과거 WORKLOG 보존 후 append하고 CURRENT_STATE를 갱신했다. 코드/계약/DB/배포/Jira 변경 및 Secret/Token 기록 없음. 기록만 변경해 테스트 재실행 생략, git diff --check 및 현재 표식1회 확인.
+
+## 2026-10-14 — paid wire draft-3 문구 보완 확인
+
+- PLAN-011/012/013 및 TMI-116/TMI-128/TMI-122, TMI-125 관련 첨부 draft-3와 직전 draft-2를 diff 대조했다. §1 status body 예외·command header 범위와 §8 기존409/503·신규 두409 문구가 반영돼 두 의견 해소. revision/설명 외 새 wire 변경 없음, 이번 변경 범위 추가 이견 없음.
+- 검토서/CURRENT_STATE/WORKLOG만 갱신. fixture 제작·hash/독립실행·계약 최종동결/구현/배포 승인으로 확대하지 않았다. 제품/DB/외부서비스/Jira/commit/push 변경 및 Secret/Token 기록 없음. 기존 변경 보존, 문서 검토로 테스트 재실행 생략, git diff --check 확인.
+
+## 2026-10-14 — draft-3 검토의 현재 턴 기록 보완
+
+<!-- codex-turn:01a137f6-bc70-74f0-bde4-63d8c43bc6ba -->
+
+- TMI-116/TMI-128/TMI-122 및 TMI-125 관련 draft-3 검토에 현재 턴 표식을 보완했다. 마지막 두 문구 의견 해소·이번 보완 범위 추가 이견 없음이라는 결론을 유지한다. 공동 fixture 제작/독립검증·최종동결은 미수행이다.
+- 과거 기록을 보존하고 WORKLOG 끝에 append, CURRENT_STATE 갱신. 코드/DB/배포/Jira 변경 및 Secret/Token 기록 없음. 기록만 수정해 테스트 재실행 생략, git diff --check와 표식 단일 출현 확인.
+
+## 2026-10-14 — 유료 단순화 최소 wire·fixture 검토
+
+<!-- codex-turn:01a1380b-60a9-76c2-b413-67cfe281c028 -->
+
+- PLAN-011/012/013, TMI-116/TMI-128/TMI-122 및 TMI-125 관련 최신 단순화 인계를 읽고 LC 접수tracker/Job/AttemptGroup evidence/문제선정 코드를 확인했다. LC_BILLING_PAID_SIMPLIFICATION_REVIEW.md에 단일mock·서버고정 startReason·공통transition/전체전환 마무리·불변group revoke·terminalAt재사용과 fixture교체를 제안했다. exact명칭/분기 최종수락이나 구현승인으로 확대하지 않는다.
+- 전체접수후 신규는 BillingOPEN/mock동일 여부와 무관하게 신규권리INITIAL, 부분접수는 같은mock이나 Billing권리에 따라 replacement/전환INITIAL을 구분하도록 권고했다. 준비/마지막접수 경합·같은key 판정불변, 알림tracking 의존 접수증거의 독립성, 현재 완료count 선정이 다른mock를 보장하지 않는 점, phone/삭제 증거불명 처리를 명시했다.
+- group최초eventId/digest·deny예외 양unique와원자성은 유지하고 version/highwater/semantic history 제거, 새ID동일group충돌 후보·보존/replay안전 미해소를 기록했다. draft3 두후보/type/version/rejectedAt fixture는 새정본/revision으로 교체하며 A fixtures불변이다.
+- 신규 검토서/CURRENT_STATE/WORKLOG만 변경. 제품/API/A계약/fixture/AGENTS/타저장소/DB/AWS/배포/Jira/commit/push 변경 및 Secret/Token 기록 없음. 기존변경 보존, 정적검토로 테스트 재실행 생략. git diff --check 및 현재marker1회 확인.
+
+## 2026-10-14 — 단순화 후속 문제선정 승인 검토
+
+<!-- codex-turn:01a13814-c0c7-7db1-8e51-9e505d748a1c -->
+
+- PLAN-011/012/013, TMI-116/TMI-128/TMI-122 및 TMI-125 관련 첨부 전체를 확인했다. 직전 인계 대비 §1/9에 전체접수·요약대기 직전mock 제외, 다른적격후보 실제0개일 때만 동일mock 허용, catalog장애 fallback금지·완료count위조금지·tracking독립 접수증거·replay고정이 반영됐다. 해당 정책 방향 추가 이견 없음.
+- 검토서 §4/8과 CURRENT_STATE 갱신, 다른후보/0개/장애/같은key·catalog변화/접수경합 fixture 추가 방향을 기록했다. 동일mock fallback이어도 신규INITIAL 권리판정은 유지한다. startReason exact명칭·phone/삭제·transition·불변revoke/보존 및 새정본/fixture동결은 아직 별도이며 구현승인으로 확대하지 않았다.
+- 문서/기록만 변경. 코드/API/A계약/fixtures/AGENTS/타저장소/DB/AWS/배포/Jira/commit/push 변경 및 Secret/Token 기록 없음. 기존변경 보존, 테스트 재실행 생략, git diff --check와 현재marker1회 확인.
+
+## 2026-10-14 — 유료 공동 통합 계약 R2 검토
+
+<!-- codex-turn:01a1381f-2241-7e63-bd26-5447fbcee3ac -->
+
+- PLAN-011/012/013, TMI-116/TMI-128/TMI-122 및 TMI-125 관련 사용자 전달 lc-billing-paid-exam-contract-r2-draft-1 전체를 검토했다. 회신요청1~3의 startReason/단일mock·source/kind/transition,공통마무리/Billing복원,불변event/group 충돌·terminalAt 기술내용에 추가 이견 없음. 이전 명칭미정 의견을 그대로 반복하지 않고 검토서 §9/CURRENT_STATE를 갱신했다.
+- phone/삭제접수증거·권리정상분기·보존/삭제와 실환경 담당/잔여gate를 분리했다. inboxTTL 후 group증거 재전송, 지연완료의 신규guard 불해제, 권리부족 시 선종료금지 사례를 기존fixture 세부화에 권고했다. fixture기준 검토를 실제제작/독립실행/최종동결/제품구현 승인으로 확대하지 않는다.
+- 문서/기록만 변경. 코드/API/A계약/fixture/AGENTS/타저장소/DB/AWS/배포/Jira/commit/push 변경 및 Secret/Token 기록 없음. 기존변경 보존, 검토작업으로 테스트 생략. git diff --check 및 현재marker1회 확인.
+
+## 2026-10-14 — 통합 R2 draft-2 보완 확인
+
+<!-- codex-turn:01a13825-6375-7a00-9c85-8052079604c5 -->
+
+- PLAN-011/012/013, TMI-116/TMI-128/TMI-122 및 TMI-125 관련 첨부를 직전 통합R2와 diff 대조했다. 권리부족 선종료금지, 지연완료 신규group/operation guard 불해제, inboxTTL뒤 group최초증거 재전송204/충돌409 및 S09/S12/V01 반영을 확인했다. 담당분리·S15/V07 미확정 정상기대값 금지 유지, 보완범위 추가 이견 없음.
+- 검토서 §10/CURRENT_STATE/WORKLOG만 갱신. 기술1~3의 fixture세부화 가능과 실제제작/독립검증/최종동결·제품구현 승인을 구분했다. 코드/API/A계약/fixture/AGENTS/타저장소/DB/AWS/배포/Jira/commit/push 변경 및 Secret/Token 기록 없음. 기존변경 보존, 테스트 생략, git diff --check와 현재marker1회 확인.
+
+## 2026-10-14 — Billing paid fixtures-1 확인
+
+<!-- codex-turn:01a1382e-aa0b-7a31-942e-8dd24554940f -->
+
+- 사용자 요청으로 Billing 원본fixture/manifest/보고서/생성기/검사기를 읽기 확인했다(PLAN-011/012/013, TMI-116/TMI-128/TMI-122, TMI-125). 계약 원문은 전달R2와동일, 계약hash와12파일SHA256 일치. Billing검사기 재실행은 canonical9/invalid13/token22/HTTP판정표12/wire6/status3 통과. LC독립검증이나 실제HTTP/상태26시나리오 실행으로 보고하지 않는다.
+- 생성기의 JSON.stringify후control정규식치환이 literal backslash+n 의미를 바꾸는 문제와 검사기 datetime/float now의1ns→1µs 정밀도손실을 비민감 입력으로 재현했다. 현재fixture통과와 별개인 미포함회귀·도구보완으로 구분하고 새revision/hash를 권고했다. LC_BILLING_PAID_FIXTURES_1_INSPECTION.md 및 CURRENT_STATE 갱신.
+- Billing파일/원본fixture/생성기 미수정·미재생성, 실제DB/AWS/배포/외부회신/Jira/commit/push 없음. LC제품/A계약/AGENTS 미변경, Secret/Token 원문 기록 없음. 기존dirty보존, 전체Gradle미실행. git diff --check 및 현재marker1회 확인.
+
+## 2026-10-14 — Billing paid fixtures-2 수정 재검토
+
+<!-- codex-turn:01a1383a-fa94-7223-ac5f-3e97622af1e1 -->
+
+- PLAN-011/012/013, TMI-116/TMI-128/TMI-122 및 TMI-125 관련 Billing 수정 source/보고서/fixtures-2를 읽기 확인했다. scalar serializer와 정수초+Decimal epoch로 이전 두 지적이 해소됐다. 실제 serializer 함수만 격리 실행해 문자열14/고립surrogate거절2를 확인하고 이전 나노초 재현 입력의 정확1ns 간격을 확인했다. 전체 생성기는 실행하지 않았다.
+- 새13파일 SHA256 및 Billing 오프라인 검사 canonical18/clock5/invalid13/token31/HTTP판정표12/wire6/status3 통과. 기존 fixtures-1 경로도 수정 검사기로 재검증해 통과. 이번 범위 추가 지적 없음. LC 독립검증/실제HTTP·상태26시나리오/최종동결 완료로 보고하지 않으며 S15/V07 잔여gate 유지.
+- 검토서 후속절/CURRENT_STATE/WORKLOG만 갱신. Billing파일/fixture/API/제품/A계약/DB/AWS/배포/Jira/commit/push 변경 및 Secret/Token 기록 없음. 기존dirty보존, 제품 변경 없어 전체Gradle 미실행. git diff --check 및 현재marker 단일 출현 확인.
+
+## 2026-10-14 — Paid fixtures-2 LC 자체 독립 검증
+
+<!-- codex-turn:01a13861-e0eb-7930-8497-aeef52a66b3a -->
+
+- 사용자 명시 승인으로 Billing fixtures-2 원본14파일을 SHA256SUMS 포함 byte 그대로 LC test resources에 인수했다. PLAN-011/012/013, TMI-116/TMI-128/TMI-122 및 TMI-125 관련. 생산자 README/manifest는 그대로 보존하고 결과는 LC_BILLING_PAID_FIXTURES_2_VALIDATION.md에 분리 기록했다. Billing 파일이나 생성기를 수정·실행하지 않았다.
+- LC 자체 LcBillingPaidFixtureTest를 추가했다. Billing Python/Node/제품 codec에 의존하지 않는 JCA RSA/Jackson strict JSON/Instant nanosecond/canonical serializer와 오프라인 HTTP·DTO 구조검사다. 원문token 유지, 기대값은 비교에만 사용, 키setup실패와 인증실패 구분, SHA256SUMS 자체hash pin 및13파일hash 검증.
+- 선별89개 통과, 최종 ./gradlew clean test948개 실패0/오류0/skip0(89포함). diff -qr 양측14파일 동일, shasum13개OK. Gradle sandbox 캐시 접근 오류 후 승인된 재실행 성공, 기존 compiler warnings 유지. XML에 fixture ID별 결과 기록. S15/V07 보류 및 실제HTTP/Transaction/상태26시나리오 미실행을 명시했다.
+- 새 테스트/원본인수/검증기록/CURRENT_STATE/WORKLOG만 변경. 기존dirty보존, API/AI/S3/Redis/제품/A계약·fixtures/Billing/실제DB/AWS/배포/활성화/Jira/commit/push 변경 없음. 실Secret/Token/private key 및 fixture token 원문을 로그/보고서에 기록하지 않았다. git diff --check 및 현재marker1회 확인. 최종 공동동결·서비스 구현 승인은 별도다.
+
+## 2026-10-14 — Paid 연동 구현계획 작성 준비 확인
+
+<!-- codex-turn:01a138b0-f5af-7cf2-b9fa-e707cd716969 -->
+
+- 사용자 질문에 따라 fixtures-2 독립검증 기록과 통합R2 검토·잔여gate를 확인했다. 관련 PLAN-011/012/013, TMI-116/TMI-128/TMI-122 및 TMI-125. 계획서 초안 작성 가능하며 서비스 구현 착수 가능/승인과 구분한다. 앞선89/948 통과는 오프라인/회귀 증거로만 인용하고 재실행하지 않았다.
+- 계획에는 단일mock/startReason·tracking독립 접수증거, source/transition snapshot, confirm 후 로컬마무리·기접수Job/복구, 불변revoke/역방향보안, legacy manifest·default-off·실HTTP/Transaction 테스트를 포함할 것을 안내한다. S15/V07은 별도 미확정 의존성으로 남겨 schema/삭제/phone 정책을 추정하지 않는다. 공동수락·기준동결과 ADR/AGENTS 범위동기화 및 구현승인은 착수 전 조건이다.
+- 이번은 확인 응답이며 구현계획서 자체나 제품/fixture/API/DB/배포를 변경하지 않았다. WORKLOG append/CURRENT_STATE만 갱신, 기존dirty보존·Secret/Token 기록 및 Jira/commit/push 없음. 문서 확인이라 테스트 재실행 생략, git diff --check 및 현재marker1회 확인.
+
+## 2026-10-14 — LC 유료 시험 구현계획 작성
+
+<!-- codex-turn:01a138b7-d397-78c0-8f2d-b7367e4a1ddc -->
+
+- 사용자 요청으로 LC_BILLING_PAID_EXAM_IMPLEMENTATION_PLAN.md 작성. 관련 PLAN-011/012/013, TMI-116/TMI-128/TMI-122 및 TMI-125. R2 draft-2/fixtures-2 독립검증을 기준으로 현재 tracker/client/saga/Transaction/선정/복구/Job 경계를 정적 대조했다. 현행 tracking OFF 접수미기록·confirm전 진행시험일괄abandon을 주요 변경점으로 기록했다.
+- P0계약·schema·승인, P1독립접수/단일mock, P2wire/source, P3confirm후원자마무리/기존operation복구, P4기접수Job/파생Summary, P5불변revoke, P6legacy/index/운영준비 단계·완료기준·담당·테스트를 작성했다. 신규 공개409/대기Session index/owner·삭제 경합과 보존증거 위험을 명시했다. S15/V07을 추정하지 않고 관련schema·정상지원·활성화의 미확정 의존성으로 남겼다.
+- 계획서와 CURRENT_STATE/WORKLOG만 변경. 계획 작성은 제품구현 승인이나 공동최종동결이 아니며 ADR/AGENTS/코드/fixture/타저장소/API/DB/AWS/배포/활성화/Jira/commit/push 변경 없음. 기존dirty보존·Secret/Token 기록 없음. 문서 작업으로 테스트 재실행 생략, git diff --check·현재marker1회 확인.
+
+## 2026-10-14 — 공동 구현 합의안 R1 LC 검토
+
+<!-- codex-turn:01a138c6-2840-7db3-b9dd-dacb35a4d705 -->
+
+- 전달 합의안R1 전체를 LC 계획/독립검증 기록 및 saga guard/replay·OPERATION_NOT_FOUND 분류와 대조했다. 관련 PLAN-011/012/013, TMI-116/TMI-128/TMI-122 및 TMI-125. LC_BILLING_PAID_IMPLEMENTATION_AGREEMENT_R1_REVIEW.md에 J1/J2 요구 이견없음과 실제검증미완료, J3 status exact관측/귀속/TTL/worker수렴, J4 T2 source별owner/lifecycle표 확인필요를 기록했다.
+- 첨부hash/89·948 수치는 LC기록과일치. S15/V07 보류 및 원본bytes 유지, 새fixture필요시 별도revision 경계 유지. 기접수완료는 lifecycle보다 우선하지 않으며 worker새reserve를 임의추가하지 않는다. 최종 공동수락/구현승인으로 해석하지 않았다.
+- 검토서/CURRENT_STATE/WORKLOG만 변경. 기존dirty보존, 계획/ADR/AGENTS/제품/API/fixture/타저장소/DB/배포/활성화/Jira/commit/push 변경과 외부전송·Secret/Token 기록 없음. 정적검토로 테스트 재실행 생략, git diff --check·현재marker1회 확인.
+
+## 2026-10-14 — J3/J4 보완안 R1 LC 검토
+
+<!-- codex-turn:01a138cb-d163-7df0-9236-c0a30c2dcc2b -->
+
+- 첨부전체와 LC error reader/category·worker·CurrentUserProvider·Challenge MEMBER검사를 확인했다. 관련 PLAN-011/012/013, TMI-116/TMI-128/TMI-122 및 TMI-125. LC_BILLING_PAID_J3_J4_R1_REVIEW.md에 J3 status전용409 수용가능 방향, strict4필드/HTTP/retryable 검사·PREPARED/신규Session미commit·CAS·관측시각 구분 보완을 기록했다. ownerMismatch는 전역auth차단/guard해제와 분리한다.
+- J4 source별owner/일반version·epoch 구분에는 이견없음. 현 LC userId/서비스JWT가 ACTIVE MEMBER 증거를 전달하지 않고 Challenge account_type도 최신ACTIVE증명이 아님을 확인했다. Identity 권위의 Billing 검증가능한 증거/최신성/탈퇴경합/무사용자JWT worker 계약은 추가확인 대상으로 남겼다. S15/V07 보류, 기존fixture 불변 및 별도revision/추가회귀 권고.
+- 검토서/CURRENT_STATE/WORKLOG만 변경. 기존dirty보존, 제품/API/계획/ADR/AGENTS/fixtures/타저장소/DB/배포/Jira/commit/push 변경 및 외부전송·Secret/Token 기록 없음. 코드미변경으로 테스트 재실행 생략. git diff --check·현재marker1회 확인. 최종수락/구현/fixture제작 승인으로 확대하지 않았다.
+
+## 2026-10-14 — J3/J4 draft-2 보완 확인
+
+<!-- codex-turn:01a138d2-1ba3-7c11-9961-a230ff9578ff -->
+
+- 직전첨부와 draft-2를 diff 대조했다(PLAN-011/012/013, TMI-116/TMI-128/TMI-122, TMI-125). J3 PREPARED/신규Session부재·strict4필드/status결속·응답후Tx/lease/version/owner/CAS·관측시각·owner-blocked와 J3-08~12에 이전 의견 반영, 이번 변경범위 추가 이견 없음. 검토서 후속절/CURRENT_STATE 갱신.
+- J4의 Billing로컬ACTIVE/구매당시MEMBER와 현재Identity상태 구분, 전달/최신성/탈퇴지연 질문·미확정 정상기대값 금지 확인. Billing 기존계약 조사는 첨부보고 근거로 접수했고 이번에 직접 재검증하지 않았다. J3공동수락/별도fixture 및 J4Identity계약 확인을 분리 권고. S15/V07 보류, 기존R2/fixtures-2 불변.
+- 문서검토/기록만 변경, 신규fixture/최종동결/구현 승인으로 확대하지 않음. 기존dirty보존·제품/계획/ADR/AGENTS/타저장소/DB/배포/Jira/commit/push/외부전송·Secret/Token 기록 없음. 테스트 재실행 생략, git diff --check·현재marker1회 확인.
+
+## 2026-10-14 — PLAN-011 남은 기술안 R1 검토
+
+<!-- codex-turn:01a138e1-ddd6-71a0-bd1e-fc22dfe08da1 -->
+
+- 첨부와 Billing 승인정책 원문을 읽고 LC saga/terminal7일보존/삭제worker·continuation 경계를 대조했다. 관련 PLAN-011/012/013, TMI-116/TMI-128/TMI-122/TMI-125 및 삭제 TMI-193/TMI-136. 최신 MEMBER증거보존/탈퇴지연수용·명시삭제재응시포기 정책을 접수하되 신규route/phone조합/기간은 기술후보로 구분했다.
+- LC_BILLING_REMAINING_TECHNICAL_R1_REVIEW.md에 M1최초보강/오류, 삭제ACK와자료정리checkpoint·생성대기/deny교착방지·삭제후replay, phone INITIAL snapshot/복원owner 조합을 보완 요청했다. 과거key의 모든증거폐기후 공개재입력이 새operation 생성시각으로120일 age fence를 우회할 수 있어 최초성증거/폐기조건과fixture가 필요함을 기록했다. 기존24시간/200회격리를120일자동retry로 바꾸지 않는다.
+- 검토서/CURRENT_STATE/WORKLOG만 변경. 기존dirty보존·제품/계획/ADR/AGENTS/계약/fixture/타저장소/DB/배포/Jira/commit/push/외부전송·Secret/Token 기록 없음. 문서검토로 테스트 재실행 생략, git diff --check·현재marker1회 확인. 최종수락/구현승인 아님.
+
+## 2026-10-14 — 단순화 승인 정책 LC 문서 반영
+
+<!-- codex-turn:01a138ed-e4e8-77c1-9e67-2fc5fdb86055 -->
+
+- 사용자 전달 승인에 따라 LC_BILLING_PAID_EXAM_IMPLEMENTATION_PLAN.md §3.1 및 S15/V07·replay 설명 갱신. 관련 PLAN-011/012/013, TMI-116/TMI-128/TMI-122/TMI-125, 삭제 TMI-193/TMI-136. target paid우선/자격있는 원trial consumption당 target복원1회, 생성중삭제 미접수·재시도안내/공통fence, MEMBER앱보강/worker새reserve금지,120일멱등보장과 이후key재입력위험수용을 반영했다.
+- 이전 남은기술 검토서에 후속승인 우선주석 추가: 당시 위험분석은 보존하되 과거key식별 불가만으로 purge금지 요구는 해제. 금융/소비/복원unique·권한/보호Session·미완료unknown evidence는 별도보존,24시간/200회격리 유지. 정확wire/공개오류/clock경계·자료별보존은 후속동결, 신규fixture/구현승인과 구분했다.
+- 계획/검토서/CURRENT_STATE/WORKLOG만 변경. 과거WORKLOG 및 기존dirty보존. 코드/ADR/AGENTS/기존A·R2·fixtures-2/DB/purge/배포/타저장소/Jira/외부전송/commit/push·Secret/Token 기록 없음. 문서작업으로 테스트 재실행 생략, git diff --check·현재marker1회 확인.
+
+## 2026-10-14 — 단순화 승인 반영의 현재 턴 기록 보완
+
+<!-- codex-turn:01a138ee-607f-7ac0-b18c-de7bcda1b257 -->
+
+- 종료 점검 요청에 따라 WORKLOG 과거 기록을 유지하고 현재 표식의 새 항목을 끝에 추가, CURRENT_STATE 갱신. 관련 PLAN-011/012/013, TMI-116/TMI-128/TMI-122/TMI-125, TMI-193/TMI-136.
+- 직전 단순화 정책 동기화 결과 유지: target 유료 우선/조건부 복원1회, 생성 중 삭제 미접수, MEMBER 앱 보강,120일 멱등 보장 이후 위험수용 및 금융/소비/권한/미완료 증거 별도보존. 추가 코드/계약/fixture/DB/배포/외부전송 변경 없음.
+- Secret/Token 기록 없음. 기록만 보완하여 테스트 재실행 생략, git diff --check 및 현재marker 정확히1회 확인.
+
+## 2026-10-14 — 단순화 exact 계약 R1 검토
+
+<!-- codex-turn:01a138f7-8281-7781-82ac-6b30934a4940 -->
+
+- 첨부전체와 LC ErrorStatus/BaseResponse/삭제advice/saga·worker cleanup 경계를 대조했다. 관련 PLAN-011/012/013, TMI-116/TMI-128/TMI-122/TMI-125, TMI-193/TMI-136. 공개오류·NON_NULL·120일정각·phone echo/INITIAL/target복원 규격 방향 이견없음. LC_BILLING_SIMPLIFIED_EXACT_R1_REVIEW.md 작성.
+- MEMBERpending PREPARED를 현worker가 CLEANUP_PRECOMMIT으로 바꾸면 앱보강 후 same-key가 생성409로 막히는 경로를 확인했다. durable대기/일반cleanup분리·응답유실/worker경합·격리/120일재개조건 명시와 E02확장 권고. worker새reserve/404의terminal추정/무조건intent리셋 금지. 기존정책선택을 다시 요구하지 않으며 별도삭제route/보존gate는 남긴다.
+- 검토서/CURRENT_STATE/WORKLOG만 변경. 기존dirty보존, 코드/계획/ADR/AGENTS/기존A·R2·fixture/타저장소/DB/배포/Jira/외부전송/commit/push·Secret/Token 기록 없음. 정적검토로 테스트 재실행 생략, git diff --check 및 현재marker1회 확인. 최종공동수락/fixture제작/구현승인 아님.
+
+## 2026-10-14 — 재첨부 exact R1 동일성 확인
+
+<!-- codex-turn:01a138fb-e380-7523-8828-a16cd4233081 -->
+
+- 새 첨부를 직전 exact draft-1과 diff/SHA256 대조해 byte 동일함을 확인했다. 관련 PLAN-011/012/013, TMI-116/TMI-128/TMI-122/TMI-125, TMI-193/TMI-136. MEMBER대기와 cleanup분리·동일key재개/격리 조건·E02확장 보완 의견은 여전히 유효하며 반영됐다고 표시하지 않는다.
+- WORKLOG append/CURRENT_STATE만 갱신, 기존dirty보존. 코드/검토서/계약/fixture/DB/배포/외부전송/Jira/commit/push 변경 및 Secret/Token 기록 없음. 내용 변화 없어 테스트 재실행 생략. git diff --check 및 현재marker1회 확인.
+
+## 2026-10-14 — simplified exact draft-2 MEMBER 대기 검토
+
+<!-- codex-turn:01a138fd-2628-7d03-8998-6e26a44d03ea -->
+
+- 첨부diff 및 LC recovery status/retry소진 저장을 확인했다. 관련 PLAN-011/012/013, TMI-116/TMI-128/TMI-122/TMI-125, TMI-193/TMI-136. §3.4/E02-a~h의 비종료대기receipt/status·LC waiting/cleanup분리·HTTP같은keyCAS/worker무reserve가 이전 핵심 의견을 반영했다. 검토서 후속절/CURRENT_STATE 갱신.
+- 현 retry소진은 NEEDS_REVIEW/retry_exhausted이므로 제한적재개행과 NEEDS_REVIEW금지행의 겹침을 확인했다. MEMBER원인 durable증명 예외의 우선순위, 원인불명/일반장애 운영확인 및 E02-f/h 구분을 명시하도록 요청. retry_exhausted 문자열만으로 원인증명하지 않으며120일은 firstAcceptedAt 기준 유지.
+- 문서/기록만 변경, 기존dirty보존. 계약/fixture/제품/계획/ADR/AGENTS/DB/배포/외부전송/Jira/commit/push 및 Secret/Token 기록 없음. 테스트 재실행 생략, git diff --check·현재marker1회 확인. 공동최종수락/fixture제작/구현승인 아님.
+
+## 2026-10-14 — simplified exact draft-3 보완 확인
+
+<!-- codex-turn:01a13901-48bd-7fa2-aad4-32cd0539c48f -->
+
+- Billing 원문을 이전첨부 draft-2와 diff 대조했다. 관련 PLAN-011/012/013, TMI-116/TMI-128/TMI-122/TMI-125, TMI-193/TMI-136. NEEDS_REVIEW기본운영확인/동일MEMBER대기원인영속증명 예외의 우선순위, auth/owner/lifecycle우선, 원인혼재·누락 운영확인과 E02-f 양음성 반영 확인. 이전 보완의견 해소·이번범위 추가이견 없음. LC검토서 후속절/CURRENT_STATE 갱신.
+- 공동수락/새fixture제작·hash/독립검증은 후속이며 별도삭제route/owner/자료별보존gate 유지. 최종동결/제품구현/배포로 확대하지 않는다. 검토서/기록만 변경·기존dirty보존, Billing/계약/fixture/코드/DB/외부전송/Jira/commit/push·Secret/Token 기록 없음. 테스트 재실행 생략, git diff --check·현재marker1회 확인.
+
+## 2026-10-14 — simplified exact fixtures-1 LC 독립 검증
+
+<!-- codex-turn:01a13909-e4d4-77f2-a290-aa5c02d2d3bc -->
+
+- 전달ZIP의 한정수락/검사범위를 읽고 원본fixture10파일을 LC test resources로 인수했다. ZIP와각파일 byte일치/계약snapshot과Billing원문일치/9파일checksum·SHA256SUMS자체hash pin 확인. 관련 PLAN-011/012/013, TMI-116/TMI-128/TMI-122/TMI-125, TMI-193/TMI-136. 기존A/R2/fixtures-2 불변.
+- LcBillingSimplifiedFixtureTest의 독립Java strict JSON/Instant/Duration/판정모형으로80벡터+hash/범위1개=81개 통과. ./gradlew clean test1,029개 실패0/오류0/skip0. Billing검사기/생성기를 실행/복사하지 않았고 상태28개는 미실행으로 유지. 실제HTTP/worker/Transaction/복원unique 검증으로 확대하지 않는다. LC_BILLING_SIMPLIFIED_FIXTURES_1_VALIDATION.md 작성.
+- 신규test/resource/검증기록/CURRENT_STATE/WORKLOG만 변경·기존dirty보존. 제품/API/ADR/AGENTS/Billing/Identity/DB/배포/활성화/Jira/외부전송/commit/push 및 Secret/Token 기록 없음. 기존compile경고 유지, git diff --check·현재marker1회 확인. 별도삭제route/owner/자료별purge·실환경 검증과구현승인은 후속.
+
+## 2026-10-14 — 구현계획 최신화 준비 확인
+
+<!-- codex-turn:01a13911-86d9-75c2-b9d4-ab97aa95c606 -->
+
+- 기존 LC 구현계획과 simplified fixture 검증기록 확인. 관련 PLAN-011/012/013, TMI-116/TMI-128/TMI-122/TMI-125, TMI-193/TMI-136. 새 계획 중복 작성보다 기존 초안을 exact draft-3/fixtures-1 기준으로 최신화할 단계라고 안내한다. MEMBER waiting/격리재개·phone/삭제·120일 보존·상태28개의 실제테스트 매핑을 포함하고 별도삭제route/owner/최종purge gate는 분리한다.
+- 질문 확인만이며 계획서 자체·제품/fixture/DB/배포는 미변경. WORKLOG append/CURRENT_STATE 갱신·기존dirty보존. Secret/Token 기록·외부전송/Jira/commit/push 없음. 테스트 재실행 생략, git diff --check 및 현재marker1회 확인. 계획 승인·ADR/AGENTS 동기화·구현 승인과 배포를 구분한다.
+
+## 2026-10-14 — 최신 exact 기준 LC 구현계획 보완
+
+- 사용자 「어 해줘」에 따라 기존 LC_BILLING_PAID_EXAM_IMPLEMENTATION_PLAN.md를 최신화했다. 관련 PLAN-011/012/013, TMI-116/TMI-128/TMI-122/TMI-125, TMI-193/TMI-136. exact draft-3/새fixture 인수·독립81/전체1,029 증거와hash를 연결하고 제품구현 승인이 아닌 계획보완임을 명시했다.
+- P2.1 strict오류/phone INITIAL, P3.1 영속MEMBER대기·status-first/cleanup분리·좁은격리재개, P4.1 삭제미접수/public오류, P6.1120일reader/receipt/eligibility를 상세화했다. 상태28개 각각 LC단계/실제테스트와Billing·공동책임에 매핑하고 정적모형을runtime증거로 확대하지 않았다. 단계의존성과 별도삭제route/owner/최종purge gate를 구분했다.
+- 계획/CURRENT_STATE/WORKLOG만 변경, 기존dirty보존. ADR/AGENTS/제품/계약·fixture/DB/배포/외부전송/Jira/commit/push·Secret/Token 기록 없음. 문서작업으로 테스트 재실행 생략, git diff --check·제목순서 및28개ID 매핑 확인. 기존 턴marker는 중복 추가하지 않고 보존했다.
+
+## 2026-10-14 — 구현계획 최신화 현재 턴 기록 보완
+
+<!-- codex-turn:01a13912-18fe-7a50-bf41-f793d3ab38fd -->
+
+- 종료 점검 요청에 따라 현재 표식의 항목을 WORKLOG 끝에 추가하고 CURRENT_STATE를 갱신했다. 관련 PLAN-011/012/013, TMI-116/TMI-128/TMI-122/TMI-125, TMI-193/TMI-136. 앞선 계획 최신화 및28개 상태시나리오 매핑 완료 결과를 유지하며 과거 기록은 수정하지 않았다.
+- 기록만 보완. 추가 제품/계약/fixture/DB/배포/Jira/외부전송/commit/push 변경과 Secret/Token 기록 없음. 테스트 재실행 생략, git diff --check 및 현재marker 정확히1회 확인.
+
+## 2026-10-14 — 유료 시험 구현계획 설명
+
+<!-- codex-turn:01a13916-0b03-7a10-aad9-87199002ae3e -->
+
+- 사용자 설명 요청에 따라 최신 LC_BILLING_PAID_EXAM_IMPLEMENTATION_PLAN.md의 시험 선정, confirm 후 원자적 전환, 기존 접수 작업 보존, MEMBER/삭제/120일 정책과 구현 순서를 확인했다. 관련 PLAN-011/012/013, TMI-116/TMI-128/TMI-122/TMI-125, TMI-193/TMI-136.
+- 독립81개/전체1,029개 검증 기록과 실제 상태28개 미실행을 구분해 설명한다. 이번은 설명/작업 기록만이며 계획·제품·fixture·DB·배포·활성화 변경 없음. 테스트는 재실행하지 않고 문서 diff 공백과 현재 표식 단일 출현을 점검한다.
+
+## 2026-10-14 — 문제 선정과 대기 시험 전환 기준 확인
+
+- TMI-116/TMI-128, PLAN-011/012/013 관련 사용자 질문을 검토했다. ExamGradingService.ensureSummaryStartedIfReady의 문항 completion 조건과 계획의 전체 durable 접수 기준 차이를 확인했다. 실제 요약 시작 조건으로 정책을 바꾸려는지 확인 전 계획은 유지한다.
+- 대기 Session은 신규 Session이며 Billing confirm 성공 뒤 기존 신규 제출 차단·신규 활성·operation 성공을 원자적으로 마무리한다는 계획을 설명한다. 코드/계획/DB/배포 변경 없음. 설명 작업이므로 테스트 재실행 생략, 문서 diff 공백 점검.
+
+## 2026-10-14 — 문제 선정 기준 설명의 현재 턴 기록 보완
+
+<!-- codex-turn:01a1391b-032a-7eb3-b97d-742c8f663280 -->
+
+- TMI-116/TMI-128, PLAN-011/012/013 관련: 전체 답안 접수 기준과 실제 요약 시작 조건의 차이를 설명했고, 사용자 의도 확인 전 계획을 유지한다. Billing confirm 이후 기존 신규 제출 차단·대기 시험 활성의 원자적 전환을 안내했다.
+- 종료 점검에 따라 현재 턴 표식과 상태 기록을 보완했다. 과거 기록 보존, Secret/Token 기록 없음. 추가 코드/계획/fixture/DB/배포 변경 및 테스트 재실행 없음. git diff --check와 표식 단일 출현을 확인한다.
+
+## 2026-10-14 — 기존 전체 답안 접수 기준 유지 확인
+
+<!-- codex-turn:01a1391d-5123-7302-b9b2-397d8662de3a -->
+
+- 사용자 「아니 기존 우리 계획대로 하면 돼」로 직전 기준 질의를 해소했다. TMI-116/TMI-128, PLAN-011/012/013 관련: 필수 retry0 전체 durable 접수 후 다음 문제를 선정하고 미완료 접수는 동일 문제를 사용한다. 문항 채점/요약 완료 기준으로 변경하지 않으며 기존 문제 후보 부재 예외와 Billing confirm 이후 원자적 전환은 유지한다.
+- CURRENT_STATE를 갱신했다. 기존 구현계획/제품 코드/fixture/DB/배포는 변경하지 않았고 구현 승인으로 해석하지 않는다. 테스트 재실행 없이 git diff --check와 현재 표식 단일 출현을 확인한다. Secret/Token 기록 없음.
+
+## 2026-10-14 — 유료 시험 구현계획 승인 접수와 다음 단계 안내
+
+<!-- codex-turn:01a1391e-9528-7350-8e2f-c4d62a8210d1 -->
+
+- 사용자 계획안 승인을 구현계획과 CURRENT_STATE에 기록했다. 관련 TMI-116/TMI-128/TMI-122/TMI-125, TMI-193/TMI-136, PLAN-011/012/013. 다음 단계는 P0 ADR/AGENTS 동기화·schema/index·flag 조합 및 미확정 계약 경계 확인, 이후 접수/선정·client·전환/복구·lifecycle·revoke/보존의 단계별 구현과 실제 상태28개 검증이다.
+- 이번 요청은 승인 접수 및 다음 단계 안내로 처리했다. 제품 코드/fixture/실제 DB/배포/활성화 변경 없음. 기존 검증을 재실행하지 않고 git diff --check와 현재 표식 단일 출현을 확인한다. Secret/Token 기록 없음.
+
+## 2026-10-14 — 유료 시험 P0 문서·저장 구조·설정 조합 준비
+
+<!-- codex-turn:01a13924-446f-7962-b17f-c576b87a6b69 -->
+
+- 사용자 후속 요청을 직전 안내의 P0 수행으로 한정했다. TMI-116/TMI-128/TMI-122/TMI-125, TMI-193/TMI-136 및 PLAN-011/012/013 관련. AGENTS/현행 Session·operation·Transaction·repository·startup validator·설정/계약 검증 기록을 읽고 LC_BILLING_PAID_EXAM_P0_DESIGN.md, ADR-LC-BILLING-PAID-EXAM.md를 작성했다. AGENTS에 승인된 준비 경계, 구현계획에 참조를 추가했다.
+- 대기 ENTITLEMENT_CONFIRMING/active=false·exact 원시험 제출차단/새활성 Tx, 알림 독립 접수 집합, MEMBER 대기 인과/lease·관측 예산,120일 receipt reader/TTL coverage, 불변 revoke/legacy manifest 및 index/flag 설계안을 정리했다. 기존 publisher-only drain/기존22허용42거절 유지, 신규N/V 조건과 실환경 활성화 gate를 분리했다. 신규 내부 이름은 로컬 설계안이며 공동 최종 수락/제품 구현 사실이 아니다.
+- 신규 삭제 전달 route/auth·과거owner·자료별최종purge·실환경은 공동 gate로 유지한다. 기존 API/AI/S3/Redis·fixture 원본은 불변이다. 제품 코드/실DB/index apply/Billing 저장소/배포/활성화/Jira/외부전송/commit/push 변경 없음. 기존 dirty 문서/test-only fixture와 .DS_Store 변경을 보존했다. 이번 변경은 문서6개(AGENTS, ADR, P0, 계획, CURRENT_STATE, WORKLOG)이며 예상 밖의 작업 변경 없음.
+- 검증: 문서3개의 상대링크9개 및 공백 검사 통과, A3개/R2 13개/simplified9개 SHA256SUMS 모두 일치, simplified 계약 및 checksum 파일 자체 hash도 기존 pin과 일치. git diff --check와 현재 marker 단일 출현 확인. 문서 작업이므로 Gradle/실DB 테스트 재실행 없음; 과거 독립81/전체1,029 기록 및 실제 상태28개 미실행을 유지한다. Secret/Token 기록 없음.
+
+## 2026-10-14 — P0 단순화 가능성과 수용 위험 검토
+
+<!-- codex-turn:01a13924-446f-7962-b17f-c576b87a6b69 -->
+
+- 사용자 요청으로 P0/현행 operation·terminal purge/접수 tracker·Job 및 exact MEMBER status를 정적 대조했다. 관련 TMI-116/TMI-128/TMI-122/TMI-125, TMI-193/TMI-136, PLAN-011/012/013. 신규 검토서에 operation 단일120일 증거, revoke 단일 collection, 기존 접수 receipt/완료marker 재사용, 확정 MEMBER 대기 관측 축소와 조합 단순화를 권고했다.
+- NEEDS_REVIEW 예외 제거는 정상 재개와 분리했고, 운영대기 증가·승인된 exact/E02-f 변경 필요를 명시했다. 단순 TTL 상수변경/전체 무기한 보존/unknown 증거삭제나 owner·삭제 fence 제거는 권하지 않았다. 운영DB 용량/성능/고장확률은 미측정으로 남겼다.
+- 이번 변경은 검토서/CURRENT_STATE/WORKLOG뿐이며 기존 계획/ADR/AGENTS·제품 코드/fixture/DB/배포/활성화/Billing 저장소 변경 없음. 기존 dirty 파일을 보존했다. 정적 검토이므로 Gradle은 재실행하지 않고 검토서 링크/공백 및 git diff --check를 점검한다. Secret/Token 기록 없음.
+
+## 2026-10-14 — P0 단순화 검토 현재 턴 기록 보완
+
+<!-- codex-turn:01a1392a-8c65-7800-b187-e2e7ed76626a -->
+
+- 현재 턴 표식으로 기록을 보완했다. 관련 TMI-116/TMI-128/TMI-122/TMI-125, TMI-193/TMI-136, PLAN-011/012/013. 앞선 단순화 검토 항목은 이전 P0 표식을 재사용했으므로 과거 기록을 수정하지 않고 이 항목을 추가한다.
+- operation120일 단일보관·revoke 단일문서·기존 접수증거 재사용 권고와 MEMBER 관측/격리 수동복구의 비용·계약 변경 조건은 검토서에 유지한다. 아직 사용자 채택 전이며 계획/제품/fixture/DB/배포는 변경하지 않았다.
+- 추가 변경은 WORKLOG/CURRENT_STATE뿐이다. Gradle 재실행 없음. git diff --check 및 이번 표식 단일 출현을 확인한다. Secret/Token 기록 없음.
+
+## 2026-10-14 — 단순화3안 LC 변경 범위 확인
+
+<!-- codex-turn:01a13930-b867-77a1-b9dc-d1240cd5f8c7 -->
+
+- TMI-116/TMI-128, PLAN-011/012/013 관련: 사용자가 인용한 세 단순화는 LC 내부 저장/조회/테스트 대상이고 Billing wire/제품코드 변경을 요구하는 정책변경이 아님을 설명했다. 원래 예정된 Billing 유료연동 구현은 별개다.120일 보장·revoke 충돌/보호예외·접수 의미는 유지하며 공동 문서/저장구조 종속 T04 설명은 동기화 대상이다.
+- NEEDS_REVIEW 수동복구 전환 선택안은 이번 세 항목에 포함하지 않는다. 승인/구현으로 확대하지 않고 상태·기록만 갱신했다. 제품/계획/계약/fixture/DB/배포 변경과 Gradle 재실행 없음. git diff --check 및 현재 표식 단일 출현 확인, Secret/Token 기록 없음.
+
+## 2026-10-14 — 승인된 세 저장 단순화 계획 동기화
+
+<!-- codex-turn:01a13931-aa05-76c1-8f3e-ce0e6e338770 -->
+
+- 사용자 「그럼 이거까지만 승인할게 수정해줘」를 인용한 세 내부 저장 단순화의 문서 반영으로 처리했다. 관련 TMI-116/TMI-128/TMI-122/TMI-125, TMI-193/TMI-136, PLAN-011/012/013. AGENTS, 유료 시험 ADR, 구현계획, P0 r2, 단순화 검토서 및 CURRENT_STATE를 동기화했다.
+- 기존 operation 자체에120일 결과 보장/최초terminal 보존, max 기간/hold/미완료 무TTL을 반영했다. 별도 생성 결과 receipt와 두 index, revoke inbox와 그 index 제안을 제거하고 그룹/event unique가 있는 단일 revoke 문서로 중복·충돌/deny를 처리하도록 했다. 기존 접수 receipt/완료marker·미완료 무TTL/완료 후3일TTL을 재사용하고 Session accepted 배열은 추가하지 않는다.
+- MEMBER 관측 축소, NEEDS_REVIEW 자동재개 예외 제거, 설정 조합 추가 단순화는 승인되지 않아 유지했다. T04 저장방식 종속 설명은 별도 공동 보완 대상으로 표시했으며 Billing wire/코드·기존 fixture 원본은 수정하지 않았다. 제품 코드/실DB/index apply/배포/활성화/외부전송/Jira/commit/push 없음. 기존 dirty 파일 보존, 이번 문서7개 외 예상 밖 작업 변경 없음.
+- 검증: 문서4개 상대링크18개/공백 및 git diff --check 통과, A3+R2 13+simplified9개 checksum 전부 일치. 이번 표식 단일 출현 확인. 문서 변경이므로 Gradle 재실행 없음; 실제28개 상태테스트는 계속 미실행. 최종purge/삭제공동계약·용량측정/실환경 gate는 유지한다. Secret/Token 기록 없음.
+
+## 2026-10-14 — 세 단순화 반영 전체 계획 설명
+
+<!-- codex-turn:01a13934-ef68-73e3-807f-b01cdf5bad3a -->
+
+- 사용자 요청에 따라 최신 구현계획/P0를 확인하고 LC/Billing 역할, 전체접수 단일문제 선정, confirm 후 exact 전환/기접수완료, same-key 복구, MEMBER/phone/삭제/revoke,120일 단일operation 보관/legacy 및 단계별 검증을 설명한다. 관련 TMI-116/TMI-128/TMI-122/TMI-125, TMI-193/TMI-136, PLAN-011/012/013.
+- 세 저장 단순화만 채택됐고 MEMBER 관측/NEEDS_REVIEW 예외는 유지됨을 구분했다. T04 공동설명/삭제route/과거owner/최종purge/실환경 잔여와 과거 독립81·전체1,029 및 실제28개 미실행을 분리한다. 이번은 설명·CURRENT_STATE/WORKLOG 갱신뿐이며 계획/제품/fixture/DB/배포 변경 없음. 테스트 재실행 없이 git diff --check와 현재 표식 단일 출현을 확인한다. Secret/Token 기록 없음.
+
+## 2026-10-14 — 전체 계획 방향 확인 접수
+
+<!-- codex-turn:01a13937-b9bc-7781-af7b-74b32e9e6482 -->
+
+- 사용자 「어 괜찮아 보인다」를 최신 전체 계획 설명에 대한 방향 확인으로 기록했다. 관련 TMI-116/TMI-128/TMI-122/TMI-125, TMI-193/TMI-136, PLAN-011/012/013. 기존 계획과 승인된 세 저장 단순화 및 잔여 공동 확인 경계를 유지한다.
+- 추가 구현 요청으로 확대하지 않았다. 이번은 WORKLOG/CURRENT_STATE만 갱신하며 계획/코드/fixture/DB/배포 변경 없음. 테스트 재실행 없이 git diff --check 및 현재 표식 단일 출현을 확인한다. Secret/Token 기록 없음.
+
+## 2026-10-14 — P1 구현 Jira TMI-218 생성
+
+- 사용자 Jira 생성 요청으로 TMI-218 「[Learning Core P1] 알림 독립 답안 접수 증거 및 전체 접수 기준 문제 선정」을 생성했다. 상태 해야 할 일, 담당자 미지정. URL: https://to-teacher.atlassian.net/browse/TMI-218 . TMI-116 완료 상태와 관련 제목 검색 결과를 확인했고 동일 P1 이슈는 조회 결과에서 발견되지 않았다. 통합 검색은 연결 오류였으나 Jira 직접 조회/생성은 성공했다.
+- 접수증거 재사용/알림독립·retry0/필수집합·TTL·고정 문제선정/동일key·경합 검증과 P2/P3 준비 전 활성화 금지를 명시했다. 관련 TMI-116/TMI-128/TMI-122/TMI-125, TMI-193/TMI-136 및 PLAN-011/012/013. 구현계획 P1에 링크 및 CURRENT_STATE를 추가했다.
+- 제품 코드/fixture/DB/배포/활성화/Billing 저장소 변경 없음. Jira 등록·문서 추적 작업이므로 Gradle 재실행 없이 git diff --check를 확인한다. Secret/Token 기록 없음.
+
+## 2026-10-14 — TMI-218 생성 현재 턴 기록 보완
+
+<!-- codex-turn:01a13938-cf85-7f81-b619-6d444d181d00 -->
+
+- TMI-218 생성 완료 기록에 현재 턴 표식을 보완했다. 이슈는 해야 할 일/담당자 미지정이며 P1 접수증거·문제선정·관련 검증 범위를 포함한다. 관련 TMI-116/TMI-128/TMI-122/TMI-125, TMI-193/TMI-136, PLAN-011/012/013. 과거 WORKLOG 항목은 수정하지 않았다.
+- 추가 작업은 CURRENT_STATE/WORKLOG 갱신뿐이다. Jira 중복 생성/추가 변경·제품 코드/DB/배포 없음. Gradle 재실행 없이 git diff --check 및 현재 표식 단일 출현을 확인한다. Secret/Token 기록 없음.
+
+## 2026-10-14 — TMI-218 P1 기반 구현 및 격리 검증
+
+<!-- codex-turn:01a1393c-b6fe-70a0-944d-bf2a6416499f -->
+
+- 사용자 브랜치 변경/구현 요청에 따라 기존 `feat/TMI-번호-설명` 관례로 local develop `3d50195`에서 `feat/TMI-218-submission-evidence-exam-selection`을 생성했다. 기존 dirty 문서/fixture test/DS_Store를 보존했다. AGENTS P1 승인 범위를 기록하고 Billing/Identity 저장소는 수정하지 않았다.
+- 공통 ExamSubmissionEvidence와 기존 알림 tracker 위임, schema1 Session의 알림 독립 실제 Job 접수·필수집합/marker/TTL, PaidExamPreparationService의 단일 mock/사유/원대상 고정 및 owner/Session version fence를 구현했다. P1은 새 Session/confirm 전환 미구현이며 공개 saga에 연결하지 않는다. paidSelection/schema2로 구 saga/worker를 차단하고 paid enabled=true 기동을 거절한다. 상세: TMI_218_P1_IMPLEMENTATION.md.
+- `./gradlew clean test` 1,036개, `JAVA_TOOL_OPTIONS=-Dapi.version=1.44 ./gradlew mongoIntegrationTest` 158개, 실패/오류/skip0. P1 Mongo12개/단위 추가7개 포함. 초기 import 누락을 수정했고 Docker29 기본 API 호환 실패는 테스트 프로세스 옵션으로 해결했다. owner 3회 즉시 재시도 소진은 알려진 transient abort의 같은 요청 재전송으로 수렴 검증하며 공유 재시도 정책/unknown commit 처리는 바꾸지 않았다.
+- fixture A3+R2 13+simplified9개 checksum 일치 및 diff 공백 검사 통과. 기존 fixture 원본/외부API/BaseResponse/AI/S3/Redis 불변. 전체28개 공동 상태테스트 완료가 아니며 P2/P3 wire digest·coverage 설치·활성 경로 및 P4~P6/legacy·보존/실환경 gate는 후속이다.
+- AGENTS/구현계획/ADR/보고/CURRENT_STATE를 동기화했다. 이번 예상 밖 범위 변경 없음. 실DB/index apply/배포/활성화/Jira 상태 변경/commit/push 없음. Secret/Token 기록 없음.
+
+## 2026-10-14 — TMI-218 커밋·PR·머지 진행
+
+<!-- codex-turn:01a1394d-11d2-7f52-986d-b82e657cb666 -->
+
+- 사용자가 커밋/푸시/머지를 요청했다. develop PR 머지 시 테스트 서버 자동 배포가 실행됨을 안내했고 최종 「머지까지 해줘」로 승인받았다. 기능 설정과 운영 서버 변경은 하지 않는다.
+- 원격 develop은 answer-learning PR #36이 추가된 39c2b7b다. P1 및 관련 계약/검증 자료만 커밋하고 DS_Store는 제외한다. 최신 develop 통합·회귀 검증 후 PR 머지를 진행하며 결과는 후속 항목에 남긴다. 기존 문서/fixture bytes와 양쪽 작업 이력을 보존한다. 관련 TMI-218; P2/P3 구현은 별도 후속 단계다.
 
 ## 2026-10-12 — 답변 익히기 백엔드 구현 / 배포 전
 

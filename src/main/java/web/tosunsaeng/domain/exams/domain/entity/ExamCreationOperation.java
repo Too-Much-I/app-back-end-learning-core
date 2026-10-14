@@ -47,6 +47,7 @@ public class ExamCreationOperation {
     private Instant terminalAt;
     private Instant purgeAt;
     private ReservationRecovery recovery;
+    private PaidExamSelection paidSelection;
 
     @Version
     private Long version;
@@ -97,12 +98,20 @@ public class ExamCreationOperation {
                 cycleNumber, ExamCreationState.PREPARED, null, null, null,
                 replacementSourceSessionId, expectedAttemptGroupId, expectedMockExamId,
                 continuationReason, continuationId, null,
-                null, null, null, true, now, now, null, null, ReservationRecovery.prepared(now), null
+                null, null, null, true, now, now, null, null, ReservationRecovery.prepared(now), null, null
         );
     }
 
     public boolean isPhoneContinuation() {
         return continuationReason == BillingContinuationReason.PHONE_REJOIN;
+    }
+
+    public void fixPaidSelection(PaidExamSelection selection) {
+        requireState(ExamCreationState.PREPARED);
+        if (paidSelection != null) throw new IllegalStateException("Selection is already fixed");
+        paidSelection = java.util.Objects.requireNonNull(selection);
+        // P2/P3 must explicitly adopt this format; legacy status/cancel workers must not claim it.
+        recovery.setSchemaVersion(2);
     }
 
     /** Preserve the durable lease after the transaction fence increments @Version. */

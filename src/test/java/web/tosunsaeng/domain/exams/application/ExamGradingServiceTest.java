@@ -169,6 +169,34 @@ class ExamGradingServiceTest {
     }
 
     @Test
+    void coveredSubmissionWithoutOwnerGuardFailsBeforeJobInsert() {
+        var evidence = org.mockito.Mockito.mock(ExamSubmissionEvidence.class);
+        ReflectionTestUtils.setField(service, "submissionEvidence", evidence);
+        when(evidence.covered(EXAM_ID)).thenReturn(true);
+        assertThrows(IllegalStateException.class, () -> service.submitQuestion(EXAM_ID, 1, 0));
+        verify(questionJobRepository, never()).insert(any(QuestionGradingJob.class));
+    }
+
+    @Test
+    void coveredSubmissionRecordsEvidenceWithNotificationsAbsentOnlyOnFirstRetryZeroJob() {
+        var evidence = org.mockito.Mockito.mock(ExamSubmissionEvidence.class);
+        var owners = org.mockito.Mockito.mock(web.tosunsaeng.domain.usermerge.application.UserOwnedTransactionExecutor.class);
+        ReflectionTestUtils.setField(service, "submissionEvidence", evidence);
+        ReflectionTestUtils.setField(service, "userOwnedTransactionExecutor", owners);
+        when(evidence.covered(EXAM_ID)).thenReturn(true);
+        when(owners.enabled()).thenReturn(true);
+        when(examSessionRepository.findById(EXAM_ID)).thenReturn(Optional.of(ExamSession.builder()
+                .examId(EXAM_ID).userId("owner").mockExamId(GradingKeys.LEGACY_MOCK_EXAM_ID).build()));
+        when(owners.executeExamCoordination(eq("owner"), eq(EXAM_ID), any())).thenAnswer(invocation ->
+                ((java.util.function.Supplier<?>) invocation.getArgument(2)).get());
+        service.submitQuestion(EXAM_ID, 1, 0);
+        service.submitQuestion(EXAM_ID, 1, 0);
+        service.submitQuestion(EXAM_ID, 1, 1);
+        verify(evidence, times(1)).accepted(EXAM_ID, 1, 0, null, NOW);
+        verify(evidence, never()).accepted(eq(EXAM_ID), anyInt(), eq(1), any(), any());
+    }
+
+    @Test
     void firstSubmitCreatesProcessingJobAndDispatchesOnce(CapturedOutput output) {
         ExamStatus status = service.submitQuestion(EXAM_ID, 1, 0);
 

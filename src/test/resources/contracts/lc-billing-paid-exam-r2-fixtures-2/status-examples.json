@@ -1,0 +1,63 @@
+[
+  {
+    "id": "S13-revoked",
+    "request": {
+      "userId": "00000002-1111-4111-8111-111111111111",
+      "operationId": "00000005-1111-4111-8111-111111111111"
+    },
+    "response": {
+      "operationId": "00000005-1111-4111-8111-111111111111",
+      "reservationId": "00000006-1111-4111-8111-111111111111",
+      "reservationKind": "INITIAL",
+      "reservationStatus": "CANCELED",
+      "attemptGroupId": "00000007-1111-4111-8111-111111111111",
+      "sessionId": "session-new",
+      "mockExamId": "mock-a",
+      "expiresAt": "2026-10-14T00:05:00.000Z",
+      "entitlementSource": "SUBSCRIPTION",
+      "terminalAt": "2026-10-14T00:00:00.000Z",
+      "confirmRejection": {
+        "code": "ENTITLEMENT_REVOKED"
+      }
+    }
+  },
+  {
+    "id": "S13-canceled",
+    "request": {
+      "userId": "00000002-1111-4111-8111-111111111111",
+      "operationId": "00000005-1111-4111-8111-111111111111"
+    },
+    "response": {
+      "operationId": "00000005-1111-4111-8111-111111111111",
+      "reservationId": "00000006-1111-4111-8111-111111111111",
+      "reservationKind": "INITIAL",
+      "reservationStatus": "CANCELED",
+      "attemptGroupId": "00000007-1111-4111-8111-111111111111",
+      "sessionId": "session-new",
+      "mockExamId": "mock-a",
+      "expiresAt": "2026-10-14T00:05:00.000Z",
+      "entitlementSource": "SUBSCRIPTION",
+      "terminalAt": "2026-10-14T00:00:00.000Z"
+    }
+  },
+  {
+    "id": "S14-confirmed-replay",
+    "request": {
+      "userId": "00000002-1111-4111-8111-111111111111",
+      "operationId": "00000005-1111-4111-8111-111111111111"
+    },
+    "response": {
+      "operationId": "00000005-1111-4111-8111-111111111111",
+      "reservationId": "00000006-1111-4111-8111-111111111111",
+      "reservationKind": "INITIAL",
+      "reservationStatus": "CONFIRMED",
+      "attemptGroupId": "00000007-1111-4111-8111-111111111111",
+      "sessionId": "session-new",
+      "mockExamId": "mock-a",
+      "expiresAt": "2026-10-14T00:05:00.000Z",
+      "entitlementSource": "SUBSCRIPTION",
+      "attemptGroupStatus": "OPEN",
+      "terminalAt": "2026-10-14T00:00:00.000Z"
+    }
+  }
+]

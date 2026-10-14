@@ -1,0 +1,43 @@
+{
+  "revision": "lc-billing-paid-exam-r2-fixtures-2",
+  "contractRevision": "lc-billing-paid-exam-contract-r2-draft-2",
+  "contractSha256": "3210c7eef1fb2f9fdde101c2384c86a5bbde1f9be346da0651c971e357444c52",
+  "fixedNow": "2026-10-14T00:00:00.000Z",
+  "environment": "test",
+  "scope": "OFFLINE_ONLY",
+  "runtimeTested": false,
+  "lcIndependentValidation": false,
+  "deferred": [
+    "S15",
+    "V07"
+  ],
+  "included": [
+    "S01",
+    "S02",
+    "S03",
+    "S04",
+    "S05",
+    "S06",
+    "S07",
+    "S08",
+    "S09",
+    "S10",
+    "S11",
+    "S12",
+    "S13",
+    "S14",
+    "S16",
+    "V01",
+    "V02",
+    "V03",
+    "V04",
+    "V05",
+    "V06"
+  ],
+  "privateKeysWritten": false,
+  "previousRevision": "lc-billing-paid-exam-r2-fixtures-1",
+  "changes": [
+    "Scalar-wise canonical escaping with literal-backslash regressions",
+    "Exact nanosecond clock and expiry/iat/nbf boundaries"
+  ]
+}

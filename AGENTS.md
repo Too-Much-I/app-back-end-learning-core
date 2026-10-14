@@ -1,5 +1,27 @@
 # 프로젝트 목적
 
+## 2026-10-14 TMI-218 전달 승인 예외
+
+- 사용자 커밋·푸시·머지 요청과 「머지까지 해줘」 확인으로 이번 P1 변경의 커밋/푸시/PR/develop 머지 및 기존 테스트 서버 자동 배포 트리거를 허용한다. 일반 Git 금지 규칙의 이번 요청 한정 예외다. 기능 설정/운영 배포는 변경하지 않는다.
+
+## 2026-10-14 TMI-218 P1 구현 승인
+
+- 사용자 「브랜치 내가 변경했던 거처럼 해서 변경해서 구현해줘」로 P1 코드/로컬·격리 Mongo 테스트를 승인했다. 기존 feat/TMI-번호-설명 방식의 브랜치에서 작업한다. 앞선 P0 문서 전용 제한은 이 P1 범위에 한해 대체한다.
+- 접수 receipt/완료 marker 공통화, 알림 독립 coverage, 필수집합 snapshot, 단일 mock/startReason·원대상 고정과 동일 key/접수 경합 검증을 구현한다. P2/P3 준비 전 새로운 준비 operation을 기존 Billing wire/worker로 전송하지 않는다.
+- P2~P6 전체 구현, Billing/Identity 저장소, 실DB·index 적용·배포·활성화/commit/push는 제외한다. 기존 공개/AI/S3/Redis와 fixture bytes를 유지한다.
+
+## 2026-10-14 LC 유료 시험 계획 승인·P0 문서 준비
+
+- 후속 사용자 「그럼 이거까지만 승인할게 수정해줘」로 세 내부 저장 단순화의 문서 반영을 승인했다: 별도 생성 결과 receipt 없이 기존 operation120일 보관, 별도 inbox 없이 그룹별 단일 revoke 문서, Session 접수 목록 중복 없이 기존 접수 receipt/완료 marker 재사용. 이 절은 설계 동기화이며 제품 코드/실DB 승인이 아니다. MEMBER 관측 축소·NEEDS_REVIEW 자동재개 예외 제거·추가 설정 조합 단순화는 포함하지 않는다. Billing wire/제품 코드는 불변이며 T04 등 저장방식 종속 공동 설명은 별도 보완한다.
+
+- 사용자 계획안 승인과 후속 「어 해줘」는 현재 P0 문서·저장 구조·설정 조합 준비에 적용한다. 이번 작업은 제품 코드 구현/실DB/index 적용/배포/활성화 승인이 아니다. 후속 구현은 승인된 단계·잔여 계약 경계를 확인하고 진행한다.
+- 기준: `docs/codex/LC_BILLING_PAID_EXAM_IMPLEMENTATION_PLAN.md`, `docs/codex/LC_BILLING_PAID_EXAM_P0_DESIGN.md`, `docs/adr/ADR-LC-BILLING-PAID-EXAM.md`. A/paid R2/최신 simplified exact fixture 원본 bytes/hash를 변경하지 않는다.
+- 신규 시험 선정 기준은 필수 retryCount=0 답안의 durable 전체 접수다. 채점/요약 완료까지 기다리지 않으며 접수 미완료는 동일 mock, 전체 접수 후에는 기존 선정 정책으로 다음 mock을 고른다. 다른 적격 후보가 실제 없을 때만 동일 mock 예외를 적용한다. 같은 요청의 최초 판정을 고정한다.
+- 계획상 신규 대기 Session은 사용 불가다. Billing confirm 성공 뒤 exact 이전 신규제출 차단·새 Session 활성·operation 성공을 같은 Transaction으로 마무리한다. 기접수 채점/파생 Summary는 원 접수 증거로 완료하되 삭제/탈퇴/owner deny를 우회하지 않는다.
+- phone paid-first/조건부 target 복원은 Billing 책임이며 LC는 exact snapshot을 검증한다. MEMBER 보강은 앱의 기존 purchase-account 호출, worker 새 reserve 금지, NEEDS_REVIEW 제한적 재개는 동일 MEMBER 대기 소진의 영속 원인과 현재 안전 조건 모두 필요하다.
+- 생성 중 삭제는 미접수이며 queue를 만들지 않는다. 120일 멱등 보장은 미완료 증거·금융/소비/복원1회·권한 차단 보존과 분리한다. 신규 삭제 route/과거 owner 삭제/자료별 최종 purge는 별도 공동 계약 gate다.
+- 본 절은 후속 설계 기준이며 기존 runtime 동작이 이미 바뀌었다는 뜻이 아니다. 공개 성공 DTO/BaseResponse, AI user_id=examId, retryCount/S3/Redis 계약, default-off와 W OFF/P ON drain 및 W OR P index 점검을 유지한다. Billing/Identity 저장소를 수정하지 않는다.
+
 ## 2026-10-13 LC–Billing workload JWT B 구현 승인 예외
 
 - 문서 동기화 후 사용자의 「어 해줘」로 LC B 코드·관련 테스트 구현이 승인됐다. **C 재처리 도구, 실제 DB/AWS/배포/활성화는 별도 승인 전 수행하지 않는다.** 격리 Testcontainers DB 검증은 B 테스트 범위다.
