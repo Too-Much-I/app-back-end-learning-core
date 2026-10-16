@@ -15975,3 +15975,113 @@
 - 결정적 fresh 조회 경합3개 및 bounded backoff/unknown/no replay/interrupt 검증을 추가했다. 수정 후 대상 단위·격리Mongo51개 통과, 전체 clean 검증 진행 중이다. 실DB/키/기능flag 변경 없음. Secret/Token 미기록.
 
 - 전체 clean test/mongoIntegrationTest/bootJar 통과 및 배포Node16/diff 검사 통과. 수정과 회귀를 기존 PR #46에 추가 전달하고 CI 성공 후 develop 머지/test 배포를 재개한다.
+
+- 최종 로컬 단위1370 실패/오류0·기존skip1, Mongo324 실패/오류/skip0. 보완5e1db05 commit/push·PR 설명 갱신/첨부 후 CI38901474969 첫실행 성공을 확인하고 develop d02fe0fa7fa9bf4e52f8bffbfc1831e9e8fa4d27로 머지했다. test 자동배포38901895642 검증 진행 중이며 실제프로필/최종성공은 후속 확인한다. main/기능flag/DB/index 변경 없음.
+
+- 최종 test 배포38901895642는 ECS deploy/Verify health 모두success. AWS 콘솔의 test 서비스 task36에서 profile=test·deployment environment=test·auth=jwt, saga/phone/reconciliation=false를 제한된 값만 읽어 확인했다. 서비스 실행1/보류0·ALB 정상1/비정상0, 별도 외부 GET health200·무인증history401을 확인했다. 서버 JWT/index/Transaction startup gate를 유지한 배포 성공이며 인증된 앱 전체 업무/Billing 공동E2E 통과 주장은 하지 않는다.
+- 이번 작업으로 main/기존 별도 서비스에 배포하지 않았고 Billing 활성화/실DB index 설치/키 변경도 하지 않았다. 기존 startup Transaction probe는 승인된 test 배포 기동 과정에서 실행되는 경계다. 최종 기록은 로컬에 남기며 사용자 DS_Store 보존, Secret/Token 미기록.
+
+## 2026-10-16 — 동시성 보완 및 test 배포 턴 기록 보완
+
+<!-- codex-turn:01a144b1-2cff-7f62-ba21-0c8eca44c655 -->
+
+- 관련 TMI-14/116/128/217/125/220. 두 동시성 실패를 재현·보완하고5e1db05를 전달했다. 단위1370(기존skip1)·Mongo324·배포Node16 통과, PR #46 CI 성공 후 develop d02fe0f 머지와 test 배포38901895642 성공을 확인했다.
+- task36의 test 프로필·JWT·Billing OFF, 서비스/ALB 정상·health200·무인증history401을 확인했다. main/기존 별도 서비스 배포 및 Billing 활성화는 수행하지 않았다. 이번 보완은 기록만 변경하며 Secret/Token 미기록.
+
+## 2026-10-16 — LC/Billing test 활성화 사전 점검
+
+<!-- codex-turn:01a144c3-22fa-76a2-9438-a372e696d881 -->
+
+- 관련 TMI-116/128/217/125/220. 사용자 후속 요청으로 자체 AWS 조회 탭에서 양측 test 서비스/태스크 설정을 읽기 확인했다. 다른 작업의 CloudShell/탭은 조작하지 않았다.
+- LC task36 실행1/보류0·배포성공, profile/deployment=test·auth=jwt, saga/phone/reconciliation=false·owner writer=true. 표시된 환경변수에는 Billing URL/JWT sender/paid/legacy/access receiver가 없고 SPRING_APPLICATION_JSON의 app 하위는 notifications뿐이다.
+- Billing task3 실행1/보류0·배포성공, HTTPS8443 target 정상1/비정상0. LC 전용 receiver=true, Identity용 receiver=false, environment=test, LC 공개키와 TLS Secret 참조를 확인했다. 일반 receiver=false를 LC receiver OFF로 오인하지 않는다. Secret 원문·private key는 조회하지 않았다.
+- Billing의 BILLING-TEST-BOOTSTRAP-2026-10-16.md 최신 기록에 제한된 billing-workload-test origin/네트워크 probe 성공과 기존 LC JWT Secret 생성이 있다. 이 보고를 이번 LC 서명/업무E2E 성공으로 해석하지 않는다. 기존 키의 안전한 주입·권한/키쌍 확인, 역방향 revoke trust/TLS/경로 준비가 필요하다.
+- LC test activation은 sender/receiver/paid/saga 및 검증된 SEALED legacy 목록·필수 index를 함께 요구한다. 실제 DB inventory/목록 설치/인덱스 검증은 미실행이며 export/install CLI도 아직 없다. 현재 미설정 상태에서 flag만 켜지 않았다.
+- 후속은 LC test 한정 Secret 참조/필요 최소권한 확인, 역방향 수신 준비, exact DB의 읽기 inventory 및 승인된 목록/index 설치 수단 준비다. 권한 확대/새 키·실DB 설치는 정확 대상과 변경 범위를 확인한 뒤 진행한다. 이번은 읽기 확인·기록만 수행했고 Gradle/실제 업무요청·서버설정·배포·Billing/Identity 코드·DB·commit/push 변경 없음. 기존 미커밋 기록과 사용자 DS_Store 보존.
+
+## 2026-10-16 — LC test 기존 서명키 권한 준비
+
+- 관련 TMI-116/128/217/125/220. 사용자 연결 준비 요청 후 기존 Secret 메타데이터와 LC test execution role의3개 인라인 정책을 확인했다. 서명키 읽기 권한이 없어 exact 역할/Secret/action을 설명하고 적용 직전 승인을 받았다.
+- 승인 후 LearningCoreTestBillingSigningKeyRead를 추가하고 성공 메시지·정책4개·저장된 exact ARN/GetSecretValue를 재조회했다. 기존3개 정책·운영/Billing 역할은 그대로다. 코드 편집기 최초 입력이 중첩되는 것을 저장 전에 발견해 전체 JSON을 교체하고 정확한1문장을 검토한 뒤 생성했다.
+- Secret의 PRIVATE_JWK 필드를 확인하고 공개 구성요소만 추출해 Billing task3 public verifier와 kty/kid/n/e가 같은지 비교했다. 결과 일치. private key/token 원문은 출력/저장/전송하지 않았고 Secret 화면 탭을 닫았다. 실제 서명/HTTP·ECS 주입은 미검증이다.
+- LC_BILLING_TEST_CONNECTION_PREPARATION.md에 적용 권한, 미적용 ECS Secret 참조와 URL/env, 역방향 공개키/scope·TLS 파일주입·DB inventory/manifest/index 잔여를 분리 기록했다. 현 Dockerfile은 Java 직접 실행이며 PKCS12 파일 주입은 별도 준비가 필요하다.
+- 태스크/서비스 재배포·DB/index/manifest 쓰기·기능 활성화·Billing/Identity 코드 변경·commit/push 없음. 문서 diff 검사만 수행하며 Gradle은 재실행하지 않는다. 사용자 DS_Store 및 기존 변경 보존.
+
+## 2026-10-16 — LC test 키 준비 턴 기록 보완
+
+<!-- codex-turn:01a144c7-4433-7f90-b3ca-5234fdc34941 -->
+
+- 관련 TMI-116, TMI-128, TMI-217, TMI-125, TMI-220. 적용 직전 사용자 승인으로 LC 테스트 실행 역할에 기존 서명키 한 개의 읽기 권한만 추가하고 저장된 정책을 확인했다. 양측 공개 구성요소 일치도 확인했으며 실제 ECS 주입·서명 HTTP 검증과는 구분한다.
+- 역방향 Billing 공개키/scope, LC TLS 및 DB inventory/manifest/index 준비는 남아 있다. 기능 활성화·재배포·DB 변경은 하지 않았다.
+- 이번 보완은 WORKLOG/CURRENT_STATE 기록만 갱신한다. Secret·Token 원문을 기록하지 않았으며 기존 변경을 보존한다.
+
+## 2026-10-16 — Billing 환불 공개키 인계 검토
+
+<!-- codex-turn:01a144d4-8729-7261-a112-02433ab50ac3 -->
+
+- 관련 TMI-116/TMI-217/TMI-220. 전달 공개 JWK와 인증/scope 인계서를 읽고 Node crypto로 RSA3072·RS256/use=sig·단일키·비밀필드 부재를 확인했다. 파일646 bytes 및 SHA-256 a47d2266640b43104947d86cba3f8379a1c06386d59a521549854e33d739dbed를 기록한다. 비밀키/Token 원문은 읽거나 기록하지 않았다.
+- test issuer/sub/audience는 LC AccessWorkloadVerifier와 일치하고 scope는 tosunsaeng-billing-test다. 그러나 전달본에 필수 key_ops=["verify"]가 없어 현재 LC 기동 구성 검증에서 거절될 입력임을 정적 대조로 확인했다. 실제 Java/HTTP 검증 성공으로 보고하지 않는다.
+- 동일 공개키의 메타데이터 보완 후 새 hash 재확인이 필요하다. 원본 bytes·verifier/계약·서버 설정/권한·DB·배포·활성화는 변경하지 않았다. 준비 문서/CURRENT_STATE 갱신 및 diff 검사만 수행했다.
+
+## 2026-10-16 — Billing 환불 공개키 수정본 재검토
+
+<!-- codex-turn:01a144d7-5c61-7960-a0ae-d47a6dbb8528 -->
+
+- 관련 TMI-116/TMI-217/TMI-220. 갱신 인계서 및 공개 JWK를 확인했다. Node crypto 공개키 파싱과 필드 검증으로 RSA3072/RS256/use=sig·key_ops=["verify"]·단일키·기존 kid 및 비밀필드 부재를 확인했다.
+- 수정본667 bytes, SHA-256 8ff85f90bd0d00bdcf69a25b8d0ad3996b761934cc1e52ef6a318a2947d4feb9. SPKI DER SHA-256 947df008ad59faf6e27a794ac6c8388df6b6e037263453c48805fe5d35beff49는 인계서에 기록된 수정 전후 지문과 일치한다. 이전 파일 bytes 직접 비교는 하지 않았으며 키 유지에 관한 상대 검증과 이번 지문 계산을 구분한다.
+- 기존 key_ops 누락 보류를 해소하고 test/scope=tosunsaeng-billing-test 등록 후보로 수락했다. 실제 Java verifier·서명/HTTP·서버등록·TLS·DB·배포·활성화 검증은 아니다. AWS Secret 내부 공개키는 미수정이라는 인계서 주의사항을 준비 문서에 반영했다.
+- 공개 전달 파일·제품 코드·권한·외부 설정은 변경하지 않았다. 문서 갱신 및 diff 검사만 수행하며 Secret/Token 원문은 기록하지 않았다.
+
+## 2026-10-16 — LC test Billing 연결 설정 등록·배포
+
+<!-- codex-turn:01a144d8-6752-7d41-a400-cc9c3a9eda71 -->
+
+- 관련 TMI-116/TMI-128/TMI-217/TMI-125/TMI-220. 사용자 후속 요청으로 test 서비스 task36을 확인하고37을 생성했다. 기존 이미지/58개환경/4개Secret/나머지 task 설정을 보존했고9개환경과 기존 발신키 Secret 참조1개만 추가했다. 원문 private key를 평문 환경변수에 넣지 않았다.
+- Billing URL/test 환경·수정 환불 public JWK/scope 및 LC PRIVATE_JWK field 참조를 등록했다. sender/receiver/paid/승인flag는 false다. JSON 편집 결과 전체를 재읽어 준비 객체와 일치 확인 후 생성했고 test 서비스만37로 업데이트했다. IAM 추가/운영/Billing/Identity 설정 변경 없음.
+- 배포 fpo8PbLjnF9u6h1I3Jf8c의 새 task c04ae329bc3440ffbb96d8f7e7f9cbc5 RUNNING·Started 로그를 확인했고 표시 로그에서 APPLICATION FAILED/예외class는 없었다. 이 기록 시 최종교체/ALB 성공은 대기 중이다.
+- 실제 Java21 AccessWorkloadVerifier로 공개키 로드 및 malformed token401 통과. JShell socket/classpath 실행문제로 대체했고 종료했다. 외부health200·무인증history401은 rolling 중 관측이며 최종 태스크 교체와 구분한다. 공개키 원문/Secret/Token을 WORKLOG에 넣지 않았다.
+- TLS·DB inventory/manifest/index·Billing 발신 연결/공동E2E는 미완료이며 기능 OFF를 유지한다. 제품 코드/DB/commit/push 변경 없음. 후속 최종 배포 상태를 확인한다.
+
+- 최종 결과: 배포 fpo8PbLjnF9u6h1I3Jf8c는22:20 KST 완료(4분5초), task37 실행1/보류0·배포성공·ALB 정상1/비정상0을 확인했다. 이전태스크 중지/드레인 및 신태스크 기동 확인. 교체 후 외부health200·무인증history401 재확인. Secret 참조를 포함한 기동 성공이지 OFF인 서명/환불 기능의 E2E 통과는 아니다. 기존 기능설정·알림과 운영서비스는 보존했다.
+
+## 2026-10-16 — LC 환불 TLS 파일 주입 및 비밀 입력 인계
+
+<!-- codex-turn:01a144e2-5f15-7480-a5c0-400e39630844 -->
+
+- 관련 TMI-116/TMI-128/TMI-217/TMI-125/TMI-220. 사용자 후속 준비 요청으로 TLS base64→임시 PKCS12 entrypoint와 Dockerfile 연결을 로컬 구현했다. OFF 미파싱, ON 제한된 크기/0600·0700·고정 오류/encoded env 제거, 기존 mount 경로 호환·혼합입력 거절과 exec/PID1을 검증한다. 실제 키 검증은 기존 Java TLS 코드 책임이다.
+- 신규14개 포함 Node 배포30개/shell syntax/diff 통과. 기존 LC 로컬 이미지에서 network-none/read-only/tmpfs·비root·가짜자료 smoke 통과. 새 image 전체빌드·Gradle·실TLS/E2E를 수행한 것으로 보고하지 않는다.
+- 적용 직전 사용자 명시 승인 후 LC 전용 TLS RSA3072 인증서/암호화PKCS12를 생성하고 OpenSSL 암호 검증 성공. 인증서 만료2027-10-16 22:28:32 KST, DER fingerprint337c968d050eae38127b59e8834e730d681650047b88638dd7ec9cdb88655ae9. 평문private PEM/중간PKCS12는 제거했고 제한된 임시 JSON은 AWS 저장용으로 보존한다. 비밀값/Token 원문은 출력·기록하지 않았다.
+- AWS에서 exact Secret 이름의 기존 항목 없음을 확인하고 기타/일반 텍스트 생성 화면을 열었다. 비밀값을 로그 없이 전달하려던 native Terminal 접근이 안전 제한으로 거절돼 중단했다. 다른 경로로 회피하지 않고 사용자 직접 입력·저장 단계로 인계하며 해당 탭을 유지한다.
+- Secret 생성/추가IAM·서버설정·네트워크/DB/index·Billing/Identity 변경·기능활성화·commit/push 없음. task37 기존OFF 상태는 그대로다. DB inventory/manifest/index 및 양측E2E는 아직 미실행이다. 기존 사용자DS_Store/미커밋 문서 보존.
+
+## 2026-10-16 — 사용자 TLS Secret 저장 확인·한정 읽기 권한 적용
+
+- 관련 TMI-116/TMI-128/TMI-217/TMI-125/TMI-220. 사용자 「했어」 회신 후 LC test TLS Secret과 필수 PKCS12_BASE64/KEYSTORE_PASSWORD 필드 존재를 확인했다. 비밀값은 기록하지 않았다.
+- 사전 승인 범위대로 LC test 실행 역할에 LearningCoreTestAccessTlsRead를 추가했다. 확인된 TLS Secret exact ARN 하나의 GetSecretValue만 허용하며 저장 정책 재조회와 기존 네 정책 보존·총 다섯 정책을 확인했다. 다른 역할/Secret 권한 변경 없음.
+- 준비 문서와 CURRENT_STATE를 갱신했다. Secret 존재/필드 확인은 실제 ECS 주입·PKCS12 런타임 검증을 의미하지 않는다. 새 이미지/서버 배포·ALB/SG·DB/index·Billing/Identity·기능 활성화·commit/push는 수행하지 않았다. task37 OFF 유지, 로컬 비밀 임시파일은 보존 상태다.
+- 문서 diff 검사 수행. Java 변경 없이 Gradle은 재실행하지 않았으며 기존 사용자 변경을 보존했다.
+
+## 2026-10-16 — TLS 준비 완료 턴 기록 보완
+
+<!-- codex-turn:01a144ea-f1c5-7530-b3e9-afe7de5ce222 -->
+
+- 관련 TMI-116/TMI-128/TMI-217/TMI-125/TMI-220. 이번 턴의 TLS 저장 확인·단일 대상 읽기 권한 적용 결과는 위 기록과 동일하다. 턴 식별자를 추가하고 CURRENT_STATE를 갱신했다.
+- 추가 서버 변경·배포·활성화 없이 task37 기능 OFF 유지. Secret/Token 원문은 기록하지 않았으며 과거 WORKLOG와 사용자 변경은 보존했다.
+
+## 2026-10-16 — TLS 후속 배포 준비·전달 경계 확인
+
+- 관련 TMI-116/TMI-128/TMI-217/TMI-125/TMI-220. 후속 요청으로 Dockerfile/entrypoint·배포 workflow와 Git 승인 경계를 확인했다. 새 TLS 코드가 로컬 미커밋이고 test 배포가 develop PR 머지 결과를 요구함을 확인했다.
+- Node 배포 테스트30개 실패/skip0. TLS ECS 필드 참조·alias·혼합 경로 금지와 OFF 배포만으로 실제 TLS 검증이 되지 않는 한계를 준비 문서에 추가했다. Secret/Token 값은 기록하지 않았다.
+- 이번 TLS 변경의 commit/push/PR/develop 머지·test 자동 배포는 명시 확인 후 진행한다. 추가 서버 설정·네트워크·DB/index·기능 활성화는 하지 않았다. 기존 사용자 변경 보존, 문서 diff 검사 수행.
+
+## 2026-10-16 — TLS 배포 준비 턴 기록 보완
+
+<!-- codex-turn:01a144f1-7250-7143-bfa3-6d5e2fbf337d -->
+
+- 관련 TMI-116/TMI-128/TMI-217/TMI-125/TMI-220. TLS 배포 준비·Node30개 통과 결과에 현재 턴 식별자를 보완하고 CURRENT_STATE를 갱신했다.
+- 전달/머지·test 자동 배포 승인 확인 대기 상태를 유지한다. 추가 서버 변경·배포·활성화 없음. Secret/Token 원문 미기록, 과거 기록 보존.
+
+## 2026-10-16 — TLS 코드 전달 승인·PR 준비
+
+- 관련 TMI-116/TMI-128/TMI-217/TMI-125/TMI-220. 사용자 승인으로 TLS 코드 commit/push/PR/develop 머지·test 자동배포 확인을 진행한다. main/prod·네트워크·DB 및 기능 활성화는 제외한다.
+- 원격 develop d02fe0f를 조회하고 feat/lc-test-access-tls를 생성했다. 기존 로컬 변경 보존, 사용자 DS_Store는 전달에서 제외한다. Node30개/shell syntax/diff 통과. 실제 AWS TLS Secret 주입/수신 ON 검증과 코드 OFF 배포는 구분한다.

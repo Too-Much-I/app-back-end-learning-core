@@ -1,5 +1,7 @@
 # LC 배포 프로필 prod/test 정리
 
+> 2026-10-16 적용 완료: PR #46·develop d02fe0f·test 배포38901895642 성공. task36에서 test/test/JWT 설정과 기능OFF, 서비스/ALB 정상·health200·무인증history401 확인. 아래 미적용 문구는 구현 당시 상태이며 main 배포와 Billing 활성화는 여전히 미실행이다. 동시성 보완5e1db05 포함, 상세 실행 기록은 WORKLOG를 따른다.
+
 ## 결론
 
 - 사용자 배포 환경 기준은 prod/test 두 개다. main→prod, develop→test를 배포 렌더러에서 명시한다.
