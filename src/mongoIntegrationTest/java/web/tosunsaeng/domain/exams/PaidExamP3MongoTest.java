@@ -107,12 +107,75 @@ class PaidExamP3MongoTest {
         return new ReservationSnapshot(prepared.getOperationId(),RESERVATION,BillingReservationKind.INITIAL,status,
                 NEW_GROUP,status==ReservationStatus.CONFIRMED?AttemptGroupStatus.OPEN:null,"new","mock",null,null,
                 NOW.plusSeconds(300),status==ReservationStatus.RESERVED?null:NOW.minusSeconds(1),
-                PaidReservationProtocol.Source.SUBSCRIPTION,new PaidReservationProtocol.Transition(OLD_GROUP,"old"),
+                PaidReservationProtocol.Source.SUBSCRIPTION,prepared.getPaidLegacySource()==null?new PaidReservationProtocol.Transition(OLD_GROUP,"old"):null,
                 rejected?new PaidReservationProtocol.ConfirmRejection("ENTITLEMENT_REVOKED"):null);
     }
     <T> T leased(Supplier<T> work) { return execution.http(prepared.getCommandId(),work); }
     ExamCreationOperation op() { return operations.findById(prepared.getCommandId()).orElseThrow(); }
     ExamSession session(String id) { return mongo.findById(id,ExamSession.class); }
+    private void legacyPrepared() {
+        operations.deleteAll();
+        mongo.updateFirst(Query.query(Criteria.where("_id").is("old")),new Update().unset("attemptGroupId")
+                .unset("submissionEvidenceVersion").unset("requiredQuestionNumbers"),ExamSession.class);
+        for(String name:List.of("exam_legacy_manifest_entries","exam_paid_rollout_state")) {
+            if(mongo.collectionExists(name)) mongo.dropCollection(name);
+            mongo.createCollection(name);
+        }
+        var inspector=new web.tosunsaeng.domain.exams.rollout.PaidExamCutoverInspector(mongo);
+        var expected=inspector.inspectCandidate("test","legacy-r1",true);
+        mongo.insert(new Document("_id","old").append("revision",expected.revision()),"exam_legacy_manifest_entries");
+        mongo.insert(new Document("_id","legacy-v1").append("status","SEALED")
+                .append("environment",expected.environment()).append("database",expected.database())
+                .append("revision",expected.revision()).append("sha256",expected.sha256()).append("count",expected.count())
+                .append("sealedAt",Date.from(NOW)).append("writersDrained",true).append("readerCoverageVerified",true),"exam_paid_rollout_state");
+        org.springframework.test.util.ReflectionTestUtils.setField(lifecycle,"legacyRuntime",
+                new web.tosunsaeng.domain.exams.rollout.LegacyExamRuntime(inspector.verifySealed(expected)));
+        prepared=ExamCreationOperation.prepared(USER,UUID.randomUUID().toString(),"new","mock",1,"old",null,"mock",NOW);
+        prepared.fixPaidSelection(new PaidExamSelection(PaidExamSelection.StartReason.RESTART_INCOMPLETE,List.of(1,2)));
+        prepared.fixPaidLegacySource(expected); operations.insert(prepared);
+        evidence.prepareRequest(USER,prepared.getCommandId());
+    }
+    @Test void legacyFirstPaidInitialClosesExactOldOnlyAfterConfirmation() {
+        legacyPrepared(); pending();
+        assertThat(session("old").isActive()).isTrue();
+        assertThat(session("old").getSubmissionsClosedAt()).isNull();
+        assertThat(session("new").isActive()).isFalse();
+        leased(()->lifecycle.applyStatus(USER,prepared.getCommandId(),snapshot(ReservationStatus.CONFIRMED,false)));
+        assertThat(op().getState()).isEqualTo(ExamCreationState.SUCCEEDED);
+        assertThat(session("new").isActive()).isTrue();
+        assertThat(session("old").isActive()).isFalse();
+        assertThat(session("old").getSubmissionsClosedByOperationId()).isEqualTo(prepared.getOperationId());
+        assertThat(session("old").getBillingReservationId()).isNull();
+        assertThat(session("old").getSubmissionEvidenceVersion()).isNull();
+    }
+    @Test void legacyCanceledInitialPreservesOriginalSession() {
+        legacyPrepared(); pending();
+        leased(()->lifecycle.applyStatus(USER,prepared.getCommandId(),snapshot(ReservationStatus.CANCELED,true)));
+        assertThat(session("old").isActive()).isTrue();
+        assertThat(session("old").getSubmissionsClosedAt()).isNull();
+        assertThat(session("new").isActive()).isFalse();
+    }
+    @Test void readerUsesPersistedSessionEvidenceAfterOperationRetentionAndRejectsCorruptLinks() {
+        legacyPrepared(); pending();
+        leased(()->lifecycle.applyStatus(USER,prepared.getCommandId(),snapshot(ReservationStatus.CONFIRMED,false)));
+        var runtime = (web.tosunsaeng.domain.exams.rollout.LegacyExamRuntime)
+                org.springframework.test.util.ReflectionTestUtils.getField(lifecycle,"legacyRuntime");
+        // Isolated test setup only: not an implementation/approval of production purge.
+        operations.deleteById(prepared.getCommandId());
+        runtime.requireKnown(session("old"));
+        runtime.requireKnown(session("new"));
+        mongo.updateFirst(Query.query(Criteria.where("_id").is("new")),
+                Update.update("attemptGroupId",UUID.randomUUID().toString()),ExamSession.class);
+        assertThatThrownBy(()->runtime.requireKnown(session("new"))).isInstanceOf(IllegalStateException.class);
+    }
+    @Test void legacyPinnedRevisionMismatchCannotDispatchReserve() {
+        legacyPrepared();
+        mongo.updateFirst(Query.query(Criteria.where("_id").is(prepared.getCommandId())),
+                Update.update("paidLegacySource.revision","unapproved"),ExamCreationOperation.class);
+        assertThatThrownBy(()->recovery.resumeHttp(USER,prepared.getCommandId(),ZoneOffset.UTC)).isInstanceOf(IllegalStateException.class);
+        verifyNoInteractions(billing);
+        assertThat(op().getRecovery().getDispatch()).isEqualTo(ReservationRecovery.Dispatch.NOT_DISPATCHED);
+    }
     void pending() { leased(()-> {
         lifecycle.acceptReserved(USER,prepared.getCommandId(),snapshot(ReservationStatus.RESERVED,false));
         return lifecycle.commitPending(USER,prepared.getCommandId(),ZoneOffset.UTC);

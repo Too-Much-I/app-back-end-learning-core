@@ -125,6 +125,18 @@ class ExamGradingServiceTest {
     private MutableClock clock;
     private ExamGradingService service;
 
+    @Test
+    void unclassifiedSessionCannotCreateJobOrCallS3OrAi() {
+        var session = examSessionRepository.findById(EXAM_ID).orElseThrow();
+        var runtime = org.mockito.Mockito.mock(web.tosunsaeng.domain.exams.rollout.LegacyExamRuntime.class);
+        doThrow(new IllegalStateException("unclassified")).when(runtime).requireKnown(session);
+        ReflectionTestUtils.setField(service, "legacyExamRuntime", runtime);
+        assertThrows(IllegalStateException.class, () -> service.submitQuestion(EXAM_ID, 1, 0));
+        assertTrue(questionJobs.isEmpty());
+        assertTrue(summaryJobs.isEmpty());
+        org.mockito.Mockito.verifyNoInteractions(s3Client, dispatchService);
+    }
+
     @BeforeEach
     void setUp() {
         expectedQuestionNumbers = List.of(1);

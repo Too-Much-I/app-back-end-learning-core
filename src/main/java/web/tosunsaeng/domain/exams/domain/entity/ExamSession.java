@@ -61,6 +61,21 @@ public class ExamSession {
     // Admission closure is separate from grading/summary lifecycle completion.
     private Instant submissionsClosedAt;
     private String submissionsClosedByOperationId;
+    private web.tosunsaeng.domain.exams.rollout.LegacyExamManifest.Summary legacyClosureManifest;
+
+    public void closeLegacySubmissions(web.tosunsaeng.domain.exams.rollout.LegacyExamManifest.Summary manifest,
+            String operationId, Instant now) {
+        if (paidReservation != null || creationOperationId != null || billingReservationId != null || attemptGroupId != null
+                || manifest == null || legacyClosureManifest != null && !legacyClosureManifest.equals(manifest))
+            throw new IllegalStateException("Invalid legacy closure");
+        closeSubmissions(operationId, now);
+        legacyClosureManifest = manifest;
+    }
+
+    public boolean hasLegacyClosure() {
+        return legacyClosureManifest != null && submissionsClosedAt != null && submissionsClosedByOperationId != null
+                && paidReservation == null && creationOperationId == null && billingReservationId == null && attemptGroupId == null;
+    }
 
     public void closeSubmissions(String operationId, Instant now) {
         if (submissionsClosedAt != null) {

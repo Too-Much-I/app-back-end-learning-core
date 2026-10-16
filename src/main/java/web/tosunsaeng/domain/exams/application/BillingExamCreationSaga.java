@@ -90,6 +90,13 @@ public class BillingExamCreationSaga {
         return execution.http(operation.getCommandId(), () -> runOperation(prepared));
     }
 
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    private web.tosunsaeng.domain.exams.rollout.LegacyExamWriterGuard legacyWriterGuard;
+
+    private void requireLegacyWriterAllowed() {
+        if (legacyWriterGuard != null) legacyWriterGuard.requireAllowed();
+    }
+
     private ExamSessionManager.Assignment runOperation(ExamCreationOperation operation) {
         for (int step = 0; step < MAX_STATE_STEPS; step++) {
             operation = reload(operation.getCommandId());
@@ -104,7 +111,7 @@ public class BillingExamCreationSaga {
                 throw new ExamsException(ErrorStatus._EXAM_CREATION_PROCESSING, 1);
             }
             switch (operation.getState()) {
-                case PREPARED -> reserve(operation);
+                case PREPARED -> { requireLegacyWriterAllowed(); reserve(operation); }
                 case RESERVED -> commitSession(operation);
                 case SESSION_COMMITTED -> confirmOrReconcile(operation);
                 case SUCCEEDED -> {
@@ -124,6 +131,7 @@ public class BillingExamCreationSaga {
         if (existing != null) {
             return existing;
         }
+        requireLegacyWriterAllowed();
         if (operationRepository.findByUserIdAndActiveGuardTrue(userId).isPresent()) {
             throw new ExamsException(ErrorStatus._EXAM_CREATION_PROCESSING, 1);
         }

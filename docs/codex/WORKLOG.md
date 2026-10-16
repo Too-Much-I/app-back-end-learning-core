@@ -15712,3 +15712,77 @@
 
 - 사용자 commit/push/merge 후 새 브랜치 구현 요청을 접수했다. 현재 브랜치와 origin/develop 기반 일치 확인, 사용자DS_Store 제외, 기능OFF/기동gate 유지. 전체 회귀 후 PR/develop 전달을 진행하고 legacy 동일문제 예외를 별도 feat에서 구현한다. 관련 TMI-116/128/217/193/136/125.
 - AGENTS/CURRENT_STATE 동기화. 실DB/index·목록설치·기능 활성화·운영배포·Billing/Identity 변경은 제외한다. 실제 전달/검증 결과는 후속 항목에 기록한다. Secret/Token 미기록.
+
+## 2026-10-16 — P6.1·삭제 연동 머지 및 legacy 생성 후속 구현
+
+- 15b298e 커밋/푸시, PR #43 생성·앱 첨부, CI38885959880 성공 확인 후 develop에 merge577e3175a8c5ccf3e49fe49eb27cd046468f08a2. 사용자DS_Store 제외. 자동 테스트배포38886406335 첫실행은 기존 LearningQuotaTransactionTest 동시성1건 실패로 AWS 전 중단; 같은커밋 failed job 재실행은 테스트통과 후 이미지빌드 진행 중으로 최종배포성공은 미확인이다. 실패 테스트를 제외하거나 무관한 코드를 수정하지 않았다.
+- feat/billing-paid-exam-legacy-runtime 신규 브랜치에서 승인된 동일mock 예외 구현. 별도 승인summary/환경·sealed exact membership을 operation에 결속하며 source누락 일반fallback 금지. 원legacy는 LC local-only로 보존하고 일반INITIAL 요청; confirm 후 exact 이전 신규접수차단/새Session활성/성공의 원자처리. 기존시험 source/접수시각 backfill·terminal 부활 없이 증거 있는 기접수 Job/receipt·전체접수marker만 허용한다. 관련 TMI-116/128/217/193/136/125.
+- 신규 단위5/Mongo9 추가. 개발중 Spring bean lifecycle와 DB조회 구분 테스트 수정·legacy Job mock 생략값 기본규칙 호환 수정 후 최종 clean test/mongoIntegrationTest/bootJar 성공: 단위1,311 실패/오류0·기존1skip, Mongo281 실패/오류/skip0. migration Node7·fixture34 hash/신규diff없음·diff check 통과. 실제Billing/공동E2E는 실행하지 않았다.
+- 보고서 LC_BILLING_LEGACY_RUNTIME_IMPLEMENTATION.md 및 계획/ADR/CURRENT_STATE 동기화. 신규 후속변경은 미커밋/미푸시, 기존사용자변경 보존·예상밖 제품범위 변경없음. 실목록설치/봉인·전체reader coverage·구writer drain/공동검증 및 활성화gate는 유지한다. 실DB/index·기능설정·운영배포·Billing/Identity/Jira 변경없음. Secret/Token 미기록.
+
+- 종료 전 자동배포 재확인: 38886406335 attempt2는 테스트/이미지빌드 통과 후 ECS 배포 진행 중이며 health/최종성공 미확인. 새 legacy 후속변경은 미커밋이므로 배포에 포함되지 않는다. CURRENT_STATE 최신 관측을 반영했다.
+
+## 2026-10-16 — 전달·legacy 구현 턴 식별자 보완
+
+<!-- codex-turn:01a14433-2377-7040-8bb9-034e4cec4b53 -->
+
+- 이번 작업의 정확한 턴 식별자를 기록한다. 15b298e commit/push 및 PR #43 develop 머지577e317 완료 후 feat/billing-paid-exam-legacy-runtime에서 후속 구현했다. 최종 단위1,311 실패/오류0·기존1skip, Mongo281 전부통과, bootJar 성공. 관련 TMI-116/128/217/193/136/125.
+- 새 구현은 미커밋이며 활성화 차단 유지. 자동 테스트배포38886406335 attempt2는 마지막 관측상 ECS 진행 중으로 최종성공 미확인이다. 이번 보완은 CURRENT_STATE/WORKLOG 기록만 변경하며 추가 코드·테스트 재실행·실DB·배포·commit/push는 수행하지 않았다. 기존 변경 보존, Secret/Token 미기록.
+
+## 2026-10-16 — legacy/paid reader·접수·Callback 경계 구현
+
+<!-- codex-turn:01a14443-cf14-7d10-8bbc-e199a42ceb7a -->
+
+- 사용자 「어 구현해줘」에 따라 현 feat/billing-paid-exam-legacy-runtime에서 후속 reader 검증을 구현했다. exact manifest legacy 또는 strict paid snapshot의 Session/operation/reservation/group/mock/kind·confirm 증거를 검증한다. 생성 operation을 조회하지 않아120일 이후에도 읽기를 유지하며 current owner와 historical confirmer 차이를 일괄 거절하지 않는다. 관련 TMI-116/128/217/193/136/125.
+- ExamServiceImpl 공개 조회·Callback, ExamReadService 이력/재시도, ExamGradingService 접수/복구/Summary·owner Transaction에 연결. owner/삭제/환불·기접수 증거·대기Session 차단을 유지한다. OFF 기존 흐름, API/DTO/BaseResponse·AI user_id=examId/Callback·S3/Redis·Billing wire/fixture bytes 불변. 잘못된 stored source는 내부 검증 실패로 중단하며 새 공개 오류코드는 추가하지 않았다.
+- 추가 단위13개와 Mongo1개. 집중 단위 성공 후 clean test/mongoIntegrationTest/bootJar 성공; operation 정리 뒤 저장Session 검증/변조거절 Mongo를 추가하고 최종 test/mongoIntegrationTest/bootJar 재실행 성공. 최종 XML 단위1,324 실패/오류0·기존1skip, Mongo282 실패/오류/skip0. Node reconciliation migration15·원fixture34 hash·fixture diff없음·git diff --check 통과.
+- 보고서/계획/ADR/CURRENT_STATE 갱신. 기존 dirty와 사용자DS_Store 보존, 예상 밖 제품 범위 변경 없음. 실DB/index·목록설치/봉인·배포/활성화·commit/push·Billing/Identity/Jira 변경 없음. 공동 경합·전체owner/삭제/실환경 reader 검증 및 구writer drain은 남고 paid ON 기동차단은 유지한다. 과거 자동배포의 최종 상태는 이번에 재조회하지 않았다. Secret/Token 미기록.
+
+## 2026-10-16 — 완료범위 재점검 및 구writer 재개 방어 구현
+
+- 사용자 「이제 구현 다 했나? 아직 다 안 했으면 구현해줘」로 잔여 코드 점검 후 LegacyExamWriterGuard를 추가했다. feature flag에 의존하지 않고 기존 rollout state 존재를 읽어 구writer preparation/phone discovery/reserve/Session commit을 막는다. state 불명/조회실패는 fail-closed, no-state 환경은 기존 흐름 유지. 기존 Session을 abandon하기 전 검사하고 DB Transaction 진입점에서도 재확인한다. 관련 TMI-116/128/217/193/136/125.
+- ExamSessionManager/BillingExamCreationSaga/BillingExamCreationTransactionService 연결. 새 paid lifecycle·기존 성공replay/committed 복구는 일괄 차단하지 않는다. 자동 state 삭제·추가 DB자료/TTL·신규 wire/API/error code 없음. 기존409/Retry-After1 사용. 현재코드 미탑재 구바이너리나 설치경합을 이 검사로 해결했다고 주장하지 않으며 실제 drain/버전/접근통제 확인이 필요하다.
+- 추가 단위7개 및 격리Mongo1개: no-state·state 존재·DB장애, abandon/선정·phone/reserve 전 무호출, insert/commit 차단과 committed replay, 재시작/비정상state 차단. 최종 JAVA_TOOL_OPTIONS=-Dapi.version=1.44 ./gradlew clean test mongoIntegrationTest bootJar 성공. XML 단위1,331 실패/오류0·기존1skip; Mongo283 실패/오류/skip0. 원fixture34 hash/fixture 미변경·diff check 통과.
+- 보고서/계획/ADR/CURRENT_STATE에 핵심 구현과 별도 잔여를 분리했다. 실제 manifest 설치/봉인 도구·전환 접근통제와 drain 절차, 공동E2E/실환경 검증, 기동차단 해제는 별도 작업이다. 최종purge는 승인 보존gate 전 제외한다. 현 branch 미커밋/미푸시, 실DB/index·배포/활성화·Billing/Identity/Jira 변경 없음. 기존 dirty/사용자DS_Store 보존, 예상밖 변경 없음, Secret/Token 미기록.
+
+## 2026-10-16 — 구writer 재개 방어 구현 턴 식별자 보완
+
+<!-- codex-turn:01a1444b-861c-7fc2-8787-2ef415fba194 -->
+
+- 이번 턴의 LegacyExamWriterGuard 및 구생성 manager/saga/Transaction 연결 구현 기록을 식별자와 함께 보완했다. 관련 TMI-116/128/217/193/136/125. 최종 단위1,331 실패/오류0·기존1skip, 격리Mongo283 전부 통과, bootJar 성공은 위 실행 결과를 따른다.
+- WORKLOG append 및 CURRENT_STATE 갱신만 수행했다. 추가 코드 변경·테스트 재실행·실DB·배포·commit/push 없음. 전환 도구/절차·공동E2E·활성화 차단 해제·최종purge 잔여와 기존 사용자 변경을 보존했다. Secret/Token 미기록.
+
+## 2026-10-16 — 전환 절차와 도구 구현 기준 정리
+
+<!-- codex-turn:01a14460-728b-7541-8aa4-68b34db300b0 -->
+
+- 사용자 「어 해줘」를 직전 제안인 구서버 중지·목록 설치·접근권한 절차 정리로 해석하고 작업 전 범위를 안내했다. LC_BILLING_PAID_EXAM_CUTOVER_RUNBOOK.md 신규 작성, 계획/CURRENT_STATE 갱신. 관련 TMI-116/128/122/125/217/220/193/136.
+- 실제 코드상 develop→test/main→staging routing, inspector의 최초전환 unlinked 전제, runtime 설정 및 hard activation gate를 대조했다. 환경/담당/변경창·artifact 접근 입력, drain·동일snapshot export·독립승인·install/verify/seal·공동검증·재개와 장애복구 기준을 정리했다. 운영 승인/담당 배정/실행 완료로 표기하지 않는다.
+- 제품코드/공개API/fixture·실DB/index·AWS/배포/활성화·Billing/Identity/Jira·commit/push 변경 없음. 기존 dirty/사용자파일 보존. 문서 변경만으로 Gradle 재실행하지 않았고 로컬 링크/코드필드 대조·git diff --check 수행. 예상밖 변경 없음. Secret/Token 및 실제 시험ID 미기록. 다음은 격리 도구 구현 및 실제 운영 입력·별도 실행 승인 확인이다.
+
+- 후속 「설명해줘」: 전환 절차의 목적을 기존/신규 생성 방식 혼재 방지로 설명하고, 신규 생성 차단·진행 생성 정리·기존시험 exact 목록 확정/봉인·검증 후 재개를 구분했다. 기존 시험 보존, 채점 전체완료 대기 불필요, 실패시 state 삭제/구writer 자동복귀 금지, 기능코드와 미구현 전환도구/공동검증의 차이를 안내했다. 관련 TMI-116/128/217/220/193/136/125. 설명과 CURRENT_STATE/WORKLOG 기록 외 코드·실DB·배포·테스트 재실행 없음. Secret/Token 미기록.
+
+## 2026-10-16 — 전환 절차 설명 턴 기록
+
+<!-- codex-turn:01a14463-e6f1-7342-b577-1d21591c5c1f -->
+
+- 사용자에게 기존 시험 보존과 신규 Billing 생성 전환의 목적·순서를 설명했다. 생성 유입 차단/진행 요청 정리→exact 목록 확정/봉인→공동 검증→재개이며, 전체 채점 완료 대기나 기존 시험 삭제가 아니다. 관련 TMI-116/128/217/220/193/136/125.
+- 기능 코드 구현과 미구현 전환 도구·공동E2E·활성화 작업을 구분했다. WORKLOG append 및 CURRENT_STATE 갱신 외 코드·DB·배포·commit/push 변경 없음. 문서 검사만 수행하고 테스트는 재실행하지 않았다. 기존 사용자 변경 보존, Secret/Token 미기록.
+
+## 2026-10-16 — 테스트 서버 전환 절차 단순화
+
+<!-- codex-turn:01a14467-61ee-74f1-9c63-1a743d64327a -->
+
+- 사용자가 test 서버의 새 시험은 직접 요청할 때만 생성된다고 설명했다. 이 운영 전제에 한해 생성 요청/자동테스트를 작업 동안 중단하고 test 대상·기존 미완료 생성/자동writer를 최소 읽기 점검하는 경로를 runbook에 반영했다. 별도 traffic 제어 시스템/서버 전체중지/자동 installer를 테스트 착수의 무조건 선행으로 요구하지 않는다. 관련 TMI-116/128/217/125.
+- 사용자 설명과 실제 검증을 구분했다. 기존 목록/source 및 검증·활성화 경계는 유지하며 staging/production으로 확대하지 않는다. WORKLOG append/CURRENT_STATE/runbook 외 제품 코드·DB·AWS·배포·활성화·commit/push 변경 없음. 문서 diff 검사만 수행하고 테스트 재실행 없음. 기존 변경 보존, Secret/Token 미기록.
+
+## 2026-10-16 — 테스트 배포와 활성화 준비 구분
+
+<!-- codex-turn:01a1446b-0abb-7b62-ac76-5b05e322ad8d -->
+
+- 사용자 배포 가능 여부 질문에 현재 branch/dirty 및 PaidExamActivationGate를 읽기 확인했다. 기능OFF 선배포는 실제 Billing ON 테스트와 다르며 현재 ON은 서버 기동을 거절한다. 테스트 전용 검증/차단 해제 변경, 기존 목록·미완료 확인과 양측 URL/JWT/TLS/index 설정 검증이 필요하다. 관련 TMI-116/128/217/125.
+- 앞선 test 운영 절차 간소화를 제품 기동차단 해제 완료로 오해하지 않도록 설명한다. CURRENT_STATE/WORKLOG만 갱신, 코드/DB/AWS·배포·commit/push 없음. 정적 확인과 diff 검사만 수행, 테스트 재실행 없음. 기존 사용자 변경 보존, Secret/Token 미기록.
+
+## 2026-10-16 — legacy 전달·test 활성화 준비 승인 접수
+
+- 사용자 commit/push/merge 및 다음 브랜치 구현 요청을 접수했다. 현재 feat/billing-paid-exam-legacy-runtime과 origin/develop577e317 기반 일치를 확인했다. 사용자DS_Store 제외·기존 기능OFF/운영설정 보존. 관련 TMI-116/128/217/125. AGENTS/CURRENT_STATE 동기화 후 검증/전달하고 별도 feat에서 test 한정 활성화 준비를 구현한다. 실제DB/키/목록설치·활성화 및 타저장소 변경은 제외한다. 최종 결과는 후속 append한다. Secret/Token 미기록.

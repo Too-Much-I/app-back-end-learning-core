@@ -116,6 +116,43 @@ class ExamServiceImplTest {
 
     private ExamSession assignedSession;
 
+    @Test
+    void callbackRejectsUnclassifiedSessionBeforeSavingFeedback() {
+        org.mockito.Mockito.lenient().when(currentUserProvider.getCurrentUserId()).thenReturn(LEGACY_USER_ID);
+        when(examSessionRepository.findById(assignedSession.getExamId())).thenReturn(java.util.Optional.of(assignedSession));
+        var runtime = org.mockito.Mockito.mock(web.tosunsaeng.domain.exams.rollout.LegacyExamRuntime.class);
+        org.mockito.Mockito.doThrow(new IllegalStateException("unclassified")).when(runtime).requireKnown(assignedSession);
+        ReflectionTestUtils.setField(examService, "legacyExamRuntime", runtime);
+        var request = new web.tosunsaeng.domain.exams.dto.ExamRequestDTO.AiResultReq();
+        ReflectionTestUtils.setField(request, "examId", assignedSession.getExamId());
+        ReflectionTestUtils.setField(request, "questionNumber", 1);
+        ReflectionTestUtils.setField(request, "retryCount", 0);
+        org.junit.jupiter.api.Assertions.assertThrows(IllegalStateException.class, () -> examService.updateExamResult(request));
+        org.mockito.Mockito.verifyNoInteractions(examResultRepository, gradingService);
+    }
+
+    @Test
+    void ownerMismatchIsRejectedBeforeInspectingClassification() {
+        var foreign = ExamSession.builder().examId("foreign").userId("different-owner").build();
+        when(examSessionRepository.findById("foreign")).thenReturn(java.util.Optional.of(foreign));
+        var runtime = org.mockito.Mockito.mock(web.tosunsaeng.domain.exams.rollout.LegacyExamRuntime.class);
+        ReflectionTestUtils.setField(examService, "legacyExamRuntime", runtime);
+        org.junit.jupiter.api.Assertions.assertThrows(web.tosunsaeng.domain.exams.exception.ExamsException.class,
+                () -> examService.getQuestionPrompt("foreign", 1));
+        org.mockito.Mockito.verifyNoInteractions(runtime, mockExamCatalogService, s3Presigner);
+    }
+
+    @Test
+    void promptRejectsUnclassifiedOwnedSessionBeforeCatalogOrPresigning() {
+        when(examSessionRepository.findById(assignedSession.getExamId())).thenReturn(java.util.Optional.of(assignedSession));
+        var runtime = org.mockito.Mockito.mock(web.tosunsaeng.domain.exams.rollout.LegacyExamRuntime.class);
+        org.mockito.Mockito.doThrow(new IllegalStateException("unclassified")).when(runtime).requireKnown(assignedSession);
+        ReflectionTestUtils.setField(examService, "legacyExamRuntime", runtime);
+        org.junit.jupiter.api.Assertions.assertThrows(IllegalStateException.class,
+                () -> examService.getQuestionPrompt(assignedSession.getExamId(), 1));
+        org.mockito.Mockito.verifyNoInteractions(mockExamCatalogService, s3Presigner);
+    }
+
     @BeforeEach
     void setUp() throws Exception {
         ReflectionTestUtils.setField(examService, "bucketName", "test-learning-core-bucket");

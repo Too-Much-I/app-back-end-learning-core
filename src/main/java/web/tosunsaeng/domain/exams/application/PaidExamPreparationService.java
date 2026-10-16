@@ -24,6 +24,8 @@ import static web.tosunsaeng.domain.exams.domain.entity.PaidExamSelection.StartR
 public class PaidExamPreparationService {
     @org.springframework.beans.factory.annotation.Autowired(required = false)
     private web.tosunsaeng.domain.learningrecorddeletion.infrastructure.DeletedExamContinuationStore deletedSources;
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    private web.tosunsaeng.domain.exams.rollout.LegacyExamRuntime legacyRuntime;
     private final MongoTemplate mongo;
     private final ExamCreationOperationRepository operations;
     private final MockExamCatalogService catalog;
@@ -80,12 +82,20 @@ public class PaidExamPreparationService {
         }
         if (phone != null && (previous != null || deleted != null)) throw new IllegalStateException("Phone source changed during discovery");
         PaidExamSelection.StartReason reason = null;
+        web.tosunsaeng.domain.exams.rollout.LegacyExamManifest.Summary legacySource = null;
         if (previous != null) {
-            if (!previous.isInProgress() && !previous.isCompleted() && !previous.isRetakeAvailable())
+            if (previous.getAttemptGroupId() == null) {
+                if (legacyRuntime == null) throw new IllegalStateException("Verified legacy inventory unavailable");
+                legacySource = legacyRuntime.requireLegacy(previous);
+            }
+            if (previous.isEntitlementConfirming() || (legacySource == null
+                    && !previous.isInProgress() && !previous.isCompleted() && !previous.isRetakeAvailable()))
                 throw new IllegalStateException("Previous Session lifecycle cannot start a paid exam");
-            boolean allAccepted = evidence.completeAndFence(previous);
+            if (previous.getSubmissionCompletedAt()!=null && previous.getSubmissionCompletedAt().isAfter(clock.instant()))
+                throw new IllegalStateException("Submission evidence is in the future");
+            boolean allAccepted = legacySource != null ? evidence.legacyCompleteAndFence(previous) : evidence.completeAndFence(previous);
             if (previous.isCompleted()) {
-                if (!allAccepted) throw new IllegalStateException("Completion and admission evidence disagree");
+                if (!allAccepted && legacySource == null) throw new IllegalStateException("Completion and admission evidence disagree");
                 reason = NEW_AFTER_COMPLETION;
             } else reason = allAccepted ? NEW_AFTER_SUBMISSION : RESTART_INCOMPLETE;
         }
@@ -121,6 +131,7 @@ public class PaidExamPreparationService {
                 previous != null ? previous.getAttemptGroupId() : deleted != null ? deleted.getAttemptGroupId() : null,
                 previous != null ? previous.getMockExamId() : deleted != null ? deleted.getMockExamId() : null, clock.instant());
         operation.fixPaidSelection(new PaidExamSelection(reason, required));
+        if (legacySource != null) operation.fixPaidLegacySource(legacySource);
         if (phone != null) {
             operation = ExamCreationOperation.prepared(userId,operationId,operation.getSessionId(),selected.getMockExamId(),cycle,
                     null,phone.attemptGroupId(),phone.mockExamId(),phone.continuationReason(),phone.continuationId(),clock.instant());

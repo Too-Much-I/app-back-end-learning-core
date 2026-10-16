@@ -26,6 +26,12 @@ import java.util.function.Supplier;
 
 @Service
 public class BillingExamCreationTransactionService {
+    @Autowired(required = false)
+    private web.tosunsaeng.domain.exams.rollout.LegacyExamWriterGuard legacyWriterGuard;
+
+    private void requireLegacyWriterAllowed() {
+        if (legacyWriterGuard != null) legacyWriterGuard.requireAllowed();
+    }
     @org.springframework.beans.factory.annotation.Autowired(required = false)
     private web.tosunsaeng.domain.exams.access.AccessRevocationStore accessRevocations;
 
@@ -90,6 +96,7 @@ public class BillingExamCreationTransactionService {
                     || operation.getState() == ExamCreationState.SUCCEEDED) {
                 return operation;
             }
+            requireLegacyWriterAllowed();
             if (execution != null && operation.getRecovery().getIntent()
                     != web.tosunsaeng.domain.exams.billing.reconciliation.ReservationRecovery.Intent.CONTINUE) {
                 throw new IllegalStateException("Reservation cleanup already committed");
@@ -230,6 +237,7 @@ public class BillingExamCreationTransactionService {
         return inTransaction(() -> {
             if (userOwnedTransactionExecutor != null) userOwnedTransactionExecutor.requirePublicWrite(operation.getUserId());
             touchOwner(operation.getUserId());
+            requireLegacyWriterAllowed();
             if (execution != null) execution.scheduleInitialProgress(operation);
             if (deletedExamContinuations != null) deletedExamContinuations.claimForInsert(operation);
             return operationRepository.insert(operation);

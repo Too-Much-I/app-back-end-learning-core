@@ -31,6 +31,12 @@ import java.util.function.Supplier;
 @Service
 @RequiredArgsConstructor
 public class ExamSessionManager {
+    @Autowired(required = false)
+    private web.tosunsaeng.domain.exams.rollout.LegacyExamWriterGuard legacyWriterGuard;
+
+    private void requireLegacyWriterAllowed() {
+        if (legacyWriterGuard != null) legacyWriterGuard.requireAllowed();
+    }
 
     private static final DateTimeFormatter EXAM_ID_TIME_FORMAT = DateTimeFormatter.ofPattern("MMdd_HHmm");
     private static final int CREATE_ATTEMPTS = 3;
@@ -60,6 +66,7 @@ public class ExamSessionManager {
     }
 
     private PreparedAssignment prepareForBillingInTransaction(String userId) {
+        requireLegacyWriterAllowed();
         List<ExamSession> activeSessions = findInProgressSessions(userId);
         ExamSession replacement = activeSessions.stream()
                 .filter(candidate -> candidate.getAttemptGroupId() != null
@@ -114,6 +121,7 @@ public class ExamSessionManager {
             String expectedAttemptGroupId,
             String expectedMockExamId
     ) {
+        requireLegacyWriterAllowed();
         MockExam mockExam = mockExamCatalogService.getRequiredExam(expectedMockExamId);
         LocalDateTime now = LocalDateTime.ofInstant(clock.instant(), clock.getZone());
         return new PreparedAssignment(
@@ -123,6 +131,7 @@ public class ExamSessionManager {
     }
 
     private Assignment startNewAttempt(String userId, int attempt) {
+        requireLegacyWriterAllowed();
         if (deletedExamContinuations != null && deletedExamContinuations.findAvailable(userId).isPresent())
             throw web.tosunsaeng.domain.learningrecorddeletion.application.DeletionFailure.temporary();
         List<String> abandonedExamIds = abandonInProgressSessions(userId);

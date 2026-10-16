@@ -17,6 +17,35 @@ class ExamAcceptedWorkPolicyTest {
     ExamSession closed() { return ExamSession.builder().examId("old").status(ExamSessionStatus.IN_PROGRESS)
             .submissionEvidenceVersion(1).requiredQuestionNumbers(List.of(1,2)).submissionsClosedAt(NOW).build(); }
 
+    ExamSession legacy(boolean complete) {
+        var session=ExamSession.builder().examId("old").status(ExamSessionStatus.IN_PROGRESS)
+                .submissionCompletedAt(complete?NOW.minusSeconds(1):null).build();
+        session.closeLegacySubmissions(new web.tosunsaeng.domain.exams.rollout.LegacyExamManifest.Summary(
+                "test","isolated","r1","a".repeat(64),1),"operation",NOW);
+        return session;
+    }
+    @Test void legacyFallbackDoesNotInventFullSubmissionOrAcceptSyntheticJobs() {
+        var old=legacy(false);
+        var job=QuestionGradingJob.pending(GradingKeys.questionJobId("old",1,0),"old",1,0,"key",NOW.minusSeconds(5));
+        when(jobs.findById(job.getJobId())).thenReturn(Optional.of(job));
+        assertThat(policy.questionAllowed(old,1,0)).isFalse();
+        assertThat(ExamAcceptedWorkPolicy.summaryAllowed(old)).isFalse();
+        job.markUserSubmission(NOW.minusSeconds(1));
+        assertThat(policy.questionAllowed(old,1,0)).isTrue();
+        assertThat(ExamAcceptedWorkPolicy.summaryAllowed(legacy(true))).isTrue();
+    }
+    @Test void legacyReceiptPermitsOnlyOriginalWorkAndRevocationStillWins() {
+        var old=legacy(false);
+        when(receipts.legacyAcceptedQuestion(old,1,0)).thenReturn(true);
+        assertThat(policy.questionAllowed(old,1,0)).isTrue();
+        assertThat(policy.questionAllowed(old,2,0)).isFalse();
+        var revoked=ExamSession.builder().examId("old").status(ExamSessionStatus.IN_PROGRESS).accessRevoked(true)
+                .legacyClosureManifest(old.getLegacyClosureManifest()).submissionsClosedAt(NOW)
+                .submissionsClosedByOperationId("operation").submissionCompletedAt(NOW).build();
+        assertThat(policy.questionAllowed(revoked,1,0)).isFalse();
+        assertThat(ExamAcceptedWorkPolicy.summaryAllowed(revoked)).isFalse();
+    }
+
     @Test void acceptedUserJobSurvivesClosureButSyntheticJobDoesNot() {
         var job=QuestionGradingJob.pending(GradingKeys.questionJobId("old",1,1),"old",1,1,"key",NOW);
         when(jobs.findById(job.getJobId())).thenReturn(Optional.of(job));

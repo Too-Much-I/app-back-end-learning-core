@@ -34,6 +34,8 @@ import java.util.stream.Collectors;
 @Service
 @RequiredArgsConstructor
 public class ExamReadService {
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    private web.tosunsaeng.domain.exams.rollout.LegacyExamRuntime legacyExamRuntime;
 
     private static final int EXAM_MAX_SCORE = 200;
     private static final Comparator<ExamSession> HISTORY_ORDER = Comparator
@@ -79,6 +81,8 @@ public class ExamReadService {
                     .histories(List.of())
                     .build();
         }
+
+        if (legacyExamRuntime != null) completedSessions.forEach(legacyExamRuntime::requireKnown);
 
         Set<String> examIds = completedSessions.stream()
                 .map(ExamSession::getExamId)
@@ -198,6 +202,7 @@ public class ExamReadService {
         if (session.isEntitlementConfirming()) {
             throw new ExamsException(ErrorStatus._EXAM_CREATION_PROCESSING, 1);
         }
+        if (legacyExamRuntime != null) legacyExamRuntime.requireKnown(session);
         return session;
     }
 

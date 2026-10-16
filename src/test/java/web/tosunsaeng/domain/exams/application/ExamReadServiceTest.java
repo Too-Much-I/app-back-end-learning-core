@@ -84,6 +84,29 @@ class ExamReadServiceTest {
     }
 
     @Test
+    void paidReaderRejectsUnclassifiedSessionBeforeLoadingResults() {
+        var session = ExamSession.builder().examId(EXAM_ID).userId(USER_ID).build();
+        when(examSessionRepository.findById(EXAM_ID)).thenReturn(Optional.of(session));
+        var runtime = org.mockito.Mockito.mock(web.tosunsaeng.domain.exams.rollout.LegacyExamRuntime.class);
+        org.mockito.Mockito.doThrow(new IllegalStateException("unclassified")).when(runtime).requireKnown(session);
+        org.springframework.test.util.ReflectionTestUtils.setField(examReadService, "legacyExamRuntime", runtime);
+        assertThrows(IllegalStateException.class, () -> examReadService.getExamRetries(EXAM_ID));
+        verifyNoInteractions(questionGradingJobRepository, examResultRepository, examSummaryRepository);
+    }
+
+    @Test
+    void paidHistoryChecksVisibleCompletedSessionsBeforeBatchReads() {
+        var session = ExamSession.builder().examId(EXAM_ID).userId(USER_ID)
+                .completedAt(LocalDateTime.of(2026, 10, 16, 0, 0)).build();
+        when(examSessionRepository.findCompletedByUserId(USER_ID)).thenReturn(List.of(session));
+        var runtime = org.mockito.Mockito.mock(web.tosunsaeng.domain.exams.rollout.LegacyExamRuntime.class);
+        org.mockito.Mockito.doThrow(new IllegalStateException("unclassified")).when(runtime).requireKnown(session);
+        org.springframework.test.util.ReflectionTestUtils.setField(examReadService, "legacyExamRuntime", runtime);
+        assertThrows(IllegalStateException.class, () -> examReadService.getExamHistory());
+        verifyNoInteractions(mockExamRepository, examResultRepository, examSummaryRepository);
+    }
+
+    @Test
     void historyUsesCompletedAtDeterministicOrderAndBatchSummaryCompatibility(CapturedOutput output) {
         LocalDateTime newest = LocalDateTime.of(2026, 8, 4, 11, 0);
         LocalDateTime newestStartedAt = LocalDateTime.of(2026, 8, 4, 10, 30);

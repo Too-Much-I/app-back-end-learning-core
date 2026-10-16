@@ -77,11 +77,28 @@ public class ExamSubmissionEvidence {
         return session.getSubmissionsClosedAt()==null || !receipt.getDate("acceptedAt").toInstant().isAfter(session.getSubmissionsClosedAt());
     }
 
+    /** Exact existing receipt only; legacy same-mock fallback never manufactures admission evidence. */
+    public boolean legacyAcceptedQuestion(ExamSession session,int question,int retry) {
+        if (session==null || !session.hasLegacyClosure() || retry!=0) return false;
+        Document receipt=mongo.findById(session.getExamId()+":"+question,Document.class,RECEIPTS);
+        return receipt!=null && session.getExamId().equals(receipt.getString("examId"))
+                && Integer.valueOf(question).equals(receipt.getInteger("questionNumber")) && receipt.getDate("acceptedAt")!=null
+                && !receipt.getDate("acceptedAt").toInstant().isAfter(session.getSubmissionsClosedAt());
+    }
+
     /** Same Session write fence as admission; caller must also hold the current owner guard. */
     public boolean completeAndFence(ExamSession session) {
         requireTransaction();
         if (!covered(session)) throw new IllegalStateException("Submission coverage is not proven");
         required(session.getRequiredQuestionNumbers());
+        touch(session);
+        return session.getSubmissionCompletedAt() != null;
+    }
+
+    /** Caller must first verify exact legacy membership. Missing evidence means same mock, not completion. */
+    public boolean legacyCompleteAndFence(ExamSession session) {
+        requireTransaction();
+        if (covered(session)) required(session.getRequiredQuestionNumbers());
         touch(session);
         return session.getSubmissionCompletedAt() != null;
     }

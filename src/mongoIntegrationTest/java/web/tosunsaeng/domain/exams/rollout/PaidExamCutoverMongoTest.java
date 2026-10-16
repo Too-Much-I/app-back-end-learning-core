@@ -39,6 +39,18 @@ class PaidExamCutoverMongoTest {
                 .append("writersDrained", true).append("readerCoverageVerified", true), PaidExamCutoverInspector.STATE);
         return summary;
     }
+    @Test void installedStateStopsOldWriterAndRestartDoesNotClearTheStop() {
+        var guard = new LegacyExamWriterGuard(mongo);
+        guard.requireAllowed();
+        seal();
+        var before = mongo.findById("legacy", Document.class, "exam_sessions");
+        assertThatThrownBy(guard::requireAllowed).isInstanceOf(web.tosunsaeng.domain.exams.exception.ExamsException.class);
+        assertThatThrownBy(() -> new LegacyExamWriterGuard(mongo).requireAllowed())
+                .isInstanceOf(web.tosunsaeng.domain.exams.exception.ExamsException.class);
+        mongo.updateFirst(new Query(), Update.update("status", "INVALID"), PaidExamCutoverInspector.STATE);
+        assertThatThrownBy(guard::requireAllowed).isInstanceOf(web.tosunsaeng.domain.exams.exception.ExamsException.class);
+        assertThat(mongo.findById("legacy", Document.class, "exam_sessions")).isEqualTo(before);
+    }
     @Test void inspectIsReadOnlyAndDoesNotChangeStatusMissingLegacy() {
         var before = mongo.findById("legacy", Document.class, "exam_sessions");
         assertThat(inspector.inspectCandidate("test", "r1", true).count()).isEqualTo(1);
