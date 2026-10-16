@@ -1,5 +1,7 @@
 # LC legacy 생성 runtime 연결
 
+- 후속: 선행 구현은 PR #44로 머지됐다. 별도 브랜치의 [test 한정 기동 준비](LC_BILLING_PAID_EXAM_TEST_ACTIVATION.md)는 승인된 조건부 예외를 추가한다. 아래 기동차단/미커밋 표기는 legacy 구현 당시 상태이며 실제 서버 활성화 완료를 뜻하지 않는다.
+
 ## 1. 5줄 결론
 
 1. 2026-10-16 PR #43을 develop에 머지한 뒤 `feat/billing-paid-exam-legacy-runtime`에서 후속 구현했다.

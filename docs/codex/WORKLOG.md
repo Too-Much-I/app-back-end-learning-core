@@ -15786,3 +15786,39 @@
 ## 2026-10-16 — legacy 전달·test 활성화 준비 승인 접수
 
 - 사용자 commit/push/merge 및 다음 브랜치 구현 요청을 접수했다. 현재 feat/billing-paid-exam-legacy-runtime과 origin/develop577e317 기반 일치를 확인했다. 사용자DS_Store 제외·기존 기능OFF/운영설정 보존. 관련 TMI-116/128/217/125. AGENTS/CURRENT_STATE 동기화 후 검증/전달하고 별도 feat에서 test 한정 활성화 준비를 구현한다. 실제DB/키/목록설치·활성화 및 타저장소 변경은 제외한다. 최종 결과는 후속 append한다. Secret/Token 미기록.
+
+## 2026-10-16 — legacy PR #44 머지 및 test 한정 기동 준비 구현
+
+- legacy 변경을72fd00a commit/push하고 PR #44 생성·앱첨부, CI38892797996 성공 확인 후 develop ef6d151bf041588d30233dc29ab9a97ea8d3530a에 merge했다. 사용자DS_Store 제외·보존. 새 feat/billing-paid-exam-test-activation을 머지기준에서 생성했다. 관련 TMI-116/128/217/125/220/193/136.
+- PaidExamTestActivation/PaidExamTestIndexCheck와 두 gate 연결: test 단일profile·명시적 기본OFF 승인·paid/saga/sender/receiver/owner flags·환경test 일치·검증sealed runtime·실제owner executor·strict필수index 통과 시만 허용한다. staging/production/혼합profile은 계속 거절한다. test에서 생략/경고하던 saga/assignment/owner index 검사도 읽기전용으로 엄격하게 수행한다. 실제 key/TLS/기존feature 검증은 유지한다.
+- application.yml에 기본OFF paid/test승인 및 legacy summary 환경변수 매핑을 추가했고 실제값은 설정하지 않았다. 기존 API/DTO/BaseResponse/AI/S3/Redis/Billing wire·원fixture bytes 불변. manifest installer/실목록설치/실DB/index·키·기능 활성화/전체웹기동·공동E2E는 이번 범위의 완료가 아니다.
+- 최종 clean test/mongoIntegrationTest/bootJar 성공: 단위1,353 실패/오류0·기존1skip, Mongo286 실패/오류/skip0. 신규단위22/격리Mongo3; gate context의 owner는 mock이고 실제manifest/index만 검증했다. Node137·fixture34 hash·diff 검사 통과. 새 후속변경은 미커밋/미푸시이며 예상밖 제품 변경 없음. 보고서/계획/ADR/runbook/CURRENT_STATE 동기화, Secret/Token 미기록.
+- 기존 자동배포38893127747 첫실행은 AWS단계 전 LearningQuotaTransactionTest의 기존 concurrentServiceReplayChargesOneSubmissionEvenAtTheDailyLimit 1건(DataIntegrityViolation/MongoCommandException) 실패. 로컬/PR는 통과했으므로 같은commit 실패job을1회 재실행했고 마지막 관측은 attempt2 Mongo검증 진행중이다. 테스트 제외·해당제품코드 수정 없음. 이전38886406335 최종성공도 읽기 확인했다. 새 test예외 코드는 이 배포에 포함되지 않는다.
+
+- 종료 전 재확인: 자동배포38893127747 attempt2는 단위/Mongo 검증을 통과하고 Docker Buildx 준비 단계다. 이미지/ECS/health 최종성공은 아직 미확인이며 CURRENT_STATE를 최신화했다. 후속test예외 미커밋·기능설정 미변경 상태를 유지한다.
+
+## 2026-10-16 — PR #44 전달·test 준비 구현 턴 식별자 보완
+
+<!-- codex-turn:01a1446b-f8f0-7490-ad00-cdff0cc774f1 -->
+
+- 이번 턴의 정확한 식별자를 기록한다. legacy72fd00a commit/push·PR #44 CI 성공·develop ef6d151 머지 후 feat/billing-paid-exam-test-activation에서 test 한정 기동 준비를 구현했다. 관련 TMI-116/128/217/125/220/193/136.
+- 최종 단위1,353 실패/오류0·기존1skip, Mongo286 전부통과·bootJar 성공. 새 변경은 미커밋이며 실제 설정/DB/활성화 미변경. 자동배포38893127747 attempt2 마지막 관측은 검증 통과 후 Docker Buildx 준비, 최종성공 미확인이다.
+- 이번 보완은 WORKLOG append/CURRENT_STATE 갱신과 diff 검사만 수행했다. 추가 코드·배포·테스트 재실행·commit/push 없음. 기존 사용자 변경 보존, Secret/Token 미기록.
+
+## 2026-10-16 — test 활성화 준비 이후 작업 안내
+
+- 사용자 다음 작업 질문에 현재 브랜치와 변경 상태를 읽기 확인했다. test 활성화 준비 구현은 미커밋이며 기능 OFF 코드 전달, 실제 test 대상/미완료 생성/legacy 목록·index 및 Billing JWT·TLS 준비 확인, 별도 승인 후 활성화·공동 검증 순서로 안내한다. 관련 TMI-116/128/217/125/220.
+- test 환경에 복잡한 트래픽 제어를 새로 요구하지 않으며 기존 시험 보존과 필수 검증은 유지한다. 자동 목록 설치 도구와 실제 공동 E2E 완료를 주장하지 않는다.
+- 상태/기록 확인만 수행했다. 제품 코드·실DB·설정·배포·Git 전달 및 테스트 재실행 없음. 사용자 기존 변경을 보존하고 Secret/Token을 기록하지 않았다.
+
+## 2026-10-16 — 다음 작업 안내 턴 기록 보완
+
+<!-- codex-turn:01a14478-acc8-7f02-9031-a2a30dc42250 -->
+
+- 현재 test 활성화 준비 변경이 미커밋임을 확인하고 기능 OFF 코드 전달 → test 목록/index·Billing 인증 준비 → 별도 승인 후 활성화·공동 검증 순서를 안내했다. 관련 TMI-116/128/217/125/220.
+- 이번 보완은 턴 식별자와 현재 상태 기록만 추가한다. 제품 코드·실DB·설정·배포·commit/push 변경 및 테스트 재실행 없음. Secret/Token 미기록.
+
+## 2026-10-16 — test 활성화 준비 코드 전달
+
+- 사용자 「어 해줘」로 안내한 코드 전달을 진행한다. feat/billing-paid-exam-test-activation 기반과 origin/develop 일치 확인 및 코드 검토. 사용자 DS_Store는 제외하며 기능 OFF·실DB/키/설정 불변으로 전달한다. 관련 TMI-116/128/217/125/220.
+- 앞선 전체 단위/Mongo/Node 검증 기록과 별개로 이번 전달 전 PaidExamTestActivationTest 및 bootJar를 재검증한다. PR CI 결과를 확인한 뒤 머지하며 실제 기능 활성화·공동 E2E 완료로 해석하지 않는다.

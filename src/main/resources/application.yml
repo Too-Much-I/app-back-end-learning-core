@@ -49,6 +49,15 @@ app:
     poll-ms: ${CHALLENGE_POLL_MS:1000}
     expiry-poll-ms: ${CHALLENGE_EXPIRY_POLL_MS:10000}
   billing:
+    paid-exam:
+      enabled: ${BILLING_PAID_EXAM_ENABLED:false}
+      test-activation-approved: ${BILLING_PAID_EXAM_TEST_ACTIVATION_APPROVED:false}
+      legacy:
+        environment: ${BILLING_PAID_EXAM_LEGACY_ENVIRONMENT:}
+        database: ${BILLING_PAID_EXAM_LEGACY_DATABASE:}
+        revision: ${BILLING_PAID_EXAM_LEGACY_REVISION:}
+        sha256: ${BILLING_PAID_EXAM_LEGACY_SHA256:}
+        count: ${BILLING_PAID_EXAM_LEGACY_COUNT:-1}
     exam-deletion:
       sender-enabled: ${BILLING_EXAM_DELETION_SENDER_ENABLED:false}
     access-events:
