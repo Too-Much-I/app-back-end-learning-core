@@ -15959,3 +15959,19 @@
 
 - 관련 TMI-14/116/128/217/125/220. 사용자 후속 요청으로 commit/push/PR/develop 머지·test 자동배포와 기동 확인을 진행한다. main 배포·Billing 기능 활성화·DB/index 설치는 제외한다.
 - 원격 develop f41745a와 차이는 선행 PR merge commit1개뿐임을 확인하고 fast-forward했다. 사용자 DS_Store 및 기존 기록은 보존한다. 전달 전 DeploymentEnvironmentTest/bootJar·배포Node 회귀를 재검증한다. Secret/Token 미기록.
+
+## 2026-10-16 — prod/test 전달 결과 및 CI 실패 보류
+
+<!-- codex-turn:01a144a8-dd0a-7790-b61d-20ae7035f5e0 -->
+
+- 관련 TMI-14/116/128/217/125/220. 전달 전 DeploymentEnvironmentTest/bootJar·배포Node16 통과 후39a785e commit/push·PR #46 생성/첨부 완료. 사용자 DS_Store 제외. develop은 f41745a 기반이다.
+- CI38900049735 attempt1은 기존 LearningQuotaTransactionTest.concurrentServiceReplayChargesOneSubmissionEvenAtTheDailyLimit에서 ExecutionException/DataIntegrityViolationException/MongoCommandException1건 실패했다. 로컬 격리 해당 클래스 재실행은 통과했다. 같은commit 실패job을1회 재실행한 attempt2는 기존 AccessRevocationMongoTest.concurrentSameEventHasOneFactAndBothAcknowledge의77행 assertion1건 실패했다. 각 Mongo286 중1건 실패이며 원인을 확정하지 않는다.
+- CI 실패를 우회하거나 추가 반복 재실행하지 않고 PR 상태로 중단한다. develop 머지·이번 test 배포·main 배포·Billing 활성화·실DB/index 변경 없음. 별도 기존 동시성 문제 진단/수정과 재검증이 필요하다. 결과 기록은 로컬 미커밋으로 남기며 Secret/Token 미기록.
+
+## 2026-10-16 — PR #46 동시성 재현 및 보완
+
+- 관련 TMI-14/116/128/217/125/220. 사용자 후속 승인으로 두 실패를 각각20회 반복했다. 수정 전 LearningQuota3/20은 TransientTransactionError label의 Mongo WriteConflict112, AccessRevocation4/20은 expected204/actual409로 재현했다. 테스트 완화나 skip 없이 반복을 회귀로 유지한다.
+- owner Transaction3회 즉시 재시도 소진을 방지하도록 실패 Transaction 종료 후25/50ms 대기를 추가했다. 시도 수/unknown commit/owner deny 의미는 유지하며 interrupt는 복구하고 재시도를 중단한다. 환불 fresh 조회 사이 commit된 동일event는 group 문서의 eventId/digest를 확인해 중복으로 수렴하고 다른내용/다른event 충돌은 유지한다.
+- 결정적 fresh 조회 경합3개 및 bounded backoff/unknown/no replay/interrupt 검증을 추가했다. 수정 후 대상 단위·격리Mongo51개 통과, 전체 clean 검증 진행 중이다. 실DB/키/기능flag 변경 없음. Secret/Token 미기록.
+
+- 전체 clean test/mongoIntegrationTest/bootJar 통과 및 배포Node16/diff 검사 통과. 수정과 회귀를 기존 PR #46에 추가 전달하고 CI 성공 후 develop 머지/test 배포를 재개한다.

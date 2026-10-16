@@ -1,5 +1,9 @@
 # Learning Core Current State
 
+- PR #46 동시성 보완 진행: 수정 전20회 반복에서 학습3/20 WriteConflict112·환불4/20 잘못된409를 재현했다. owner Transaction 재시도3회 상한은 유지하며25/50ms 대기를 추가했고, 환불의 두 fresh 조회 사이 동일event commit을 group 문서의 eventId/digest로 재판정한다. 보완 후 해당51개 테스트 통과, 전체 검증 진행 중이다. 관련 TMI-14/116/128/217/125/220. main/실DB/기능flag 변경 없음.
+
+- 2026-10-16 전달 중단: 39a785e commit/push·PR #46 생성/첨부까지 완료했으나 CI38900049735가 두 번 실패해 develop 머지/test 배포는 하지 않았다. attempt1 LearningQuotaTransactionTest 동시 replay1건, attempt2 AccessRevocationMongoTest 동일event 동시 수신1건 실패(각 Mongo286 중1). 전자는 이번 로컬 재실행 통과, 실패 원인은 미확정이다. 기존 동시성 문제 진단/수정 후 CI 재검증이 필요하다. main/실서버/Billing flag/DB는 변경하지 않았다. 관련 TMI-14/116/128/217/125/220.
+
 - prod/test 정리 전달 승인: 사용자 후속 요청으로 feat/deployment-prod-test를 develop에 전달하고 test 자동배포/프로필 적용을 확인한다. origin/develop f41745a로 fast-forward했고 사용자 DS_Store는 제외한다. main 배포·Billing 기능 활성화·DB/index 설치는 범위 밖이다. 관련 TMI-14/116/128/217/125/220.
 
 - test 전달 순서 안내 턴 식별자를 WORKLOG에 보완했다. main→prod 매핑은 사용자 재확인됐으며 다음은 develop 대상 test 배포 검증이다. 실제 전달·배포는 미실행이고 Billing 기능 OFF 유지 방향이다. 관련 TMI-14/116/128/217/125/220. 이번 보완은 기록만 변경했다.

@@ -67,7 +67,7 @@ class AccessRevocationMongoTest {
         assertThatThrownBy(()->store.accept(event(id,UUID.randomUUID().toString(),null))).isInstanceOfSatisfying(AccessEventFailure.class,e->assertThat(e.code()).isEqualTo("EVENT_ID_CONFLICT"));
         assertThat(fact().get("confirmedSessionId")).isNull();
     }
-    @Test void concurrentSameEventHasOneFactAndBothAcknowledge() throws Exception {
+    @RepeatedTest(20) void concurrentSameEventHasOneFactAndBothAcknowledge() throws Exception {
         var e=event(UUID.randomUUID().toString(),GROUP,null); var gate=new CountDownLatch(1); var pool=Executors.newFixedThreadPool(2);
         try {
             var a=pool.submit(()->{gate.await();return receive(e);});
