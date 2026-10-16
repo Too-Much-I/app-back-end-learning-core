@@ -3,7 +3,6 @@ package web.tosunsaeng.domain.usermerge.config;
 import org.springframework.boot.ApplicationArguments;
 import org.springframework.boot.ApplicationRunner;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnExpression;
-import org.springframework.context.annotation.Profile;
 import org.springframework.data.domain.Sort;
 import org.springframework.data.mongodb.core.MongoTemplate;
 import org.springframework.data.mongodb.core.index.IndexInfo;
@@ -16,7 +15,7 @@ import web.tosunsaeng.domain.usermerge.domain.UserOwnershipGuard;
 import java.util.List;
 
 @Component
-@Profile("!test")
+@org.springframework.context.annotation.Conditional(web.tosunsaeng.global.config.DeploymentEnvironment.IndexChecks.class)
 @ConditionalOnExpression("${app.user-merged.writer-enabled:false} || "
         + "${app.user-merged.consumer-enabled:false} || "
         + "${app.user-merged.source-deny-enabled:false}")

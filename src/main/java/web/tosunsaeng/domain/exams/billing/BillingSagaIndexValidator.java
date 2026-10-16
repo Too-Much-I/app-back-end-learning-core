@@ -6,7 +6,6 @@ import org.springframework.boot.ApplicationArguments;
 import org.springframework.boot.ApplicationRunner;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.core.env.Environment;
-import org.springframework.core.env.Profiles;
 import org.springframework.data.domain.Sort;
 import org.springframework.data.mongodb.core.MongoTemplate;
 import org.springframework.data.mongodb.core.index.IndexField;
@@ -37,7 +36,6 @@ public class BillingSagaIndexValidator implements ApplicationRunner {
     public static final String SESSION_RESERVATION_INDEX = "uniq_exam_sessions_billing_reservation";
     public static final String SESSION_GROUP_INDEX = "idx_exam_sessions_attempt_group_created";
 
-    private static final Profiles STAGING_OR_PROD = Profiles.of("staging", "prod");
 
     private final MongoTemplate mongoTemplate;
     private final Environment environment;
@@ -49,7 +47,7 @@ public class BillingSagaIndexValidator implements ApplicationRunner {
 
     @Override
     public void run(ApplicationArguments args) {
-        boolean failClosed = environment.acceptsProfiles(STAGING_OR_PROD);
+        boolean failClosed = web.tosunsaeng.global.config.DeploymentEnvironment.restricted(environment);
         try {
             validate(failClosed);
         } catch (RuntimeException failure) {

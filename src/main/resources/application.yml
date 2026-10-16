@@ -24,6 +24,8 @@ spring:
       max-request-size: 10MB
 
 app:
+  deployment:
+    environment: ${APP_DEPLOYMENT_ENVIRONMENT:}
   answer-learning:
     enabled: ${ANSWER_LEARNING_ENABLED:false}
     grading-enabled: ${ANSWER_LEARNING_GRADING_ENABLED:false}

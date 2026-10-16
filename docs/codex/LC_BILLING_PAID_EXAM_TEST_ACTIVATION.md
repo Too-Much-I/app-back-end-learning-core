@@ -1,5 +1,7 @@
 # LC 유료 시험 — test 한정 기동 준비
 
+> 2026-10-16 전달 완료: 아래 구현 당시 미커밋/미배포 기록 이후2e24f10·PR #45를 develop f41745a로 머지했고 test 자동배포38895660977이 성공했다. 기능 설정은 변경하지 않았으며 실제 활성화·Billing 공동E2E는 미완료다. 최신 상태는 CURRENT_STATE를 따른다.
+
 - 날짜: 2026-10-16 / 브랜치: `feat/billing-paid-exam-test-activation`
 - 관련 TMI-116/TMI-128/TMI-217/TMI-125/TMI-220/TMI-193/TMI-136.
 

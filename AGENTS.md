@@ -1,5 +1,13 @@
 # 프로젝트 목적
 
+## 2026-10-16 prod/test 정리 전달 승인
+
+- 사용자 후속 「어 해줘」로 현재 환경 정리의 commit/push/PR/develop 머지와 test 자동배포 및 적용 확인을 승인했다. main 배포·기존 별도 서비스 변경·Billing 기능 활성화·DB/index 설치는 제외한다. 사용자 DS_Store는 전달하지 않는다.
+
+## 2026-10-16 prod/test 배포 프로필 정리
+
+- 사용자 prod/test 두 배포 환경 기준 및 후속 「어 해줘」로 LC 코드·배포 설정·격리 테스트 정리를 승인했다. 배포 대상은 main→prod, develop→test이며 서버 test에서 기존 인증/index/트랜잭션 검증을 유지한다. local/test 개발·자동 테스트는 명시 배포 환경 없는 경우 기존 계약을 유지한다. 실제 AWS 설정/리소스·DB·배포·활성화·commit/push는 이번 코드 정리와 분리한다. Billing/Identity wire의 환경 enum과 기존 AWS 이름/도메인은 임의 치환하지 않는다.
+
 ## 2026-10-16 legacy 전달 및 테스트 활성화 준비 승인
 
 - 사용자 「커밋 푸시 머지한 다음 브랜치 파서 다음꺼 구현해줘」로 legacy runtime/reader/구writer 방어 및 관련 문서의 commit/push/PR/develop 머지와 기존 테스트 자동배포를 승인했다. 사용자 DS_Store는 제외한다. 다음 feat 브랜치에서는 test 환경 한정 활성화 준비 코드와 격리 검증을 구현한다. 실DB/index·실목록 설치/봉인·실키/운영설정·기능 활성화·Billing/Identity 변경은 제외한다. staging/production의 기동차단을 임의 해제하지 않으며 후속 변경 자체 commit/push는 별도 요청 전 수행하지 않는다.

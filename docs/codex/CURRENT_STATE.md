@@ -1,5 +1,51 @@
 # Learning Core Current State
 
+- prod/test 정리 전달 승인: 사용자 후속 요청으로 feat/deployment-prod-test를 develop에 전달하고 test 자동배포/프로필 적용을 확인한다. origin/develop f41745a로 fast-forward했고 사용자 DS_Store는 제외한다. main 배포·Billing 기능 활성화·DB/index 설치는 범위 밖이다. 관련 TMI-14/116/128/217/125/220.
+
+- test 전달 순서 안내 턴 식별자를 WORKLOG에 보완했다. main→prod 매핑은 사용자 재확인됐으며 다음은 develop 대상 test 배포 검증이다. 실제 전달·배포는 미실행이고 Billing 기능 OFF 유지 방향이다. 관련 TMI-14/116/128/217/125/220. 이번 보완은 기록만 변경했다.
+
+- 사용자 main→prod 매핑을 재확인했다. 해당 매핑 보류는 해소하되 기존 서비스/도메인/리소스 자체 변경 승인은 아니다. 현재 feat/deployment-prod-test는 미커밋이며 다음은 develop 대상 전달·test 프로필 기동/인증/index/health 확인이다. Billing 기능 OFF 유지·실제 연동 활성화는 별도다. 이번은 상태 확인·기록만 수행했다. 관련 TMI-14/116/128/217/125/220.
+
+- 프로필 설명 턴 식별자를 WORKLOG에 보완했다. 실행 프로필과 배포 서비스의 구분 및 기존 staging 보존 방향은 동일하다. 관련 TMI-14/116/128/217/125/220. 이번 보완은 기록만 변경했다.
+
+- Spring 프로필 의미 설명: 실행 설정/검증 선택과 ECS 배포 대상을 구분했다. test 서비스에서 staging 프로필을 쓰는 상태이며 프로필 이름 자체가 서버/DB를 지정하지 않는다. 관련 TMI-14/116/128/217/125/220. 이번은 설명·기록만 수행했다.
+
+- 기존 staging 보존 확인 턴 식별자를 WORKLOG에 보완했다. 완료 배포는 별도 test 서비스 대상이며 로컬 main→prod 변경은 전달/적용 보류 상태다. 관련 TMI-14/116/128/217/125/220. 이번 보완은 기록만 변경했다.
+
+- 배포 대상 재확인: 완료 run38895660977은 develop/f41745a에서 tosunsaeng-learning-core-test-service·test task family·api-test health 대상으로 실행됐다. 기존 main/staging 서비스 대상 배포가 아니다. 클러스터 이름의 staging 및 test 태스크의 staging 프로필과 서비스 대상을 구분한다. 사용자 기존 staging 보존 요구로 로컬 main→prod 변경은 적용/전달 보류하며 운영 대상 확정 없이 승격하지 않는다. 관련 TMI-14/116/128/217/125/220.
+
+- prod/test 정리 검증 완료: 단위1,364 실패/오류0·기존skip1, 격리Mongo286 전부통과, 배포Node16·bootJar·diff 검사 통과. feat/deployment-prod-test 미커밋이며 실제 ECS task35의 staging 프로필은 아직 변경하지 않았다. main의 기존 api-staging health 주소는 운영 주소 확인 전 유지한다. 관련 TMI-14/116/128/217/125/220.
+
+- prod/test 정리 구현: feat/deployment-prod-test에서 명시 배포 환경과 profile/JWT 일치 검증, 서버 test의 strict 인증/index/Transaction probe, main→prod/develop→test 렌더링을 준비했다. local/test 개발 호환·Billing wire는 유지한다. 실제 서버는 아직 미변경이며 main 기존 health URL의 운영 주소 적합성·실DB/index 준비는 별도 확인이 필요하다. 관련 TMI-14/116/128/217/125/220. 상세: DEPLOYMENT_PROD_TEST_ALIGNMENT.md.
+
+- 환경 정리 설명 턴 식별자를 WORKLOG에 보완했다. prod/test 기준과 보안/index 검증 유지 방향은 동일하며 실제 수정은 미실행이다. 관련 TMI-116/128/217/125/220/TMI-14. 이번 보완은 기록만 변경했다.
+
+- 환경 정리 설명: 사용자 기준은 prod/test 두 배포 환경이다. 현재 test 서버의 staging 프로필을 test로 정리하되 기존 보안/index 검증을 유지한다는 의미이며 새 환경을 추가하지 않는다. 실제 수정은 아직 미실행이다. 관련 TMI-116/128/217/125/220/TMI-14. 이번은 설명·기록만 수행했다.
+
+- prod/test 배포 환경 기준 정정 턴 식별자를 WORKLOG에 보완했다. 기존 인증/index 검증을 유지하며 환경 정합성을 맞추는 방향이고 실제 서버 설정은 변경하지 않았다. 관련 TMI-116/128/217/125/220/TMI-14. 이번 보완은 기록만 변경했다.
+
+- 사용자 환경 기준 정정: 배포 환경은 prod/test 두 개로 정리하며 staging을 별도 환경으로 유지하지 않는다. 따라서 test 서비스에 staging 허용 예외를 추가하는 방향이 아니라 test 프로필 정합성을 맞춘다. 현재 staging/prod에만 적용되는 인증·index 기동 검증, 기존 local/test 개발모드와 운영 도메인/배포 routing 영향을 먼저 검토해야 한다. 기존 staging 명칭 AWS 리소스를 prod로 추정하거나 즉시 변경하지 않는다. 이번은 기준 기록·정적 확인만 수행했다. 관련 TMI-116/128/217/125/220/TMI-14.
+
+- test ECS 조회 턴 식별자를 WORKLOG에 보완했다. 브라우저 접근은 복구됐으며 실제 staging 프로필과 exact test 활성화 조건의 불일치가 후속 검토 대상이다. 관련 TMI-116/128/217/125/220. 이번 보완은 기록만 변경했다.
+
+- 2026-10-16 브라우저 접근 복구·test ECS 읽기 확인: tosunsaeng-learning-core-test-service 활성/실행1/보류0·배포성공·ALB 정상1을 확인했다. 적용 task definition은 tosunsaeng-learning-core-test:35이며 Spring profile은 staging, DB명은 to-teacher-learning-core-test다. PaidExamTestActivation은 exact test만 허용하므로 현 구성은 활성화 불가다. saga/phone/reconciliation/outbox writer·publisher는 false, user-merged writer는 true이며 paid/JWT/access receiver/legacy 전용 환경변수는 표시 목록에 없다. 실제 DB/index/키/TLS는 미검증, 설정 변경 없음. 관련 TMI-116/128/217/125/220.
+
+- 브라우저 동시 사용 문의 턴 식별자를 WORKLOG에 보완했다. 다른 Codex 사용과 연결 오류의 인과관계는 미확인으로 유지하며 순차 재시도를 권장했다. 관련 TMI-116/128/217/125/220. 기록 외 변경 없음.
+
+- 브라우저 동시 사용 문의: 다른 Codex의 사용이 현재 오류 원인인지는 미확인이다. 관측된 오류는 request-header policy/Statsig timeout이며 탭 점유 오류로 단정하지 않는다. 다른 작업을 중단하거나 브라우저를 재시작하지 않았고, 사용 완료 후 순차 재시도로 구분할 수 있다. 관련 TMI-116/128/217/125/220.
+
+- 브라우저 연결 재확인 턴 식별자를 WORKLOG에 보완했다. Chrome은 실행 중이나 도구 연결 오류로 AWS 화면은 미확인이다. 관련 TMI-116/128/217/125/220. 이번 보완은 기록만 변경했다.
+
+- 브라우저 재확인: Chrome 실행 중임은 확인했다. 탭 없음으로 판단한 것이 아니라 도구의 request-header policy/Statsig timeout으로 탭 조회가 실패한 상태다. AWS 콘솔 내용은 미확인이고 기능/DB 변경 없음. 관련 TMI-116/128/217/125/220.
+
+- 실환경 접근 점검 턴 식별자를 WORKLOG에 보완했다. AWS 인증 부재·브라우저 연결 오류로 준비 점검은 미완료이며 연결 복구가 필요하다. 관련 TMI-116/128/217/125/220. 이번 보완은 기록만 변경했다.
+
+- 2026-10-16 실환경 준비 점검 시도: AWS profile 목록이 비어 있고 test ECS 제한 조회는 NoCredentials로 실패했다. 브라우저 콘솔 대체 경로도 request-header policy 로드 오류가 재발해 탭을 읽지 못했다. 실제 profile/legacy 목록/index/JWT/TLS 준비는 미확인이다. 사용자 AWS 인증 또는 브라우저 연결 복구 후 읽기 점검을 재개해야 하며 기능/DB/키/배포는 변경하지 않았다. 관련 TMI-116/128/217/125/220.
+
+- 2026-10-16 최종 전달 결과: PR #45(2e24f10)를 develop f41745a로 머지했고 test 자동배포38895660977이 최종 success다. 실제 기능 설정·키·DB 변경은 없으며 Billing 활성화/공동E2E는 미완료다. AWS 로컬 인증이 없어 실환경 준비 점검은 추가 접근이 필요하다. 전달 후 결과 기록만 로컬 미커밋으로 남긴다. 관련 TMI-116/128/217/125/220.
+
+- 2026-10-16 test 준비 전달 완료: 2e24f10 commit/push, PR #45 CI 재실행 성공 후 develop f41745a 머지. 자동배포38895660977 진행 중으로 최종 성공은 미확인이다. 최초 CI는 기존 AccessRevocationMongoTest 동시 동일event 사례1건 실패; 로컬 해당 클래스 및 동일commit CI 재실행은 통과했다. 로컬 AWS NoCredentials로 실제 ECS 설정 조회는 불가했고 기능/키/실DB는 변경하지 않았다. 관련 TMI-116/128/217/125/220.
+
 - 2026-10-16 전달 진행: 사용자 후속 승인으로 test 활성화 준비 변경의 commit/push/PR/develop 머지와 기존 test 자동배포를 진행한다. 기능 설정·실DB/목록/index·키 변경은 제외한다. 원격 develop과 기반 일치 확인, 사용자 DS_Store 제외. 관련 TMI-116/128/217/125/220.
 
 - 다음 작업 안내 턴의 WORKLOG 식별자 기록을 보완했다. test 준비 코드 미커밋·실환경 활성화 미실행 상태는 그대로이며, 후속은 기능 OFF 전달과 환경 준비 후 승인된 공동 테스트다. 관련 TMI-116/128/217/125/220. 이번 보완은 기록만 변경했다.
