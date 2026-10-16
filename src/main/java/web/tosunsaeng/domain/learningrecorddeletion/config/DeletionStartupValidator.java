@@ -3,7 +3,6 @@ package web.tosunsaeng.domain.learningrecorddeletion.config;
 import org.bson.Document;
 import org.springframework.beans.factory.InitializingBean;
 import org.springframework.core.env.Environment;
-import org.springframework.core.env.Profiles;
 import org.springframework.data.mongodb.core.MongoTemplate;
 import java.util.*;
 
@@ -13,7 +12,7 @@ public final class DeletionStartupValidator implements InitializingBean {
     private final Environment env;
     public DeletionStartupValidator(MongoTemplate mongo, Environment env) { this.mongo = mongo; this.env = env; }
     @Override public void afterPropertiesSet() {
-        if (env.acceptsProfiles(Profiles.of("staging", "prod")) && !"jwt".equals(env.getProperty("app.auth.mode"))) fail();
+        if (web.tosunsaeng.global.config.DeploymentEnvironment.restricted(env) && !"jwt".equals(env.getProperty("app.auth.mode"))) fail();
         Document topology = mongo.executeCommand(new Document("hello", 1));
         if (topology.get("logicalSessionTimeoutMinutes") == null
                 || (topology.get("setName") == null && !"isdbgrid".equals(topology.get("msg")))) fail();

@@ -95,4 +95,45 @@ class UserOwnedTransactionExecutorTest {
         mongoFailure.addLabel(MongoException.UNKNOWN_TRANSACTION_COMMIT_RESULT_LABEL);
         return new TransactionSystemException("commit result unknown", mongoFailure);
     }
+
+    @Test
+    void retryBackoffIsBoundedAndOnlyBetweenRetryableAttempts() {
+        var delays = new java.util.ArrayList<Long>();
+        var props = new UserMergedProperties(); props.setWriterEnabled(true);
+        var bounded = new UserOwnedTransactionExecutor(props, guardService, transactionProvider,
+                Clock.systemUTC(), delays::add);
+        var conflict = new MongoException(112, "write conflict");
+        conflict.addLabel(MongoException.TRANSIENT_TRANSACTION_ERROR_LABEL);
+        doThrow(conflict).when(transactions).execute(any());
+        assertThatThrownBy(() -> bounded.executeWithoutGuard(() -> "unused")).isSameAs(conflict);
+        assertThat(delays).containsExactly(25L, 50L);
+        verify(transactions, times(3)).execute(any());
+    }
+
+    @Test
+    void unknownCommitDoesNotWaitOrReplay() {
+        var delays = new java.util.ArrayList<Long>();
+        var props = new UserMergedProperties(); props.setWriterEnabled(true);
+        var bounded = new UserOwnedTransactionExecutor(props, guardService, transactionProvider,
+                Clock.systemUTC(), delays::add);
+        doThrow(unknownCommit()).when(transactions).execute(any());
+        assertThatThrownBy(() -> bounded.executeWithoutGuard(() -> "unused"))
+                .isInstanceOf(UserOwnedCommitOutcomeUnknownException.class);
+        assertThat(delays).isEmpty();
+        verify(transactions, times(1)).execute(any());
+    }
+
+    @Test
+    void interruptionStopsRetryAndRestoresInterruptFlag() {
+        var conflict = new MongoException(112, "write conflict");
+        conflict.addLabel(MongoException.TRANSIENT_TRANSACTION_ERROR_LABEL);
+        doThrow(conflict).when(transactions).execute(any());
+        Thread.currentThread().interrupt();
+        try {
+            assertThatThrownBy(() -> executor.executeWithoutGuard(() -> "unused"))
+                    .isInstanceOf(IllegalStateException.class).hasCauseInstanceOf(InterruptedException.class);
+            assertThat(Thread.currentThread().isInterrupted()).isTrue();
+            verify(transactions, times(1)).execute(any());
+        } finally { Thread.interrupted(); }
+    }
 }

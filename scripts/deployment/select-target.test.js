@@ -21,14 +21,16 @@ function values(result) {
     return [line.slice(0, i), line.slice(i + 1)];
   }));
 }
-test('main preserves existing service, role, URL and image aliases', () => {
+test('main selects prod but preserves existing service, role and verified URL', () => {
   const env = values(select('refs/heads/main'));
   assert.equal(env.ECS_SERVICE, 'tosunsaeng-learning-core-service');
   assert.equal(env.TASK_FAMILY, 'tosunsaeng-learning-core');
   assert.equal(env.CONTAINER_NAME, env.TASK_FAMILY);
   assert.equal(env.HEALTH_URL, 'https://api-staging.to-teacher.com/actuator/health');
   assert.equal(env.AWS_DEPLOY_ROLE_ARN, mainRole);
-  assert.equal(env.IMAGE_ALIAS, 'staging');
+  assert.equal(env.IMAGE_ALIAS, 'prod');
+  assert.equal(env.DEPLOY_TARGET, 'prod');
+  assert.equal(env.SPRING_DEPLOY_PROFILE, 'prod');
   assert.equal(env.IMAGE_TAG, sha);
 });
 test('develop uses only test targets including namespaced commit tag', () => {
@@ -39,6 +41,8 @@ test('develop uses only test targets including namespaced commit tag', () => {
   assert.equal(env.HEALTH_URL, 'https://api-test.to-teacher.com/actuator/health');
   assert.equal(env.AWS_DEPLOY_ROLE_ARN, testRole);
   assert.equal(env.IMAGE_ALIAS, 'test');
+  assert.equal(env.DEPLOY_TARGET, 'test');
+  assert.equal(env.SPRING_DEPLOY_PROFILE, 'test');
   assert.equal(env.IMAGE_TAG, `test-${sha}`);
 });
 for (const ref of ['refs/heads/feature/foo', 'refs/tags/main', 'refs/heads/devlop', '']) {
@@ -75,4 +79,6 @@ test('workflow uses selected target, preflights before push and deploys digest',
   assert.match(workflow, /\.family == \$family/);
   assert.ok(workflow.indexOf('name: Download current task definition') < workflow.indexOf('name: Build and push image'));
   assert.match(workflow, /@\$\{IMAGE_DIGEST\}/);
+  assert.match(workflow, /SPRING_PROFILES_ACTIVE=\$\{\{ env.SPRING_DEPLOY_PROFILE \}\}/);
+  assert.match(workflow, /APP_DEPLOYMENT_ENVIRONMENT=\$\{\{ env.DEPLOY_TARGET \}\}/);
 });

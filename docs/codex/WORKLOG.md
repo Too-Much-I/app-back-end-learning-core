@@ -15822,3 +15822,156 @@
 
 - 사용자 「어 해줘」로 안내한 코드 전달을 진행한다. feat/billing-paid-exam-test-activation 기반과 origin/develop 일치 확인 및 코드 검토. 사용자 DS_Store는 제외하며 기능 OFF·실DB/키/설정 불변으로 전달한다. 관련 TMI-116/128/217/125/220.
 - 앞선 전체 단위/Mongo/Node 검증 기록과 별개로 이번 전달 전 PaidExamTestActivationTest 및 bootJar를 재검증한다. PR CI 결과를 확인한 뒤 머지하며 실제 기능 활성화·공동 E2E 완료로 해석하지 않는다.
+
+- 전달 결과: PaidExamTestActivationTest/bootJar 재검증 성공 후2e24f10 commit/push·PR #45 생성/첨부. CI38894683398 최초 실행의 기존 AccessRevocationMongoTest.concurrentSameEventHasOneFactAndBothAcknowledge 1건 실패로 머지 보류했다. 제품/테스트 변경 없이 해당 클래스 로컬 격리Mongo 재실행과 동일commit CI attempt2가 모두 통과하여 develop f41745abd27688919cff3278846e8e83983b98eb로 머지했다. 동시성 실패 원인은 확정하지 않았다.
+- 선행 배포38893127747 최종success 확인. 이번 배포38895660977은 진행 중이며 기능 설정은 변경하지 않았다. 실제test ECS 서비스의 제한된 읽기 조회를 시도했으나 로컬 AWS NoCredentials로 실패했다. 실제 환경·목록/index·키 준비와 공동E2E는 미확인이다. 사용자DS_Store 보존, Secret/Token 미기록.
+
+## 2026-10-16 — test 준비 전달 최종 결과
+
+<!-- codex-turn:01a1447c-fdfe-7df3-a09f-864804491698 -->
+
+- 관련 TMI-116/128/217/125/220. commit2e24f10·PR #45·develop merge f41745abd27688919cff3278846e8e83983b98eb 전달 완료. CI38894683398 attempt2 성공 후 머지했으며 자동배포38895660977도 최종 success를 확인했다. 최초 기존 환불 동시성 테스트 실패 및 로컬/원격 재검증 내역은 위에 보존한다.
+- 실제 기능 설정·키·실DB/목록/index 변경과 Billing 공동E2E는 수행하지 않았다. 로컬 AWS 인증 부재로 실환경 준비 조회는 진행하지 못했으며 실제 활성화 완료를 주장하지 않는다. 사용자DS_Store 보존. 전달 후 결과 기록은 로컬에 남기며 추가 배포를 만들지 않는다. Secret/Token 미기록.
+
+## 2026-10-16 — 테스트 실환경 접근 재확인
+
+- 사용자 후속 요청에 AWS profile 목록과 test ECS 서비스 상태를 제한적으로 읽기 확인했다. profile 목록은 비었고 ECS 조회는 NoCredentials로 실패했다. 관련 TMI-116/128/217/125/220.
+- AWS 콘솔 대체 경로를 위해 브라우저 목록/탭 조회를 시도했으나 request-header policy 로드 오류가 두 번 발생했다. 콘솔 내용을 읽지 못했으며 인증·기능 설정을 변경하거나 키 값을 수집하지 않았다.
+- 실제 legacy 목록/index/JWT/TLS 준비 상태는 미확인으로 유지한다. 사용자 AWS 인증 또는 브라우저 연결 복구가 필요하다. 제품 코드·실DB·배포·commit/push·테스트 실행 없음. 기존 변경 보존, Secret/Token 미기록.
+
+## 2026-10-16 — 실환경 접근 점검 턴 식별자 보완
+
+<!-- codex-turn:01a14490-82f8-7bc0-8c6c-697060c69ba1 -->
+
+- 관련 TMI-116/128/217/125/220. test ECS 읽기 조회는 AWS NoCredentials로 실패했고 브라우저 대체 조회도 연결 오류로 실패했다. 실제 환경 준비 상태는 확인하지 못했으며 사용자 인증 또는 연결 복구가 필요하다.
+- 이번 보완은 작업 기록만 갱신한다. 기능 활성화·키·DB·배포·제품 코드 변경 없음. Secret/Token 미기록.
+
+## 2026-10-16 — 열린 브라우저와 연결 실패 구분
+
+- 사용자 브라우저 실행 확인에 따라 UI 연결을 다시 조회했다. Chrome isRunning=true를 확인했으며 request-header policy 로드 오류와 Statsig timeout 때문에 탭 내용은 읽지 못했다. 브라우저가 닫혔다는 의미가 아님을 정정했다. 관련 TMI-116/128/217/125/220.
+- AWS 콘솔·실환경 준비 상태는 미확인이다. 기록 외 코드/DB/설정/배포 변경 없음. Secret/Token 미기록.
+
+## 2026-10-16 — 브라우저 연결 재확인 턴 기록 보완
+
+<!-- codex-turn:01a14493-6ded-7fd3-9fc8-aad684a597c2 -->
+
+- 관련 TMI-116/128/217/125/220. Chrome 실행 상태는 확인했으나 도구의 request-header policy 오류/Statsig timeout으로 탭 조회가 실패했다. 브라우저 종료나 AWS 로그아웃을 확인한 것이 아님을 설명했다.
+- 이번 보완은 작업 기록만 갱신한다. AWS 콘솔 내용과 준비 상태는 미확인, 코드/DB/설정/배포 변경 없음. Secret/Token 미기록.
+
+## 2026-10-16 — 다른 Codex의 브라우저 사용과 오류 원인 구분
+
+- 사용자 동시 사용 문의에 현재 오류를 탭 점유 문제로 단정할 수 없다고 안내한다. 동일 화면을 동시 조작할 경우 상태 간섭 가능성과 관측된 request-header policy/Statsig timeout을 구분한다. 관련 TMI-116/128/217/125/220.
+- OpenAI Docs 지침에 따라 공식 문서 검색을 시도했으나 검색 도구가 오류를 반환해 제품의 동시 세션 동작을 공식 확인하지 못했다. 다른 Codex/브라우저를 중지하거나 재시작하지 않았다. 제품 코드/DB/배포 변경 및 Secret/Token 기록 없음.
+
+## 2026-10-16 — 브라우저 동시 사용 문의 턴 기록 보완
+
+<!-- codex-turn:01a14494-ec3a-7f31-9f53-ad1194e42914 -->
+
+- 관련 TMI-116/128/217/125/220. 동일 탭 동시 조작의 간섭 가능성과 현재 연결 초기화 오류를 구분해 설명했다. 다른 Codex 사용이 원인인지는 미확인이며 다른 작업 완료 후 순차 재시도를 권장했다.
+- 이번 보완은 기록만 변경한다. 브라우저/다른 Codex 중단·재시작, 제품 코드/DB/배포 변경 없음. Secret/Token 미기록.
+
+## 2026-10-16 — 브라우저 연결 복구 및 test 프로필 불일치 확인
+
+- 관련 TMI-116/128/217/125/220. 브라우저 탭 조회가 정상화됐다. 기존 CloudShell은 조작하지 않고 별도 임시 ECS 조회 탭을 사용했다. 동시 사용이 과거 오류의 원인이었다고 확정하지 않는다.
+- LC test 서비스 활성/실행1/보류0·배포성공·ALB 정상1, task definition tosunsaeng-learning-core-test:35를 UI에서 확인했다. Spring active profile은 staging, DB명은 to-teacher-learning-core-test다. 로컬 PaidExamTestActivation.java의 exact test 조건과 불일치하므로 현 상태에서는 활성화할 수 없다.
+- 표시된 환경변수에서 saga/phone/reconciliation/outbox writer·publisher false, user-merged writer true를 확인했다. paid 승인/JWT/access receiver/legacy 전용 환경변수는 목록에 없다. 별도 런타임 override 가능성과 실제 DB/index/키/TLS 준비는 아직 검증하지 않았다. Secret 값 조회·저장, 실환경 설정/DB/배포 변경 없음.
+- 프로필만 즉시 변경하면 기존 프로필별 안전 검증에도 영향을 줄 수 있으므로 임의 수정하지 않고 후속 설정 정합성 검토 대상으로 보고한다. 이번은 읽기 확인과 기록만 수행했다.
+
+## 2026-10-16 — test ECS 조회 턴 기록 보완
+
+<!-- codex-turn:01a14496-b375-74b0-bb3d-dc680dd00ec7 -->
+
+- 관련 TMI-116/128/217/125/220. 브라우저 연결 복구 후 LC test ECS 서비스 배포/헬스 정상과 task definition35를 읽기 확인했다. 실제 staging 프로필이 exact test 활성화 조건과 불일치함을 확인해 보완 필요성을 보고했다.
+- 이번 보완은 기록만 변경한다. 실제 설정/DB/키/배포 변경 및 Secret/Token 기록 없음. DB/index/TLS·공동E2E는 미검증이다.
+
+## 2026-10-16 — 배포 환경 prod/test 기준 정정
+
+- 사용자 「staging도 틀렸어 prod랑 test 이렇게 두개 해야 해」를 배포 환경 기준으로 기록했다. test 서비스의 staging 프로필을 정합하게 정리해야 하며 paid gate에 staging을 추가하는 해결책은 채택하지 않는다. 관련 TMI-116/128/217/125/220/TMI-14.
+- 정적 확인: AuthStartupValidator·ExamAssignmentIndexValidator에 staging/prod 전용 검증이 있고 배포 routing에 staging alias/health URL·기존 AWS 클러스터명이 남아 있다. 단순 문자열 치환이나 프로필만 변경하면 안전 검증/라우팅에 영향이 있으므로 후속 변경에서 함께 검토해야 한다. main 대상/기존 AWS 이름을 prod 실환경으로 단정하지 않는다.
+- 이번은 사용자 기준 반영·정적 확인과 기록만 수행했다. 제품 코드·실제 환경변수/리소스/DB/배포·commit/push 변경 및 테스트 재실행 없음. Secret/Token 미기록.
+
+## 2026-10-16 — prod/test 환경 정정 턴 기록 보완
+
+<!-- codex-turn:01a14498-9950-7c43-919a-2b3d197283e7 -->
+
+- 관련 TMI-116/128/217/125/220/TMI-14. 사용자 기준에 따라 배포 환경을 prod/test 두 개로 정리하고 staging 허용 예외를 추가하지 않는 방향을 기록했다. 기존 인증/index 검증과 배포 routing 영향은 후속 검토 대상이다.
+- 이번 보완은 기록만 변경한다. 실제 서버 설정·AWS 리소스·제품 코드·DB·배포 변경 없음. Secret/Token 미기록.
+
+## 2026-10-16 — prod/test 정리 의미 설명
+
+- 관련 TMI-116/128/217/125/220/TMI-14. 테스트 서버가 내부적으로 staging 프로필을 사용하는 현재 상태와 사용자가 지정한 prod/test 기준을 구분해 설명한다. test로 정리하면서 기존 보안/index 검사도 유지해야 한다는 뜻이며 환경을 추가하자는 제안이 아니다.
+- 이번은 설명·기록만 수행했다. 실제 서버 설정·코드·DB·배포 변경 없음. Secret/Token 미기록.
+
+## 2026-10-16 — 환경 정리 설명 턴 기록 보완
+
+<!-- codex-turn:01a1449a-5eb8-7612-9262-4f4e8b29eb31 -->
+
+- 관련 TMI-116/128/217/125/220/TMI-14. 테스트 서버의 내부 staging 프로필을 사용자 기준인 test로 정리하면서 기존 보안/index 검증을 유지해야 한다는 뜻을 설명했다. 운영은 prod이며 새 환경을 추가하자는 제안이 아니다.
+- 이번 보완은 기록만 변경한다. 실제 서버 설정·제품 코드·DB·배포 변경 없음. Secret/Token 미기록.
+
+## 2026-10-16 — prod/test 배포 프로필 정리 구현
+
+<!-- codex-turn:01a1449f-7efe-7803-b9de-0ff19190786d -->
+
+- 관련 TMI-14/116/128/217/125/220. feat/deployment-prod-test에서 DeploymentEnvironment와 명시 배포 target/profile/JWT 검증을 추가했다. main→prod/develop→test 렌더링과 서버 test의 기존 strict 인증·index·트랜잭션 검증을 연결했다. local/test 개발 호환과 기존 wire/fixtures를 유지한다.
+- 실제 리소스명/기존 main health URL은 유지하고 운영 주소 확인은 잔여로 명시했다. 사용자 DS_Store와 이전 기록 변경은 보존한다. 실DB/키/서버 설정·배포·commit/push는 수행하지 않는다. Secret/Token 미기록.
+
+- 최종 검증: `./gradlew test bootJar` 성공, 단위1,364 실패/오류0·기존skip1. `JAVA_TOOL_OPTIONS=-Dapi.version=1.44 ./gradlew mongoIntegrationTest` 성공,286 실패/오류/skip0. 배포Node16 통과·diff check 통과. 신규 배포 조건 테스트11개이며 실제 ECS/서버 기동·Billing 공동E2E는 아니다. 미커밋 상태로 전달한다.
+
+## 2026-10-16 — 기존 staging 보존 및 실제 배포 대상 확인
+
+- 관련 TMI-14/116/128/217/125/220. 사용자 우려에 run38895660977의 브랜치/commit과 실제 배포 로그를 읽기 확인했다. develop/f41745a, service=tosunsaeng-learning-core-test-service, family=tosunsaeng-learning-core-test, health=api-test였다. 기존 main/staging 서비스에 이번 변경을 배포한 것은 아니다.
+- 공용 클러스터 이름의 staging, test 태스크의 Spring staging 프로필, 실제 서비스 대상을 구분해 설명한다. 미커밋 로컬 main→prod 변경은 기존 대상의 의미를 바꿀 수 있어 기존 staging 보존 요구에 따라 전달/적용을 보류한다. 운영 대상을 확인하기 전에 main을 prod로 간주했던 판단은 정정한다.
+- 이번은 읽기 확인·기록만 수행했다. 추가 코드/서버 설정/DB/배포 변경 없음. Secret/Token 미기록.
+
+## 2026-10-16 — 기존 staging 보존 확인 턴 기록 보완
+
+<!-- codex-turn:01a144a4-b092-7ee0-a174-3f445757d9f4 -->
+
+- 관련 TMI-14/116/128/217/125/220. 완료 배포 로그에서 develop/f41745a의 대상이 별도 LC test 서비스·test task family·api-test임을 확인했다. 기존 main/staging 서비스 대상 배포가 아님을 설명했다.
+- 미커밋 main→prod 변경은 성급한 대상 해석으로 정정하고 전달/적용을 보류한다. 이번 보완은 기록만 변경하며 서버 설정·DB·배포 및 Secret/Token 기록 없음.
+
+## 2026-10-16 — Spring 프로필과 배포 대상 차이 설명
+
+- 관련 TMI-14/116/128/217/125/220. 프로필은 실행 시 설정/검증/bean 선택에 쓰는 이름이며 ECS 배포 서비스나 DB 주소 자체가 아님을 설명한다. 실제 test 서비스에서 staging 프로필을 쓰는 현재 상태를 구분하고 프로필 변경이 다른 서버를 자동 변경하지 않는다고 안내한다.
+- 이번은 설명과 기록만 수행했다. 제품 코드/실환경 설정/DB/배포 변경 및 Secret/Token 기록 없음.
+
+## 2026-10-16 — 프로필 설명 턴 기록 보완
+
+<!-- codex-turn:01a144a6-fc7b-7410-b8a1-0d546859acc1 -->
+
+- 관련 TMI-14/116/128/217/125/220. Spring 프로필은 실행 설정 선택이며 실제 ECS 배포 대상과 별개임을 설명했다. test 서비스의 staging 프로필을 기존 staging 서버 배포로 해석하지 않도록 구분했다.
+- 이번 보완은 기록만 변경한다. 제품 코드·실환경 설정·DB·배포 변경 없음. Secret/Token 미기록.
+
+## 2026-10-16 — main/prod 매핑 재확인 및 test 전달 순서 안내
+
+- 관련 TMI-14/116/128/217/125/220. 사용자 main→prod 매핑이 맞다는 확인을 접수했다. 해당 매핑 보류는 해소하되 기존 서비스/도메인 변경으로 확대하지 않는다. 현재 브랜치 미커밋 상태와 실행 기록을 확인했다.
+- 다음 단계는 develop 대상 커밋/푸시/PR/머지 후 test 프로필·명시 배포 환경·JWT·필수 index/Transaction probe·health 검증이다. Billing 기능은 켜지 않으며 실제 Billing 연동 검증 준비 완료와 구분한다. 이번 질문에 실제 전달/배포는 수행하지 않았다. Secret/Token 미기록.
+
+## 2026-10-16 — test 전달 순서 안내 턴 기록 보완
+
+<!-- codex-turn:01a144a8-04dc-7bd0-bbf5-0ef64cfffe07 -->
+
+- 관련 TMI-14/116/128/217/125/220. 사용자 main→prod 매핑 재확인을 기록하고 develop 전달 후 test 프로필·인증·index·트랜잭션·health 검증 순서를 안내했다. Billing 기능 활성화와는 구분한다.
+- 이번 보완은 기록만 변경한다. 실제 commit/push/머지·서버 설정·DB·배포 변경 없음. Secret/Token 미기록.
+
+## 2026-10-16 — prod/test 정리 develop 전달 및 test 적용 확인
+
+- 관련 TMI-14/116/128/217/125/220. 사용자 후속 요청으로 commit/push/PR/develop 머지·test 자동배포와 기동 확인을 진행한다. main 배포·Billing 기능 활성화·DB/index 설치는 제외한다.
+- 원격 develop f41745a와 차이는 선행 PR merge commit1개뿐임을 확인하고 fast-forward했다. 사용자 DS_Store 및 기존 기록은 보존한다. 전달 전 DeploymentEnvironmentTest/bootJar·배포Node 회귀를 재검증한다. Secret/Token 미기록.
+
+## 2026-10-16 — prod/test 전달 결과 및 CI 실패 보류
+
+<!-- codex-turn:01a144a8-dd0a-7790-b61d-20ae7035f5e0 -->
+
+- 관련 TMI-14/116/128/217/125/220. 전달 전 DeploymentEnvironmentTest/bootJar·배포Node16 통과 후39a785e commit/push·PR #46 생성/첨부 완료. 사용자 DS_Store 제외. develop은 f41745a 기반이다.
+- CI38900049735 attempt1은 기존 LearningQuotaTransactionTest.concurrentServiceReplayChargesOneSubmissionEvenAtTheDailyLimit에서 ExecutionException/DataIntegrityViolationException/MongoCommandException1건 실패했다. 로컬 격리 해당 클래스 재실행은 통과했다. 같은commit 실패job을1회 재실행한 attempt2는 기존 AccessRevocationMongoTest.concurrentSameEventHasOneFactAndBothAcknowledge의77행 assertion1건 실패했다. 각 Mongo286 중1건 실패이며 원인을 확정하지 않는다.
+- CI 실패를 우회하거나 추가 반복 재실행하지 않고 PR 상태로 중단한다. develop 머지·이번 test 배포·main 배포·Billing 활성화·실DB/index 변경 없음. 별도 기존 동시성 문제 진단/수정과 재검증이 필요하다. 결과 기록은 로컬 미커밋으로 남기며 Secret/Token 미기록.
+
+## 2026-10-16 — PR #46 동시성 재현 및 보완
+
+- 관련 TMI-14/116/128/217/125/220. 사용자 후속 승인으로 두 실패를 각각20회 반복했다. 수정 전 LearningQuota3/20은 TransientTransactionError label의 Mongo WriteConflict112, AccessRevocation4/20은 expected204/actual409로 재현했다. 테스트 완화나 skip 없이 반복을 회귀로 유지한다.
+- owner Transaction3회 즉시 재시도 소진을 방지하도록 실패 Transaction 종료 후25/50ms 대기를 추가했다. 시도 수/unknown commit/owner deny 의미는 유지하며 interrupt는 복구하고 재시도를 중단한다. 환불 fresh 조회 사이 commit된 동일event는 group 문서의 eventId/digest를 확인해 중복으로 수렴하고 다른내용/다른event 충돌은 유지한다.
+- 결정적 fresh 조회 경합3개 및 bounded backoff/unknown/no replay/interrupt 검증을 추가했다. 수정 후 대상 단위·격리Mongo51개 통과, 전체 clean 검증 진행 중이다. 실DB/키/기능flag 변경 없음. Secret/Token 미기록.
+
+- 전체 clean test/mongoIntegrationTest/bootJar 통과 및 배포Node16/diff 검사 통과. 수정과 회귀를 기존 PR #46에 추가 전달하고 CI 성공 후 develop 머지/test 배포를 재개한다.

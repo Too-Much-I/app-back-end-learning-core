@@ -1,4 +1,4 @@
-name: Deploy Learning Core (main / develop)
+name: Deploy Learning Core (prod / test)
 
 on:
   push:
@@ -154,6 +154,9 @@ jobs:
           task-definition: task-definition.json
           container-name: ${{ env.CONTAINER_NAME }}
           image: ${{ steps.image.outputs.image_uri }}
+          environment-variables: |
+            SPRING_PROFILES_ACTIVE=${{ env.SPRING_DEPLOY_PROFILE }}
+            APP_DEPLOYMENT_ENVIRONMENT=${{ env.DEPLOY_TARGET }}
 
       - name: Deploy to Amazon ECS
         uses: aws-actions/amazon-ecs-deploy-task-definition@v2

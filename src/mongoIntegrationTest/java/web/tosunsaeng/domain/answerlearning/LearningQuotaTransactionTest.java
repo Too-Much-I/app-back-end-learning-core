@@ -69,7 +69,7 @@ class LearningQuotaTransactionTest {
             return Arrays.asList(a.get(15, TimeUnit.SECONDS), b.get(15, TimeUnit.SECONDS));
         }
     }
-    @Test void concurrentServiceReplayChargesOneSubmissionEvenAtTheDailyLimit() throws Exception {
+    @RepeatedTest(20) void concurrentServiceReplayChargesOneSubmissionEvenAtTheDailyLimit() throws Exception {
         var gate = new CyclicBarrier(2);
         var catalog = mock(LearningCatalog.class);
         doAnswer(i -> { gate.await(10, TimeUnit.SECONDS); return null; }).when(catalog).version("v1");

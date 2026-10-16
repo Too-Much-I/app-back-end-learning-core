@@ -5,9 +5,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.bson.Document;
 import org.springframework.boot.ApplicationArguments;
 import org.springframework.boot.ApplicationRunner;
-import org.springframework.context.annotation.Profile;
 import org.springframework.core.env.Environment;
-import org.springframework.core.env.Profiles;
 import org.springframework.data.domain.Sort;
 import org.springframework.data.mongodb.core.MongoTemplate;
 import org.springframework.data.mongodb.core.index.IndexField;
@@ -22,7 +20,7 @@ import java.util.Objects;
 
 @Slf4j
 @Component
-@Profile("!test")
+@org.springframework.context.annotation.Conditional(web.tosunsaeng.global.config.DeploymentEnvironment.IndexChecks.class)
 @RequiredArgsConstructor
 public class ExamAssignmentIndexValidator implements ApplicationRunner {
 
@@ -30,14 +28,13 @@ public class ExamAssignmentIndexValidator implements ApplicationRunner {
     public static final String COMPLETION_LOOKUP_INDEX = "idx_exam_sessions_user_completed_mock_exam";
     public static final String MOCK_EXAM_ID_INDEX = "uniq_mock_exams_mock_exam_id";
 
-    private static final Profiles STAGING_OR_PROD = Profiles.of("staging", "prod");
 
     private final MongoTemplate mongoTemplate;
     private final Environment environment;
 
     @Override
     public void run(ApplicationArguments args) {
-        boolean failClosed = environment.acceptsProfiles(STAGING_OR_PROD);
+        boolean failClosed = web.tosunsaeng.global.config.DeploymentEnvironment.restricted(environment);
         try {
             validateIndexes(failClosed);
         } catch (RuntimeException inspectionFailure) {

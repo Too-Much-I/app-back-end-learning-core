@@ -3,9 +3,7 @@ package web.tosunsaeng.domain.withdrawal.config;
 import org.springframework.boot.ApplicationArguments;
 import org.springframework.boot.ApplicationRunner;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnExpression;
-import org.springframework.context.annotation.Profile;
 import org.springframework.core.env.Environment;
-import org.springframework.core.env.Profiles;
 import org.springframework.data.domain.Sort;
 import org.springframework.data.mongodb.core.MongoTemplate;
 import org.springframework.data.mongodb.core.index.Index;
@@ -18,14 +16,13 @@ import java.time.Duration;
 import java.util.List;
 
 @Component
-@Profile("!test")
+@org.springframework.context.annotation.Conditional(web.tosunsaeng.global.config.DeploymentEnvironment.IndexChecks.class)
 @ConditionalOnExpression("${app.user-withdrawn.consumer-enabled:false} || "
         + "${app.user-withdrawn.deny-gate-enabled:false}")
 public class UserWithdrawnIndexValidator implements ApplicationRunner {
 
     public static final String INBOX_TTL_INDEX = "ttl_user_withdrawn_inbox_cleanup";
     public static final String DENY_TTL_INDEX = "ttl_withdrawn_user_access_deny_expire";
-    private static final Profiles STAGING_OR_PROD = Profiles.of("staging", "prod");
 
     private final MongoTemplate mongoTemplate;
     private final Environment environment;
@@ -42,7 +39,7 @@ public class UserWithdrawnIndexValidator implements ApplicationRunner {
 
     @Override
     public void run(ApplicationArguments args) {
-        if (environment.acceptsProfiles(STAGING_OR_PROD)) {
+        if (web.tosunsaeng.global.config.DeploymentEnvironment.restricted(environment)) {
             validateExisting(WithdrawnUserAccessDeny.class, DENY_TTL_INDEX, "expireAt");
             if (properties.isConsumerEnabled()) {
                 validateExisting(UserWithdrawnEventInbox.class, INBOX_TTL_INDEX, "cleanupAt");

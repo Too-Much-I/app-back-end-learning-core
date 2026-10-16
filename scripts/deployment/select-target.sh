@@ -4,11 +4,11 @@ set -euo pipefail
 # Emit only fixed deployment settings and a validated role ARN to GITHUB_ENV.
 case "${GITHUB_REF:-}" in
   refs/heads/main)
-    target=main
+    target=prod
     service=tosunsaeng-learning-core-service
     family=tosunsaeng-learning-core
     health=https://api-staging.to-teacher.com/actuator/health
-    alias=staging
+    alias=prod
     tag="${GITHUB_SHA:-}"
     role="${MAIN_ROLE_ARN:-}"
     ;;
@@ -37,5 +37,6 @@ if [[ ! "$role" =~ ^arn:aws:iam::[0-9]{12}:role/[A-Za-z0-9_+=,.@/-]+$ ]]; then
   exit 1
 fi
 printf '%s\n' "DEPLOY_TARGET=$target" "ECS_SERVICE=$service" \
+  "SPRING_DEPLOY_PROFILE=$target" \
   "TASK_FAMILY=$family" "CONTAINER_NAME=$family" "HEALTH_URL=$health" \
   "IMAGE_ALIAS=$alias" "IMAGE_TAG=$tag" "AWS_DEPLOY_ROLE_ARN=$role"

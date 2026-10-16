@@ -3,13 +3,11 @@ package web.tosunsaeng.domain.exams.billing;
 import org.springframework.boot.ApplicationArguments;
 import org.springframework.boot.ApplicationRunner;
 import org.springframework.core.env.Environment;
-import org.springframework.core.env.Profiles;
 
 import java.net.URI;
 
 public class BillingSagaConfigurationValidator implements ApplicationRunner {
 
-    private static final Profiles STAGING_OR_PROD = Profiles.of("staging", "prod");
 
     private final BillingSagaProperties properties;
     private final Environment environment;
@@ -33,7 +31,7 @@ public class BillingSagaConfigurationValidator implements ApplicationRunner {
             return;
         }
         URI baseUri = parseBaseUri(properties.getBaseUrl());
-        if (environment.acceptsProfiles(STAGING_OR_PROD)
+        if (web.tosunsaeng.global.config.DeploymentEnvironment.restricted(environment)
                 && !"https".equalsIgnoreCase(baseUri.getScheme())) {
             throw new IllegalStateException("Billing base URL must use HTTPS in staging/prod");
         }

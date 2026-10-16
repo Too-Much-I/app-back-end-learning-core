@@ -10,6 +10,7 @@ import web.tosunsaeng.domain.usermerge.config.UserMergedProperties;
 
 import java.time.Clock;
 import java.util.function.Supplier;
+import java.util.function.LongConsumer;
 
 public class UserOwnedTransactionExecutor {
 
@@ -19,6 +20,7 @@ public class UserOwnedTransactionExecutor {
     private final UserOwnershipGuardService guardService;
     private final ObjectProvider<TransactionOperations> transactionProvider;
     private final Clock clock;
+    private final LongConsumer retryPause;
 
     @org.springframework.beans.factory.annotation.Autowired(required = false)
     private web.tosunsaeng.domain.learningrecorddeletion.application.DeletionAccess deletionAccess;
@@ -29,10 +31,16 @@ public class UserOwnedTransactionExecutor {
             ObjectProvider<TransactionOperations> transactionProvider,
             Clock clock
     ) {
+        this(properties, guardService, transactionProvider, clock, UserOwnedTransactionExecutor::pause);
+    }
+
+    UserOwnedTransactionExecutor(UserMergedProperties properties, UserOwnershipGuardService guardService,
+            ObjectProvider<TransactionOperations> transactionProvider, Clock clock, LongConsumer retryPause) {
         this.properties = properties;
         this.guardService = guardService;
         this.transactionProvider = transactionProvider;
         this.clock = clock;
+        this.retryPause = retryPause;
     }
 
     public boolean enabled() {
@@ -116,6 +124,9 @@ public class UserOwnedTransactionExecutor {
                         || failureKind != TransactionFailureKind.TRANSIENT_RETRYABLE) {
                     throw failure;
                 }
+                // The failed transaction has exited. Let the competing owner transaction commit
+                // before opening a new one; retain the existing three-attempt bound.
+                retryPause.accept(25L << (attempt - 1));
             }
         }
         throw lastFailure == null
@@ -147,6 +158,15 @@ public class UserOwnedTransactionExecutor {
         return retryable
                 ? TransactionFailureKind.TRANSIENT_RETRYABLE
                 : TransactionFailureKind.NON_RETRYABLE;
+    }
+
+    private static void pause(long millis) {
+        try {
+            Thread.sleep(millis);
+        } catch (InterruptedException interrupted) {
+            Thread.currentThread().interrupt();
+            throw new IllegalStateException("User-owned transaction retry interrupted", interrupted);
+        }
     }
 
     private enum TransactionFailureKind {

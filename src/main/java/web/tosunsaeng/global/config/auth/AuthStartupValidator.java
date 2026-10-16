@@ -17,7 +17,6 @@ import java.util.Set;
 public class AuthStartupValidator implements InitializingBean, SmartInitializingSingleton {
 
     private static final Profiles LOCAL_OR_TEST = Profiles.of("local", "test");
-    private static final Profiles STAGING_OR_PROD = Profiles.of("staging", "prod");
     private static final Set<String> LOCAL_HOSTS = Set.of("localhost", "0.0.0.0", "::1", "[::1]");
     private static final Set<String> AUDIENCE_PLACEHOLDERS = Set.of(
             "change-me",
@@ -44,7 +43,7 @@ public class AuthStartupValidator implements InitializingBean, SmartInitializing
     public void afterPropertiesSet() {
         validateRawAuthMode();
 
-        boolean restrictedProfile = environment.acceptsProfiles(STAGING_OR_PROD);
+        boolean restrictedProfile = web.tosunsaeng.global.config.DeploymentEnvironment.restricted(environment);
         if (authProperties.getMode() == AuthMode.LEGACY) {
             if (restrictedProfile) {
                 throw new IllegalStateException("staging and prod profiles require jwt authentication mode");
@@ -78,7 +77,7 @@ public class AuthStartupValidator implements InitializingBean, SmartInitializing
 
     @Override
     public void afterSingletonsInstantiated() {
-        if (!environment.acceptsProfiles(STAGING_OR_PROD)) {
+        if (!web.tosunsaeng.global.config.DeploymentEnvironment.restricted(environment)) {
             return;
         }
 

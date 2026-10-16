@@ -91,8 +91,15 @@ public final class AccessRevocationStore {
             if(!e.digest().equals(byEvent.getString("digest"))) throw new AccessEventFailure(409,"EVENT_ID_CONFLICT");
             return true;
         }
-        if(collection.find(base().append("attemptGroupId",e.attemptGroupId())).first()!=null)
+        Document byGroup=collection.find(base().append("attemptGroupId",e.attemptGroupId())).first();
+        if(byGroup!=null) {
+            // A fresh read is not one snapshot: the same event may commit between these two queries.
+            if(e.eventId().equals(byGroup.getString("eventId"))) {
+                if(!e.digest().equals(byGroup.getString("digest"))) throw new AccessEventFailure(409,"EVENT_ID_CONFLICT");
+                return true;
+            }
             throw new AccessEventFailure(409,"GROUP_REVOKE_CONFLICT");
+        }
         return false;
     }
     /** Must run within the caller's owner transaction before pending insert/final activation. */

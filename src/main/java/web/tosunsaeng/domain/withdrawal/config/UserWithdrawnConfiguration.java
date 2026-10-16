@@ -8,7 +8,6 @@ import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.Import;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnExpression;
 import org.springframework.core.env.Environment;
-import org.springframework.core.env.Profiles;
 import org.springframework.data.mongodb.MongoDatabaseFactory;
 import org.springframework.data.mongodb.MongoTransactionManager;
 import org.springframework.transaction.support.TransactionOperations;
@@ -42,7 +41,6 @@ import io.micrometer.core.instrument.MeterRegistry;
 @Import(ClockConfiguration.class)
 public class UserWithdrawnConfiguration {
 
-    private static final Profiles STAGING_OR_PROD = Profiles.of("staging", "prod");
 
     @Bean
     public UserWithdrawnConfigurationValidator userWithdrawnConfigurationValidator(
@@ -52,7 +50,7 @@ public class UserWithdrawnConfiguration {
         return new UserWithdrawnConfigurationValidator(
                 properties,
                 authProperties,
-                environment.acceptsProfiles(STAGING_OR_PROD)
+                web.tosunsaeng.global.config.DeploymentEnvironment.restricted(environment)
         );
     }
 

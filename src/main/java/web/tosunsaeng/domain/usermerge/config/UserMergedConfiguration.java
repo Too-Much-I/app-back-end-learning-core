@@ -8,7 +8,6 @@ import org.springframework.boot.context.properties.EnableConfigurationProperties
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.core.env.Environment;
-import org.springframework.core.env.Profiles;
 import org.springframework.data.mongodb.MongoDatabaseFactory;
 import org.springframework.data.mongodb.MongoTransactionManager;
 import org.springframework.data.mongodb.core.MongoTemplate;
@@ -47,7 +46,6 @@ import web.tosunsaeng.global.config.ClockConfiguration;
 @Import(ClockConfiguration.class)
 public class UserMergedConfiguration {
 
-    private static final Profiles STAGING_OR_PROD = Profiles.of("staging", "prod");
 
     @Bean
     public UserMergedConfigurationValidator userMergedConfigurationValidator(
@@ -56,7 +54,7 @@ public class UserMergedConfiguration {
     ) {
         return new UserMergedConfigurationValidator(
                 properties,
-                environment.acceptsProfiles(STAGING_OR_PROD)
+                web.tosunsaeng.global.config.DeploymentEnvironment.restricted(environment)
         );
     }
 

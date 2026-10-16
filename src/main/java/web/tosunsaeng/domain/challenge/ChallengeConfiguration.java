@@ -5,7 +5,6 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.annotation.*;
 import org.springframework.core.env.Environment;
-import org.springframework.core.env.Profiles;
 import org.springframework.data.mongodb.MongoDatabaseFactory;
 import org.springframework.data.mongodb.core.MongoTemplate;
 import software.amazon.awssdk.services.s3.S3Client;
@@ -42,13 +41,13 @@ public class ChallengeConfiguration {
         return new ChallengeCallbackService(store, tx, clock, metrics);
     }
     @Bean public ChallengeAiClient challengeAiClient(ChallengeProperties properties, Environment environment) {
-        properties.validate(environment.acceptsProfiles(Profiles.of("staging", "prod")));
+        properties.validate(web.tosunsaeng.global.config.DeploymentEnvironment.restricted(environment));
         return new ChallengeAiClient(properties.getAiEndpoint(), properties.getOutboundCredential());
     }
     @Bean public ChallengeStartupValidator challengeStartupValidator(ChallengeStore store, ChallengeTransactions tx, ChallengeCatalog catalog,
                                                                     ChallengeProperties properties, Environment environment) {
         ChallengeStartupValidator validator = new ChallengeStartupValidator(store, tx, catalog);
-        properties.validate(environment.acceptsProfiles(Profiles.of("staging", "prod")));
+        properties.validate(web.tosunsaeng.global.config.DeploymentEnvironment.restricted(environment));
         validator.validate(); return validator;
     }
     @Bean @DependsOn("challengeStartupValidator")

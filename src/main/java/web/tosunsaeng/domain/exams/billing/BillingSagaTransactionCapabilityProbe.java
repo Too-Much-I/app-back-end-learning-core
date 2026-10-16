@@ -6,7 +6,6 @@ import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.boot.ApplicationArguments;
 import org.springframework.boot.ApplicationRunner;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
-import org.springframework.context.annotation.Profile;
 import org.springframework.data.mongodb.core.MongoTemplate;
 import org.springframework.data.mongodb.core.query.Criteria;
 import org.springframework.data.mongodb.core.query.Query;
@@ -19,7 +18,7 @@ import java.util.UUID;
 
 @Slf4j
 @Component
-@Profile({"staging", "prod"})
+@org.springframework.context.annotation.Conditional(web.tosunsaeng.global.config.DeploymentEnvironment.Restricted.class)
 @ConditionalOnProperty(
         prefix = "app.billing",
         name = "creation-saga-enabled",
