@@ -31,6 +31,7 @@ RUN groupadd --system app \
 WORKDIR /app
 
 COPY --from=builder --chown=app:app /workspace/app.jar /app/app.jar
+COPY --chown=app:app scripts/deployment/access-events-entrypoint.sh /app/access-events-entrypoint.sh
 
 USER app
 
@@ -40,4 +41,5 @@ ENV JAVA_TOOL_OPTIONS="-XX:+UseContainerSupport -XX:MaxRAMPercentage=75.0"
 
 STOPSIGNAL SIGTERM
 
-ENTRYPOINT ["java", "-jar", "/app/app.jar"]
+ENTRYPOINT ["sh", "/app/access-events-entrypoint.sh"]
+CMD ["java", "-jar", "/app/app.jar"]

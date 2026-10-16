@@ -1,5 +1,14 @@
 # 프로젝트 목적
 
+## 2026-10-16 LC test TLS 코드 전달 승인
+
+- 사용자 「어 해줘」로 TLS 주입 코드의 commit/push/PR/develop 머지 및 기존 test 자동 배포·확인을 승인했다. 기능 OFF와 기존 서버 설정을 유지한다. main/prod·네트워크·DB/index 변경 및 기능 활성화는 제외한다. 사용자 DS_Store는 전달하지 않는다.
+
+## 2026-10-16 LC test 환불 TLS 준비 승인
+
+- 사용자 후속 요청으로 LC test 환불 수신 TLS의 파일 주입 준비·격리 검증을 진행한다. 적용 직전 별도 응답으로 테스트 전용 인증서/PKCS12 생성, `tosunsaeng/test/learning-core/access-events-tls` Secret 저장 및 LC test 실행 역할의 해당1개 읽기 권한 추가를 승인했다. 실제 권한 적용은 exact ARN 확인 후 수행한다.
+- 기존 운영/Billing 키·네트워크 공개범위·feature OFF 상태는 변경하지 않는다. 이 승인은 ALB/SG 접근 확대·Billing 발신 변경·실DB/index 설치·paid 활성화나 commit/push 승인이 아니다. 비밀값은 저장소/채팅/로그에 기록하지 않는다.
+
 ## 2026-10-16 PR #46 동시성 보완 승인
 
 - 사용자 후속 「어 해줘」로 CI에서 재현된 학습 사용량·환불 중복 동시성의 진단/보완·격리 검증 및 기존 PR 전달/머지/test 배포 재개를 승인했다. 재시도 상한·unknown commit 비재실행·owner/중복 충돌 의미는 유지한다. main 배포·Billing 활성화·실DB/index 설치는 제외한다.

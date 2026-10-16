@@ -1,5 +1,37 @@
 # Learning Core Current State
 
+- TLS 코드 전달 승인 접수: 최신 origin/develop d02fe0f에서 feat/lc-test-access-tls 생성, 기존 변경 보존. Node30개/shell syntax/diff 통과, PR CI 후 develop 머지·test 자동 배포 확인을 진행한다. 기능 OFF·서버 설정 유지, main/prod·네트워크·DB 변경 제외. 관련 TMI-116/TMI-128/TMI-217/TMI-125/TMI-220.
+
+- TLS 배포 준비 턴 식별자를 WORKLOG에 보완했다. Node30개 통과·전달/머지 및 test 자동배포 승인 확인 대기 상태는 동일하며 추가 서버 변경 없음. 관련 TMI-116/TMI-128/TMI-217/TMI-125/TMI-220.
+
+- TLS 후속 배포 준비: Node 배포 테스트30개 재통과, ECS secrets 두 필드/alias 매핑과 OFF 검증 한계를 준비 문서에 정리했다. 새 entrypoint는 로컬 미커밋이며 이번 변경의 commit/push/PR/develop 머지·자동 test 배포 승인을 확인해야 한다. 추가 AWS/DB/네트워크/활성화 변경 없음. 관련 TMI-116/TMI-128/TMI-217/TMI-125/TMI-220.
+
+- TLS 준비 완료 턴의 WORKLOG 식별자 보완 완료. 저장 확인·한정 읽기 권한 적용 완료 상태는 아래와 같으며 추가 서버 변경·배포·활성화는 없다. 관련 TMI-116/TMI-128/TMI-217/TMI-125/TMI-220.
+
+- 2026-10-16 LC test TLS Secret 저장·IAM 완료: 사용자 저장 후 exact Secret 및 필수 두 필드 존재 확인. 실행 역할에 LearningCoreTestAccessTlsRead로 해당 Secret 하나 GetSecretValue만 추가·재조회했고 기존 네 정책 보존. 아래 Secret/IAM 대기 기록은 해소됐다. 실제 TLS Secret 주입·새 이미지 배포·네트워크/DB/index·활성화·공동E2E는 미실행, task37 기능 OFF 유지. 관련 TMI-116/TMI-128/TMI-217/TMI-125/TMI-220.
+
+- 2026-10-16 LC TLS 주입 코드 로컬 준비: shell entrypoint/Dockerfile 및 신규14개 포함 Node30개 통과, 기존 LC 이미지 network-none·비root smoke 성공. 사용자 승인 후 테스트 TLS 인증서/PKCS12 생성·암호 검증 완료, 비밀 JSON은 제한된 로컬 임시파일에 보존. Secret 생성 화면까지 열었으나 native Terminal 접근 안전 제한으로 비밀값을 입력하지 못해 사용자 직접 입력/저장 인계 상태다. 실제 Secret/IAM 추가·네트워크/DB/재배포·활성화 없음; 서버 task37 OFF 유지. 관련 TMI-116/TMI-128/TMI-217/TMI-125/TMI-220. 상세 LC_BILLING_TEST_CONNECTION_PREPARATION.md.
+
+- LC test task37 설정 배포 완료: 2026-10-16 22:20 KST, 서비스 실행1/보류0·배포성공·ALB 정상1/비정상0, 교체 후health200·무인증history401. 공개키/scope·발신 Secret 참조/URL 등록과 기동까지 완료했으며 sender/receiver/paid는 OFF다. TLS·legacy/index·양측 서명 HTTP/E2E는 남는다. 운영/Billing/Identity·DB 변경 없음. 관련 TMI-116/TMI-128/TMI-217/TMI-125/TMI-220.
+
+- 2026-10-16 LC test task37 등록 및 설정 배포 진행: 기존 이미지/환경·Secret 보존 후 Billing URL/env·환불 공개키/scope 및 발신키 Secret 참조를 추가했다. sender/receiver/paid 모두 OFF. 새 task RUNNING 및 Started 로그 확인, 최종 ALB/교체 완료는 확인 중이다. 실제 Java verifier의 수정 공개키 파싱·malformed401은 통과했으며 서명 HTTP/E2E는 미검증. TLS/legacy/index·Billing 발신 준비는 남고 DB·운영/기존 별도 서비스는 변경하지 않았다. 관련 TMI-116/TMI-128/TMI-217/TMI-125/TMI-220.
+
+- 2026-10-16 환불 공개키 수정본 수락: key_ops=["verify"] 누락 해소, 단일 RSA3072/RS256·허용 공개 필드·기존 kid 확인. 667 bytes/SHA-256 8ff85f90bd0d00bdcf69a25b8d0ad3996b761934cc1e52ef6a318a2947d4feb9. 계산 SPKI 지문은 인계서와 일치한다. scope=tosunsaeng-billing-test/test 등록 후보로 수락하며 실제 Java/HTTP 검증·서버 등록/TLS/DB/배포는 미실행이다. 관련 TMI-116/TMI-217/TMI-220. 이전 누락에 따른 보류는 이 수정본에 한해 해소됐다.
+
+- 2026-10-16 역방향 환불 공개키 접수: RSA3072/RS256·단일 공개키·비밀필드 부재 및 인계서 test issuer/sub/audience 정합성을 확인했다. scope는 tosunsaeng-billing-test. 다만 key_ops=["verify"]가 누락돼 현 LC verifier의 필수 구성 검증을 통과할 수 없으므로 등록 보류다. 동일 키의 공개 JWK 메타데이터 보완/새 hash 확인 필요. 원본·코드·서버·DB·권한 변경 없음. 관련 TMI-116/TMI-217/TMI-220.
+
+- LC test 서명키 준비의 턴 식별자 기록을 보완했다. 단일 키 읽기 권한 적용·공개 구성요소 일치 확인까지 완료했으며 ECS 주입/HTTP 검증·역방향 수신·DB 준비·활성화는 미완료다. 관련 TMI-116/TMI-128/TMI-217/TMI-125/TMI-220. 이번 보완은 문서 기록만 변경했다.
+
+- 2026-10-16 LC test 키 준비: 적용 직전 사용자 승인 후 실행 역할에 LearningCoreTestBillingSigningKeyRead를 추가·재조회했다. 기존 JWT Secret exact1개 GetSecretValue만 허용하고 기존3정책/다른역할은 보존했다. Secret PRIVATE_JWK의 공개 구성요소와 Billing task3 verifier 일치 확인(실제 서명/HTTP 검증 아님). 태스크 주입/재배포·DB 설치·활성화는 미실행. 역방향 Billing 공개키/scope, LC TLS 파일 주입·제한 경로, test DB inventory/manifest/index가 남는다. 상세 LC_BILLING_TEST_CONNECTION_PREPARATION.md. 관련 TMI-116/128/217/125/220.
+
+- 2026-10-16 Billing 연동 사전 점검: AWS 콘솔에서 LC test task36 실행1/보류0·배포성공, test/JWT 및 saga/phone/reconciliation OFF를 재확인했다. 환경변수 목록에 Billing URL/JWT sender/paid/legacy/access receiver 설정이 없으며 추가 JSON은 notifications만 포함한다. Billing test task3은 실행1/보류0·배포성공, HTTPS8443 target 정상1, LC 전용 receiver=true·Identity용 receiver=false·환경test·LC 공개키/TLS Secret 참조가 있다. Secret 원문은 조회하지 않았다. Billing runbook에는 기존 LC 테스트 JWT Secret 준비와 제한된 workload origin 연결 완료가 기록돼 있으나 LC private key 주입·권한/키쌍 일치, 역방향 revoke/TLS, LC legacy 목록/필수 index는 미검증·미적용이다. 현재 조건으로 paid 활성화하지 않으며 공동 업무E2E도 미실행. 관련 TMI-116/128/217/125/220. 서버·Billing/Identity 코드·DB·권한 변경 없음.
+
+- 동시성 보완·test 배포 턴 식별자를 WORKLOG에 보완했다. PR #46/test 배포 성공과 task36 test 프로필·JWT·Billing OFF 상태는 동일하다. 관련 TMI-14/116/128/217/125/220. 이번 보완은 기록만 변경했다.
+
+- 최종 배포 확인: PR #46 develop d02fe0f, test 배포38901895642의 ECS/health 모두success. 콘솔 task36에서 SPRING_PROFILES_ACTIVE=test·APP_DEPLOYMENT_ENVIRONMENT=test·APP_AUTH_MODE=jwt 및 saga/phone/reconciliation=false 확인. 서비스 실행1/보류0·ALB 정상1/비정상0, 외부health200·무인증history401 확인. 인증된 앱 전체 흐름/Billing 공동E2E는 미실행이다. main/기존 별도 서비스·Billing 활성화·index 설치는 변경하지 않았다. 관련 TMI-14/116/128/217/125/220. 최종 결과 기록만 로컬 미커밋.
+
+- 동시성 보완 전달:5e1db05 commit/push 후 PR #46 CI38901474969 첫실행 성공, develop d02fe0f로 머지했다. test 자동배포38901895642 진행 중으로 최종 성공/실프로필은 아직 미확인이다. 전체 로컬 단위1370(기존skip1)·Mongo324 실패0, Node16·bootJar 성공. main/기능flag/실DB index 변경 없음. 관련 TMI-14/116/128/217/125/220.
+
 - PR #46 동시성 보완 진행: 수정 전20회 반복에서 학습3/20 WriteConflict112·환불4/20 잘못된409를 재현했다. owner Transaction 재시도3회 상한은 유지하며25/50ms 대기를 추가했고, 환불의 두 fresh 조회 사이 동일event commit을 group 문서의 eventId/digest로 재판정한다. 보완 후 해당51개 테스트 통과, 전체 검증 진행 중이다. 관련 TMI-14/116/128/217/125/220. main/실DB/기능flag 변경 없음.
 
 - 2026-10-16 전달 중단: 39a785e commit/push·PR #46 생성/첨부까지 완료했으나 CI38900049735가 두 번 실패해 develop 머지/test 배포는 하지 않았다. attempt1 LearningQuotaTransactionTest 동시 replay1건, attempt2 AccessRevocationMongoTest 동일event 동시 수신1건 실패(각 Mongo286 중1). 전자는 이번 로컬 재실행 통과, 실패 원인은 미확정이다. 기존 동시성 문제 진단/수정 후 CI 재검증이 필요하다. main/실서버/Billing flag/DB는 변경하지 않았다. 관련 TMI-14/116/128/217/125/220.
