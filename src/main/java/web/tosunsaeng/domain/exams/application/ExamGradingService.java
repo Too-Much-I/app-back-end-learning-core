@@ -50,6 +50,12 @@ import java.util.stream.Collectors;
 @Service
 @RequiredArgsConstructor
 public class ExamGradingService {
+    @Autowired(required = false)
+    private web.tosunsaeng.domain.exams.rollout.LegacyExamRuntime legacyExamRuntime;
+
+    private void requireKnownSession(ExamSession session) {
+        if (legacyExamRuntime != null) legacyExamRuntime.requireKnown(session);
+    }
 
     private static final int CALLBACK_COMPLETION_RETRIES = 5;
     private static final String QUESTION_DISPATCH_FAILED = "QUESTION_DISPATCH_FAILED";
@@ -1024,6 +1030,7 @@ public class ExamGradingService {
     private ExamSession requireInProgressSession(String examId) {
         ExamSession observed = examSessionRepository.findById(examId)
                 .orElseThrow(() -> new ExamsException(ErrorStatus._EXAM_NOT_FOUND));
+        requireKnownSession(observed);
         if (observed.permitsRevokedAcceptedWork()) return observed;
         ExamSession session = requireNotAbandonedSession(examId);
         if (!session.isInProgress()) {
@@ -1048,6 +1055,7 @@ public class ExamGradingService {
                     if (!java.util.Objects.equals(current.getUserId(), observed.getUserId())) {
                         throw new SessionOwnerChangedException();
                     }
+                    requireKnownSession(current);
                     return command.get();
                 });
             } catch (UserOwnershipGuardException | SessionOwnerChangedException race) {
@@ -1084,6 +1092,7 @@ public class ExamGradingService {
         if (session.isRetakeAvailable()) {
             throw new ExamsException(ErrorStatus._EXAM_ALREADY_COMPLETED);
         }
+        requireKnownSession(session);
         return session;
     }
 
@@ -1093,22 +1102,26 @@ public class ExamGradingService {
         if (session.isAccessRevoked()) throw new ExamsException(ErrorStatus._ENTITLEMENT_REVOKED);
         if (session.getSubmissionsClosedAt()!=null) throw new ExamsException(ErrorStatus._EXAM_ABANDONED);
         if (session.isEntitlementConfirming()) throw new ExamsException(ErrorStatus._EXAM_CREATION_PROCESSING,1);
+        requireKnownSession(session);
     }
 
     private boolean canProcessSession(String examId) {
         return examSessionRepository.findById(examId)
-                .map(ExamAcceptedWorkPolicy::processable)
+                .map(session -> { requireKnownSession(session); return ExamAcceptedWorkPolicy.processable(session); })
                 .orElse(false);
     }
 
     private boolean acceptedQuestionWork(String examId,Integer question,Integer retry) {
         ExamSession session=examSessionRepository.findById(examId).orElse(null);
+        if (session != null) requireKnownSession(session);
         return ExamAcceptedWorkPolicy.processable(session) && (!ExamAcceptedWorkPolicy.requiresEvidence(session)
                 || acceptedWorkPolicy!=null && acceptedWorkPolicy.questionAllowed(session,question,retry));
     }
 
     private boolean acceptedSummaryWork(String examId) {
-        return ExamAcceptedWorkPolicy.summaryAllowed(examSessionRepository.findById(examId).orElse(null));
+        ExamSession session = examSessionRepository.findById(examId).orElse(null);
+        if (session != null) requireKnownSession(session);
+        return ExamAcceptedWorkPolicy.summaryAllowed(session);
     }
 
     private SummaryAction retrySummaryIfEligible(String examId) {

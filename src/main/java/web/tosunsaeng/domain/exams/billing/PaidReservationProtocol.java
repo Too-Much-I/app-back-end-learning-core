@@ -73,8 +73,13 @@ public final class PaidReservationProtocol {
             if (restart.startReason() == StartReason.RESTART_INCOMPLETE)
                 require(Objects.equals(op.getExpectedMockExamId(), op.getMockExamId()));
         } else {
-            // P6 must provide an explicit manifest-backed legacy path. Missing group is not proof of legacy.
-            require(op.getReplacementSourceSessionId() == null && op.getPaidSelection().startReason() == null);
+            // Legacy original target is local-only; never create a retrospective Billing group/transition.
+            if (op.getPaidLegacySource() != null) {
+                require(op.getPaidDeletedSource() == null && op.getReplacementSourceSessionId() != null
+                        && op.getExpectedMockExamId() != null && op.getPaidSelection().startReason() != null);
+                if (op.getPaidSelection().startReason() == StartReason.RESTART_INCOMPLETE)
+                    require(op.getExpectedMockExamId().equals(op.getMockExamId()));
+            } else require(op.getReplacementSourceSessionId() == null && op.getPaidSelection().startReason() == null);
         }
         return new Request(op.getUserId(), op.getSessionId(), op.getMockExamId(), restart);
     }

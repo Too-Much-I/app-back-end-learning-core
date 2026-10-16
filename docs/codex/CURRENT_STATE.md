@@ -1,5 +1,34 @@
 # Learning Core Current State
 
+- 2026-10-16 legacy 전달 및 test 준비 승인: 사용자 요청에 따라 현재 legacy/runtime/reader/구writer 변경을 commit/push/PR/develop 머지하고 다음 feat에서 test 한정 활성화 준비를 구현한다. 원격 develop577e317와 현재 기반 일치 확인, 사용자DS_Store 제외. 실제 기능설정/실DB/키·목록설치/봉인·운영배포는 제외. 관련 TMI-116/128/217/125. 최종 전달/검증 결과는 후속 기록을 따른다.
+
+- 2026-10-16 test 배포 가능 여부 재확인: feat/billing-paid-exam-legacy-runtime 변경은 미커밋이며 PaidExamActivationGate가 paid ON을 무조건 거절한다. 기능OFF 코드 선배포와 실제 Billing 활성화 테스트를 구분해야 한다. test의 간소화는 운영 drain 절차만 줄이며 기동차단/목록·설정 검증을 해제하지 않는다. 관련 TMI-116/128/217/125. 이번은 정적 확인·기록만, 배포/코드수정/테스트 재실행 없음.
+
+- 2026-10-16 사용자 확인: test 서버에서는 직접 요청하지 않으면 새 시험이 생성되지 않는다. 이 전제에 한해 전환 중 수동생성/자동테스트를 멈추고 대상test·기존 미완료operation/자동writer만 최소 점검하는 단순 경로를 runbook에 추가했다. 복잡한 traffic 차단 시스템/전체 서버중지를 필수로 두지 않는다. 사용자 정보이며 실환경 조회로 검증하지 않았다. 관련 TMI-116/128/217/125. 목록/source·공동검증·활성화 경계는 유지, 이번 코드/실DB/배포 변경 없음.
+
+- 전환 절차 설명 턴의 정확한 WORKLOG 식별자를 별도 항목으로 추가했다. 기존 시험 보존·신규 생성 전환 설명과 전환 도구/공동E2E/활성화 잔여 상태는 동일하다. 관련 TMI-116/128/217/220/193/136/125. 이번 보완은 기록만 변경했으며 코드/DB/배포·테스트 재실행 없음.
+
+- 후속 설명: 전환 절차는 기존시험을 지우는 작업이 아니라 구/신규 생성 방식 혼재를 막는 작업이다. 신규 생성 차단·진행 생성 정리·목록 확정/봉인·검증 후 재개를 설명했다. 기존 채점 전체완료를 기다리는 조건은 아니며 실제 영향범위/재전송은 환경별 확인이 필요하다. 전환도구 미구현·공동검증/활성화 잔여는 동일하다. 관련 TMI-116/128/217/220/193/136/125. 기록 외 코드/DB/배포 변경·테스트 재실행 없음.
+
+- 2026-10-16 후속 요청: [전환 runbook·도구 구현 기준](LC_BILLING_PAID_EXAM_CUTOVER_RUNBOOK.md)을 작성했다. develop/test·main/staging의 코드상 routing, 담당/환경 승인, writer drain, 제한 artifact, 동일snapshot 목록, install/seal·실패복구 기준을 정리했다. 운영 담당자/환경/변경창/저장소는 미지정이며 도구 구현·실DB·배포 승인이 아니다. 관련 TMI-116/128/122/125/217/220/193/136.
+- 이번은 문서만 수정했다. 제품 코드/기존 API/fixture·DB/AWS/Jira·commit/push 변경 및 Gradle 재실행 없음. 기존 dirty/사용자파일 보존, 링크·코드필드 대조/diff 검사. 다음은 이 기준의 오프라인/격리 도구 구현과 운영 실행 입력 확정이며, 실제 적용/기동차단 해제는 별도 승인이다.
+
+- 현재 구writer 재개 방어 구현 턴의 WORKLOG 식별자를 보완했다. 구현·검증 결과와 잔여 범위는 아래와 같으며, 이번 보완은 기록만 변경했다. 관련 TMI-116/128/217/193/136/125; 추가 테스트·실DB·배포·commit/push 없음.
+
+- 2026-10-16 잔여 구현 재점검: `LegacyExamWriterGuard` 및 구manager/saga/Transaction 연결을 추가했다. rollout state 설치 후 flag OFF·재시작으로 구신규 생성이 재개되지 않도록 준비/reserve/Session commit을 차단한다. 기존 replay/복구는 유지. state 조회 실패도 기존409로 차단하며 실제 drain/seal 동시성 lock은 아니다. 관련 TMI-116/128/217/193/136/125.
+- 최종 `clean test mongoIntegrationTest bootJar` 성공: 단위1,331 실패/오류0·기존1skip, Mongo283 실패/오류/skip0. 추가 단위7/Mongo1, 원fixture34 hash·diff check 통과. 핵심 LC 코드 보완과 별도로 자동 manifest installer/전환 절차·실환경 공동E2E·활성화gate 해제 및 최종purge는 남는다. 실제 DB/배포/활성화·commit/push 없이 기존 dirty·사용자DS_Store 보존. [완료범위와 잔여](LC_BILLING_LEGACY_RUNTIME_IMPLEMENTATION.md#8-구writer-재개-차단-및-전체-완료-범위).
+
+- 2026-10-16 reader 후속 구현 완료(미커밋): `LegacyExamRuntime.requireKnown`으로 exact legacy/Session paid snapshot 검사를 공개 조회·이력·제출·Callback·채점 복구에 연결했다. operation120일 정리 후에도 Session 근거로 읽으며 source 누락 fallback/owner 이전 거절을 새로 만들지 않는다. 관련 TMI-116/128/217/193/136/125. [상세](LC_BILLING_LEGACY_RUNTIME_IMPLEMENTATION.md#7-2026-10-16-reader채점-경계-후속).
+- 최종 단위1,324(실패/오류0·기존1skip), 격리Mongo282(실패/오류/skip0), bootJar 성공. Node migration15개·원fixture34 hash·diff check 통과. 추가 단위13/Mongo1개. 실DB/index·manifest 설치·배포·기능 활성화·commit/push·타저장소 변경 없음. 기존 dirty/사용자DS_Store 보존. 실제 공동 경합/owner·삭제/실환경 reader 검증 및 구writer drain이 남으며 `PaidExamActivationGate` ON 거절은 유지한다.
+
+- PR #43 전달·legacy 후속 구현 턴의 정확한 WORKLOG 식별자를 보완했다. 새 브랜치 구현/검증 결과와 자동배포 마지막 관측은 아래와 동일하며 이번 기록 보완으로 추가 구현·배포를 수행하지 않았다. 관련 TMI-116/128/217/193/136/125.
+
+- 전달 자동배포 최신 확인: 38886406335 attempt2는 테스트·이미지빌드를 통과하고 ECS 배포 진행 중이다. health/최종성공은 아직 미확인이다. 새 legacy 브랜치 변경은 이 배포에 포함되지 않는다.
+
+- 2026-10-16 — 전달 완료: 15b298e commit/push, [PR #43](https://github.com/Too-Much-I/app-back-end-learning-core/pull/43) CI38885959880 성공 후 develop merge577e3175a8c5ccf3e49fe49eb27cd046468f08a2. 기존 자동 테스트배포38886406335 attempt1은 LearningQuotaTransactionTest 동시성1건 실패로 AWS 적용 전 중단, 같은커밋 attempt2는 테스트 통과 후 이미지 빌드 진행 중(배포 최종성공 미확인). 기능설정/운영배포 불변, 사용자DS_Store 제외.
+
+- 2026-10-16 — 새 feat/billing-paid-exam-legacy-runtime에서 [legacy 생성 runtime](LC_BILLING_LEGACY_RUNTIME_IMPLEMENTATION.md) 구현. 승인summary/환경·sealed목록 검증, legacy 불충분접수 동일mock·전체접수 다음문제, local-only 원대상/목록결속·일반INITIAL wire·confirm 후 exact closure 및 실제기접수 작업보호. 최종 clean test/mongoIntegrationTest/bootJar 성공: 단위1,311 실패/오류0·기존1skip, Mongo281 실패/오류/skip0; migration Node7·fixture34 원본유지·diff 통과. 신규변경 미커밋/미푸시. 실제목록설치/봉인·전체reader coverage/공동E2E·실DB/index·활성화는 미완료이며 ON차단 유지. 관련 TMI-116/128/217/193/136/125.
+
 - 2026-10-16 — 사용자 요청으로 P6.1/삭제연동·paid 경로 연결 전달 준비 중. 현재 브랜치 feat/billing-paid-exam-p6-1은 origin/develop과 같은 기반이며 기능OFF를 유지한다. 사용자DS_Store 제외, 전체 회귀 후 commit/push/PR/develop 머지하고 별도 feat 브랜치에서 승인된 legacy 동일문제 예외를 구현한다. 실DB/활성화/운영배포는 제외한다. 관련 TMI-116/128/217/193/136/125.
 
 - legacy 동일 문제 정책 승인 턴의 정확한 WORKLOG 식별자를 추가했다. 정책은 계획/ADR에 반영됐으며 코드 구현·배포는 아직 수행하지 않았다. 관련 TMI-116/128/217.

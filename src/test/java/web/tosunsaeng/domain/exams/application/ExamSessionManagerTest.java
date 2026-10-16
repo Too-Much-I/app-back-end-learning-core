@@ -65,6 +65,16 @@ class ExamSessionManagerTest {
     private ExamSessionManager manager;
     private List<MockExamCatalogService.CatalogExam> catalog;
 
+    @Test void cutoverGuardBlocksBeforeAbandonmentOrProblemSelection() {
+        var guard = org.mockito.Mockito.mock(web.tosunsaeng.domain.exams.rollout.LegacyExamWriterGuard.class);
+        org.mockito.Mockito.doThrow(new IllegalStateException("stopped")).when(guard).requireAllowed();
+        org.springframework.test.util.ReflectionTestUtils.setField(manager,"legacyWriterGuard",guard);
+        org.junit.jupiter.api.Assertions.assertThrows(IllegalStateException.class, () -> manager.startNew(USER_ID));
+        org.junit.jupiter.api.Assertions.assertThrows(IllegalStateException.class, () -> manager.prepareForBilling(USER_ID));
+        org.junit.jupiter.api.Assertions.assertThrows(IllegalStateException.class, () -> manager.preparePhoneReplacement("group","mock"));
+        org.mockito.Mockito.verifyNoInteractions(examSessionRepository,examSessionCompletionQuery,completionEvidenceService,mockExamCatalogService);
+    }
+
     @BeforeEach
     void setUp() {
         manager = new ExamSessionManager(

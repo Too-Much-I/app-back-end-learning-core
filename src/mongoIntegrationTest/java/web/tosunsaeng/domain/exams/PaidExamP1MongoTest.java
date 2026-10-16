@@ -83,6 +83,76 @@ class PaidExamP1MongoTest {
             .status(ExamSessionStatus.IN_PROGRESS).active(true).submissionEvidenceVersion(covered ? 1 : null)
             .requiredQuestionNumbers(covered ? List.of(1,2) : null).build()); }
     String key() { return UUID.randomUUID().toString(); }
+
+    private void legacySource(ExamSessionStatus status, boolean complete) {
+        mongo.insert(ExamSession.builder().examId("legacy").userId(OWNER).mockExamId("mock_1")
+                .createdAt(LocalDateTime.ofInstant(NOW.minusSeconds(86400),ZoneOffset.UTC))
+                .status(status).active(status==ExamSessionStatus.IN_PROGRESS)
+                .submissionCompletedAt(complete?NOW.minusSeconds(1):null).build());
+    }
+    private void bindLegacyInventory() {
+        var inspector=new web.tosunsaeng.domain.exams.rollout.PaidExamCutoverInspector(mongo);
+        for(String collection:List.of("exam_legacy_manifest_entries","exam_paid_rollout_state")) {
+            if(mongo.collectionExists(collection)) mongo.dropCollection(collection);
+            mongo.createCollection(collection);
+        }
+        var expected=inspector.inspectCandidate("test","legacy-r1",true);
+        mongo.insert(new Document("_id","legacy").append("revision",expected.revision()),"exam_legacy_manifest_entries");
+        mongo.insert(new Document("_id","legacy-v1").append("status","SEALED")
+                .append("environment",expected.environment()).append("database",expected.database())
+                .append("revision",expected.revision()).append("sha256",expected.sha256()).append("count",expected.count())
+                .append("sealedAt",Date.from(NOW)).append("writersDrained",true).append("readerCoverageVerified",true),"exam_paid_rollout_state");
+        ReflectionTestUtils.setField(preparation,"legacyRuntime",
+                new web.tosunsaeng.domain.exams.rollout.LegacyExamRuntime(inspector.verifySealed(expected)));
+    }
+    @Test void verifiedLegacyWithoutCoverageUsesSameMockAndPlainInitialWire() {
+        legacySource(ExamSessionStatus.IN_PROGRESS,false); bindLegacyInventory();
+        var op=preparation.prepare(OWNER,key());
+        assertThat(op.getMockExamId()).isEqualTo("mock_1");
+        assertThat(op.getPaidSelection().startReason()).isEqualTo(RESTART_INCOMPLETE);
+        assertThat(op.getPaidLegacySource().revision()).isEqualTo("legacy-r1");
+        assertThat(paidStore.prepareRequest(OWNER,op.getCommandId()).restartContext()).isNull();
+        var original=mongo.findById("legacy",ExamSession.class);
+        assertThat(original.getAttemptGroupId()).isNull();
+        assertThat(original.getSubmissionEvidenceVersion()).isNull();
+        assertThat(original.isActive()).isTrue();
+        mongo.updateFirst(Query.query(Criteria.where("_id").is("legacy")),Update.update("submissionCompletedAt",NOW),ExamSession.class);
+        assertThat(preparation.prepare(OWNER,op.getOperationId()).getMockExamId()).isEqualTo("mock_1");
+    }
+    @Test void verifiedLegacyAllAcceptedChoosesNextWithoutGradingWait() {
+        legacySource(ExamSessionStatus.IN_PROGRESS,true); bindLegacyInventory();
+        var op=preparation.prepare(OWNER,key());
+        assertThat(op.getMockExamId()).isEqualTo("mock_2");
+        assertThat(op.getPaidSelection().startReason()).isEqualTo(NEW_AFTER_SUBMISSION);
+        assertThat(paidStore.prepareRequest(OWNER,op.getCommandId()).restartContext()).isNull();
+    }
+    @Test void verifiedCompletedLegacyDoesNotRequireNewReceiptBackfill() {
+        legacySource(ExamSessionStatus.COMPLETED,false); bindLegacyInventory();
+        assertThat(preparation.prepare(OWNER,key()).getPaidSelection().startReason()).isEqualTo(NEW_AFTER_COMPLETION);
+        assertThat(mongo.findById("legacy",ExamSession.class).getSubmissionCompletedAt()).isNull();
+    }
+    @Test void unknownLegacyStatusIsNotReinterpretedAsPermission() {
+        legacySource(null,false); bindLegacyInventory();
+        var op=preparation.prepare(OWNER,key());
+        assertThat(op.getMockExamId()).isEqualTo("mock_1");
+        assertThat(mongo.findById("legacy",ExamSession.class).getStatus()).isNull();
+        assertThat(mongo.findById("legacy",ExamSession.class).isActive()).isFalse();
+    }
+    @Test void unlistedOrUnverifiedMissingSourceCannotUseLegacyFallback() {
+        legacySource(ExamSessionStatus.IN_PROGRESS,false);
+        assertThatThrownBy(()->preparation.prepare(OWNER,key())).isInstanceOf(IllegalStateException.class);
+        bindLegacyInventory();
+        mongo.insert(ExamSession.builder().examId("late").userId(OWNER).mockExamId("mock_1")
+                .createdAt(LocalDateTime.ofInstant(NOW,ZoneOffset.UTC)).status(ExamSessionStatus.IN_PROGRESS).active(true).build());
+        assertThatThrownBy(()->preparation.prepare(OWNER,key())).isInstanceOf(IllegalStateException.class);
+        assertThat(operations.count()).isZero();
+    }
+    @Test void legacyMembershipCannotHideNewBillingMetadata() {
+        legacySource(ExamSessionStatus.IN_PROGRESS,false); bindLegacyInventory();
+        mongo.updateFirst(Query.query(Criteria.where("_id").is("legacy")),Update.update("billingReservationId","unexpected"),ExamSession.class);
+        assertThatThrownBy(()->preparation.prepare(OWNER,key())).isInstanceOf(IllegalStateException.class);
+        assertThat(operations.count()).isZero();
+    }
     @Test void creationFirstRejectsDeletionWithoutRowsOrNotificationSuppression() {
         preparation.prepare(OWNER,key());
         var notifications=org.mockito.Mockito.mock(web.tosunsaeng.domain.notification.NotificationStore.class);

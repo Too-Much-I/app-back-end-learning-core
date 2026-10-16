@@ -1,5 +1,11 @@
 # ADR — LC 유료 시험의 접수 기준 전환과 복구 경계
 
+- 2026-10-16 rollback 방어: 기존 rollout state가 설치된 경우 feature flag OFF여도 구writer의 신규 preparation/reserve/Session commit을 허용하지 않는다. 기존 결과 replay/복구와 분리하고 상태 불명/조회 실패는 fail-closed. 이 읽기 검사를 실제 구writer drain이나 설치 Transaction lock으로 간주하지 않는다. 별도 state 삭제/installer/활성화 변경 없음.
+
+- 2026-10-16 reader 후속: exact legacy membership 또는 Session 자체의 strict paid snapshot을 공개 조회·제출·Callback·채점 경계에서 확인한다. operation120일 정리 이후에도 reader가 동작하도록 operation 존재를 요구하지 않는다. 현재 owner와 역사적 confirm owner의 차이를 자동 거절하지 않으며 기존 owner/삭제/권한 gate는 유지한다. [구현 범위](../codex/LC_BILLING_LEGACY_RUNTIME_IMPLEMENTATION.md#7-2026-10-16-reader채점-경계-후속). 실제 공동검증/rollout 및 ON 기동차단 해제는 별도다.
+
+- 2026-10-16 legacy runtime: [구현 경계](../codex/LC_BILLING_LEGACY_RUNTIME_IMPLEMENTATION.md). 별도 승인 summary/환경을 sealed 목록과 대조하고 불변 membership을 operation에 고정한다. 원 legacy는 Billing restartContext로 보내지 않으며 confirm 후 exact local closure만 수행한다. fallback은 문제선정에만 적용하고 기접수 채점/요약 증거를 생성하지 않는다. 전체 reader/rollout 및 활성화 gate는 유지한다.
+
 - 2026-10-16 legacy 문제선정 예외 승인: 서버 exact manifest에 속하는 원 시험의 전체접수 근거가 불충분하면 동일 mock의 새 Session을 선택한다. 오래된 기록을 잘못 완료 처리하지 않으며, 실제 전부 제출했던 경우 같은 문제를 반복할 비용을 수용한다. 확인된 전체접수/완료는 기존 다음 문제 규칙, 신규 Billing 예약/확정 및 source 필수·owner/삭제 보호는 불변이다. 일반 source 누락 fallback이나 기존 권리/무료권 복원 증거 생성으로 확대하지 않는다.
 
 - 2026-10-16 삭제 연동: [삭제 후 INITIAL 연결](../codex/TMI_217_DELETED_INITIAL_PAID_ROUTING.md)은 exact ACK/hash와 원 시험 접수판정을 고정하며 기존 restartContext wire를 사용한다. 원 Session 재생성 없이 새 INITIAL/newgroup만 허용하고 성공/확정실패의 claim 변경을 local Transaction에 참여시킨다. 공개 adapter/schema2 worker 연결은 default-off이며 legacy runtime/공동 rollout gate를 해제하지 않는다.

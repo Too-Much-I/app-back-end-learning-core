@@ -1,5 +1,13 @@
 # LC–Billing 유료 시험 연동 구현 계획
 
+- 2026-10-16 전환 절차 정리: [cutover runbook·후속 도구 기준](LC_BILLING_PAID_EXAM_CUTOVER_RUNBOOK.md). 환경/담당/접근제한 artifact→drain→동일snapshot export→별도승인→install/verify/seal→공동검증→유입재개의 순서와 실패시 증거 보존을 정의했다. 운영 입력/실제 실행 승인·도구 구현은 미완료이며 이번은 문서 작업이다.
+
+- 2026-10-16 완료범위 재점검: [구writer 재개 차단 및 잔여](LC_BILLING_LEGACY_RUNTIME_IMPLEMENTATION.md#8-구writer-재개-차단-및-전체-완료-범위). 기존 state 설치 후 구 생성 준비/reserve/Session commit을 flag와 무관하게 차단한다. 실제 drain/전환 설치의 동시성 보장이 아니며 자동 installer·활성화gate 해제·최종purge·공동E2E는 여전히 별도다. 핵심 코드 완료를 전체 출시 준비 완료로 표시하지 않는다.
+
+- 2026-10-16 reader 후속: 공개 조회/이력·접수·Callback·채점 복구에서 exact legacy/paid 저장 근거를 검증하도록 연결했다. 생성 operation 보존기간과 reader 수명을 분리하고 Session snapshot을 사용한다. [상세 범위](LC_BILLING_LEGACY_RUNTIME_IMPLEMENTATION.md#7-2026-10-16-reader채점-경계-후속). 실환경 reader/owner/삭제 공동 검증·writer drain과 ON 기동차단은 아직 gate이며 전체 rollout 완료가 아니다.
+
+- 2026-10-16 legacy 후속 구현: [서버 목록 기반 생성 runtime](LC_BILLING_LEGACY_RUNTIME_IMPLEMENTATION.md). 승인한 증거불충분 동일문제 예외·operation 목록결속·일반 INITIAL 요청·confirm 후 원 시험 closure를 구현했다. 실제 목록설치/봉인·전체 reader coverage/공동검증·활성화는 완료하지 않았다.
+
 - 2026-10-16 사용자 승인 — 서버 exact manifest로 확인한 기존 시험에서 전체접수 여부를 증명할 수 없으면 동일 mock으로 새 Session을 시작한다. 실제 전체접수를 했더라도 같은 문제를 다시 받을 수 있는 비용을 수용한다. 전체접수/완료가 확인되는 경우 기존 다음 문제 선정 규칙은 유지한다. 이 예외는 문제 선택에만 적용하며 기존 완료 여부를 조작하거나 접수 증거를 backfill하지 않는다. 신규 시험은 Billing 예약/확정·source 필수이며 원 시험을 소비/복원 근거로 연결하지 않는다. 같은 요청의 판정을 고정하고 owner/삭제/terminal 보호·기능OFF/활성화 gate를 유지한다. 이번 정책 기록 자체는 코드 구현·배포 완료가 아니다.
 
 - 2026-10-16 후속: [삭제 후 INITIAL·paid 경로 연결](TMI_217_DELETED_INITIAL_PAID_ROUTING.md). 삭제 ACK와 원 대상/접수판정의 operation 고정, default-off 공개 adapter/schema2 worker 분기를 구현했다. legacy manifest runtime·공동 검증 전 활성화 차단은 유지한다.

@@ -69,6 +69,27 @@ class BillingExamCreationSagaTest {
     private MockExam mockExam;
     private BillingSagaProperties properties;
 
+    @Test void installedCutoverBlocksNewOperationBeforePhoneDiscovery() {
+        properties.setPhoneContinuationEnabled(true);
+        var guard = org.mockito.Mockito.mock(web.tosunsaeng.domain.exams.rollout.LegacyExamWriterGuard.class);
+        org.mockito.Mockito.doThrow(new ExamsException(ErrorStatus._EXAM_CREATION_PROCESSING,1)).when(guard).requireAllowed();
+        org.springframework.test.util.ReflectionTestUtils.setField(saga,"legacyWriterGuard",guard);
+        assertThrows(ExamsException.class, () -> saga.start(USER_ID,OPERATION_ID));
+        verifyNoInteractions(billingClient,sessionManager,transactionService);
+        verify(operationRepository,never()).insert(any(ExamCreationOperation.class));
+    }
+
+    @Test void installedCutoverBlocksPreparedReplayBeforeReserve() {
+        var operation = preparedOperation();
+        when(operationRepository.findByUserIdAndOperationId(USER_ID,OPERATION_ID)).thenReturn(Optional.of(operation));
+        when(operationRepository.findById(operation.getCommandId())).thenReturn(Optional.of(operation));
+        var guard = org.mockito.Mockito.mock(web.tosunsaeng.domain.exams.rollout.LegacyExamWriterGuard.class);
+        org.mockito.Mockito.doThrow(new ExamsException(ErrorStatus._EXAM_CREATION_PROCESSING,1)).when(guard).requireAllowed();
+        org.springframework.test.util.ReflectionTestUtils.setField(saga,"legacyWriterGuard",guard);
+        assertThrows(ExamsException.class, () -> saga.start(USER_ID,OPERATION_ID));
+        verifyNoInteractions(billingClient,transactionService);
+    }
+
     @BeforeEach
     void setUp() {
         properties = new BillingSagaProperties();

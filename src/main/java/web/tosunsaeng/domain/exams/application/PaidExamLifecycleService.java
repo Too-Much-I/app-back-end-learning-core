@@ -26,6 +26,8 @@ public class PaidExamLifecycleService {
     @org.springframework.beans.factory.annotation.Autowired(required = false)
     private web.tosunsaeng.domain.learningrecorddeletion.infrastructure.DeletedExamContinuationStore deletedSources;
     @org.springframework.beans.factory.annotation.Autowired(required = false)
+    private web.tosunsaeng.domain.exams.rollout.LegacyExamRuntime legacyRuntime;
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
     private web.tosunsaeng.domain.exams.access.AccessRevocationStore accessRevocations;
     @org.springframework.beans.factory.annotation.Autowired(required = false)
     private web.tosunsaeng.domain.learningrecorddeletion.application.DeletionAccess deletionAccess;
@@ -70,6 +72,7 @@ public class PaidExamLifecycleService {
             require(op.getState()==ExamCreationState.PREPARED && op.getReservationId()==null && op.getPaidReservation()==null
                     && op.getRecovery().getDispatch()==ReservationRecovery.Dispatch.NOT_DISPATCHED);
             requireNoSession(op);
+            if (op.getPaidLegacySource()!=null) previous(op);
             op.getRecovery().setDispatch(ReservationRecovery.Dispatch.MAY_HAVE_BEEN_SENT);
             return save(op);
         });
@@ -225,7 +228,9 @@ public class PaidExamLifecycleService {
                 ExamSession old=previous(op);
                 requireNoOtherActive(op);
                 if (old!=null) {
-                    old.closeSubmissions(op.getOperationId(),execution.now());
+                    if (op.getPaidLegacySource()!=null)
+                        old.closeLegacySubmissions(op.getPaidLegacySource(),op.getOperationId(),execution.now());
+                    else old.closeSubmissions(op.getOperationId(),execution.now());
                     mongo.save(old); // Same owner/Session write fence as admission.
                 }
                 fresh.observePaidReservation(op.getPaidReservation());
@@ -281,6 +286,10 @@ public class PaidExamLifecycleService {
         require(old!=null && Objects.equals(old.getUserId(),op.getUserId())
                 && Objects.equals(old.getAttemptGroupId(),op.getExpectedAttemptGroupId())
                 && Objects.equals(old.getMockExamId(),op.getExpectedMockExamId()));
+        if (op.getPaidLegacySource()!=null) {
+            require(legacyRuntime!=null);
+            legacyRuntime.requireBound(op,old);
+        }
         require(old.getSubmissionsClosedAt()==null || Objects.equals(old.getSubmissionsClosedByOperationId(),op.getOperationId()));
         return old; // Keep terminal status/results; never resurrect or close a different current Session.
     }

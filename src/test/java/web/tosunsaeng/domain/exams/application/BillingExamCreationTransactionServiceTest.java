@@ -45,6 +45,27 @@ class BillingExamCreationTransactionServiceTest {
 
     private BillingExamCreationTransactionService service;
 
+    @Test void cutoverBlocksPreparedInsertAndReservedCommitButNotAlreadyCommittedReplay() {
+        var now = Instant.parse("2026-10-16T00:00:00Z");
+        var operation = ExamCreationOperation.prepared("00000000-0000-4000-8000-000000000001",
+                "018f6f36-2f42-4bf5-8c17-0be35de4872c", "ex_new", "mock", 1, now);
+        var guard = org.mockito.Mockito.mock(web.tosunsaeng.domain.exams.rollout.LegacyExamWriterGuard.class);
+        org.mockito.Mockito.doThrow(new IllegalStateException("stopped")).when(guard).requireAllowed();
+        org.springframework.test.util.ReflectionTestUtils.setField(service,"legacyWriterGuard",guard);
+        org.junit.jupiter.api.Assertions.assertThrows(IllegalStateException.class, () -> service.insertPrepared(operation));
+        operation.markReserved("018f6f36-2f42-4bf5-8c17-0be35de4872d", BillingReservationKind.INITIAL,
+                "018f6f36-2f42-4bf5-8c17-0be35de4872e", now.plusSeconds(300), now);
+        when(operationRepository.findById(operation.getCommandId())).thenReturn(Optional.of(operation));
+        org.junit.jupiter.api.Assertions.assertThrows(IllegalStateException.class,
+                () -> service.commitReservedSession(operation.getCommandId(), now, ZoneOffset.UTC));
+        operation.markSessionCommitted(now);
+        org.junit.jupiter.api.Assertions.assertSame(operation,
+                service.commitReservedSession(operation.getCommandId(), now, ZoneOffset.UTC));
+        org.mockito.Mockito.verifyNoInteractions(sessionRepository, sessionManager);
+        org.mockito.Mockito.verify(operationRepository, org.mockito.Mockito.never()).insert(any(ExamCreationOperation.class));
+        org.mockito.Mockito.verify(operationRepository, org.mockito.Mockito.never()).save(any());
+    }
+
     @BeforeEach
     void setUp() {
         TransactionOperations directTransactions = new TransactionOperations() {

@@ -43,6 +43,8 @@ import java.util.function.Supplier;
 @Service
 @RequiredArgsConstructor
 public class ExamServiceImpl implements ExamService {
+    @Autowired(required = false)
+    private web.tosunsaeng.domain.exams.rollout.LegacyExamRuntime legacyExamRuntime;
     @Autowired(required = false) private PaidExamCreationSaga paidExamCreationSaga;
     @Value("${app.billing.paid-exam.enabled:false}") private boolean paidExamEnabled;
 
@@ -168,6 +170,7 @@ public class ExamServiceImpl implements ExamService {
             throw new ExamsException(ErrorStatus._EXAM_CREATION_PROCESSING, 1);
         }
 
+        if (legacyExamRuntime != null) legacyExamRuntime.requireKnown(examSession);
         return examSession;
     }
 
@@ -203,6 +206,7 @@ public class ExamServiceImpl implements ExamService {
             Integer questionNumber,
             Integer retryCount,
             String jobId) {
+        if (legacyExamRuntime != null) legacyExamRuntime.requireKnown(examSession);
         boolean accepted=GradingKeys.summaryJobId(examSession.getExamId()).equals(jobId)
                 ? ExamAcceptedWorkPolicy.summaryAllowed(examSession)
                 : ExamAcceptedWorkPolicy.processable(examSession)

@@ -27,6 +27,16 @@ public class ExamAcceptedWorkPolicy {
         if (session.getSubmissionEvidenceVersion()!=null && !Integer.valueOf(1).equals(session.getSubmissionEvidenceVersion())) return false;
         int canonical=GradingKeys.canonicalRetryCount(retry);
         var job=jobs.findById(GradingKeys.questionJobId(session.getExamId(),question,canonical)).orElse(null);
+        if (session.hasLegacyClosure() && !session.isAccessRevoked()) {
+            if (job!=null && java.util.Objects.equals(job.getJobId(),GradingKeys.questionJobId(session.getExamId(),question,canonical))
+                    && java.util.Objects.equals(GradingKeys.effectiveMockExamId(job.getMockExamId()),GradingKeys.effectiveMockExamId(session.getMockExamId()))
+                    && java.util.Objects.equals(job.getExamId(),session.getExamId())
+                    && java.util.Objects.equals(job.getQuestionNumber(),question)
+                    && java.util.Objects.equals(job.getRetryCount(),canonical)
+                    && job.isActivityUserSubmission() && job.getFirstUserSubmittedAt()!=null
+                    && !job.getFirstUserSubmittedAt().isAfter(session.getSubmissionsClosedAt())) return true;
+            return evidence.legacyAcceptedQuestion(session,question,canonical);
+        }
         if (session.isAccessRevoked()) {
             if (!Integer.valueOf(1).equals(session.getSubmissionEvidenceVersion())
                     || session.getRequiredQuestionNumbers()==null || !session.getRequiredQuestionNumbers().contains(question)
@@ -49,6 +59,8 @@ public class ExamAcceptedWorkPolicy {
     public static boolean summaryAllowed(ExamSession session) {
         if (!processable(session)) return false;
         if (!requiresEvidence(session)) return true;
+        if (session.hasLegacyClosure() && !session.isAccessRevoked())
+            return session.getSubmissionCompletedAt()!=null && !session.getSubmissionCompletedAt().isAfter(session.getSubmissionsClosedAt());
         if (!Integer.valueOf(1).equals(session.getSubmissionEvidenceVersion()) || session.getSubmissionCompletedAt()==null
                 || session.getRequiredQuestionNumbers()==null || session.getRequiredQuestionNumbers().isEmpty()) return false;
         if (session.getRequiredQuestionNumbers().stream().anyMatch(number -> number==null || number<1)) return false;
