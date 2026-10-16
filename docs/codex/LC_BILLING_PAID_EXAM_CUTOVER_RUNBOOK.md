@@ -4,6 +4,8 @@
 - 상태: 사용자 후속 요청에 따른 절차 초안 및 도구 구현 기준. 운영 담당자·환경·변경창 승인/도구 구현/실행 완료가 아니다.
 - 관련: TMI-116/TMI-128/TMI-122/TMI-125/TMI-217/TMI-220/TMI-193/TMI-136.
 
+- 후속 코드: [test 한정 기동 준비](LC_BILLING_PAID_EXAM_TEST_ACTIVATION.md)를 별도 브랜치에서 구현했다. 이하 활성화 단계는 이 test 예외의 준비조건과 실제 적용 승인을 따르며 staging/production의 차단은 유지한다. 아직 서버에 적용하지 않았다.
+
 ## 1. 5줄 결론
 
 1. 먼저 test에서 별도 승인된 공동 검증을 수행하고 실제 전환은 환경별로 새 목록·새 승인을 받는다.
@@ -54,7 +56,7 @@
 ## 4. 위험·중단 및 복구 기준
 
 - `LegacyExamWriterGuard`는 state 설치 후 이번 코드를 사용하는 구writer의 재개를 막는다. guard 없는 구바이너리, 설치와 겹친 진행 요청, state 삭제/backup 복원을 막는 분산 lock이 아니다.
-- 현재 `PaidExamActivationGate`는 ON을 무조건 거절한다. 설정만 켜면 시작하지 못한다. 로컬 테스트 성공이나 이 문서를 근거로 삭제하지 않으며 test 공동 검증용 해제도 명시적 검증 계획/승인 아래 별도 변경한다.
+- 선행 배포의 `PaidExamActivationGate`는 ON을 무조건 거절한다. 후속 브랜치의 test 예외는 승인property/단일test profile·환경·검증runtime/owner·필수index 조건을 모두 요구한다. 설정 하나만 켜서는 시작하지 못한다. 로컬 테스트 성공이나 이 문서를 근거로 비test 차단을 삭제하지 않는다.
 - candidate 검사에서 Billing 연결 Session이나 미완료 operation이 발견되면 중단한다. 현재 inspector는 모든 Session이 unlinked인 최초 전환 전제다. 기존 연결 자료를 source 없음으로 취급하거나 목록에 강제 편입하지 않는다. 별도 자료 분류·복구 검토가 필요하다.
 - 목록 밖 신규 Session, writer 재개, 환경/hash 불일치가 관측되면 기존 후보 승인을 폐기하고 drain부터 다시 확인한다. 과거 1,493/146건을 현재 대상 수로 재사용하지 않는다.
 - `writersDrained`/`readerCoverageVerified`는 외부 검증 증거를 참조하는 확인값이다. installer 성공만으로 true를 작성하지 않는다.

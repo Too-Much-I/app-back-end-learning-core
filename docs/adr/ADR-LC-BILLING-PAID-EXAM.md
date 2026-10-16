@@ -1,5 +1,7 @@
 # ADR — LC 유료 시험의 접수 기준 전환과 복구 경계
 
+- 2026-10-16 test 한정 활성화 예외: [준비검사](../codex/LC_BILLING_PAID_EXAM_TEST_ACTIVATION.md). 기본OFF와 비test 차단은 유지하되 test 단일profile/승인property·환경일치·검증runtime/owner·엄격한필수index 조건에서만 paid/revoke 기동을 허용한다. test에서 평소 생략하는 필수index 검사를 읽기전용으로 수행한다. 승인값은 실환경/공동E2E 성공의 대체물이 아니다. 이번은 코드·격리검증 승인, 실제설정/기능활성화 승인 아님.
+
 - 2026-10-16 rollback 방어: 기존 rollout state가 설치된 경우 feature flag OFF여도 구writer의 신규 preparation/reserve/Session commit을 허용하지 않는다. 기존 결과 replay/복구와 분리하고 상태 불명/조회 실패는 fail-closed. 이 읽기 검사를 실제 구writer drain이나 설치 Transaction lock으로 간주하지 않는다. 별도 state 삭제/installer/활성화 변경 없음.
 
 - 2026-10-16 reader 후속: exact legacy membership 또는 Session 자체의 strict paid snapshot을 공개 조회·제출·Callback·채점 경계에서 확인한다. operation120일 정리 이후에도 reader가 동작하도록 operation 존재를 요구하지 않는다. 현재 owner와 역사적 confirm owner의 차이를 자동 거절하지 않으며 기존 owner/삭제/권한 gate는 유지한다. [구현 범위](../codex/LC_BILLING_LEGACY_RUNTIME_IMPLEMENTATION.md#7-2026-10-16-reader채점-경계-후속). 실제 공동검증/rollout 및 ON 기동차단 해제는 별도다.

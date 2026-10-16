@@ -1,5 +1,7 @@
 # LC–Billing 유료 시험 연동 구현 계획
 
+- 2026-10-16 [test 한정 기동 준비](LC_BILLING_PAID_EXAM_TEST_ACTIVATION.md): 선행 legacy PR #44 머지 후 새 feat에서 구현. 명시적 test 승인/환경·sealed 목록/owner·필수index가 충족돼야 gate 통과하며 다른환경은 계속 차단한다. 실환경 설정/활성화·목록 설치 도구/공동E2E 완료는 아니다.
+
 - 2026-10-16 전환 절차 정리: [cutover runbook·후속 도구 기준](LC_BILLING_PAID_EXAM_CUTOVER_RUNBOOK.md). 환경/담당/접근제한 artifact→drain→동일snapshot export→별도승인→install/verify/seal→공동검증→유입재개의 순서와 실패시 증거 보존을 정의했다. 운영 입력/실제 실행 승인·도구 구현은 미완료이며 이번은 문서 작업이다.
 
 - 2026-10-16 완료범위 재점검: [구writer 재개 차단 및 잔여](LC_BILLING_LEGACY_RUNTIME_IMPLEMENTATION.md#8-구writer-재개-차단-및-전체-완료-범위). 기존 state 설치 후 구 생성 준비/reserve/Session commit을 flag와 무관하게 차단한다. 실제 drain/전환 설치의 동시성 보장이 아니며 자동 installer·활성화gate 해제·최종purge·공동E2E는 여전히 별도다. 핵심 코드 완료를 전체 출시 준비 완료로 표시하지 않는다.

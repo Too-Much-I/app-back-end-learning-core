@@ -49,6 +49,8 @@ public class ExamAssignmentIndexValidator implements ApplicationRunner {
         }
     }
 
+    public void validateRequiredIndexes() { validateIndexes(true); }
+
     void validateIndexes(boolean failClosed) {
         List<IndexInfo> sessionIndexes = mongoTemplate.indexOps(ExamSession.class).getIndexInfo();
         List<IndexInfo> mockExamIndexes = mongoTemplate.indexOps(MockExam.class).getIndexInfo();

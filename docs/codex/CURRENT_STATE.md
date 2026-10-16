@@ -1,5 +1,18 @@
 # Learning Core Current State
 
+- 2026-10-16 전달 진행: 사용자 후속 승인으로 test 활성화 준비 변경의 commit/push/PR/develop 머지와 기존 test 자동배포를 진행한다. 기능 설정·실DB/목록/index·키 변경은 제외한다. 원격 develop과 기반 일치 확인, 사용자 DS_Store 제외. 관련 TMI-116/128/217/125/220.
+
+- 다음 작업 안내 턴의 WORKLOG 식별자 기록을 보완했다. test 준비 코드 미커밋·실환경 활성화 미실행 상태는 그대로이며, 후속은 기능 OFF 전달과 환경 준비 후 승인된 공동 테스트다. 관련 TMI-116/128/217/125/220. 이번 보완은 기록만 변경했다.
+
+- 2026-10-16 다음 작업 안내: 현재 test 활성화 준비 변경은 미커밋이다. 후속 순서는 기능 OFF 상태의 코드 전달 → 실제 test 대상/미완료 생성/legacy 목록·필수 index 및 Billing JWT·TLS 준비 확인 → 별도 승인 후 test 설정 활성화와 공동 연동 검증이다. 이번은 상태 확인·기록만 수행했으며 배포 최종 결과는 재조회하지 않았다. 관련 TMI-116/128/217/125/220.
+
+- PR #44 전달·test 준비 구현 턴의 정확한 WORKLOG 식별자를 보완했다. 아래 구현/검증/배포 마지막 관측은 그대로이며 이번 보완은 기록만 변경했다. 관련 TMI-116/128/217/125/220/193/136. 추가 코드·실DB·배포·테스트 재실행 없음.
+
+- 종료 전 자동배포 최신 관측: 38893127747 attempt2는 단위/Mongo 검증을 통과하고 Docker Buildx 준비 단계에 진입했다. 이미지/ECS/health 최종 성공은 아직 미확인이다. 후속 test 활성화 준비 코드는 미커밋으로 이 배포에 포함되지 않는다.
+
+- 2026-10-16 전달 완료: legacy 변경72fd00a commit/push, PR #44 CI38892797996 성공 후 develop ef6d151 머지. 새 `feat/billing-paid-exam-test-activation` 생성. 자동배포38893127747 첫시도는 기존 LearningQuotaTransactionTest 동시성1건 실패(AWS 전), 동일commit 실패job1회 재실행 중. 사용자DS_Store 제외. 관련 TMI-116/128/217/125/220/193/136.
+- 후속 [test 활성화 준비](LC_BILLING_PAID_EXAM_TEST_ACTIVATION.md) 구현: 정확한 test profile·기본OFF 승인property·환경일치·sealed runtime·owner·strict index 검사 모두 통과할 때만 paid/revoke gate 예외. staging/production/혼합profile 차단 유지. 실제값/키/DB/설정/활성화 변경 없음, 새 변경 미커밋. 단위1,353 실패/오류0·기존1skip, Mongo286 전부통과·bootJar 성공, Node137·fixture34 hash·diff check 통과. 자동 목록도구/실목록설치·전체서버/공동E2E는 잔여.
+
 - 2026-10-16 legacy 전달 및 test 준비 승인: 사용자 요청에 따라 현재 legacy/runtime/reader/구writer 변경을 commit/push/PR/develop 머지하고 다음 feat에서 test 한정 활성화 준비를 구현한다. 원격 develop577e317와 현재 기반 일치 확인, 사용자DS_Store 제외. 실제 기능설정/실DB/키·목록설치/봉인·운영배포는 제외. 관련 TMI-116/128/217/125. 최종 전달/검증 결과는 후속 기록을 따른다.
 
 - 2026-10-16 test 배포 가능 여부 재확인: feat/billing-paid-exam-legacy-runtime 변경은 미커밋이며 PaidExamActivationGate가 paid ON을 무조건 거절한다. 기능OFF 코드 선배포와 실제 Billing 활성화 테스트를 구분해야 한다. test의 간소화는 운영 drain 절차만 줄이며 기동차단/목록·설정 검증을 해제하지 않는다. 관련 TMI-116/128/217/125. 이번은 정적 확인·기록만, 배포/코드수정/테스트 재실행 없음.
