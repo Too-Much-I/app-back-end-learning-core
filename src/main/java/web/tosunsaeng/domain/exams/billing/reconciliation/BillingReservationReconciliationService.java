@@ -28,6 +28,8 @@ import static web.tosunsaeng.domain.exams.billing.reconciliation.ReservationSnap
 @Slf4j
 @Service
 public class BillingReservationReconciliationService {
+    @org.springframework.beans.factory.annotation.Value("${app.billing.paid-exam.enabled:false}")
+    private boolean paidEnabled;
     private final ReservationOperationExecution execution;
     private final ReservationRecoveryStore store;
     private final ReservationAuthCircuit circuit;
@@ -203,13 +205,17 @@ public class BillingReservationReconciliationService {
         String token = circuit.claimProbe();
         if (token == null) return;
         ExamCreationOperation op = mongo.findOne(Query.query(Criteria.where("activeGuard").is(true)
-                .and("recovery.schemaVersion").is(1)).limit(1), ExamCreationOperation.class);
+                .and("recovery.schemaVersion").in(paidEnabled?java.util.List.of(1,2):java.util.List.of(1))).limit(1), ExamCreationOperation.class);
         if (op == null) return;
         try {
-            ReservationSnapshotValidator.status(op, billing.status(op.getUserId(), op.getOperationId()));
+            if (op.getRecovery().getSchemaVersion()==2)
+                web.tosunsaeng.domain.exams.billing.PaidReservationProtocol.matches(op,billing.statusPaid(op.getUserId(),op.getOperationId()));
+            else ReservationSnapshotValidator.status(op, billing.status(op.getUserId(), op.getOperationId()));
             circuit.recovered(token);
         } catch (BillingClientException failure) {
-            if (failure.category() == BillingClientException.Category.OPERATION_NOT_FOUND) circuit.recovered(token);
+            if (failure.category() == BillingClientException.Category.OPERATION_NOT_FOUND
+                    || op.getRecovery().getSchemaVersion()==2 && (failure.category()==BillingClientException.Category.MEMBER_EVIDENCE_PENDING
+                    || failure.category()==BillingClientException.Category.PRE_RESERVE_REJECTED)) circuit.recovered(token);
         }
     }
 }

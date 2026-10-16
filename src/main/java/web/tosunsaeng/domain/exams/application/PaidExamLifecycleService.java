@@ -24,6 +24,8 @@ import static web.tosunsaeng.domain.exams.billing.PaidReservationProtocol.requir
 @Service
 public class PaidExamLifecycleService {
     @org.springframework.beans.factory.annotation.Autowired(required = false)
+    private web.tosunsaeng.domain.learningrecorddeletion.infrastructure.DeletedExamContinuationStore deletedSources;
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
     private web.tosunsaeng.domain.exams.access.AccessRevocationStore accessRevocations;
     @org.springframework.beans.factory.annotation.Autowired(required = false)
     private web.tosunsaeng.domain.learningrecorddeletion.application.DeletionAccess deletionAccess;
@@ -80,7 +82,7 @@ public class PaidExamLifecycleService {
             if (wait==null) wait=MemberWaitEvidence.first(op.getOperationId(),op.getPaidRequestDigest(),execution.now());
             else { require(wait.bound(op.getOperationId(),op.getPaidRequestDigest())); wait=wait.observed(execution.now()); }
             r.setMemberWait(wait);
-            if (!execution.now().isBefore(op.getCreatedAt().plus(Duration.ofDays(120)))) {
+            if (!op.withinPaidGuarantee(execution.now())) {
                 r.setStatus(ReservationRecovery.Status.NEEDS_REVIEW); r.setFailureCode("member_resume_window_expired");
                 if (r.getAlertIncidentId()==null) {
                     r.setAlertIncidentId(java.util.UUID.randomUUID().toString());
@@ -100,7 +102,7 @@ public class PaidExamLifecycleService {
             memberSafety(op);
             var r=op.getRecovery(); var wait=r.getMemberWait();
             require(wait!=null && wait.bound(op.getOperationId(),op.getPaidRequestDigest()) && wait.phase()==MemberWaitEvidence.Phase.WAITING
-                    && execution.now().isBefore(op.getCreatedAt().plus(Duration.ofDays(120))));
+                    && op.withinPaidGuarantee(execution.now()));
             boolean review=r.getStatus()==ReservationRecovery.Status.NEEDS_REVIEW;
             if (review) {
                 require(wait.reviewEligible(op.getOperationId(),op.getPaidRequestDigest(),r.getFailureCode())
@@ -144,6 +146,7 @@ public class PaidExamLifecycleService {
             op.markFailedTerminal("RESERVE_REJECTED_BEFORE_CREATION",execution.now(),execution.now().plus(Duration.ofDays(120)));
             resolveMemberWait(op);
             op.completeRecovery(execution.now());
+            finishDeleted(op);
             return operations.save(op);
         });
     }
@@ -242,6 +245,7 @@ public class PaidExamLifecycleService {
                 else op.markExpired(now,purge);
             }
             op.completeRecovery(execution.now());
+            finishDeleted(op);
             return operations.save(op);
         });
     }
@@ -266,6 +270,11 @@ public class PaidExamLifecycleService {
     }
 
     private ExamSession previous(ExamCreationOperation op) {
+        if (op.getPaidDeletedSource() != null) {
+            require(deletedSources != null);
+            deletedSources.validatePaid(op);
+            return null; // Exact ACK-bound deleted source; never recreate or close another Session.
+        }
         if (op.getReplacementSourceSessionId()==null) return null;
         require(!op.getReplacementSourceSessionId().equals(op.getSessionId()));
         ExamSession old=mongo.findById(op.getReplacementSourceSessionId(),ExamSession.class);
@@ -274,6 +283,12 @@ public class PaidExamLifecycleService {
                 && Objects.equals(old.getMockExamId(),op.getExpectedMockExamId()));
         require(old.getSubmissionsClosedAt()==null || Objects.equals(old.getSubmissionsClosedByOperationId(),op.getOperationId()));
         return old; // Keep terminal status/results; never resurrect or close a different current Session.
+    }
+
+    private void finishDeleted(ExamCreationOperation op) {
+        if (op.getPaidDeletedSource() != null) {
+            require(deletedSources != null); deletedSources.finishPaid(op);
+        }
     }
 
     private void requireNoSession(ExamCreationOperation op) {

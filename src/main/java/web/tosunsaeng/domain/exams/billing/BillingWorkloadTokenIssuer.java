@@ -19,7 +19,7 @@ import java.util.UUID;
 
 /** No network access, no token cache, no authentication fallback. */
 public final class BillingWorkloadTokenIssuer {
-    public enum Purpose { RESERVATIONS, ATTEMPT_GROUP_EVENTS }
+    public enum Purpose { RESERVATIONS, ATTEMPT_GROUP_EVENTS, EXAM_DELETION_EVENTS }
     private final String environment;
     private final RSAKey key;
     private final Clock clock;
@@ -85,7 +85,11 @@ public final class BillingWorkloadTokenIssuer {
 
     private SignedJWT sign(Purpose purpose) throws JOSEException {
         long now = clock.instant().getEpochSecond();
-        String target = purpose == Purpose.RESERVATIONS ? "reservations" : "attempt-group-events";
+        String target = switch (purpose) {
+            case RESERVATIONS -> "reservations";
+            case ATTEMPT_GROUP_EVENTS -> "attempt-group-events";
+            case EXAM_DELETION_EVENTS -> "exam-deletion-events";
+        };
         SignedJWT jwt = new SignedJWT(new JWSHeader.Builder(JWSAlgorithm.RS256)
                 .type(JOSEObjectType.JWT).keyID(key.getKeyID()).build(), new JWTClaimsSet.Builder()
                 .issuer("urn:tosunsaeng:workload:learning-core:" + environment)

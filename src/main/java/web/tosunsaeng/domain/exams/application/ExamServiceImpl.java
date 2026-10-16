@@ -43,6 +43,8 @@ import java.util.function.Supplier;
 @Service
 @RequiredArgsConstructor
 public class ExamServiceImpl implements ExamService {
+    @Autowired(required = false) private PaidExamCreationSaga paidExamCreationSaga;
+    @Value("${app.billing.paid-exam.enabled:false}") private boolean paidExamEnabled;
 
     @org.springframework.beans.factory.annotation.Autowired(required = false)
     private web.tosunsaeng.domain.learningrecorddeletion.application.DeletionAccess deletionAccess;
@@ -232,8 +234,9 @@ public class ExamServiceImpl implements ExamService {
     public ExamResponseDTO.CreateSessionResult createExamSession(String idempotencyKey) {
         long startedAt = System.nanoTime();
         String userId = currentUserProvider.getCurrentUserId();
-        if (deletionAccess != null) deletionAccess.requirePublicWrite(userId);
-        ExamSessionManager.Assignment assignment = billingSagaProperties.isCreationSagaEnabled()
+        if (!paidExamEnabled && deletionAccess != null) deletionAccess.requirePublicWrite(userId);
+        ExamSessionManager.Assignment assignment = paidExamEnabled ? paidExamCreationSaga.start(userId,idempotencyKey)
+                : billingSagaProperties.isCreationSagaEnabled()
                 ? billingExamCreationSaga.start(userId, idempotencyKey)
                 : examSessionManager.startNew(userId);
         String examId = assignment.session().getExamId();

@@ -85,8 +85,16 @@ public class ReservationOperationExecution {
         ExamCreationOperation op=freshOperation(id);
         if (op==null || op.getPaidSelection()==null || op.getRecovery()==null || op.getRecovery().getMemberWait()==null
                 || op.getRecovery().getStatus()!=ReservationRecovery.Status.NEEDS_REVIEW
-                || !op.getRecovery().getMemberWait().reviewEligible(op.getOperationId(),op.getPaidRequestDigest(),op.getRecovery().getFailureCode())
-                || !now().isBefore(op.getCreatedAt().plus(java.time.Duration.ofDays(120)))) return null;
+                || !op.getRecovery().getMemberWait().reviewEligible(op.getOperationId(),op.getPaidRequestDigest(),op.getRecovery().getFailureCode())) return null;
+        if (!op.withinPaidGuarantee(now())) {
+            // Persist the closed window even for the exceptional MEMBER-review entry.
+            // Otherwise a later clock rollback could revive the old pure-wait proof.
+            mongo.updateFirst(Query.query(Criteria.where("_id").is(id).and("version").is(op.getVersion())
+                            .and("activeGuard").is(true).and("recovery.status").is(ReservationRecovery.Status.NEEDS_REVIEW)
+                            .andOperator(new Criteria().orOperator(Criteria.where("recovery.leaseUntil").is(null),
+                                    Criteria.where("recovery.leaseUntil").lte(now())))),paidWindowReview(),ExamCreationOperation.class);
+            return null;
+        }
         var proof=op.getRecovery().getMemberWait().exhaustion();
         if (proof.quarantinedAt().isAfter(now()) || proof.chargedAttempts()!=op.getRecovery().getAttempts()
                 || !java.util.Objects.equals(proof.firstAttemptAt(),op.getRecovery().getFirstAt())) return null;
@@ -159,6 +167,24 @@ public class ReservationOperationExecution {
         ExamCreationOperation operation = mongo.findOne(owned(lease), ExamCreationOperation.class);
         if (operation == null) throw new ReservationRecoveryException(LEASE_LOST);
         requireOwner(operation.getUserId());
+        if (!paidWindowOpen(lease, operation))
+            throw new ReservationRecoveryException(ReservationRecoveryException.Reason.STATE_INCONSISTENT);
+    }
+
+    /** Durable quarantine before any paid remote attempt; never infer terminal or release the owner guard. */
+    public boolean paidWindowOpen(Lease lease, ExamCreationOperation operation) {
+        if (operation.getPaidSelection()==null || operation.isTerminal() || operation.withinPaidGuarantee(now())) return true;
+        if(mongo.updateFirst(owned(lease).addCriteria(Criteria.where("activeGuard").is(true)),paidWindowReview(),
+                ExamCreationOperation.class).getModifiedCount()!=1) throw new ReservationRecoveryException(LEASE_LOST);
+        return false;
+    }
+
+    private Update paidWindowReview() {
+        return new Update().set("recovery.status",ReservationRecovery.Status.NEEDS_REVIEW)
+                .set("recovery.failureCode","paid_acceptance_window_closed").unset("purgeAt")
+                .set("recovery.alertReason","state_inconsistent").set("recovery.alertStatus","PENDING")
+                .set("recovery.alertIncidentId",UUID.randomUUID().toString())
+                .set("recovery.alertCreatedAt",now()).set("recovery.alertNextAt",now()).inc("version",1L);
     }
 
     public Lease required(String id) {

@@ -110,6 +110,8 @@ public final class PaidReservationProtocol {
     public static void matches(ExamCreationOperation op, ReservationSnapshot s) {
         if (op.isPhoneContinuation()) matchesPhone(op.getOperationId(), phoneRequest(op), s);
         else matches(op.getOperationId(), request(op), s);
+        if (op.getPaidDeletedSource() != null) require(s.reservationKind() == BillingReservationKind.INITIAL
+                && s.transition() != null && !op.getExpectedAttemptGroupId().equals(s.attemptGroupId()));
         if (op.getReservationId() != null) require(op.getReservationId().equals(s.reservationId()));
         if (op.getAttemptGroupId() != null) require(op.getAttemptGroupId().equals(s.attemptGroupId()));
         if (op.getReservationKind() != null) require(op.getReservationKind() == s.reservationKind());

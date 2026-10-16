@@ -22,6 +22,8 @@ public class DeletionWorker {
     private final DeletionStorage storage;
     private final Clock clock;
     private static final int BATCH = 100;
+    private String billingEnvironment;
+    public DeletionWorker withBillingEnvironment(String environment) { this.billingEnvironment = environment; return this; }
     public DeletionWorker(MongoTemplate mongo, DeletionTransactions tx, UserOwnershipGuardService guards,
                           DeletedExamContinuationStore continuations, DeletionStorage storage, Clock clock) {
         this.mongo = mongo; this.tx = tx; this.guards = guards; this.continuations = continuations; this.storage = storage; this.clock = clock;
@@ -75,6 +77,7 @@ public class DeletionWorker {
         return true;
     }
     private void step(DeletionOperation op, DeletionTarget external, boolean clean) {
+        if (op.isCleanupPrepared() && op.isWriteBlocked()) tryBillingCheckpoint(op);
         switch (op.getStage()) {
             case REQUESTED -> op.advance(DeletionOperation.Stage.FENCED);
             case FENCED -> op.advance(DeletionOperation.Stage.INVENTORYING);
@@ -97,7 +100,7 @@ public class DeletionWorker {
             default -> throw new UnsafeEvidence();
         }
         // Waiting on coordination is not exempt from the bounded pre-checkpoint budget.
-        if (op.isActiveGuard() && !clock.instant().isBefore(op.getTargetCompletionAt())) op.requireIntervention(false);
+        if (op.isActiveGuard() && !op.isCleanupPrepared() && !clock.instant().isBefore(op.getTargetCompletionAt())) op.requireIntervention(false);
     }
     private void inventory(DeletionOperation op) {
         if (pendingCreation(op)) { waitForCoordination(op); return; }
@@ -138,7 +141,10 @@ public class DeletionWorker {
                     .and("prepared").is(true).and("referencesInventoried").is(true)
                     .and("callbackFence").is(DeletionTarget.CallbackFence.SEALED)), DeletionTarget.class);
             if (total != op.getSealedTargetCount() || sealed != total) throw new UnsafeEvidence();
-            op.allowNewLearning(new DeletionOperation.RestartEvidence(op.getInventoryDigest(), total, total, true, true, true, true), clock.instant());
+            if (op.isBillingDeliveryRequired()) {
+                op.beginIndependentCleanup();
+                tryBillingCheckpoint(op);
+            } else op.allowNewLearning(new DeletionOperation.RestartEvidence(op.getInventoryDigest(), total, total, true, true, true, true), clock.instant());
             return;
         }
         ExamSession session = target.getTargetType() == DeletionTarget.Type.EXAM ? mongo.findById(target.getAggregateId(), ExamSession.class) : null;
@@ -153,6 +159,10 @@ public class DeletionWorker {
             Document source = mongo.findById(target.getAggregateId(), Document.class, root);
             Date until = source == null ? null : source.getDate("externalWriteUntil");
             if (until != null && clock.instant().isBefore(until.toInstant())) return;
+        }
+        if (session != null && session.getAttemptGroupId() != null) {
+            target.prepareBilling(billingEnvironment, session.getAttemptGroupId(), op.getRequestedAt(), clock.instant());
+            op.requireBillingDelivery();
         }
         target.sealCallbacks(true, true, clock.instant()); mongo.save(target);
         if (session != null && session.getAttemptGroupId() != null) continuations.retainAndDeleteSession(op.getDeletionId(), session.getExamId());
@@ -195,6 +205,7 @@ public class DeletionWorker {
                         Criteria.where("storageSweptAt").is(null), Criteria.where("verifiedAt").is(null)))), DeletionTarget.class);
         long total = mongo.count(Query.query(Criteria.where("deletionId").is(op.getDeletionId())), DeletionTarget.class);
         if (unfinished != 0 || total != op.getSealedTargetCount()) throw new UnsafeEvidence();
+        if (op.isWriteBlocked()) return; // Cleanup complete is not a remote acknowledgment.
         // New learning may have created a NEW Billing operation after the checkpoint. It is not part of this deletion.
         op.complete(new DeletionOperation.CompletionEvidence(0, 0, 0, true,
                 clock.instant()), clock.instant());
@@ -219,6 +230,16 @@ public class DeletionWorker {
     private boolean pendingCreation(DeletionOperation op) {
         return mongo.exists(Query.query(Criteria.where("userId").is(op.getUserId()).and("activeGuard").is(true)), "exam_creation_operations");
     }
+    private void tryBillingCheckpoint(DeletionOperation op) {
+        if (pendingCreation(op)) return;
+        long total = mongo.count(Query.query(Criteria.where("deletionId").is(op.getDeletionId())), DeletionTarget.class);
+        long sealed = mongo.count(Query.query(Criteria.where("deletionId").is(op.getDeletionId()).and("prepared").is(true)
+                .and("referencesInventoried").is(true).and("callbackFence").is(DeletionTarget.CallbackFence.SEALED)), DeletionTarget.class);
+        if (total != op.getSealedTargetCount() || sealed != total) throw new UnsafeEvidence();
+        if (mongo.exists(Query.query(Criteria.where("deletionId").is(op.getDeletionId()).and("billingDelivery").ne(null)
+                .and("billingDelivery.state").ne("ACKED")), DeletionTarget.class)) return;
+        op.allowNewLearning(new DeletionOperation.RestartEvidence(op.getInventoryDigest(), total, sealed, true, true, true, true), clock.instant());
+    }
     private void waitForCoordination(DeletionOperation op) {
         op.recordRetry(DeletionOperation.FailureCategory.COORDINATION_WAIT);
         if (op.getRetryCount() >= 200) op.requireIntervention(true);
@@ -240,6 +261,18 @@ public class DeletionWorker {
         var done = mongo.find(Query.query(Criteria.where("status").is(DeletionOperation.Status.COMPLETED)
                 .and("retentionFinalized").ne(true)).with(Sort.by("completedAt", "_id")).limit(1), DeletionOperation.class);
         for (var op : done) {
+            if (op.isBillingDeliveryRequired()) {
+                tx.run(() -> {
+                    var current = mongo.findById(op.getDeletionId(), DeletionOperation.class);
+                    if (current != null && current.isBillingDeliveryRequired() && !current.isRetentionFinalized()) {
+                        current.finishRetention(); mongo.save(current);
+                        for (String collection : List.of("learning_record_deletion_targets", "learning_record_deletion_commands"))
+                            mongo.updateMulti(Query.query(Criteria.where("deletionId").is(current.getDeletionId())), new Update().unset("expiresAt"), collection);
+                    }
+                    return null;
+                });
+                continue;
+            }
             var targets = mongo.find(Query.query(Criteria.where("deletionId").is(op.getDeletionId()).and("expiresAt").is(null)).limit(BATCH), DeletionTarget.class);
             for (var target : targets) { target.retainUntil(op.getCompletedAt().plus(Duration.ofDays(30))); mongo.save(target); }
             if (targets.isEmpty()) {

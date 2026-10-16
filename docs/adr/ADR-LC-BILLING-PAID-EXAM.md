@@ -1,5 +1,11 @@
 # ADR — LC 유료 시험의 접수 기준 전환과 복구 경계
 
+- 2026-10-16 legacy 문제선정 예외 승인: 서버 exact manifest에 속하는 원 시험의 전체접수 근거가 불충분하면 동일 mock의 새 Session을 선택한다. 오래된 기록을 잘못 완료 처리하지 않으며, 실제 전부 제출했던 경우 같은 문제를 반복할 비용을 수용한다. 확인된 전체접수/완료는 기존 다음 문제 규칙, 신규 Billing 예약/확정 및 source 필수·owner/삭제 보호는 불변이다. 일반 source 누락 fallback이나 기존 권리/무료권 복원 증거 생성으로 확대하지 않는다.
+
+- 2026-10-16 삭제 연동: [삭제 후 INITIAL 연결](../codex/TMI_217_DELETED_INITIAL_PAID_ROUTING.md)은 exact ACK/hash와 원 시험 접수판정을 고정하며 기존 restartContext wire를 사용한다. 원 Session 재생성 없이 새 INITIAL/newgroup만 허용하고 성공/확정실패의 claim 변경을 local Transaction에 참여시킨다. 공개 adapter/schema2 worker 연결은 default-off이며 legacy runtime/공동 rollout gate를 해제하지 않는다.
+
+- P6.1 후속: [120일 결과 보관](../codex/LC_BILLING_PAID_EXAM_P6_1_RETENTION.md)은 기존 operation 하나를 유지한다. 최초접수/terminal 경계와 정리 검토 시각을 고정하고 paid purgeAt은 null로 유지한다. 안전조건은 TTL만으로 판정하지 않으며 최종 purge는 별도 승인이다. 기존 legacy7일/공개계약·활성화 gate는 유지한다.
+
 - TMI-220 보완: [LC 기접수 구현](../codex/TMI_220_LC_ACCEPTED_WORK_IMPLEMENTATION.md). confirm owner·재시작 closure snapshot 및 immutable Job 최초접수 시각을 사용해 revoked 과거 Session의 exact 기존 작업만 허용한다. 신규사용·삭제/owner/terminal 우선은 유지한다. 공동 경합/E2E 및 활성화 gate는 별도다.
 
 - P6 준비: [읽기 전용 manifest 검증](../codex/LC_BILLING_PAID_EXAM_P6_PREPARATION.md). source 누락 fallback 없이 별도 승인 summary와 exact 목록을 검증한다. membership은 권한이 아니며 상태누락/삭제/owner/revoke 검사를 우회하지 않는다. snapshot과 실제 writer drain을 구분하고 현재 공개 reader/활성화 연결은 하지 않는다.

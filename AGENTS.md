@@ -1,5 +1,21 @@
 # 프로젝트 목적
 
+## 2026-10-16 P6.1·삭제 연동 전달 및 legacy 후속 승인
+
+- 사용자 「커밋 푸시 머지한 다음 브랜치 파서 다음꺼 구현해줘」로 현재 LC P6.1/삭제 sender·paid 연결 변경의 commit/push/PR/develop 머지 및 기존 테스트 자동배포 트리거를 승인했다. 사용자 DS_Store는 제외한다. 후속 feat 브랜치에서 exact manifest 기반 legacy runtime 및 접수증거 불충분 시 동일 문제 정책의 코드/격리 테스트를 구현한다. 실DB/index·목록 설치/봉인·운영 배포·기능 활성화·Billing/Identity 수정은 제외하며 후속 변경 자체의 commit/push는 별도 요청 전 하지 않는다.
+
+## 2026-10-16 삭제 후 INITIAL·paid 경로 연결 승인
+
+- 개발 잔여 범위 안내 후 사용자 「어 해줘」로 LC 삭제 ACK 기반 새 INITIAL·기존 paid 서비스의 공개 생성/worker 연결과 격리 테스트를 승인했다. 기존 P6.1/삭제 sender 변경을 보존한다. legacy runtime·공동 E2E 전 활성화 차단을 유지하며 실DB/index·Billing/Identity 변경·배포·commit/push는 제외한다.
+
+## 2026-10-16 TMI-217 LC 발신 구현 승인
+
+- 사용자 「어 해줘」로 동결 draft-3>2>1의 LC 삭제 발신·불변자료/204저장·cleanup 독립·전체ACK checkpoint·TTL/120일 보호와 격리 테스트를 승인했다. 기존 P6.1 dirty와 사용자파일을 보존하며 Billing/Identity 변경·실DB/index 적용·배포/활성화·commit/push는 제외한다. 기본OFF·공동runtime/실환경gate를 유지한다.
+
+## 2026-10-14 P6.1 구현 승인
+
+- 전달/머지 요청 후 사용자가 후속 대상을 「LC P6.1: 120일 보관·안전한 정리 준비」로 확정했다. 별도 feat 브랜치에서 최초접수/terminal 보존 경계·미완료 자동복구 상한·읽기 전용 정리 적격성 및 로컬/격리 Mongo 테스트를 구현한다. 실제 purge·실DB/index 변경·운영 설정/배포·Billing/Identity 수정은 제외한다. P6.1 자체 commit/push는 별도 요청 전 수행하지 않는다.
+
 ## 2026-10-14 P6·TMI-220 전달 승인
 
 - 사용자 「좋아 커밋 푸시 머지한 다음 브랜치 파서 다음꺼 구현해줘」로 현재 LC P6 준비·TMI-220 보완의 커밋/푸시/PR/develop 머지 및 기존 테스트 자동 배포 트리거를 승인했다. 기능 설정/운영 배포/실DB 변경은 제외한다. 후속 대상은 직전 Billing PLAN-012와 LC P6.1 사이의 범위를 확인하고 착수한다. 사용자 DS_Store는 전달 대상에서 제외한다.
