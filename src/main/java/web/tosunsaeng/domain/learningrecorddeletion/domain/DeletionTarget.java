@@ -37,6 +37,13 @@ public class DeletionTarget {
     private boolean cacheCleared;
     private Instant storageSweptAt;
     private Instant verifiedAt;
+    private BillingDeletionDelivery billingDelivery;
+
+    public void prepareBilling(String environment, String group, Instant deletedAt, Instant now) {
+        if (billingDelivery != null) throw new IllegalStateException("Delivery is immutable");
+        billingDelivery = BillingDeletionDelivery.create(environment, userId, deletionId, group, aggregateId, deletedAt, now);
+        expiresAt = null;
+    }
 
     public void markVerified(Instant now) {
         if (!prepared || !mongoCleared || !cacheCleared || storageSweptAt == null)
@@ -51,7 +58,10 @@ public class DeletionTarget {
     public void markMongoCleared() { if (!prepared) throw new IllegalStateException("Unprepared target"); mongoCleared = true; }
     public void markCacheCleared() { cacheCleared = true; }
     public void markStorageSwept(Instant now) { storageSweptAt = now; }
-    public void retainUntil(Instant expiry) { expiresAt = expiry; }
+    public void retainUntil(Instant expiry) {
+        if (billingDelivery != null && expiry != null) throw new IllegalStateException("Linked evidence is not TTL eligible");
+        expiresAt = expiry;
+    }
 
     public static DeletionTarget draining(String deletionId, String userId, Type type, String aggregateId) {
         DeletionTarget target = new DeletionTarget();

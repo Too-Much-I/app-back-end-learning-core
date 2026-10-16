@@ -1,5 +1,11 @@
 # LC–Billing 유료 시험 연동 구현 계획
 
+- 2026-10-16 사용자 승인 — 서버 exact manifest로 확인한 기존 시험에서 전체접수 여부를 증명할 수 없으면 동일 mock으로 새 Session을 시작한다. 실제 전체접수를 했더라도 같은 문제를 다시 받을 수 있는 비용을 수용한다. 전체접수/완료가 확인되는 경우 기존 다음 문제 선정 규칙은 유지한다. 이 예외는 문제 선택에만 적용하며 기존 완료 여부를 조작하거나 접수 증거를 backfill하지 않는다. 신규 시험은 Billing 예약/확정·source 필수이며 원 시험을 소비/복원 근거로 연결하지 않는다. 같은 요청의 판정을 고정하고 owner/삭제/terminal 보호·기능OFF/활성화 gate를 유지한다. 이번 정책 기록 자체는 코드 구현·배포 완료가 아니다.
+
+- 2026-10-16 후속: [삭제 후 INITIAL·paid 경로 연결](TMI_217_DELETED_INITIAL_PAID_ROUTING.md). 삭제 ACK와 원 대상/접수판정의 operation 고정, default-off 공개 adapter/schema2 worker 분기를 구현했다. legacy manifest runtime·공동 검증 전 활성화 차단은 유지한다.
+
+- P6.1 구현 후속(2026-10-14): [120일 보관·안전한 정리 준비](LC_BILLING_PAID_EXAM_P6_1_RETENTION.md). 최초접수 고정, paid TTL 분리, 120일 자동복구 상한 및 read-only 검토를 구현했다. 실제 purge/이관·공동 T04/E2E·활성화는 미실행이다.
+
 - TMI-220 보완(2026-10-14): [과거 Session 기접수 코드·독립 검증](TMI_220_LC_ACCEPTED_WORK_IMPLEMENTATION.md)을 추가했다. 공통 policy/Callback/기존 grading retry/파생 Summary·terminal 경로를 보완했으며 근거 없는 과거 데이터 backfill은 하지 않는다. C01~C06/H14~H16 전체 공동 테스트 완료·배포 승인은 아니다.
 
 - P6 준비 후속(2026-10-14): [legacy 목록 검증·읽기 전용 snapshot](LC_BILLING_PAID_EXAM_P6_PREPARATION.md)을 구현했다. 실제 목록 적용/봉인·writer 전환·공개 연결/활성화와 P6.1 최종 purge는 미실행이다. TMI-220 기접수/revoke 공동 보완 gate를 유지한다.

@@ -50,6 +50,35 @@ public class ExamCreationOperation {
     private PaidExamSelection paidSelection;
     private String paidRequestDigest;
     private PaidReservationEvidence paidReservation;
+    // Paid schema only. Immutable original acceptance, not a lease/login/replay timestamp.
+    private Instant firstAcceptedAt;
+    // Earliest review time, deliberately NOT the TTL field purgeAt.
+    private Instant detailPurgeEligibleAt;
+    private PaidDeletedSource paidDeletedSource;
+
+    public record PaidDeletedSource(String deletionId, String eventId) {
+        public PaidDeletedSource {
+            web.tosunsaeng.domain.learningrecorddeletion.domain.DeletionIdentifiers.uuidV4(deletionId);
+            web.tosunsaeng.domain.learningrecorddeletion.domain.DeletionIdentifiers.uuidV4(eventId);
+        }
+    }
+    public void fixPaidDeletedSource(PaidDeletedSource source) {
+        requireState(ExamCreationState.PREPARED);
+        if (paidDeletedSource != null || paidSelection == null || isPhoneContinuation() || replacementSourceSessionId == null)
+            throw new IllegalStateException("Invalid deleted source binding");
+        paidDeletedSource = java.util.Objects.requireNonNull(source);
+    }
+
+    public static final java.time.Duration PAID_RETENTION = java.time.Duration.ofDays(120);
+
+    public Instant getGuaranteeUntil() {
+        return firstAcceptedAt == null ? null : firstAcceptedAt.plus(PAID_RETENTION);
+    }
+
+    public boolean withinPaidGuarantee(Instant now) {
+        return paidSelection != null && firstAcceptedAt != null && now != null
+                && !now.isBefore(firstAcceptedAt) && now.isBefore(getGuaranteeUntil());
+    }
 
     @Version
     private Long version;
@@ -100,7 +129,7 @@ public class ExamCreationOperation {
                 cycleNumber, ExamCreationState.PREPARED, null, null, null,
                 replacementSourceSessionId, expectedAttemptGroupId, expectedMockExamId,
                 continuationReason, continuationId, null,
-                null, null, null, true, now, now, null, null, ReservationRecovery.prepared(now), null, null, null, null
+                null, null, null, true, now, now, null, null, ReservationRecovery.prepared(now), null, null, null, null, null, null, null
         );
     }
 
@@ -112,6 +141,9 @@ public class ExamCreationOperation {
         requireState(ExamCreationState.PREPARED);
         if (paidSelection != null) throw new IllegalStateException("Selection is already fixed");
         paidSelection = java.util.Objects.requireNonNull(selection);
+        firstAcceptedAt = createdAt.truncatedTo(java.time.temporal.ChronoUnit.MILLIS);
+        createdAt = firstAcceptedAt;
+        updatedAt = firstAcceptedAt;
         // P2/P3 must explicitly adopt this format; legacy status/cancel workers must not claim it.
         recovery.setSchemaVersion(2);
     }
@@ -161,6 +193,12 @@ public class ExamCreationOperation {
         recovery.setLeaseToken(null);
         recovery.setLeaseOwner(null);
         recovery.setLeaseUntil(null);
+        if (paidSelection != null) {
+            // Holds/unknown outcomes cannot be enforced by Mongo's TTL monitor.
+            // P6.1 never arms automatic deletion for paid records.
+            purgeAt = null;
+            return;
+        }
         Instant minimum = resolvedAt.plus(java.time.Duration.ofDays(7));
         if (purgeAt == null || purgeAt.isBefore(minimum)) purgeAt = minimum;
     }
@@ -268,9 +306,13 @@ public class ExamCreationOperation {
 
     private void markTerminal(Instant terminalAt, Instant purgeAt) {
         this.activeGuard = false;
-        this.terminalAt = terminalAt;
-        this.purgeAt = purgeAt;
-        this.updatedAt = terminalAt;
+        this.terminalAt = paidSelection == null ? terminalAt : terminalAt.truncatedTo(java.time.temporal.ChronoUnit.MILLIS);
+        this.purgeAt = paidSelection == null ? purgeAt : null;
+        if (paidSelection != null && firstAcceptedAt != null && !this.terminalAt.isBefore(firstAcceptedAt)) {
+            Instant terminalLimit = this.terminalAt.plus(PAID_RETENTION);
+            detailPurgeEligibleAt = terminalLimit.isAfter(getGuaranteeUntil()) ? terminalLimit : getGuaranteeUntil();
+        }
+        this.updatedAt = this.terminalAt;
     }
 
     private void requireState(ExamCreationState expected) {

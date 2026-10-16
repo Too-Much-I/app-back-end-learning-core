@@ -168,6 +168,213 @@ class DeletionFlowMongoTest {
         for (int i = 0; i < 40 && commands.latest(OWNER).isWriteBlocked(); i++) step();
         assertThat(commands.latest(OWNER).getSafeToStartLearningAt()).isNotNull();
     }
+    DeletionTarget linkedPrepared() {
+        return linkedPrepared(false);
+    }
+    DeletionTarget linkedPrepared(boolean allAccepted) {
+        worker.withBillingEnvironment("test");
+        mongo.insert(ExamSession.builder().examId("linked").userId(OWNER).mockExamId("mock").cycleNumber(1)
+                .createdAt(LocalDateTime.ofInstant(clock.instant(),ZoneOffset.UTC))
+                .submissionEvidenceVersion(1).requiredQuestionNumbers(List.of(1,2))
+                .submissionCompletedAt(allAccepted?clock.instant():null)
+                .attemptGroupId("22222222-2222-4222-8222-222222222222").billingReservationId("reservation")
+                .creationOperationId("33333333-3333-4333-8333-333333333333")
+                .entitlementState(web.tosunsaeng.domain.exams.domain.enums.ExamEntitlementState.CONFIRMED)
+                .attemptGroupProjectionStatus(web.tosunsaeng.domain.exams.attemptgroup.domain.AttemptGroupProjectionStatus.OPEN)
+                .status(web.tosunsaeng.domain.exams.domain.enums.ExamSessionStatus.IN_PROGRESS).active(true).build());
+        commands.request(OWNER, KEY);
+        for (int i=0;i<30 && !commands.latest(OWNER).isCleanupPrepared();i++) step();
+        assertThat(commands.latest(OWNER).isCleanupPrepared()).isTrue();
+        assertThat(commands.latest(OWNER).isWriteBlocked()).isTrue();
+        return mongo.findOne(Query.query(Criteria.where("aggregateId").is("linked")), DeletionTarget.class);
+    }
+    BillingDeletionSender sender(BillingDeletionClient remote) {
+        var guards = new UserOwnershipGuardService(mongo, new MongoRepositoryFactory(mongo).getRepository(UserOwnershipGuardRepository.class));
+        return new BillingDeletionSender(mongo,tx,guards,remote,clock,"test");
+    }
+    @Test void linkedCleanupCompletesWhileDeliveryQuarantinedAndEvidenceSurvivesThirtyDays() {
+        var target = linkedPrepared();
+        var remote = mock(BillingDeletionClient.class);
+        when(remote.send(any())).thenReturn(new BillingDeletionClient.Result(false, BillingDeletionDelivery.Failure.AUTHENTICATION_FAILED,null));
+        sender(remote).tick();
+        clock.now = clock.now.plus(Duration.ofDays(31));
+        for(int i=0;i<50;i++) step();
+        var op = commands.latest(OWNER);
+        var retained = mongo.findById(target.getId(),DeletionTarget.class);
+        assertThat(retained.getVerifiedAt()).isNotNull();
+        assertThat(retained.getBillingDelivery().getState()).isEqualTo(BillingDeletionDelivery.State.NEEDS_REVIEW);
+        assertThat(op.isWriteBlocked()).isTrue(); assertThat(op.getCompletedAt()).isNull();
+        assertThat(op.getExpiresAt()).isNull(); assertThat(retained.getExpiresAt()).isNull();
+        assertThat(mongo.findOne(new Query(),DeletionCommand.class).expiresAt()).isNull();
+    }
+    @Test void persisted204OpensCheckpointAndCompletedLinkedEvidenceHasOnlyReviewTime() {
+        var target = linkedPrepared();
+        var remote = mock(BillingDeletionClient.class);
+        when(remote.send(any())).thenReturn(new BillingDeletionClient.Result(true,null,null));
+        assertThat(sender(remote).tick()).isTrue();
+        step(); assertThat(commands.latest(OWNER).isWriteBlocked()).isFalse();
+        clock.now = clock.now.plusSeconds(360);
+        for(int i=0;i<60 && commands.latest(OWNER).isActiveGuard();i++) step();
+        worker.maintainRetention();
+        var op = commands.latest(OWNER);
+        assertThat(op.getStatus()).isEqualTo(DeletionOperation.Status.COMPLETED);
+        assertThat(op.getBillingDetailReviewAt()).isEqualTo(op.getCompletedAt().plus(Duration.ofDays(120)));
+        assertThat(op.getExpiresAt()).isNull();
+        assertThat(mongo.findById(target.getId(),DeletionTarget.class).getExpiresAt()).isNull();
+        verify(remote,times(1)).send(target.getBillingDelivery().getPayload());
+    }
+    @Test void responseLostRetriesExactPayloadAndStaleVersionCannotAcknowledge() {
+        var target = linkedPrepared();
+        var remote = mock(BillingDeletionClient.class);
+        when(remote.send(any())).thenAnswer(call -> {
+            mongo.updateFirst(Query.query(Criteria.where("_id").is(target.getId())),new Update().inc("version",1),DeletionTarget.class);
+            return new BillingDeletionClient.Result(true,null,null);
+        });
+        var sender = sender(remote); sender.tick();
+        assertThat(mongo.findById(target.getId(),DeletionTarget.class).getBillingDelivery().getState()).isEqualTo(BillingDeletionDelivery.State.PENDING);
+        when(remote.send(any())).thenReturn(new BillingDeletionClient.Result(true,null,null));
+        clock.now = clock.now.plusSeconds(31); sender.tick(); // expired claim consumes budget and backs off
+        clock.now = clock.now.plusSeconds(5); sender.tick();
+        assertThat(mongo.findById(target.getId(),DeletionTarget.class).getBillingDelivery().getState()).isEqualTo(BillingDeletionDelivery.State.ACKED);
+        verify(remote,times(2)).send(target.getBillingDelivery().getPayload());
+    }
+    @Test void senderOffDoesNotInterpretLinkedTargetAsUnlinked() {
+        linkedPrepared(); clock.now = clock.now.plusSeconds(360);
+        for(int i=0;i<60;i++) step();
+        assertThat(commands.latest(OWNER).isWriteBlocked()).isTrue();
+        assertThat(commands.latest(OWNER).getSafeToStartLearningAt()).isNull();
+    }
+    private void acknowledgeDeleted() {
+        var remote=mock(BillingDeletionClient.class);
+        when(remote.send(any())).thenReturn(new BillingDeletionClient.Result(true,null,null));
+        sender(remote).tick(); step();
+        assertThat(commands.latest(OWNER).isWriteBlocked()).isFalse();
+    }
+    private PaidHarness paidHarness() {
+        var repos=new MongoRepositoryFactory(mongo);
+        var ops=repos.getRepository(web.tosunsaeng.domain.exams.domain.repository.ExamCreationOperationRepository.class);
+        mongo.getCollection("exam_creation_operations").createIndex(new Document("userId",1).append("activeGuard",1),
+                new com.mongodb.client.model.IndexOptions().unique(true).partialFilterExpression(new Document("activeGuard",true)));
+        var beans=new org.springframework.beans.factory.support.StaticListableBeanFactory();
+        beans.addBean("tx",new org.springframework.transaction.support.TransactionTemplate(new org.springframework.data.mongodb.MongoTransactionManager(mongo.getMongoDatabaseFactory())));
+        var props=new web.tosunsaeng.domain.usermerge.config.UserMergedProperties(); props.setWriterEnabled(true);
+        var guards=new UserOwnershipGuardService(mongo,repos.getRepository(UserOwnershipGuardRepository.class));
+        var owners=new web.tosunsaeng.domain.usermerge.application.UserOwnedTransactionExecutor(props,guards,
+                beans.getBeanProvider(org.springframework.transaction.support.TransactionOperations.class),clock);
+        org.springframework.test.util.ReflectionTestUtils.setField(owners,"deletionAccess",access);
+        beans.addBean("owners",owners);
+        var provider=beans.getBeanProvider(web.tosunsaeng.domain.usermerge.application.UserOwnedTransactionExecutor.class);
+        var deleted=new DeletedExamContinuationStore(mongo,guards,clock);
+        var catalog=mock(web.tosunsaeng.domain.exams.application.MockExamCatalogService.class);
+        var questions=List.of(web.tosunsaeng.domain.exams.domain.entity.Question.builder().questionNumber(1).build(),
+                web.tosunsaeng.domain.exams.domain.entity.Question.builder().questionNumber(2).build());
+        var first=web.tosunsaeng.domain.exams.domain.entity.MockExam.builder().mockExamId("mock").questions(questions).build();
+        var next=web.tosunsaeng.domain.exams.domain.entity.MockExam.builder().mockExamId("next").questions(questions).build();
+        when(catalog.getRequiredExam("mock")).thenReturn(first); when(catalog.getRequiredExam("next")).thenReturn(next);
+        when(catalog.findAssignableExams()).thenReturn(List.of(new web.tosunsaeng.domain.exams.application.MockExamCatalogService.CatalogExam(first,1),
+                new web.tosunsaeng.domain.exams.application.MockExamCatalogService.CatalogExam(next,2)));
+        var prep=new web.tosunsaeng.domain.exams.application.PaidExamPreparationService(mongo,ops,catalog,
+                new web.tosunsaeng.domain.exams.domain.repository.ExamSessionCompletionQuery(mongo),
+                new web.tosunsaeng.domain.exams.application.ExamSubmissionEvidence(mongo),provider,clock);
+        org.springframework.test.util.ReflectionTestUtils.setField(prep,"deletedSources",deleted);
+        var settings=new web.tosunsaeng.domain.exams.billing.reconciliation.ReservationReconciliationProperties();
+        var execution=new web.tosunsaeng.domain.exams.billing.reconciliation.ReservationOperationExecution(mongo,settings,clock);
+        var store=new web.tosunsaeng.domain.exams.billing.reconciliation.ReservationRecoveryStore(mongo,execution,settings);
+        var lifecycle=new web.tosunsaeng.domain.exams.application.PaidExamLifecycleService(mongo,ops,provider,execution,
+                mock(web.tosunsaeng.domain.exams.attemptgroup.infrastructure.AttemptGroupEventProperties.class));
+        org.springframework.test.util.ReflectionTestUtils.setField(lifecycle,"deletedSources",deleted);
+        org.springframework.test.util.ReflectionTestUtils.setField(lifecycle,"deletionAccess",access);
+        var billing=mock(web.tosunsaeng.domain.exams.billing.BillingReservationClient.class);
+        var circuit=mock(web.tosunsaeng.domain.exams.billing.reconciliation.ReservationAuthCircuit.class);
+        var recovery=new web.tosunsaeng.domain.exams.application.PaidExamRecoveryService(execution,lifecycle,billing,store,circuit);
+        var evidence=new web.tosunsaeng.domain.exams.application.PaidReservationEvidenceStore(ops,mongo,provider,clock);
+        var sagaProps=new web.tosunsaeng.domain.exams.billing.BillingSagaProperties(); sagaProps.setCreationSagaEnabled(true);
+        var saga=new web.tosunsaeng.domain.exams.application.PaidExamCreationSaga(ops,prep,evidence,recovery,lifecycle,
+                mock(web.tosunsaeng.domain.exams.application.BillingExamCreationSaga.class),billing,sagaProps,circuit,mongo,catalog,clock);
+        return new PaidHarness(prep,saga,billing,ops,store);
+    }
+    private record PaidHarness(web.tosunsaeng.domain.exams.application.PaidExamPreparationService prep,
+            web.tosunsaeng.domain.exams.application.PaidExamCreationSaga saga,
+            web.tosunsaeng.domain.exams.billing.BillingReservationClient billing,
+            web.tosunsaeng.domain.exams.domain.repository.ExamCreationOperationRepository ops,
+            web.tosunsaeng.domain.exams.billing.reconciliation.ReservationRecoveryStore store) { }
+
+    private web.tosunsaeng.domain.exams.billing.BillingReservationClient.ReservationSnapshot paidSnapshot(PaidHarness h,String key,boolean confirmed) {
+        var op=h.ops().findByUserIdAndOperationId(OWNER,key).orElseThrow();
+        return new web.tosunsaeng.domain.exams.billing.BillingReservationClient.ReservationSnapshot(key,
+                "44444444-4444-4444-8444-444444444444",web.tosunsaeng.domain.exams.domain.enums.BillingReservationKind.INITIAL,
+                confirmed?web.tosunsaeng.domain.exams.billing.BillingReservationClient.ReservationStatus.CONFIRMED:web.tosunsaeng.domain.exams.billing.BillingReservationClient.ReservationStatus.RESERVED,
+                "55555555-5555-4555-8555-555555555555",confirmed?web.tosunsaeng.domain.exams.billing.BillingReservationClient.AttemptGroupStatus.OPEN:null,
+                op.getSessionId(),op.getMockExamId(),null,null,clock.instant().plusSeconds(300),confirmed?clock.instant():null,
+                web.tosunsaeng.domain.exams.billing.PaidReservationProtocol.Source.SUBSCRIPTION,
+                new web.tosunsaeng.domain.exams.billing.PaidReservationProtocol.Transition(op.getExpectedAttemptGroupId(),op.getReplacementSourceSessionId()),null);
+    }
+    @Test void deletedPartialStartsInitialWithoutRestoringOldSessionAndSameKeyReplays() {
+        var old=linkedPrepared(); acknowledgeDeleted(); var h=paidHarness(); String key=UUID.randomUUID().toString();
+        when(h.billing().reservePaid(eq(key),any())).thenAnswer(c->paidSnapshot(h,key,false));
+        when(h.billing().confirmPaid(eq(key),any(),any(),any(),any())).thenAnswer(c->paidSnapshot(h,key,true));
+        when(h.billing().statusPaid(OWNER,key)).thenAnswer(c->paidSnapshot(h,key,true));
+        var result=h.saga().start(OWNER,key);
+        assertThat(result.session().getMockExamId()).isEqualTo("mock");
+        assertThat(result.session().getBillingReservationKind()).isEqualTo(web.tosunsaeng.domain.exams.domain.enums.BillingReservationKind.INITIAL);
+        assertThat(mongo.findById("linked",ExamSession.class)).isNull();
+        assertThat(mongo.findById("linked",DeletedExamContinuation.class).getTransferState()).isEqualTo(DeletedExamContinuation.TransferState.TRANSFERRED);
+        assertThat(h.ops().findByUserIdAndOperationId(OWNER,key).orElseThrow().getPaidDeletedSource().eventId()).isEqualTo(old.getBillingDelivery().getEventId());
+        assertThat(h.saga().start(OWNER,key).session().getExamId()).isEqualTo(result.session().getExamId());
+        verify(h.billing(),times(1)).reservePaid(eq(key),any());
+        mongo.remove(Query.query(Criteria.where("_id").is(result.session().getExamId())),ExamSession.class);
+        assertThatThrownBy(()->h.saga().start(OWNER,key))
+                .isInstanceOfSatisfying(web.tosunsaeng.domain.exams.exception.ExamsException.class,
+                        e->assertThat(e.getCode()).isEqualTo(web.tosunsaeng.global.error.code.status.ErrorStatus._EXAM_NOT_FOUND));
+        verify(h.billing(),times(1)).reservePaid(eq(key),any());
+    }
+    @Test void deletedAllAcceptedChoosesNextAndRejectsMissingAck() {
+        linkedPrepared(true); var h=paidHarness();
+        assertThatThrownBy(()->h.prep().prepare(OWNER,UUID.randomUUID().toString())).isInstanceOf(RuntimeException.class);
+        acknowledgeDeleted();
+        var op=h.prep().prepare(OWNER,UUID.randomUUID().toString());
+        assertThat(op.getMockExamId()).isEqualTo("next");
+        assertThat(op.getPaidSelection().startReason()).isEqualTo(web.tosunsaeng.domain.exams.domain.entity.PaidExamSelection.StartReason.NEW_AFTER_SUBMISSION);
+        assertThat(h.prep().prepare(OWNER,op.getOperationId()).getCommandId()).isEqualTo(op.getCommandId());
+    }
+    @Test void deletedInitialRejectsReplacement() {
+        linkedPrepared(); acknowledgeDeleted(); var h=paidHarness(); String key=UUID.randomUUID().toString();
+        var op=h.prep().prepare(OWNER,key);
+        var s=paidSnapshot(h,key,false);
+        var wrong=new web.tosunsaeng.domain.exams.billing.BillingReservationClient.ReservationSnapshot(key,s.reservationId(),
+                web.tosunsaeng.domain.exams.domain.enums.BillingReservationKind.REPLACEMENT,s.reservationStatus(),op.getExpectedAttemptGroupId(),null,
+                op.getSessionId(),op.getMockExamId(),null,null,s.expiresAt(),null,s.entitlementSource(),null,null);
+        assertThatThrownBy(()->web.tosunsaeng.domain.exams.billing.PaidReservationProtocol.matches(op,wrong))
+                .isInstanceOf(web.tosunsaeng.domain.exams.billing.BillingClientException.class);
+    }
+    @Test void paidWorkerDueRequiresExplicitPaidRoutingFlag() {
+        linkedPrepared(); acknowledgeDeleted(); var h=paidHarness(); var op=h.prep().prepare(OWNER,UUID.randomUUID().toString());
+        clock.now=clock.now.plusSeconds(121);
+        assertThat(h.store().due()).isEmpty();
+        org.springframework.test.util.ReflectionTestUtils.setField(h.store(),"paidEnabled",true);
+        assertThat(h.store().due()).extracting(web.tosunsaeng.domain.exams.domain.entity.ExamCreationOperation::getCommandId).contains(op.getCommandId());
+    }
+    @Test void deletedMissingCoverageCannotFallBackToUnrelatedInitial() {
+        linkedPrepared(); acknowledgeDeleted(); var h=paidHarness();
+        mongo.updateFirst(Query.query(Criteria.where("_id").is("linked")),new Update().unset("paidStartReason"),DeletedExamContinuation.class);
+        assertThatThrownBy(()->h.prep().prepare(OWNER,UUID.randomUUID().toString())).isInstanceOf(IllegalStateException.class);
+        assertThat(h.ops().count()).isZero();
+        verifyNoInteractions(h.billing());
+    }
+    @Test void durablePreReserveRejectionReleasesDeletedClaimWithoutResurrection() {
+        linkedPrepared(); acknowledgeDeleted(); var h=paidHarness(); String key=UUID.randomUUID().toString();
+        when(h.billing().reservePaid(eq(key),any())).thenThrow(new web.tosunsaeng.domain.exams.billing.BillingClientException(
+                web.tosunsaeng.domain.exams.billing.BillingClientException.Category.TEMPORARILY_UNAVAILABLE,1));
+        assertThatThrownBy(()->h.saga().start(OWNER,key)).isInstanceOf(web.tosunsaeng.domain.exams.exception.ExamsException.class);
+        assertThat(mongo.findById("linked",DeletedExamContinuation.class).getTransferState()).isEqualTo(DeletedExamContinuation.TransferState.CLAIMED);
+        when(h.billing().statusPaid(OWNER,key)).thenThrow(new web.tosunsaeng.domain.exams.billing.BillingClientException(
+                web.tosunsaeng.domain.exams.billing.BillingClientException.Category.PRE_RESERVE_REJECTED,null));
+        assertThatThrownBy(()->h.saga().start(OWNER,key)).isInstanceOf(web.tosunsaeng.domain.exams.exception.ExamsException.class);
+        assertThat(h.ops().findByUserIdAndOperationId(OWNER,key).orElseThrow().isTerminal()).isTrue();
+        assertThat(mongo.findById("linked",DeletedExamContinuation.class).getTransferState()).isEqualTo(DeletedExamContinuation.TransferState.AVAILABLE);
+        assertThat(mongo.count(new Query(),ExamSession.class)).isZero();
+        verify(h.billing(),times(1)).reservePaid(eq(key),any());
+    }
     void step() { clock.now = clock.now.plusSeconds(10); worker.tick(); }
     static class MutableClock extends Clock {
         Instant now = Instant.parse("2026-10-03T01:00:00Z");

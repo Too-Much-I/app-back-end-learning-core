@@ -1,5 +1,55 @@
 # Learning Core Current State
 
+- 2026-10-16 — 사용자 요청으로 P6.1/삭제연동·paid 경로 연결 전달 준비 중. 현재 브랜치 feat/billing-paid-exam-p6-1은 origin/develop과 같은 기반이며 기능OFF를 유지한다. 사용자DS_Store 제외, 전체 회귀 후 commit/push/PR/develop 머지하고 별도 feat 브랜치에서 승인된 legacy 동일문제 예외를 구현한다. 실DB/활성화/운영배포는 제외한다. 관련 TMI-116/128/217/193/136/125.
+
+- legacy 동일 문제 정책 승인 턴의 정확한 WORKLOG 식별자를 추가했다. 정책은 계획/ADR에 반영됐으며 코드 구현·배포는 아직 수행하지 않았다. 관련 TMI-116/128/217.
+
+- 2026-10-16 — 사용자 승인으로 legacy 접수증거 불충분 시 문제선정 미결 해소: exact manifest 기존 시험은 동일 mock의 새 Session을 선택하며 실제 전체접수였어도 같은 문제를 반복할 비용을 수용한다. 전체접수/완료 확인 시 기존 다음 문제 규칙, 새 Billing 예약/확정/source 및 owner/삭제/terminal 보호는 유지한다. 계획/ADR에 기록했으며 이번 턴은 코드/DB/배포 변경 없음. 관련 TMI-116/128/217.
+
+- legacy 설명의 실제 턴 식별자를 WORKLOG에 추가했다. 실제 자료의 접수 근거를 확인하기 전에 추가 정책 선택을 요청한 점을 정정했으며, 기존 시험 보존·전체접수 기준 정책은 불변이다. 관련 TMI-116/128/217. 추가 코드/DB/배포 작업 없음.
+
+- 2026-10-16 — legacy 설명 보완: 오래된 미완료 시험 전체를 뜻하는 것이 아니라, 새 시험 시작 시 부분접수/전체접수 판정 근거가 불충분한 경우를 뜻한다. 전체접수 후 채점·요약 대기는 다음 문제라는 기존 정책을 유지한다. 실제 해당 건수는 미조회이며 기존 시험 계속 이용 정책을 변경하지 않았다. 관련 TMI-116/128/217. 설명·기록만 변경.
+
+- legacy 접수 증거 경계 조사 턴의 WORKLOG 식별자를 보완했다. 증거 부족 시 동일 문제로 신규 Billing 시험을 시작하는 안은 사용자 확인 대기이며 아직 승인·구현하지 않았다. 관련 TMI-116/128/217. 추가 코드/DB/배포 변경 없음.
+
+- 2026-10-16 — legacy runtime 착수 전 코드 대조: verifySealed는 exact 목록 분류만 제공하고 PaidExamPreparationService는 completeAndFence의 submissionEvidenceVersion=1/필수집합을 요구한다. 과거 시험에 이 증거가 없을 때 전체접수 여부를 임의 판정할 수 없다. 기존 시험 보존과 신규 Billing 필수는 유지하며, 증거 없는 원 시험의 신규 시작 문제선정(차단 유지 또는 동일문제 보수적 재시작)의 사용자 방향 확인 전 fallback을 구현하지 않았다. 실제 과거자료 분포를 이번에 조회하지 않았다. 관련 TMI-116/128/217, 코드/DB/배포 변경 없음.
+
+- 배포 테스트 범위 안내 턴의 WORKLOG 식별자 기록을 보완했다. 기능OFF 회귀 가능/paid ON 기동차단 및 legacy runtime·공동검증 잔여 상태는 동일하며 추가 구현·배포는 수행하지 않았다. 관련 TMI-217/116/128.
+
+- 2026-10-16 — 배포 테스트 가능 범위 확인: 기능OFF 상태의 배포/기존기능 회귀와 신규 paid E2E를 구분한다. 현재 PaidExamActivationGate는 enabled=true면 기동을 거절하므로 올리고 설정만 켜는 단계가 아니다. legacy runtime 보완·격리 공동검증·검증된 기동조건 준비 후 테스트환경 키/통신/index 확인과 활성화가 필요하다. 이번은 정적 확인/기록만이며 배포 승인이 아니다. 관련 TMI-217/116/128.
+
+- 2026-10-16 — [삭제 후 INITIAL·paid 경로 연결](TMI_217_DELETED_INITIAL_PAID_ROUTING.md) 구현. exact 삭제ACK/hash·source/접수판정 고정, INITIAL/newgroup 검증·비부활·claim 원자 마무리, 공개 paid adapter/phone 준비 및 schema2 worker 분기를 추가했다. 기본OFF/ON기동거절 유지. 최종 clean test/mongoIntegrationTest/bootJar 성공: 단위1,306개 실패/오류0·기존1skip, Mongo272개 실패/오류/skip0. legacy manifest runtime·실BillingHTTP/공동31개경합·rollout은 잔여다. 기존P6.1/sender/user dirty 보존, Billing·Identity/실DB/index/배포/활성화/commit/push 없음. 관련 TMI-217/193/136/116/128/125.
+
+- 2026-10-16 — 시험 생성 응시권 부족 공개 오류 확인: BillingExamCreationSaga는 ENTITLEMENT_INSUFFICIENT를 HTTP402/「사용 가능한 시험 응시권이 없습니다.」로 매핑한다. 환불/취소 권리의 ENTITLEMENT_REVOKED(409)와 구분한다. 관련 TMI-116. 코드 읽기·기록만, 런타임 활성화/배포 상태 확인이나 변경 없음.
+
+- 2026-10-16 — 개발완료 여부 재확인: TMI-217 LC 삭제sender/204저장·cleanup/TTL 보호 구현은 완료했으나 전체기능 개발완료는 아니다. DeletedExamContinuation은 아직 REPLACEMENT 전제이고 공개생성은 기존 BillingExamCreationSaga 경로다. 삭제후INITIAL/신규paid runtime 연결 개발과 양측31개경계·실HTTP/E2E 검증이 남는다. 이번은 정적확인/기록만, 코드·배포변경 없음. 관련 TMI-217/193/136/116/128/125.
+
+- 2026-10-16 — TMI-217 LC 발신 구현의 현재 턴 WORKLOG 식별자를 보완했다. 구현·검증 결과와 공동검증/삭제후INITIAL 연결 잔여는 아래 기록과 동일하며, 추가 코드/DB/배포 작업은 수행하지 않았다. 관련 TMI-217/193/136/125/116/128.
+
+- 2026-10-16 — 사용자 「어 해줘」로 TMI-217 [LC 삭제sender/204 연결](TMI_217_LC_DELETION_SENDER_IMPLEMENTATION.md) 구현. 요청별payload/event·전용JWT·boundedHTTPS/재시도200회·24h/floor·version/leaseACK, cleanup독립/전체ACK checkpoint, linked30일TTL제외/전체완료+120일검토 추가. 최종 clean test/mongoIntegrationTest/bootJar 성공: 단위1,306 실패/오류0·기존1skip, Mongo266 실패/오류/skip0. 기본OFF·rollout/index읽기검증 유지. 전체31개/실BillingHTTP·공동경합은 미완료, 삭제후INITIAL과기존continuation/신규paidruntime 연결도 후속. 기존P6.1 dirty/사용자파일 보존, 실DB/index/배포/commit/push 없음. 관련 TMI-217/193/136/125/116/128.
+
+- 2026-10-16 — Billing TMI-217 삭제수신 R2 구현 안내 접수. runbook상 전용JWT/strict decoder·fact/receipt Tx·현재권리보호·삭제후INITIAL 및 격리Mongo 검증 구현, 기본OFF. 전체1,749개 무실패/무skip은 사용자 보고이며 LC에서 재실행/독립감사하지 않았다. LC는 삭제purpose/sender·불변payload/204저장·cleanup독립/전체ACK신규시험gate·TTL보호/120일검토 및 공동경합 검증이 후속. 이번은 안내 읽기·기존LC경계 확인/기록만이며 구현착수/배포승인으로 해석하지 않음. 기존 P6.1 dirty 보존. 관련 TMI-217/193/136/125/116/128.
+
+- 2026-10-16 — TMI-217 draft-3 [LC 계약 수락·구현 기준 동결](TMI_217_DELETION_EXACT_R2_ACCEPTANCE.md): retryNotBefore 하한 유지·correlationId ASCII1~128 규칙으로 두 미결 해소. draft-3>2>1 원문hash 기록, 새 자료hash/산술6/추적값8+길이3/정상503구조1 확인. 전체fixture동결·서버31개경합통과·제품구현/배포 승인은 아님. Billing접수/외부전송 미실행, 기존P6.1 dirty 보존. 관련 TMI-217/193/136/125/116/128.
+
+- 2026-10-16 — TMI-217 draft-2 [재확인·독립검증](TMI_217_DELETION_EXACT_R2_DRAFT_2_VALIDATION.md):200번째 성공/24h발신경계·cleanup분리·completedAt+120일/30일TTL제외 보완 일치. LC 별도 test-only 검사기로2파일hash·raw7개(3canonical/4거절)·음성대조3개 통과;31개 runtime경계/경합 미실행. retryNotBefore invalid헤더시 기존하한보존 문구 및 correlationId 형식 명확화 요청, 전체동결/제품구현/배포 아님. 기존 P6.1 dirty 보존, 실DB/외부전송 없음. 관련 TMI-217/193/136/125/116/128.
+
+- 2026-10-16 — TMI-217 exact R2 draft-1 [E1~E5 LC 회신](TMI_217_DELETION_EXACT_R2_DRAFT_1_REVIEW.md): wire/415·fact+receipt 원자성·전체204/독립cleanup·미전달무TTL 방향에 이견 없음. 재시도 상한/응답경계, delivery격리와 기존cleanup budget 분리, LC120일 기산점 및 fixture 인증/원문bytes 보완 요청. 44개는 JSON parse/ID유일성·hash 정적확인만, runtime 통과 아님. exact동결/구현/DB/배포/외부전송 없음. 기존 P6.1 dirty 보존. 관련 TMI-217/193/136/125/116/128.
+
+- 2026-10-16 — TMI-217 삭제 단순화 R2 [LC 검토 회신](TMI_217_DELETION_SIMPLIFIED_R2_REVIEW.md): S1 LC 단일 사용자 인가·S2 요청별event/동일전송 불변·S3 원문정리와204전신규시험차단 분리 방향 수락. 앞선 Billing merge증거/operation간 최초fact 재사용 요구는 대체한다. S4 exact 저장·오류·fixture 공동동결은 후속이며 현재 sender/204 checkpoint·미전달30일TTL 보호는 미구현이다. 문서만 변경, 기존 P6.1 dirty 보존, 코드/fixture/DB/배포/외부전송 없음. 관련 TMI-217/193/136/125/116/128.
+
+- 2026-10-16 — Billing TMI-217-IMPLEMENTATION-READINESS 인계 접수·LC 정적 대조. 삭제 연동은 환불 provider 자료와 독립 진행 가능하나 공동 draft-3 exact 규격/최초eventId 보존·단일UserMerged 귀속근거·원문정리와ACK 차단 분리의 수락은 후속이다. 기존 생성중삭제409는 유지하고 sender/전용JWT purpose/ACK checkpoint를 새 구현 대상으로 구분한다. 이번은 구현 착수/계약동결 승인이 아닌 읽기 확인·기록이며 P6.1 dirty 보존. 관련 TMI-217/193/136/125/116/128/220, 실DB/배포/외부전송 없음.
+
+- PLAN-012 환불 관련 LC 잔여 범위 안내의 WORKLOG 턴 식별자 기록을 보완했다. TMI-220/217·LC TMI-116/128/122/125의 구현·잔여 검증 상태는 변경하지 않았으며 추가 코드/배포 작업은 수행하지 않았다.
+
+- 2026-10-14 — PLAN-012 관련 LC 잔여 범위 안내: 환불 수신/JWT/중복충돌·신규사용차단·보호Session·TMI-220 과거 기접수 예외는 P3~P5.1 및 보완으로 구현돼 있다. 별도 환불 기능을 처음부터 추가할 단계는 아니며 신규 paid 공개흐름/자동복구·legacy runtime 연결과 C01~C06/H14~H16 잔여 경합 테스트 구현/공동검증이 남는다. Billing 인계서의 P2 당시 미착수 표기는 현재 LC 상태로 해석하지 않는다. Billing 최신 잔여코드는 이번에 감사하지 않았다. 관련 TMI-220/217·LC TMI-116/128/122/125. 읽기 확인·문서만 변경.
+
+- 2026-10-14 — P6 이후 잔여 구현 재확인: P6.1 준비까지가 전체 출시 구현 완료는 아니다. 공개 생성은 기존 BillingExamCreationSaga 경로, 자동 recovery due는 schema1만 조회하며 신규 paid 서비스/schema2 scheduler와 legacy manifest runtime 연결이 남아 있다. P4.1 문서상 신규 삭제 fact sender/ACK·checkpoint 연결, 최종 안전 purge도 후속이다. PaidExamActivationGate의 ON 거절 유지. 공동 경합/E2E·실환경 전환은 구현과 별도 검증/배포 작업으로 구분한다. 관련 TMI-116/128/122/125/193/136/217/220. 이번은 읽기 확인·문서 기록만, 코드/테스트/외부변경 없음.
+
+- 2026-10-14 — P6·TMI-220 전달 완료: 606c55f 커밋/푸시, PR #42 첨부·develop 머지6f6675f81022bf2f8552e1b761fbab5387b19d75. CI38569038228 최초 실행은 기존 LearningQuotaTransactionTest WriteConflict1개 실패, 동일커밋 재실행 성공 후 머지했다. 별도 로컬 집중실행에서도 기존 동시성2개 실패를 확인했으며 무관한 제품/테스트를 바꾸거나 제외하지 않았다. 자동 테스트배포38569955963은 마지막 확인 ECS 진행 중으로 최종 성공 미확인이다. 기능설정/운영배포 불변.
+
+- 사용자 후속 선택 LC P6.1로 확정, feat/billing-paid-exam-p6-1에서 [120일 보관·안전한 정리 준비](LC_BILLING_PAID_EXAM_P6_1_RETENTION.md) 구현. firstAcceptedAt 고정·paid purgeAt 미설정/정리검토시각 분리, HTTP/worker/원격직전120일 운영확인·MEMBER 시계역행 비재개, read-only retention inspector 추가. 최종 clean test/mongoIntegrationTest/bootJar 성공: 단위1,280개 실패/오류0·기존1skip, Mongo262개 실패/오류/skip0, Node121·fixture34 hash·diff 통과. P6.1은 미커밋/미푸시이며 실제purge/DB/index/설정/활성화/Billing·Identity·Jira 변경 없음. 공동 T04/경합/E2E·legacy 전환/목적별 최종purge gate 유지. 관련 LC TMI-116/128/122/125/193/136·공동 TMI-217/220. 사용자 DS_Store 보존, 외부API/AI/S3/Redis/Billing wire 불변.
+
 - PLAN-012 순서 안내 턴의 WORKLOG 식별자 기록을 보완했다. 추가 구현 승인으로 해석하지 않으며 TMI-219/220/221·LC P6.1/공동 검증의 기존 상태는 그대로 유지한다.
 
 - 2026-10-14 — 후속 순서 문의: “12”를 Billing PLAN-012로 조건부 해석해 문서 확인. 해당 계획은 TMI-219 환불 코어 구현/default-OFF, TMI-220·221 후속으로 기록돼 있어 새로 전체 착수하기보다 잔여 구현/공동 검증을 진행하는 단계다. 최신 Billing 코드 완료 여부는 재검증하지 않았다. LC P6.1 보존/전환 gate는 별도로 남는다. 이번은 안내·기록만, 코드/테스트/외부변경 없음.

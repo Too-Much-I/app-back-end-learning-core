@@ -4,7 +4,7 @@ import org.springframework.beans.factory.InitializingBean;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
-/** Keep until MEMBER/lifecycle/rollout gates and public integration are implemented and verified. */
+/** Keep until legacy runtime integration and joint rollout verification are complete. */
 @Component
 public class PaidExamActivationGate implements InitializingBean {
     private final boolean enabled;

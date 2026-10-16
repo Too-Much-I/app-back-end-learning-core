@@ -353,11 +353,133 @@ class PaidExamP3MongoTest {
     @Test void memberWindowExact120DaysKeepsGuardAndRequiresReview() {
         memberWaiting(); clearInvocations(billing);
         mongo.updateFirst(Query.query(Criteria.where("_id").is(prepared.getCommandId())),
-                Update.update("createdAt",NOW.minus(Duration.ofDays(120))),ExamCreationOperation.class);
+                Update.update("firstAcceptedAt",NOW.minus(Duration.ofDays(120))),ExamCreationOperation.class);
         assertThatThrownBy(()->recovery.resumeHttp(USER,prepared.getCommandId(),ZoneOffset.UTC)).isInstanceOf(RuntimeException.class);
         verify(billing,never()).reservePaid(anyString(),any());
         assertThat(op().getRecovery().getStatus()).isEqualTo(ReservationRecovery.Status.NEEDS_REVIEW);
         assertThat(op().getPurgeAt()).isNull(); assertThat(op().getActiveGuard()).isTrue();
+    }
+
+    @Test void p61HttpWindowExpiryQuarantinesBeforeReserveAndClockRollbackCannotResume() {
+        when(recoveryClock.instant()).thenReturn(NOW.plus(Duration.ofDays(120)));
+        assertThatThrownBy(()->recovery.resumeHttp(USER,prepared.getCommandId(),ZoneOffset.UTC)).isInstanceOf(RuntimeException.class);
+        assertThat(op().getRecovery().getFailureCode()).isEqualTo("paid_acceptance_window_closed");
+        assertThat(op().getRecovery().getStatus()).isEqualTo(ReservationRecovery.Status.NEEDS_REVIEW);
+        assertThat(op().getActiveGuard()).isTrue();assertThat(op().getPurgeAt()).isNull();
+        assertThat(op().getFirstAcceptedAt()).isEqualTo(NOW);
+        when(recoveryClock.instant()).thenReturn(NOW.plusSeconds(1));
+        assertThatThrownBy(()->recovery.resumeHttp(USER,prepared.getCommandId(),ZoneOffset.UTC)).isInstanceOf(RuntimeException.class);
+        verifyNoInteractions(billing);assertThat(session("new")).isNull();
+    }
+
+    @Test void p61PureMemberReviewCannotReopenAfterWindowExpiryAndClockRollback() {
+        memberWaiting();clearInvocations(billing);
+        var current=op();var r=current.getRecovery();var wait=r.getMemberWait();
+        var proof=new MemberWaitEvidence.Exhaustion(current.getOperationId(),current.getPaidRequestDigest(),NOW,NOW,NOW,
+                "MEMBER_WAIT_BUDGET_EXHAUSTED",false,200,NOW);
+        r.setMemberWait(new MemberWaitEvidence(wait.operationId(),wait.requestDigest(),NOW,NOW,
+                MemberWaitEvidence.Phase.WAITING,NOW,0,proof,null));
+        r.setAttempts(200);r.setFirstAt(NOW);r.setStatus(ReservationRecovery.Status.NEEDS_REVIEW);r.setFailureCode("retry_exhausted");
+        operations.save(current);
+        when(recoveryClock.instant()).thenReturn(NOW.plus(Duration.ofDays(120)));
+        assertThatThrownBy(()->recovery.resumeHttp(USER,prepared.getCommandId(),ZoneOffset.UTC)).isInstanceOf(RuntimeException.class);
+        assertThat(op().getRecovery().getFailureCode()).isEqualTo("paid_acceptance_window_closed");
+        when(recoveryClock.instant()).thenReturn(NOW.plusSeconds(1));
+        assertThatThrownBy(()->recovery.resumeHttp(USER,prepared.getCommandId(),ZoneOffset.UTC)).isInstanceOf(RuntimeException.class);
+        assertThat(op().getRecovery().getMemberWait().exhaustion()).isEqualTo(proof);
+        assertThat(op().getRecovery().getMemberWait().resumedFromReviewAt()).isNull();verifyNoInteractions(billing);
+    }
+
+    @Test void p61WorkerWindowExpiryKeepsUnknownEvidenceAndGuard() {
+        when(recoveryClock.instant()).thenReturn(NOW.plus(Duration.ofDays(120)).plusMillis(1));
+        recovery.runWorker(prepared.getCommandId());
+        assertThat(op().getRecovery().getStatus()).isEqualTo(ReservationRecovery.Status.NEEDS_REVIEW);
+        assertThat(op().getActiveGuard()).isTrue();assertThat(op().getPurgeAt()).isNull();
+        assertThat(op().getDetailPurgeEligibleAt()).isNull();verifyNoInteractions(billing);
+    }
+
+    @Test void p61JustBeforeWindowCanResolveAndKeepsDetailsFor120DaysAfterTerminal() {
+        pending();var now=NOW.plus(Duration.ofDays(120)).minusMillis(1);
+        when(recoveryClock.instant()).thenReturn(now);
+        when(billing.statusPaid(USER,prepared.getOperationId())).thenReturn(snapshot(ReservationStatus.CONFIRMED,false));
+        var done=recovery.resumeHttp(USER,prepared.getCommandId(),ZoneOffset.UTC);
+        assertThat(done.getState()).isEqualTo(ExamCreationState.SUCCEEDED);
+        assertThat(done.getFirstAcceptedAt()).isEqualTo(NOW);assertThat(done.getTerminalAt()).isEqualTo(now);
+        assertThat(done.getDetailPurgeEligibleAt()).isEqualTo(now.plus(Duration.ofDays(120)));
+        assertThat(done.getPurgeAt()).isNull();verify(billing).statusPaid(USER,prepared.getOperationId());
+    }
+
+    @Test void p61EarlierRetryBudgetStillWinsInside120DayWindow() {
+        mongo.updateFirst(Query.query(Criteria.where("_id").is(prepared.getCommandId())),
+                new Update().set("recovery.attempts",200),ExamCreationOperation.class);
+        when(recoveryClock.instant()).thenReturn(NOW.plusSeconds(121));
+        recovery.runWorker(prepared.getCommandId());
+        assertThat(op().getRecovery().getFailureCode()).isEqualTo("retry_exhausted");
+        assertThat(op().getActiveGuard()).isTrue();assertThat(op().getPurgeAt()).isNull();verifyNoInteractions(billing);
+    }
+
+    @Test void p61AfterAllKeyEvidenceIsRemovedSameUuidCanBeNewButNoAutomaticPurgeExists() {
+        pending();leased(()->lifecycle.applyStatus(USER,prepared.getCommandId(),snapshot(ReservationStatus.CONFIRMED,false)));
+        mongo.remove(Query.query(Criteria.where("_id").is(prepared.getCommandId())),ExamCreationOperation.class);
+        // Simulate approved risk in an isolated fixture; this is not a production purge implementation.
+        assertThat(operations.findByUserIdAndOperationId(USER,prepared.getOperationId())).isEmpty();
+        var fresh=ExamCreationOperation.prepared(USER,prepared.getOperationId(),"another","mock",2,NOW.plus(Duration.ofDays(121)));
+        fresh.fixPaidSelection(new PaidExamSelection(PaidExamSelection.StartReason.NEW_AFTER_SUBMISSION,List.of(1,2)));
+        operations.insert(fresh);
+        assertThat(fresh.getCommandId()).isNotEqualTo(prepared.getCommandId());
+        assertThat(operations.findByUserIdAndOperationId(USER,prepared.getOperationId()).orElseThrow().getFirstAcceptedAt())
+                .isEqualTo(NOW.plus(Duration.ofDays(121)));
+        assertThat(session("new")).isNotNull();verifyNoInteractions(billing);
+    }
+
+    @Test void p61MissingAcceptanceEvidenceDoesNotBackfillOrSend() {
+        mongo.updateFirst(Query.query(Criteria.where("_id").is(prepared.getCommandId())),
+                new Update().unset("firstAcceptedAt"),ExamCreationOperation.class);
+        assertThatThrownBy(()->recovery.resumeHttp(USER,prepared.getCommandId(),ZoneOffset.UTC)).isInstanceOf(RuntimeException.class);
+        assertThat(op().getFirstAcceptedAt()).isNull();assertThat(op().getActiveGuard()).isTrue();verifyNoInteractions(billing);
+    }
+
+    @Test void p61TerminalOperationReplaysAfterSevenAnd120DaysWithoutExtendingDates() {
+        pending();leased(()->lifecycle.applyStatus(USER,prepared.getCommandId(),snapshot(ReservationStatus.CONFIRMED,false)));
+        var stored=mongo.findById(prepared.getCommandId(),Document.class,"exam_creation_operations");
+        for(int days:List.of(8,121)) {
+            when(recoveryClock.instant()).thenReturn(NOW.plus(Duration.ofDays(days)));
+            var replay=recovery.resumeHttp(USER,prepared.getCommandId(),ZoneOffset.UTC);
+            assertThat(replay.getState()).isEqualTo(ExamCreationState.SUCCEEDED);
+            assertThat(replay.getFirstAcceptedAt()).isEqualTo(NOW);assertThat(replay.getTerminalAt()).isEqualTo(NOW);
+            assertThat(replay.getPurgeAt()).isNull();
+        }
+        assertThat(mongo.findById(prepared.getCommandId(),Document.class,"exam_creation_operations")).isEqualTo(stored);
+        verifyNoInteractions(billing);
+    }
+
+    @Test void p61ReadOnlyReviewRequiresExternalChecksAndDoesNotArmTtl() {
+        pending();leased(()->lifecycle.applyStatus(USER,prepared.getCommandId(),snapshot(ReservationStatus.CONFIRMED,false)));
+        var stored=mongo.findById(prepared.getCommandId(),Document.class,"exam_creation_operations");
+        var inspector=new web.tosunsaeng.domain.exams.rollout.PaidOperationRetentionInspector(mongo);
+        var safe=new web.tosunsaeng.domain.exams.rollout.PaidOperationRetentionInspector.Preconditions(true,true,true,true,true);
+        var at=NOW.plus(Duration.ofDays(120));
+        assertThat(inspector.inspect(prepared.getCommandId(),at.minusMillis(1),safe).outcome().name()).isEqualTo("BEFORE_BOUNDARY");
+        assertThat(inspector.inspect(prepared.getCommandId(),at,safe).outcome().name()).isEqualTo("REVIEW_CANDIDATE");
+        assertThat(inspector.inspect(prepared.getCommandId(),at,null).outcome().name()).isEqualTo("CLOCK_UNTRUSTED");
+        assertThat(mongo.findById(prepared.getCommandId(),Document.class,"exam_creation_operations")).isEqualTo(stored);
+        mongo.getCollection("exam_creation_operations").createIndex(new Document("detailPurgeEligibleAt",1),
+                new IndexOptions().expireAfter(0L,TimeUnit.SECONDS));
+        assertThat(inspector.inspect(prepared.getCommandId(),at,safe).outcome().name()).isEqualTo("UNSAFE_TTL");
+    }
+
+    @Test void p61BackupRoundTripKeepsOriginalDatesAndDeletedSuccessCannotResurrect() {
+        pending();leased(()->lifecycle.applyStatus(USER,prepared.getCommandId(),snapshot(ReservationStatus.CONFIRMED,false)));
+        var backup=mongo.findById(prepared.getCommandId(),Document.class,"exam_creation_operations");
+        mongo.remove(Query.query(Criteria.where("_id").is(prepared.getCommandId())),ExamCreationOperation.class);
+        mongo.insert(backup,"exam_creation_operations"); // Isolated fixture restore, never live backup tooling.
+        when(recoveryClock.instant()).thenReturn(NOW.plus(Duration.ofDays(121)));
+        assertThat(recovery.resumeHttp(USER,prepared.getCommandId(),ZoneOffset.UTC).getFirstAcceptedAt()).isEqualTo(NOW);
+        mongo.remove(Query.query(Criteria.where("_id").is("new")),ExamSession.class);
+        assertThatThrownBy(()->recovery.resumeHttp(USER,prepared.getCommandId(),ZoneOffset.UTC)).isInstanceOf(RuntimeException.class);
+        assertThat(session("new")).isNull();assertThat(op().getTerminalAt()).isEqualTo(NOW);
+        assertThat(op().getDetailPurgeEligibleAt()).isEqualTo(NOW.plus(Duration.ofDays(120)));
+        verifyNoInteractions(billing);
     }
     @Test void status404InterruptsPureWaitWithoutManufacturingMemberProof() {
         memberWaiting();
@@ -514,7 +636,8 @@ class PaidExamP3MongoTest {
         assertThat(session("old").getSubmissionsClosedAt()).isEqualTo(NOW);
         assertThat(session("new").isInProgress()).isTrue(); assertThat(session("new").isActive()).isTrue();
         assertThat(op().getState()).isEqualTo(ExamCreationState.SUCCEEDED);
-        assertThat(op().getActiveGuard()).isFalse(); assertThat(op().getPurgeAt()).isEqualTo(NOW.plus(Duration.ofDays(120)));
+        assertThat(op().getActiveGuard()).isFalse(); assertThat(op().getPurgeAt()).isNull();
+        assertThat(op().getDetailPurgeEligibleAt()).isEqualTo(NOW.plus(Duration.ofDays(120)));
         assertThat(op().getConfirmedAt()).isEqualTo(NOW.minusSeconds(1));
         var replay=lifecycle.replay(USER,prepared.getCommandId());
         assertThat(replay.getTerminalAt()).isEqualTo(NOW); assertThat(replay.getPurgeAt()).isEqualTo(op().getPurgeAt());
@@ -524,7 +647,8 @@ class PaidExamP3MongoTest {
         leased(()->lifecycle.applyStatus(USER,prepared.getCommandId(),snapshot(ReservationStatus.CANCELED,true)));
         assertThat(op().getState()).isEqualTo(ExamCreationState.FAILED_TERMINAL);
         assertThat(op().getFailureCategory()).isEqualTo("ENTITLEMENT_REVOKED");
-        assertThat(op().getPurgeAt()).isEqualTo(NOW.plus(Duration.ofDays(120)));
+        assertThat(op().getPurgeAt()).isNull();
+        assertThat(op().getDetailPurgeEligibleAt()).isEqualTo(NOW.plus(Duration.ofDays(120)));
         assertThat(session("new").isAbandoned()).isTrue();
         assertThat(session("old").isActive()).isTrue(); assertThat(session("old").getSubmissionsClosedAt()).isNull();
         assertThat(lifecycle.replay(USER,prepared.getCommandId()).getFailureCategory()).isEqualTo("ENTITLEMENT_REVOKED");

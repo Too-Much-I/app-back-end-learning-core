@@ -49,6 +49,8 @@ app:
     poll-ms: ${CHALLENGE_POLL_MS:1000}
     expiry-poll-ms: ${CHALLENGE_EXPIRY_POLL_MS:10000}
   billing:
+    exam-deletion:
+      sender-enabled: ${BILLING_EXAM_DELETION_SENDER_ENABLED:false}
     access-events:
       # ON wiring is implemented; the separate rollout gate remains closed pending P6/V07 verification.
       receiver-enabled: ${BILLING_ACCESS_EVENTS_RECEIVER_ENABLED:false}

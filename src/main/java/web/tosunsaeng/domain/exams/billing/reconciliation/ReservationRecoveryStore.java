@@ -17,6 +17,9 @@ import java.util.concurrent.ThreadLocalRandom;
 
 @Component
 public class ReservationRecoveryStore {
+    @org.springframework.beans.factory.annotation.Value("${app.billing.paid-exam.enabled:false}")
+    private boolean paidEnabled;
+    private java.util.List<Integer> schemas() { return paidEnabled ? java.util.List.of(1,2) : java.util.List.of(1); }
     private final MongoTemplate mongo;
     private final ReservationOperationExecution execution;
     private final ReservationReconciliationProperties properties;
@@ -31,14 +34,14 @@ public class ReservationRecoveryStore {
 
     public List<ExamCreationOperation> due() {
         // Separate ready and expired-lease index paths; no full collection scan or unbounded queue.
-        Query expired = Query.query(Criteria.where("recovery.schemaVersion").is(1).and("activeGuard").is(true)
+        Query expired = Query.query(Criteria.where("recovery.schemaVersion").in(schemas()).and("activeGuard").is(true)
                 .and("recovery.status").is(ReservationRecovery.Status.IN_FLIGHT)
                 .and("recovery.leaseUntil").lte(execution.now()).and("recovery.nextAt").lte(execution.now()))
                 .with(Sort.by("recovery.leaseUntil", "_id")).limit(properties.getBatchSize());
         List<ExamCreationOperation> found = new java.util.ArrayList<>(mongo.find(expired, ExamCreationOperation.class));
         int remaining = properties.getBatchSize() - found.size();
         if (remaining > 0) {
-            Query ready = Query.query(Criteria.where("recovery.schemaVersion").is(1).and("activeGuard").is(true)
+            Query ready = Query.query(Criteria.where("recovery.schemaVersion").in(schemas()).and("activeGuard").is(true)
                     .and("recovery.status").is(ReservationRecovery.Status.READY).and("recovery.nextAt").lte(execution.now()))
                     .with(Sort.by("recovery.nextAt", "_id")).limit(remaining);
             found.addAll(mongo.find(ready, ExamCreationOperation.class));
@@ -47,9 +50,9 @@ public class ReservationRecoveryStore {
     }
 
     public long dueCount() {
-        Query ready = Query.query(Criteria.where("recovery.schemaVersion").is(1).and("activeGuard").is(true)
+        Query ready = Query.query(Criteria.where("recovery.schemaVersion").in(schemas()).and("activeGuard").is(true)
                 .and("recovery.status").is(ReservationRecovery.Status.READY).and("recovery.nextAt").lte(execution.now()));
-        Query expired = Query.query(Criteria.where("recovery.schemaVersion").is(1).and("activeGuard").is(true)
+        Query expired = Query.query(Criteria.where("recovery.schemaVersion").in(schemas()).and("activeGuard").is(true)
                 .and("recovery.status").is(ReservationRecovery.Status.IN_FLIGHT)
                 .and("recovery.leaseUntil").lte(execution.now()).and("recovery.nextAt").lte(execution.now()));
         return mongo.count(ready, ExamCreationOperation.class) + mongo.count(expired, ExamCreationOperation.class);
@@ -72,6 +75,7 @@ public class ReservationRecoveryStore {
     }
 
     public boolean canStartAttempt(ReservationOperationExecution.Lease lease,ExamCreationOperation op) {
+        if (op.getPaidSelection()!=null && !execution.paidWindowOpen(lease,op)) return false;
         ReservationRecovery r = op.getRecovery();
         Instant now = execution.now();
         if (r.getAttempts() >= properties.getMaxAttempts()
@@ -105,7 +109,7 @@ public class ReservationRecoveryStore {
 
     public void wakeAuthBlocked() {
         List<String> ids = mongo.find(Query.query(Criteria.where("recovery.status").is(ReservationRecovery.Status.BLOCKED_AUTH)
-                        .and("recovery.schemaVersion").is(1).and("activeGuard").is(true))
+                        .and("recovery.schemaVersion").in(schemas()).and("activeGuard").is(true))
                         .limit(properties.getBatchSize()), ExamCreationOperation.class).stream()
                 .map(ExamCreationOperation::getCommandId).toList();
         if (ids.isEmpty()) return;

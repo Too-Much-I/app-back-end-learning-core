@@ -41,7 +41,11 @@ class BillingWorkloadTokenIssuerTest {
                 assertEquals(now.getEpochSecond(),c.getIssueTime().toInstant().getEpochSecond());
                 assertEquals(c.getIssueTime(),c.getNotBeforeTime());
                 assertEquals(60000,c.getExpirationTime().getTime()-c.getIssueTime().getTime());
-                String target=purpose==BillingWorkloadTokenIssuer.Purpose.RESERVATIONS?"reservations":"attempt-group-events";
+                String target = switch (purpose) {
+                    case RESERVATIONS -> "reservations";
+                    case ATTEMPT_GROUP_EVENTS -> "attempt-group-events";
+                    case EXAM_DELETION_EVENTS -> "exam-deletion-events";
+                };
                 assertEquals(java.util.List.of("tosunsaeng-billing:"+target+":test"),c.getAudience());
                 // Aud must be a JSON string on the wire, not merely a single-item parser list.
                 var json=new com.fasterxml.jackson.databind.ObjectMapper().readTree(jwt.getPayload().toBytes());

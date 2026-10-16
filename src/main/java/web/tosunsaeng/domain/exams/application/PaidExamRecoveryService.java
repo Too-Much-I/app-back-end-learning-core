@@ -9,7 +9,7 @@ import java.time.ZoneId;
 import java.util.Objects;
 import static web.tosunsaeng.domain.exams.billing.PaidReservationProtocol.require;
 
-/** Shared paid status-first pass. Not wired to public routes or scheduled until remaining rollout gates. */
+/** Shared paid status-first pass; routing remains default-off behind the activation gate. */
 @Service
 public class PaidExamRecoveryService {
     private final ReservationOperationExecution execution;
@@ -29,6 +29,8 @@ public class PaidExamRecoveryService {
         if (existing.isTerminal()) return lifecycle.replay(user,id);
         return execution.httpPaid(id,()-> {
             var op=execution.freshOperation(id);
+            if (!execution.paidWindowOpen(execution.required(id),op))
+                throw new web.tosunsaeng.domain.exams.exception.ExamsException(web.tosunsaeng.global.error.code.status.ErrorStatus._EXAM_CREATION_PROCESSING,1);
             if (op.getState()==ExamCreationState.PREPARED && op.getRecovery().getDispatch()==ReservationRecovery.Dispatch.NOT_DISPATCHED) {
                 op=lifecycle.beforeReserve(user,id);
                 return reserve(user,id,zone,op);
@@ -89,7 +91,7 @@ public class PaidExamRecoveryService {
             if (failure.category()==BillingClientException.Category.MEMBER_EVIDENCE_PENDING) {
                 var waiting=lifecycle.observeMemberWait(user,id);
                 if (worker) return waiting;
-                if (!execution.now().isBefore(waiting.getCreatedAt().plus(java.time.Duration.ofDays(120))))
+                if (!waiting.withinPaidGuarantee(execution.now()))
                     throw new web.tosunsaeng.domain.exams.exception.ExamsException(web.tosunsaeng.global.error.code.status.ErrorStatus._EXAM_CREATION_PROCESSING,1);
                 var resumed=lifecycle.beforeMemberResume(user,id,waiting.getVersion());
                 return reserve(user,id,zone,resumed);

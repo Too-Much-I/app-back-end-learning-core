@@ -15546,3 +15546,169 @@
 
 - 이번 턴의 PLAN-012 후속 순서 안내를 기록했다. Billing 계획 문서상 TMI-219 코어 구현과 TMI-220/221 후속, LC P6.1 및 공동 검증/활성화 gate를 구분했으며 구현 착수는 하지 않았다. 관련 TMI-219/220/221·LC TMI-116/128/122.
 - WORKLOG 끝에 식별자를 append하고 CURRENT_STATE를 갱신했다. 기존 기록/dirty 파일 보존, 코드/DB/배포/외부변경 없음. 문서 기록만으로 Gradle 미실행, diff와 식별자 단일출현 검사. Secret/Token 미기록.
+
+## 2026-10-14 — P6·TMI-220 전달/머지 및 P6.1 보관 준비 구현
+
+<!-- codex-turn:01a13a83-abf0-7f81-be86-a95c62938118 -->
+
+- 사용자 커밋/푸시/머지·후속구현 요청에 따라 P6·TMI-220 변경을606c55f로 커밋/푸시하고 PR #42 생성·첨부했다. CI38569038228 최초 실행은 기존 LearningQuotaTransactionTest의 WriteConflict1개 실패였으며 동일커밋 재실행 성공 뒤 develop6f6675f81022bf2f8552e1b761fbab5387b19d75에 머지했다. 별도 로컬 집중실행에서는 해당 기존 동시성2개 실패를 재현했다. 무관한 기능/테스트 수정·검사제외/우회 없음. 테스트자동배포38569955963은 마지막 확인 ECS 진행 중, 최종성공으로 주장하지 않는다. 기능설정/운영배포는 변경하지 않았다.
+- 후속 범위는 사용자 답변 「LC P6.1: 120일 보관·안전한 정리 준비」로 확인한 뒤 feat/billing-paid-exam-p6-1을 머지된 develop에서 생성했다. 관련 LC TMI-116/128/122/125/193/136·공동 TMI-217/220. AGENTS에 전달 및 P6.1 범위를 기록했다. Billing PLAN-012 코드를 수정하지 않았다.
+- ExamCreationOperation에 immutable firstAcceptedAt·detailPurgeEligibleAt를 추가하고 UTC millisecond/Duration120일 경계를 구현했다. paid terminal은 TTL purgeAt을 주지 않으며 기존legacy7일 정책은 유지한다. 기존 paid/소실기록 자동backfill·새receipt collection 없음. HTTP/worker/원격직전 창밖·근거누락은 NEEDS_REVIEW/guard유지, 원격무호출. MEMBER 제한적재개도 창만료를 영속기록해 clockrollback 비재개를 보장하고 기존24시간/200회격리를 유지한다.
+- PaidOperationRetentionInspector는 primary-majority 단일operation 읽기/TTL안전·미완료·경보/lease·경계 검사와 명시적인 외부clock/restore/hold/연결작업/목적별보존 확인을 요구한다. REVIEW_CANDIDATE는 삭제허가가 아니며 삭제/스케줄러/CLI/index적용은 없다. 실제 hold/Billing/backup 상태 자동검증이나 최종purge 구현으로 보고하지 않는다.
+- unit16개·격리Mongo10개 회귀를 추가했고 기존 P3의 paid TTL 기대를 정리검토시각/무TTL로 보완했다. 최종 JAVA_TOOL_OPTIONS=-Dapi.version=1.44 ./gradlew clean test mongoIntegrationTest bootJar 성공: 단위1,280개 실패/오류0·기존1skip, Mongo262개 실패/오류/skip0. Node mongodb121개·공동fixture34 hash·diff check 통과. 최종 전체 실행에서는 기존 LearningQuota 테스트도 통과했지만 앞선 간헐실패 위험은 남긴다. 기존 컴파일경고는 범위밖으로 유지했다.
+- 보고서/계획/ADR/AGENTS/CURRENT_STATE 동기화, WORKLOG EOF append. T04 원fixture의별도receipt경로는 실행/수정하지 않고 operation유지 대체검증을 분리했다. 실제DB/삭제/이관/기능활성화·공동E2E·P6.1 commit/push·Billing/Identity/Jira/외부회신 없음. 사용자DS_Store 보존, 예상밖 제품변경 없음. 외부API/DTO/BaseResponse·AI user_id/Callback·retryCount/S3/Redis/Billing wire 불변. 다음은 공동T04/경합·legacy 전환/backup/목적별폐기 승인 확인이다. Secret/Token 미기록.
+
+## 2026-10-14 — P6 이후 잔여 구현 구분
+
+<!-- codex-turn:01a13ab1-3d17-7490-afac-b0316c019036 -->
+
+- 사용자 질문에 따라 P6/P6.1·P4.1 보고서와 ExamServiceImpl/ReservationRecoveryStore/PaidExamActivationGate를 읽기 대조했다. 신규 paid 공개생성·schema2 자동복구 연결, legacy manifest runtime 적용, 삭제 fact sender/ACK/checkpoint 및 최종 안전 purge는 남은 구현이다. 공동 HTTP/경합/E2E·실환경 설정/전환은 별도 검증/배포이며 단순히 설정만 켜는 단계가 아님을 안내한다. 관련 TMI-116/128/122/125/193/136/217/220.
+- CURRENT_STATE 갱신·WORKLOG EOF append. 기존 P6.1 dirty/사용자파일 보존, 코드/DB/설정/배포/Jira/외부전송/commit/push 없음. 읽기 검토라 Gradle 미실행, diff check 및 marker 단일출현 검증. Secret/Token 미기록.
+
+## 2026-10-14 — PLAN-012 환불 관련 LC 잔여 범위 안내
+
+- 사용자 질문에 P5.1/TMI-220 구현보고와 Billing 인계서를 읽기 대조했다. LC 환불 수신/차단·보호 및 과거기접수 예외는 이미 구현했고, 신규 paid runtime 연결 및 잔여 경합 테스트 구현/공동검증이 남는다고 구분한다. Billing 인계서의 초기 P2 당시 후속 표기는 현재 LC 미구현 증거가 아니다. Billing 최신코드 전체 완료 여부는 이번에 재검증하지 않았다. 관련 TMI-220/217·LC TMI-116/128/122/125.
+- CURRENT_STATE/WORKLOG만 갱신, 기존 dirty 보존. 코드/DB/설정/배포/외부전송/commit/push 없음. 안내용 읽기검토로 Gradle 미실행, diff check 수행. Secret/Token 미기록.
+
+## 2026-10-14 — PLAN-012 범위 안내 턴 식별자 보완
+
+<!-- codex-turn:01a13ab3-deee-7450-85a2-be3d77690d27 -->
+
+- PLAN-012 관련 LC 구현/잔여 연결·경합검증 안내의 턴 식별자를 기록했다. 관련 TMI-220/217·LC TMI-116/128/122/125. Billing 최신 구현 전체를 재검증한 것은 아니며 활성화 승인으로 해석하지 않는다.
+- 과거 WORKLOG를 수정하지 않고 끝에 append하고 CURRENT_STATE를 갱신했다. 코드/테스트/DB/배포/외부변경 없음. 문서 diff 및 marker 단일출현 확인, Secret/Token 미기록.
+
+## 2026-10-16 — TMI-217 삭제 연동 선행 인계 접수
+
+<!-- codex-turn:01a142ca-e3bc-7470-a023-1f4425e01e53 -->
+
+- Billing TMI-217-IMPLEMENTATION-READINESS-2026-10-16.md를 읽고 LC DeletionCommandService/DeletionWorker/BillingWorkloadTokenIssuer의 현 경계를 정적 대조했다. 생성중 삭제409와 기존 삭제 흐름을 보존하며, 신규 삭제 전달 규격/불변eventId·현재owner와단일merge증거·원문cleanup과BillingACK전신규시험차단 분리를 먼저 합의하는 순서를 접수했다. 환불provider 자료는 이 계약 확인의 선행조건이 아니다. Billing 생성owner 등 구현 사실은 전달문서 보고이며 Billing 전체코드 독립검증으로 주장하지 않는다.
+- 공동draft-3 exact 전체수락/새제품구현·테스트/DB/배포/외부회신/commit/push 없음. 최종물리purge는 별도, 기존 P6.1 dirty와 사용자파일 보존. CURRENT_STATE/WORKLOG만 갱신했고 정적확인이므로 Gradle 미실행, diff/marker 단일출현 검사. 관련 TMI-217/193/136/125/116/128/220. Secret/Token 미기록.
+
+## 2026-10-16 — TMI-217 삭제 단순화 R2 LC 검토
+
+<!-- codex-turn:01a143c9-313c-78b0-994b-c179548b49fc -->
+
+- Billing 승인 R2와 LC 삭제 command/target/worker/operation 경계를 정적 대조하고 TMI_217_DELETION_SIMPLIFIED_R2_REVIEW.md에 S1~S4 회신을 작성했다. LC 단일 인가, 요청별 event와 동일전송 불변, exact 재삭제204 및 충돌우선, 원문정리/204전새시험차단 방향을 수락한다. 기존 Billing merge증거와 operation간 최초fact 재사용 요구는 대체한다. exact schema/오류/fixture 공동동결 및 sender/checkpoint/미전달TTL 보호 구현은 후속이다.
+- CURRENT_STATE 갱신·WORKLOG append, 기존 P6.1 dirty/사용자파일 보존. 문서 검토라 Gradle 미실행; 문서 링크·diff·marker 검사 수행. 코드/fixture/실DB/배포/Jira/외부전송/commit/push 없음. 관련 TMI-217/193/136/125/116/128. Secret/Token 미기록.
+
+## 2026-10-16 — TMI-217 exact R2 draft-1 E1~E5 검토
+
+<!-- codex-turn:01a143d3-a54b-7103-a8e4-253c2b73d668 -->
+
+- Billing 기술초안/44개 cases.json과 LC command/access/target/operation/worker를 읽기 대조해 TMI_217_DELETION_EXACT_R2_DRAFT_1_REVIEW.md를 작성했다. wire/415·fact+receipt·전체204/cleanup분리·미전달무TTL 방향은 적합하다. retry상한/응답경계, 전달격리와 기존24시간cleanup중단 분리, LC120일 review기산점, D03 실제 verifier 신뢰조건·rawbytes/경합 fixture를 보완 요청한다. requestedAt은 성공commit된 접근차단의 논리시각으로 재사용 가능하나 실제commit wall-clock은 아님을 구분했다.
+- JSON parse·ID44개 유일성·12/18/14 집계·관측 SHA256 확인과 문서 diff/링크/marker 검사를 수행했다. 테스트 사례 실행·공동동결 아님. 코드 변경 없는 검토이므로 Gradle 미실행. CURRENT_STATE 갱신·WORKLOG EOF append, 기존 P6.1 dirty/사용자파일 보존. 코드/fixture/실DB/배포/Jira/외부전송/commit/push 없음. 관련 TMI-217/193/136/125/116/128. Secret/Token 미기록.
+
+## 2026-10-16 — TMI-217 draft-2 LC 독립 raw 검증
+
+<!-- codex-turn:01a143dd-fe7b-7620-b44f-f67694094214 -->
+
+- Billing draft-2/README/bytes/boundaries/SHA256SUMS를 읽고 E1~E5 보완을 재확인했다.200번째 성공/201번째발신금지·24시간경계·cleanup격리분리·전체completedAt+120일 및 linked30일TTL제외는 LC 요청과 일치한다. retryNotBefore의invalid헤더null과기존하한보존 충돌, correlationId형식 명확화는 동결 전 후속으로 기록했다.
+- 독립 test-only scripts/contracts/verify_deletion_draft2.py 추가. 원문재생성/생산자검사기복사 없이2개파일hash·3canonical bytes/hash·4strict거절·3음성대조 통과.31개 경계·경합은 ID/개수 확인만이며 실제sender/HTTP/DB/worker 실행/통과 아님. 보고서/CURRENT_STATE 갱신, WORKLOG EOF append. diff/링크/marker 확인. 제품코드 변경 없어 Gradle 미실행. 기존 P6.1 dirty/사용자파일 보존, Billing/fixture원본/실DB/배포/Jira/외부전송/commit/push 변경 없음. 관련 TMI-217/193/136/125/116/128. Secret/Token 미기록.
+
+## 2026-10-16 — TMI-217 draft-3 LC 계약 수락
+
+<!-- codex-turn:01a143e6-befd-7bc0-ac20-4c19d0b7c345 -->
+
+- draft-3 원문/README/cases/manifest 확인 후 retryNotBefore·correlationId 두 미결을 해소하고 LC 구현전 기술계약 수락/기준동결 보고서를 작성했다. draft-3>2>1 우선순위와 원문hash를 기록했다. Billing접수·공동runtime완료·전체fixture동결·제품구현 승인과 구분한다.
+- 독립 test-only verify_deletion_draft3.py로 hash1·하한산술6·추적값8+길이3·정상503구조1 확인. HTTP header parser/jitter/서버31개경합은 미실행. 제품코드 변경 없어 Gradle 미실행. CURRENT_STATE 갱신/WORKLOG append, diff/링크/marker 검증. 기존 P6.1 dirty/사용자파일·fixture 원본 보존, 실DB/배포/Jira/외부전송/commit/push 없음. 관련 TMI-217/193/136/125/116/128. Secret/Token 미기록.
+
+## 2026-10-16 — Billing 삭제 수신 R2 구현 인계 접수
+
+<!-- codex-turn:01a14404-a591-78a1-a596-ed175402373c -->
+
+- Billing docs/runbooks/TMI-217-deletion-receiver-r2.md를 읽고 LC BillingWorkloadTokenIssuer 목적과 DeletionWorker의 현재checkpoint/격리 경계를 확인했다. Billing 수신 구현·1,749개 통과는 전달보고이며 LC의 Billing코드 독립감사/재실행 결과가 아니다. LC sender/204저장·불변payload/lease·cleanup독립/전체ACKgate·TTL/120일 및 공동runtime검증을 후속으로 구분했다. 자료없는legacy409/실환경gate는 유지한다.
+- CURRENT_STATE/WORKLOG만 갱신, 기존 P6.1 dirty/사용자파일 보존. 안내접수를 새 코드구현 승인으로 확대하지 않았다. 정적확인이라 Gradle 미실행, diff/marker 확인. 제품코드/fixture/DB/배포/Jira/외부전송/commit/push 없음. 관련 TMI-217/193/136/125/116/128. Secret/Token 미기록.
+
+## 2026-10-16 — TMI-217 LC 발신·204 checkpoint 구현
+
+<!-- codex-turn:01a14404-a591-78a1-a596-ed175402373c -->
+
+- 후속 사용자 「어 해줘」로 코드/격리검증 승인. BillingDeletionDelivery/Client/Sender/Scheduler/Configuration 추가, 기존 issuer전용purpose·target불변payload·worker cleanup/ACK분리·operation120일review/linkedTTL보호·defaultOFF 설정 연결. AGENTS 승인기록/구현보고 작성. 기존 P6.1 미커밋과 사용자파일 보존, 공개/AI/S3/Redis 및fixture원본 불변.
+- 단위26개/격리Mongo4개 추가 및 실제JWT purpose 회귀 확장. 최초Mongo컴파일의 record getter 오류를 수정한 뒤 집중검증·최종 JAVA_TOOL_OPTIONS=-Dapi.version=1.44 ./gradlew clean test mongoIntegrationTest bootJar 성공: 단위1,306 실패/오류0·기존1skip, Mongo266 실패/오류/skip0. diff/문서링크 확인. 실BillingHTTP/양측공동31개·삭제후INITIAL/기존continuation과신규paidruntime 연결은 미완료로 구분한다. senderON은 별도rollout/index gate이며 실제환경/DB/index/배포/Billing·Identity/Jira/외부전송/commit/push 미실행. 관련 TMI-217/193/136/125/116/128. Secret/Token 미기록.
+
+## 2026-10-16 — TMI-217 구현 턴 기록 식별자 보완
+
+<!-- codex-turn:01a14405-f62d-75a2-af7d-dcb7c222161e -->
+
+- 이번 LC 삭제 sender·204 checkpoint 구현 작업의 턴 식별자를 보완한다. 앞선 구현 항목과 과거 기록은 수정하지 않았다. 구현 및 최종 검증 결과는 동일하다: 단위1,306개 실패/오류0·기존1skip, 격리Mongo266개 실패/오류/skip0, bootJar 성공. 관련 TMI-217/193/136/125/116/128.
+- CURRENT_STATE를 갱신했고 문서 diff/새 marker 단일출현을 확인했다. 이번 보완은 기록만 변경하며 테스트 재실행·코드/DB/배포/commit/push 변경 없음. 공동31개/실BillingHTTP·삭제후INITIAL 연결 잔여 및 기본OFF 유지. Secret/Token 미기록.
+
+## 2026-10-16 — 삭제 연동 개발완료 범위 재확인
+
+<!-- codex-turn:01a1441d-a98d-76f2-9f20-d961c2e29be1 -->
+
+- 사용자 완료여부 질문에 구현보고와 DeletedExamContinuation/Store·ExamServiceImpl을 정적 대조했다. sender/204/cleanup/TTL 구현과 전체기능 완료를 구분한다. 삭제후INITIAL/신규paid runtime 연결은 잔여 개발이며, 양측31개경계·실HTTP/E2E는 잔여 검증이다. 추가 구현/배포 승인으로 해석하지 않는다. 관련 TMI-217/193/136/116/128/125.
+- CURRENT_STATE/WORKLOG만 갱신, 기존dirty 보존. 상태확인이라 테스트 재실행 없음; diff/marker 확인. 코드/실DB/배포/외부전송/commit/push 변경 없음. Secret/Token 미기록.
+
+## 2026-10-16 — 시험 생성 응시권 부족 오류 확인
+
+<!-- codex-turn:01a14421-5ce1-7940-9fcb-84b7c6ec8d37 -->
+
+- ErrorStatus 및 BillingExamCreationSaga의 공개 매핑을 읽어 응시권 부족은 HTTP402 ENTITLEMENT_INSUFFICIENT/「사용 가능한 시험 응시권이 없습니다.」임을 확인했다. 환불·취소 권리의409 ENTITLEMENT_REVOKED와 구분한다. 관련 TMI-116.
+- CURRENT_STATE 갱신·WORKLOG EOF append 외 코드/DB/배포/외부통신/commit/push 변경 없음. 기존dirty 보존, 정적 확인으로 테스트 미실행, diff check·marker 단일출현 확인. 실제 서버 활성화 여부는 이번 확인 대상이 아니며 Secret/Token 미기록.
+
+## 2026-10-16 — 삭제 후 INITIAL·paid 생성 경로 연결
+
+<!-- codex-turn:01a1441e-7352-7370-9d6f-ce4909ed62f8 -->
+
+- 사용자 후속 구현 승인으로 LC 삭제 sourceCreatedAt/접수판정 보존, exact ACK/hash·원대상 바인딩, 새 INITIAL/newgroup·transition 검증, claim/성공/확정거절의 local Transaction 연결을 구현했다. 기존 Session은 재생성하지 않고 같은 key 판정을 유지한다. 공개 paid adapter/phone 준비·schema2 worker/auth probe 분기는 추가하되 기본OFF/ON기동차단 유지. 관련 TMI-217/193/136/116/128/125.
+- 격리 Mongo6개 추가와 기존 성공 replay404 검증 확장. 최초 집중실행의 테스트 import·due시각 오류 수정 후 최종 JAVA_TOOL_OPTIONS=-Dapi.version=1.44 ./gradlew clean test mongoIntegrationTest bootJar 성공: 단위1,306 실패/오류0·기존1skip, Mongo272 실패/오류/skip0. diff check 통과. Billing은 fake이며 실HTTP/공동31개경합 통과 주장이 아니다.
+- 상세보고 TMI_217_DELETED_INITIAL_PAID_ROUTING.md, CURRENT_STATE/계획/ADR/AGENTS 동기화. 기존P6.1/sender dirty·사용자DS_Store 보존, 예상 밖 외부범위 변경 없음. legacy manifest runtime·실Billing/rollout 및 최종purge는 후속이며 실DB/index/배포/활성화/Billing·Identity/Jira/commit/push 없음. Secret/Token 미기록.
+
+## 2026-10-16 — 배포 후 테스트 가능 범위 확인
+
+- CURRENT_STATE와 PaidExamActivationGate를 읽어 paid ON은 현재 기동거절임을 재확인했다. 기능OFF 배포 회귀와 신규 paid E2E를 구분하고 legacy runtime·공동검증·안전한 기동조건 및 테스트환경 준비를 후속으로 안내했다. 관련 TMI-217/116/128.
+- CURRENT_STATE/WORKLOG만 변경. 상태질문으로 테스트 재실행·코드/DB/배포/commit/push 없음. 기존dirty 보존, Secret/Token 미기록.
+
+## 2026-10-16 — 배포 테스트 범위 안내 턴 식별자 보완
+
+<!-- codex-turn:01a1442c-d7f0-7972-aa18-71b71eea6548 -->
+
+- 이번 배포 가능 범위 확인의 턴 식별자를 기록한다. paid ON 기동차단 및 legacy runtime/공동검증 잔여 확인 결과는 앞선 항목과 동일하다. 관련 TMI-217/116/128.
+- CURRENT_STATE 동기화와 WORKLOG append만 수행했다. 코드·테스트 재실행·실DB·배포·commit/push 없음. 기존 변경 보존, Secret/Token 미기록.
+
+## 2026-10-16 — legacy runtime 구현 전 접수 증거 경계 확인
+
+- 후속 구현 요청으로 PaidExamCutoverInspector/LegacyExamManifest, PaidExamPreparationService, ExamSubmissionEvidence, PaidReservationProtocol 및 lifecycle/기존 SessionManager를 읽기 대조했다. manifest는 회원/권리/전체접수 증명이 아니며, 새 준비 경로는 coverage v1/필수집합을 요구한다. 과거 coverage 없는 시험에 source/접수근거를 backfill하거나 완료를 임의 추정하지 않았다. 실제 DB 조회는 수행하지 않아 해당 자료의 현재 건수/분포는 미확인이다.
+- 증거 불충분 원 시험에서 신규 시작을 차단할지, 새 Billing 예약을 전제로 동일 문제로 보수적 재시작할지 사용자 방향을 확인한다. 기존 기록/진행은 보존하며 이는 legacy 활성 권리를 새로 부여하는 질문이 아니다. 관련 TMI-116/128/217.
+- CURRENT_STATE/WORKLOG만 변경. 제품 구현은 이 경계 확인에서 멈췄으며 코드/fixture/실DB/배포/활성화/commit/push 없음. 정적 조사로 테스트 재실행 없음. 기존dirty 보존, Secret/Token 미기록.
+
+## 2026-10-16 — legacy 접수 증거 경계 확인 턴 기록 보완
+
+<!-- codex-turn:01a1442d-99b7-75e1-8341-d871a21e520e -->
+
+- legacy runtime 조사에서 확인한 접수 증거 부족 경계와 사용자 확인 대기를 이번 턴에 연결한다. 동일 문제 보수적 재시작은 제안이며 승인·구현된 정책이 아니다. 관련 TMI-116/128/217.
+- CURRENT_STATE와 WORKLOG 기록만 보완했다. 제품 코드/실DB/배포/commit/push 변경과 테스트 재실행 없음. 기존 변경을 보존했고 Secret/Token은 기록하지 않았다.
+
+## 2026-10-16 — 오래된 시험과 접수 증거 부족의 의미 설명
+
+<!-- codex-turn:01a1442f-0de6-7e81-ae96-fffd13d4a452 -->
+
+- 사용자 질문에 미완료와 전체접수 증거 불충분을 구분했다. 전체접수 후 채점/요약 대기는 미완료로 보여도 다음 문제 대상이며, 문제는 과거 자료에서 부분접수와 전체접수를 구분할 수 없는 경우다. 모든 오래된 시험이 해당한다거나 실제 해당 건수를 확인했다고 설명하지 않는다. 기존 시험을 계속 이용하는 것과 새 시험을 시작할 때 문제를 고르는 것을 구분한다. 관련 TMI-116/128/217.
+- CURRENT_STATE/WORKLOG 설명 기록만 변경. 추가 정책 승인·제품 구현·실DB/배포/commit/push 없음. 테스트는 설명 작업이므로 재실행하지 않았다. 기존 변경 보존, Secret/Token 미기록.
+
+## 2026-10-16 — legacy 설명 턴 식별자 보완
+
+<!-- codex-turn:01a1442f-dbe7-7a83-b873-0988da5e3e1a -->
+
+- 현재 턴의 정확한 식별자를 기록한다. 오래된 미완료 시험 전체가 아닌 부분/전체접수 근거 불충분 가능성을 설명했으며, 실제 데이터 확인 전에 정책 선택을 요청한 것은 성급했음을 정정했다. 관련 TMI-116/128/217.
+- CURRENT_STATE 갱신과 WORKLOG append만 수행했다. 코드·실DB·배포·commit/push 변경 및 테스트 재실행 없음. 기존 변경 보존, Secret/Token 미기록.
+
+## 2026-10-16 — legacy 접수증거 불충분 시 동일 문제 정책 승인
+
+<!-- codex-turn:01a14431-2f95-7ef1-bd26-ef193f72661c -->
+
+- 사용자 「오래된 거면 … 그냥 같은 문제 풀면 될 거 같아」로 exact manifest 기존 시험의 전체접수 여부를 증명할 수 없을 때 동일 mock으로 새 Session을 시작하는 방향을 수락했다. 실제 전체접수 후에도 동일 문제를 반복할 비용을 수용한다. 확인된 전체접수/완료의 다음 문제 규칙은 유지하며, 오래됐다는 이유만으로 모든 시험을 동일 문제로 처리하지 않는다. 관련 TMI-116/128/217.
+- 새 Billing 예약/확정/source 필수, 원 시험 비부활·소비/복원 증거 미생성, owner/삭제/terminal 보호와 같은 요청 판정 고정을 유지한다. 계획/ADR/CURRENT_STATE 동기화·WORKLOG append만 수행했다. 제품 코드/fixture/DB/배포/활성화/commit/push 변경 없음. 문서 작업으로 테스트 재실행 없이 diff 검사, 기존dirty 보존, Secret/Token 미기록.
+
+## 2026-10-16 — legacy 동일 문제 정책 승인 턴 기록 보완
+
+<!-- codex-turn:01a14431-92ad-7301-b670-0dd8dff7b5b0 -->
+
+- 현재 턴 식별자를 보완한다. exact manifest 기존 시험의 전체접수 근거가 불충분하면 동일 문제로 새 시험을 시작하는 사용자 승인을 계획/ADR에 반영했다. 확인된 전체접수/완료의 다음 문제 규칙과 신규 Billing 예약/확정은 유지한다. 관련 TMI-116/128/217.
+- CURRENT_STATE와 WORKLOG 기록만 보완했다. 코드·DB·배포·commit/push 변경 및 테스트 재실행 없음. 기존 변경을 보존하고 Secret/Token은 기록하지 않았다.
+
+## 2026-10-16 — P6.1·삭제 연동 전달 및 legacy 후속 준비
+
+- 사용자 commit/push/merge 후 새 브랜치 구현 요청을 접수했다. 현재 브랜치와 origin/develop 기반 일치 확인, 사용자DS_Store 제외, 기능OFF/기동gate 유지. 전체 회귀 후 PR/develop 전달을 진행하고 legacy 동일문제 예외를 별도 feat에서 구현한다. 관련 TMI-116/128/217/193/136/125.
+- AGENTS/CURRENT_STATE 동기화. 실DB/index·목록설치·기능 활성화·운영배포·Billing/Identity 변경은 제외한다. 실제 전달/검증 결과는 후속 항목에 기록한다. Secret/Token 미기록.

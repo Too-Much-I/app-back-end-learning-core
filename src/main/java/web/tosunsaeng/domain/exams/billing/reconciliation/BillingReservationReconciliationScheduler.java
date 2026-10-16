@@ -16,6 +16,10 @@ import java.util.concurrent.RejectedExecutionException;
 /** No unbounded queue; claim happens inside an available worker, never while queued. */
 @Component
 public class BillingReservationReconciliationScheduler {
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    private web.tosunsaeng.domain.exams.application.PaidExamRecoveryService paidRecovery;
+    @org.springframework.beans.factory.annotation.Value("${app.billing.paid-exam.enabled:false}")
+    private boolean paidEnabled;
     private final ReservationReconciliationProperties properties;
     private final ReservationRecoveryStore store;
     private final ReservationAuthCircuit circuit;
@@ -62,7 +66,11 @@ public class BillingReservationReconciliationScheduler {
                 if (stopping) break;
                 try {
                     workers.execute(() -> {
-                        try { service.run(operation.getCommandId()); }
+                        try {
+                            if (operation.getRecovery().getSchemaVersion()==2) {
+                                if (paidEnabled && paidRecovery!=null) paidRecovery.runWorker(operation.getCommandId());
+                            } else service.run(operation.getCommandId());
+                        }
                         catch (RuntimeException failure) { failureCounter(); }
                     });
                 } catch (RejectedExecutionException full) { break; }

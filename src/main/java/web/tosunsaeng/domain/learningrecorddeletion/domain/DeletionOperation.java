@@ -48,12 +48,22 @@ public class DeletionOperation {
     private FailureCategory lastFailureCategory;
     public void recordRetry(FailureCategory category) { retryCount++; lastFailureCategory = category; }
     private boolean retentionFinalized;
+    private boolean billingDeliveryRequired;
+    private Instant billingDetailReviewAt;
+    private boolean cleanupPrepared;
+
+    public void requireBillingDelivery() { billingDeliveryRequired = true; expiresAt = null; }
+    public void beginIndependentCleanup() {
+        if (stage != Stage.PREPARING_RESTART || inventoryDigest == null) throw new IllegalStateException("Unprepared cleanup");
+        cleanupPrepared = true;
+        stage = Stage.DELETING_S3;
+    }
 
     public void holdRetention() { expiresAt = null; }
     public void finishRetention() {
         if (status != Status.COMPLETED) throw new IllegalStateException("Unfinished operation");
         retentionFinalized = true;
-        expiresAt = completedAt.plus(Duration.ofDays(30));
+        expiresAt = billingDeliveryRequired ? null : completedAt.plus(Duration.ofDays(30));
     }
     private DeletionTarget.Type inventoryType = DeletionTarget.Type.EXAM;
     private String inventoryCursor;
@@ -107,7 +117,7 @@ public class DeletionOperation {
 
     public void allowNewLearning(RestartEvidence evidence, Instant now) {
         Objects.requireNonNull(evidence);
-        if (status != Status.PROCESSING || stage != Stage.PREPARING_RESTART
+        if (status != Status.PROCESSING || (stage != Stage.PREPARING_RESTART && !cleanupPrepared)
                 || inventoryDigest == null || now.isBefore(requestedAt)
                 || !inventoryDigest.equals(evidence.inventoryDigest())
                 || sealedTargetCount != evidence.targetCount()
@@ -118,7 +128,7 @@ public class DeletionOperation {
         }
         safeToStartLearningAt = now;
         writeBlocked = false;
-        stage = Stage.SAFE_TO_START_LEARNING;
+        if (!cleanupPrepared) stage = Stage.SAFE_TO_START_LEARNING;
     }
 
     public void requireIntervention(boolean safetyUncertain) {
@@ -156,7 +166,8 @@ public class DeletionOperation {
         status = Status.COMPLETED;
         activeGuard = false;
         completedAt = now;
-        expiresAt = now.plus(Duration.ofDays(30));
+        expiresAt = billingDeliveryRequired ? null : now.plus(Duration.ofDays(30));
+        if (billingDeliveryRequired) billingDetailReviewAt = now.plus(Duration.ofDays(120));
     }
 
     public record RestartEvidence(String inventoryDigest, long targetCount, long sealedCallbackCount,

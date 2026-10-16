@@ -53,8 +53,9 @@ public class DeletionConfiguration {
     }
     @Bean @ConditionalOnProperty(prefix = "app.learning-record-deletion", name = "worker-enabled", havingValue = "true")
     public DeletionWorker deletionWorker(MongoTemplate mongo, DeletionTransactions tx, UserOwnershipGuardService guards,
-            DeletedExamContinuationStore continuations, DeletionStorage storage, Clock clock) {
-        return new DeletionWorker(mongo, tx, guards, continuations, storage, clock);
+            DeletedExamContinuationStore continuations, DeletionStorage storage, Clock clock,
+            web.tosunsaeng.domain.exams.billing.WorkloadJwtProperties jwt) {
+        return new DeletionWorker(mongo, tx, guards, continuations, storage, clock).withBillingEnvironment(jwt.getEnvironment());
     }
     @Bean @DependsOn("deletionStartupValidator")
     @ConditionalOnProperty(prefix = "app.learning-record-deletion", name = "worker-enabled", havingValue = "true")

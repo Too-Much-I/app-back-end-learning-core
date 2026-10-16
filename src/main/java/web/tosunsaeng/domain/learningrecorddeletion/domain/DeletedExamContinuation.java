@@ -43,6 +43,8 @@ public class DeletedExamContinuation {
     private Instant transferredAt;
     private Instant groupTerminalAt;
     private Instant expiresAt;
+    private java.time.LocalDateTime sourceCreatedAt;
+    private web.tosunsaeng.domain.exams.domain.entity.PaidExamSelection.StartReason paidStartReason;
 
     public static DeletedExamContinuation capture(String deletionId, ExamSession source, Instant now) {
         Objects.requireNonNull(source);
@@ -76,6 +78,17 @@ public class DeletedExamContinuation {
         result.transferState = status == AttemptGroupProjectionStatus.COMPLETED
                 ? TransferState.RETIRED : TransferState.AVAILABLE;
         result.createdAt = now;
+        result.sourceCreatedAt = source.getCreatedAt();
+        if (Integer.valueOf(1).equals(source.getSubmissionEvidenceVersion())
+                && source.getRequiredQuestionNumbers() != null && !source.getRequiredQuestionNumbers().isEmpty()) {
+            web.tosunsaeng.domain.exams.application.ExamSubmissionEvidence.required(source.getRequiredQuestionNumbers());
+            if (!source.isCompleted() || source.getSubmissionCompletedAt() != null)
+                result.paidStartReason = source.isCompleted()
+                        ? web.tosunsaeng.domain.exams.domain.entity.PaidExamSelection.StartReason.NEW_AFTER_COMPLETION
+                        : source.getSubmissionCompletedAt() != null
+                        ? web.tosunsaeng.domain.exams.domain.entity.PaidExamSelection.StartReason.NEW_AFTER_SUBMISSION
+                        : web.tosunsaeng.domain.exams.domain.entity.PaidExamSelection.StartReason.RESTART_INCOMPLETE;
+        }
         // OPEN and reusable RETAKE evidence must not expire while a continuation remains possible.
         // Terminal retention needs a separately verified lifecycle event, not merely a local projection.
         return result;
@@ -94,6 +107,40 @@ public class DeletedExamContinuation {
         claimedByCreationCommandId = operation.getCommandId();
         replacementExamId = operation.getSessionId();
         claimedAt = now;
+    }
+
+    public void claimPaid(ExamCreationOperation op, Instant now) {
+        requirePaidMatches(op);
+        require(op.getState() == ExamCreationState.PREPARED);
+        if (transferState == TransferState.CLAIMED) {
+            require(Objects.equals(claimedByCreationCommandId,op.getCommandId()) && Objects.equals(replacementExamId,op.getSessionId()));
+            return;
+        }
+        require(transferState == TransferState.AVAILABLE || transferState == TransferState.RETIRED);
+        transferState = TransferState.CLAIMED; claimedByCreationCommandId = op.getCommandId();
+        replacementExamId = op.getSessionId(); claimedAt = now; expiresAt = null;
+    }
+
+    public void finishPaid(ExamCreationOperation op, Instant now) {
+        requirePaidMatches(op);
+        require(transferState == TransferState.CLAIMED && Objects.equals(claimedByCreationCommandId,op.getCommandId())
+                && Objects.equals(replacementExamId,op.getSessionId()));
+        if (op.getState() == ExamCreationState.SUCCEEDED) {
+            require(op.getReservationKind() == BillingReservationKind.INITIAL && !attemptGroupId.equals(op.getAttemptGroupId()));
+            transferState = TransferState.TRANSFERRED; transferredAt = now;
+        } else {
+            require(op.isTerminal());
+            transferState = groupStatus == AttemptGroupProjectionStatus.COMPLETED ? TransferState.RETIRED : TransferState.AVAILABLE;
+            claimedByCreationCommandId = null; replacementExamId = null; claimedAt = null;
+        }
+    }
+
+    private void requirePaidMatches(ExamCreationOperation op) {
+        require(op.getPaidDeletedSource() != null && deletionId.equals(op.getPaidDeletedSource().deletionId())
+                && userId.equals(op.getUserId()) && sourceExamId.equals(op.getReplacementSourceSessionId())
+                && attemptGroupId.equals(op.getExpectedAttemptGroupId()) && mockExamId.equals(op.getExpectedMockExamId())
+                && paidStartReason != null && op.getPaidSelection() != null && paidStartReason == op.getPaidSelection().startReason()
+                && !op.isPhoneContinuation() && !sourceExamId.equals(op.getSessionId()));
     }
 
     public void transfer(ExamCreationOperation operation, Instant now) {
