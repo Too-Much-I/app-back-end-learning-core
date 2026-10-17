@@ -1,5 +1,16 @@
 # 심사 기간 공존 R2 구현·test 전달
 
+## 2026-10-17 실행 결과
+
+- 제품 commit `e817ae8`, PR [#48](https://github.com/Too-Much-I/app-back-end-learning-core/pull/48), develop merge `f2111e556c6b79cad0b377020fe7d5b2f2db0637`.
+- [배포 run 39032470211](https://github.com/Too-Much-I/app-back-end-learning-core/actions/runs/39032470211) 성공. 기존 test task42 → 코드 task43 → 공존 flag task44 순서로 적용했다.
+- 최종 `tosunsaeng-learning-core-test:44`: `COMPLETED`, running1/pending0. 8080/8444 새 대상 healthy, 공개 health200. v1/v2 무토큰401, OpenAPI의 두 POST와 v2 Idempotency-Key 확인.
+- 이미지 `sha256:54db3079ffd23d7f24bf4d53e0e18b222d075750d565114748eda2a72881250d` 유지. task43 대비 task44 변경은 `BILLING_LEGACY_EXAM_CREATE_ENABLED=true` 하나임을 전체 등록 필드 비교로 확인했다. Secret 값 출력/교체·IAM/네트워크/DB 변경 없음.
+- 전체 Mongo333개 통과. 실제 사용자 권리 소비·시험 생성·AI 채점 공동 E2E는 수행하지 않았다. 다음 작업은 앱의 v2 고정 연결과 실제 양측 시나리오 확인이다.
+- DB 준비 스크립트·운영 준비 문서와 DS_Store는 기존 로컬 변경으로 보존했으며 이 제품 배포에 포함하지 않았다. 예상 밖의 제품 변경 없음.
+- 최초 task 등록은 빈 tags 옵션으로 API에서 거절돼 서비스 변경 없이 끝났다. 빈 옵션 제거 후44등록·배포 성공했다. 배포 중 일시 unhealthy는 기동 후 해소됐으며 검증 없이 설정을 완화하지 않았다.
+- 이 사후 실행 기록은 작업 브랜치의 문서 전용 추가 commit으로 전달한다. 배포된 제품 코드는 위 merge와 동일하며 문서 기록을 위해 추가 서버 배포하지 않는다.
+
 ## 5줄 결론
 
 1. 구앱은 기존 `POST /api/v1/exams`, 신앱·심사 앱은 `POST /api/v2/exams`를 사용한다. 생성 외 API는 공유한다.

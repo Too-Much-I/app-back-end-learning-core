@@ -16415,3 +16415,11 @@
 - 명시 무료 출처·필수접수 snapshot·원 Session 제출 차단, owner/삭제/탈퇴/paid guard Transaction과 무료→paid 로컬 원대상 snapshot을 추가했다. 봉인과 기존 A/R2/exact fixture bytes는 유지했다.
 - clean test 성공: 1375개 중1374통과, 기존 외부 import 자료 조건부1 skip. 전체 Mongo 격리 테스트 성공, Node64개 통과, 원본 SHA256SUMS 전체 통과, git diff --check 통과. 초기 테스트 mock 연결/전환 응답 fixture 불일치를 수정 후 재실행했다.
 - 사용자 DS_Store·기존 실DB 준비 스크립트/별도 운영 준비 문서는 이번 제품 commit에서 제외한다. main/prod/Billing/Identity·실DB/index는 변경하지 않았다. PR/develop/test 배포 결과 및 실제 공동 E2E는 별도 기록한다.
+
+## 2026-10-17 — 공존 R2 test 배포 확인 완료
+
+- 관련 TMI-116/TMI-128/TMI-125/TMI-217/TMI-220/TMI-193. 제품 `e817ae8` push, PR48 검증 전체 성공 후 develop `f2111e5` merge. 배포 run39032470211 성공.
+- LC test task42를 보존 기반으로 코드 task43 배포 후, 같은 이미지에 무료 생성 flag 하나만 추가한 task44를 적용했다. 등록 입력 전체 비교로 기타 설정 불변 확인. 최종 COMPLETED/running1/pending0 및 새8080/8444 healthy, 공개 health200, v1/v2 무토큰401, OpenAPI 두 route 확인.
+- 첫 task 등록의 빈 tags 오류는 등록 전 거절됐고 옵션 제거 후 성공했다. 새 task의 초기 unhealthy가 해소되는 것을 확인했고, 이전 target drain 완료까지 기다렸다. IAM/네트워크/키/DB·manifest 변경 및 prod/Billing/Identity 수정 없음.
+- clean test1374통과/기존 조건부skip1, Mongo333통과, Node64통과 및 원본 hash 유지. 실제 유저 권리 소비·시험/AI 공동 E2E는 미실행으로 분리한다. 앱 v2 고정 호출/동일key 재시도 검증이 다음 과제다.
+- 사후 실행 문서를 같은 작업 브랜치에 추가 commit/push한다. 문서 기록은 제품 이미지 변경이 아니므로 추가 배포하지 않는다. 사용자 DS_Store와 기존 운영 준비 변경은 그대로 보존했다. Secret/Token 기록 없음.

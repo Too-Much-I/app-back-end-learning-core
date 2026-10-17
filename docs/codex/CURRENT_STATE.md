@@ -1,5 +1,7 @@
 # Learning Core Current State
 
+- 2026-10-17 공존 R2 전달·test 배포 완료: PR48 develop merge `f2111e5`, run39032470211 성공. 최종 LC test task44 COMPLETED/running1/pending0, 무료 생성 flag ON. task43 대비 flag 한 개 외 설정 불변, health200·v1/v2 무토큰401·두 생성 route 확인. prod/Billing/Identity/실DB 변경 없음. 실제 사용자 권리·AI 공동 E2E는 후속이다. 상세 `LC_BILLING_COEXISTENCE_DELIVERY.md`. 관련 TMI-116/TMI-128/TMI-125/TMI-217/TMI-220/TMI-193. 사후 실행 문서는 작업 브랜치에 추가 commit/push하며 제품 재배포는 하지 않는다.
+
 - 2026-10-17 공존 R2 로컬 구현 검증 완료: `feat/lc-review-coexistence`에서 v1 무료/v2 paid 생성 분리·명시 무료 출처·공통 fence·무료→paid exact 로컬 원대상 연결을 구현했다. clean test 1374통과/기존 skip1, Mongo333개·Node64개·원본 fixture hash 통과. PR/test 전달 진행 중이며 실제 공동 Billing/AI E2E·prod 변경 없음. 상세 `LC_BILLING_COEXISTENCE_DELIVERY.md`. 관련 TMI-116/TMI-128/TMI-125/TMI-217/TMI-220/TMI-193.
 
 - 공존 계획 R2 설명의 현재 턴 식별자를 WORKLOG에 보완했다. 계획 설명 완료·공존 구현 미완료 상태 유지, 추가 계획/코드/DB/서버 변경 없음. 관련 TMI-116/TMI-128/TMI-122/TMI-125/TMI-217/TMI-220/TMI-193/TMI-136.
