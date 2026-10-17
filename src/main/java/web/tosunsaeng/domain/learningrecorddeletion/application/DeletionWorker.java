@@ -175,8 +175,9 @@ public class DeletionWorker {
     private void cleanMongo(DeletionOperation op) {
         var target = target(op, Criteria.where("mongoCleared").ne(true));
         if (target == null) { op.advance(DeletionOperation.Stage.CLEARING_CACHE); return; }
-        String field = target.getTargetType() == DeletionTarget.Type.EXAM ? "examId" : "attemptId";
         for (String collection : children(target)) {
+            String field = target.getTargetType() == DeletionTarget.Type.EXAM
+                    ? DeletionChildFields.examReference(collection) : "attemptId";
             Query query = Query.query(Criteria.where(field).is(target.getAggregateId())).limit(BATCH);
             query.fields().include("_id");
             List<Document> batch = mongo.find(query, Document.class, collection);
@@ -193,8 +194,9 @@ public class DeletionWorker {
             if (!storageEmpty) return;
             if (mongo.exists(Query.query(Criteria.where("_id").is(external.getAggregateId())), rootCollection(external)))
                 throw new UnsafeEvidence();
-            String field = external.getTargetType() == DeletionTarget.Type.EXAM ? "examId" : "attemptId";
             for (String collection : children(external)) {
+                String field = external.getTargetType() == DeletionTarget.Type.EXAM
+                        ? DeletionChildFields.examReference(collection) : "attemptId";
                 if (mongo.exists(Query.query(Criteria.where(field).is(external.getAggregateId())), collection)) throw new UnsafeEvidence();
             }
             external.markVerified(clock.instant()); mongo.save(external); return;
