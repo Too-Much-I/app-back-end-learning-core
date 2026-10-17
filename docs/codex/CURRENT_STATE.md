@@ -1,5 +1,7 @@
 # Learning Core Current State
 
+- 2026-10-17 TMI-193/TMI-217: Azure BSON exam_id 삭제 필드 보완을 별도 브랜치로 전달 준비. cleanup/verify/fence/index 검사 일관화, 기존 API 및 권한 차단 유지. Node11 통과, Java/Mongo·CI 및 test 배포 후 검증은 진행 중. 운영 배포·봉인·미연결 자료 삭제는 제외.
+
 - 2026-10-17 공존 R2 로컬 구현 검증 완료: `feat/lc-review-coexistence`에서 v1 무료/v2 paid 생성 분리·명시 무료 출처·공통 fence·무료→paid exact 로컬 원대상 연결을 구현했다. clean test 1374통과/기존 skip1, Mongo333개·Node64개·원본 fixture hash 통과. PR/test 전달 진행 중이며 실제 공동 Billing/AI E2E·prod 변경 없음. 상세 `LC_BILLING_COEXISTENCE_DELIVERY.md`. 관련 TMI-116/TMI-128/TMI-125/TMI-217/TMI-220/TMI-193.
 
 - 공존 계획 R2 설명의 현재 턴 식별자를 WORKLOG에 보완했다. 계획 설명 완료·공존 구현 미완료 상태 유지, 추가 계획/코드/DB/서버 변경 없음. 관련 TMI-116/TMI-128/TMI-122/TMI-125/TMI-217/TMI-220/TMI-193/TMI-136.

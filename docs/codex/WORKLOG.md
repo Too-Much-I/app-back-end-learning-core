@@ -16415,3 +16415,9 @@
 - 명시 무료 출처·필수접수 snapshot·원 Session 제출 차단, owner/삭제/탈퇴/paid guard Transaction과 무료→paid 로컬 원대상 snapshot을 추가했다. 봉인과 기존 A/R2/exact fixture bytes는 유지했다.
 - clean test 성공: 1375개 중1374통과, 기존 외부 import 자료 조건부1 skip. 전체 Mongo 격리 테스트 성공, Node64개 통과, 원본 SHA256SUMS 전체 통과, git diff --check 통과. 초기 테스트 mock 연결/전환 응답 fixture 불일치를 수정 후 재실행했다.
 - 사용자 DS_Store·기존 실DB 준비 스크립트/별도 운영 준비 문서는 이번 제품 commit에서 제외한다. main/prod/Billing/Identity·실DB/index는 변경하지 않았다. PR/develop/test 배포 결과 및 실제 공동 E2E는 별도 기록한다.
+
+## 2026-10-17 — Azure 삭제 BSON 필드 보완 전달
+
+- TMI-193/TMI-217. 사용자 승인으로 Azure exam_id를 cleanup/잔존 검사/persistence fence 및 index 준비 검사에 일관 적용한다. 실제 entity 직렬화·삭제 차단·새 기록 보존 및 기존 오설치 index fail-closed 회귀를 포함한다.
+- Azure 보완만 별도 develop 기반 브랜치로 분리했다. 기존 작업트리·운영 준비·DS_Store는 보존하고 전달에서 제외한다. 공개 API/BaseResponse/AI/S3/Redis 계약 불변. 운영 배포·봉인·데이터 정리 없음.
+- 삭제 index Node11개 통과. 전체 Java/Mongo 및 CI·test 배포 결과는 후속 확인한다. 실제 사용자 삭제 E2E 완료로 보고하지 않는다.

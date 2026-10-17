@@ -18,6 +18,29 @@ function fixture(duplicateActiveOwners = 0) {
 test("explicit database, no implicit system database", () => {
     for (const name of [undefined, "", " admin ", "admin", "CONFIG", "local"]) assert.throws(() => databaseName(name));
 });
+test("Azure uses stored exam_id for index and both integrity lookups", async () => {
+    const db = fixture(), collection = db.getCollection, lookups = [];
+    db.getCollection = name => ({...collection(name), aggregate: pipeline => {
+        if (name === "azure_results") lookups.push(pipeline[0].$lookup);
+        return {toArray: async () => []};
+    }});
+    await run(db, {databaseName: "deletion-fixture"});
+    assert.equal(lookups.length, 2);
+    for (const lookup of lookups) {
+        assert.equal(lookup.localField, "exam_id");
+        assert.equal(lookup.from, "exam_sessions");
+    }
+    const expected = INDEXES.find(i => i.collection === "azure_results");
+    assert.deepEqual(expected.key, {exam_id: 1, _id: 1});
+    assert.equal(compatible({...expected, key: {examId: 1, _id: 1}}, expected), false);
+    assert.deepEqual(INDEXES.find(i => i.collection === "speechace_results").key, {examId: 1, _id: 1});
+});
+test("old Azure index is rejected without automatic drop or replacement", async () => {
+    const db = fixture();
+    db.indexes.azure_results = [{name: "idx_deletion_exam_cleanup", key: {examId: 1, _id: 1}}];
+    await assert.rejects(() => run(db, {databaseName: "deletion-fixture", apply: true, writersDrained: true}));
+    assert.equal(db.writes.length, 0);
+});
 test("TTL only targets completed deletion evidence, never learning content or aggregates", () => {
     const ttl = INDEXES.filter(i => i.expireAfterSeconds !== undefined);
     assert.equal(ttl.length, 3);
