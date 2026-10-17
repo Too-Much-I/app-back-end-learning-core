@@ -46,6 +46,7 @@ public class ExamServiceImpl implements ExamService {
     @Autowired(required = false)
     private web.tosunsaeng.domain.exams.rollout.LegacyExamRuntime legacyExamRuntime;
     @Autowired(required = false) private PaidExamCreationSaga paidExamCreationSaga;
+    @Autowired private TransitionFreeExamService transitionFreeExamService;
     @Value("${app.billing.paid-exam.enabled:false}") private boolean paidExamEnabled;
 
     @org.springframework.beans.factory.annotation.Autowired(required = false)
@@ -238,11 +239,20 @@ public class ExamServiceImpl implements ExamService {
     public ExamResponseDTO.CreateSessionResult createExamSession(String idempotencyKey) {
         long startedAt = System.nanoTime();
         String userId = currentUserProvider.getCurrentUserId();
-        if (!paidExamEnabled && deletionAccess != null) deletionAccess.requirePublicWrite(userId);
-        ExamSessionManager.Assignment assignment = paidExamEnabled ? paidExamCreationSaga.start(userId,idempotencyKey)
-                : billingSagaProperties.isCreationSagaEnabled()
-                ? billingExamCreationSaga.start(userId, idempotencyKey)
-                : examSessionManager.startNew(userId);
+        ExamSessionManager.Assignment assignment = transitionFreeExamService.start(userId);
+        return renderCreatedSession(assignment, startedAt);
+    }
+
+    @Override
+    public ExamResponseDTO.CreateSessionResult createPaidExamSession(String idempotencyKey) {
+        long startedAt = System.nanoTime();
+        if (!paidExamEnabled || paidExamCreationSaga == null)
+            throw new ExamsException(ErrorStatus._EXAM_CREATION_PROCESSING, 1);
+        return renderCreatedSession(paidExamCreationSaga.start(currentUserProvider.getCurrentUserId(), idempotencyKey), startedAt);
+    }
+
+    private ExamResponseDTO.CreateSessionResult renderCreatedSession(
+            ExamSessionManager.Assignment assignment, long startedAt) {
         String examId = assignment.session().getExamId();
         String redisKey = "exam:status:" + examId;
 

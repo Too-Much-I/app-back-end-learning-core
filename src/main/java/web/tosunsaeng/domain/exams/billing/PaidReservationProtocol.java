@@ -43,6 +43,7 @@ public final class PaidReservationProtocol {
 
     public static PhoneRequest phoneRequest(ExamCreationOperation op) {
         require(op != null && op.getPaidSelection() != null && op.isPhoneContinuation());
+        require(op.getPaidLocalSourceOrigin() == null);
         uuid(op.getOperationId(), true);
         require(op.getReplacementSourceSessionId() == null && op.getPaidSelection().startReason() == null
                 && Objects.equals(op.getExpectedMockExamId(), op.getMockExamId()));
@@ -67,6 +68,7 @@ public final class PaidReservationProtocol {
         uuid(op.getOperationId(), true);
         RestartContext restart = null;
         if (op.getExpectedAttemptGroupId() != null) {
+            require(op.getPaidLocalSourceOrigin() == null);
             restart = new RestartContext(op.getExpectedAttemptGroupId(), op.getReplacementSourceSessionId(),
                     op.getPaidSelection().startReason());
             require(op.getExpectedMockExamId() != null);
@@ -74,7 +76,10 @@ public final class PaidReservationProtocol {
                 require(Objects.equals(op.getExpectedMockExamId(), op.getMockExamId()));
         } else {
             // Legacy original target is local-only; never create a retrospective Billing group/transition.
-            if (op.getPaidLegacySource() != null) {
+            if (op.getPaidLegacySource() != null || op.getPaidLocalSourceOrigin() != null) {
+                if (op.getPaidLocalSourceOrigin() != null)
+                    require(web.tosunsaeng.domain.exams.domain.entity.ExamSession.TRANSITION_FREE_V1.equals(op.getPaidLocalSourceOrigin())
+                            && op.getPaidLegacySource() == null);
                 require(op.getPaidDeletedSource() == null && op.getReplacementSourceSessionId() != null
                         && op.getExpectedMockExamId() != null && op.getPaidSelection().startReason() != null);
                 if (op.getPaidSelection().startReason() == StartReason.RESTART_INCOMPLETE)

@@ -43,6 +43,7 @@ class PaidExamP1MongoTest {
     ExamCreationOperationRepository operations;
     PaidReservationEvidenceStore paidStore;
     DeletionCommandService deletion;
+    TransitionFreeExamService free;
     @BeforeAll static void connect() { client = MongoClients.create(MONGO.getReplicaSetUrl()); }
     @AfterAll static void close() { client.close(); }
     @BeforeEach void setup() {
@@ -74,7 +75,119 @@ class PaidExamP1MongoTest {
         preparation = new PaidExamPreparationService(mongo, operations,
                 new MockExamCatalogService(repositories.getRepository(MockExamRepository.class)),
                 new ExamSessionCompletionQuery(mongo), evidence, beans.getBeanProvider(UserOwnedTransactionExecutor.class), Clock.fixed(NOW,ZoneOffset.UTC));
+        beans.addBean("legacy", new web.tosunsaeng.domain.exams.rollout.LegacyExamRuntime(
+                ReflectionTestUtils.invokeMethod(web.tosunsaeng.domain.exams.rollout.LegacyExamManifest.class,
+                        "build", "test", "isolated", "empty", List.of())));
+        free = new TransitionFreeExamService(mongo, operations, repositories.getRepository(ExamSessionRepository.class),
+                new ExamSessionCompletionQuery(mongo), new MockExamCatalogService(repositories.getRepository(MockExamRepository.class)),
+                evidence, beans.getBeanProvider(UserOwnedTransactionExecutor.class),
+                beans.getBeanProvider(web.tosunsaeng.domain.exams.rollout.LegacyExamRuntime.class), Clock.fixed(NOW,ZoneOffset.UTC));
+        ReflectionTestUtils.setField(free,"enabled",true);
         mock("mock_1",1); mock("mock_2",2);
+    }
+
+    @Test void freeCreatesCoveredSessionAndPartialRestartClosesOnlyNewAdmissions() {
+        var first = free.start(OWNER).session();
+        owners.execute(OWNER, () -> { evidence.accepted(first.getExamId(),1,0,List.of(1,2),NOW); return null; });
+        var second = free.start(OWNER).session();
+        var old = mongo.findById(first.getExamId(),ExamSession.class);
+        assertThat(second.getMockExamId()).isEqualTo(first.getMockExamId());
+        assertThat(second.isTransitionFree()).isTrue();
+        assertThat(old.isInProgress()).isTrue();
+        assertThat(old.isActive()).isFalse();
+        assertThat(old.getSubmissionsClosedAt()).isEqualTo(NOW);
+        assertThat(evidence.acceptedQuestion(old,1,0)).isTrue();
+        assertThat(evidence.acceptedQuestion(old,2,0)).isFalse();
+        assertThat(operations.count()).isZero();
+        assertThat(second.getAttemptGroupId()).isNull();
+    }
+
+    @Test void freeAllAcceptedMovesOnBeforeGradingAndPaidBindsLocalInitial() {
+        var first = free.start(OWNER).session();
+        owners.execute(OWNER, () -> {
+            evidence.accepted(first.getExamId(),1,0,List.of(1,2),NOW);
+            evidence.accepted(first.getExamId(),2,0,List.of(1,2),NOW); return null;
+        });
+        var op = preparation.prepare(OWNER,key());
+        assertThat(op.getMockExamId()).isEqualTo("mock_2");
+        assertThat(op.getPaidSelection().startReason()).isEqualTo(NEW_AFTER_SUBMISSION);
+        assertThat(op.getPaidLocalSourceOrigin()).isEqualTo(ExamSession.TRANSITION_FREE_V1);
+        assertThat(op.getPaidLegacySource()).isNull();
+        assertThat(paidStore.prepareRequest(OWNER,op.getCommandId()).restartContext()).isNull();
+        assertThatThrownBy(() -> free.start(OWNER)).isInstanceOf(web.tosunsaeng.domain.exams.exception.ExamsException.class);
+        assertThat(mongo.findById(first.getExamId(),ExamSession.class).isActive()).isTrue();
+        assertThat(preparation.prepare(OWNER,op.getOperationId()).getSessionId()).isEqualTo(op.getSessionId());
+    }
+
+    @Test void freeOffBlocksCreationButDoesNotInvalidateExistingSession() {
+        var first = free.start(OWNER).session();
+        ReflectionTestUtils.setField(free,"enabled",false);
+        assertThatThrownBy(() -> free.start(OWNER)).isInstanceOf(web.tosunsaeng.domain.exams.exception.ExamsException.class);
+        assertThat(mongo.findById(first.getExamId(),ExamSession.class).isTransitionFree()).isTrue();
+        assertThat(mongo.count(new Query(),ExamSession.class)).isEqualTo(1);
+    }
+
+    @Test void freeAllAcceptedChoosesNextWithoutWaitingForSummary() {
+        var first=free.start(OWNER).session();
+        owners.execute(OWNER,()->{ evidence.accepted(first.getExamId(),1,0,List.of(1,2),NOW);
+            evidence.accepted(first.getExamId(),2,0,List.of(1,2),NOW); return null; });
+        assertThat(free.start(OWNER).session().getMockExamId()).isEqualTo("mock_2");
+        assertThat(mongo.findById(first.getExamId(),ExamSession.class).isCompleted()).isFalse();
+    }
+
+    @Test void paidHistoryBlocksFreeOnlyWhileStillProgressing() {
+        String operation=key(), reservation=key(), group=key();
+        var snapshot=new web.tosunsaeng.domain.exams.billing.BillingReservationClient.ReservationSnapshot(
+                operation,reservation,BillingReservationKind.INITIAL,
+                web.tosunsaeng.domain.exams.billing.BillingReservationClient.ReservationStatus.CONFIRMED,
+                group,web.tosunsaeng.domain.exams.billing.BillingReservationClient.AttemptGroupStatus.OPEN,"paid","mock_1",null,null,NOW.plusSeconds(60),NOW,
+                web.tosunsaeng.domain.exams.billing.PaidReservationProtocol.Source.SUBSCRIPTION,null,null);
+        var paid=ExamSession.builder().examId("paid").userId(OWNER).mockExamId("mock_1")
+                .createdAt(LocalDateTime.ofInstant(NOW.minusSeconds(60),ZoneOffset.UTC))
+                .creationOperationId(operation).billingReservationId(reservation).attemptGroupId(group)
+                .billingReservationKind(BillingReservationKind.INITIAL).entitlementState(ExamEntitlementState.CONFIRMED)
+                .entitlementConfirmedAt(NOW).entitlementConfirmedUserId(OWNER).paidReservation(new PaidReservationEvidence(snapshot))
+                .status(ExamSessionStatus.IN_PROGRESS).active(false).build();
+        mongo.insert(paid);
+        assertThatThrownBy(()->free.start(OWNER)).isInstanceOf(web.tosunsaeng.domain.exams.exception.ExamsException.class);
+        mongo.updateFirst(Query.query(Criteria.where("_id").is("paid")),
+                Update.update("status",ExamSessionStatus.COMPLETED).set("completedAt",LocalDateTime.ofInstant(NOW,ZoneOffset.UTC)),ExamSession.class);
+        assertThat(free.start(OWNER).session().isTransitionFree()).isTrue();
+        assertThat(mongo.findById("paid",ExamSession.class).getAttemptGroupId()).isEqualTo(group);
+    }
+
+    @Test void freeCreationAfterDeletionAdmissionIsRejected() {
+        free.start(OWNER);
+        deletion.request(OWNER,key());
+        assertThatThrownBy(() -> free.start(OWNER)).isInstanceOf(DeletionFailure.class);
+        assertThat(mongo.count(new Query(),ExamSession.class)).isEqualTo(1);
+    }
+
+    @Test void concurrentFreeStartsLeaveOnlyOneActiveSession() throws Exception {
+        var pool = Executors.newFixedThreadPool(2);
+        try {
+            var latch = new CountDownLatch(1);
+            Callable<Boolean> task = () -> { latch.await(); try { free.start(OWNER); return true; }
+                catch (org.springframework.dao.OptimisticLockingFailureException e) { return false; } };
+            var a=pool.submit(task); var b=pool.submit(task); latch.countDown();
+            assertThat(a.get(10,TimeUnit.SECONDS) || b.get(10,TimeUnit.SECONDS)).isTrue();
+            b.get(10,TimeUnit.SECONDS);
+            assertThat(mongo.count(Query.query(Criteria.where("active").is(true)),ExamSession.class)).isEqualTo(1);
+        } finally { pool.shutdownNow(); }
+    }
+
+    @Test void concurrentFreeAndPaidPreparationCannotBypassPaidGuard() throws Exception {
+        var pool=Executors.newFixedThreadPool(2); var gate=new CountDownLatch(1);
+        try {
+            var a=pool.submit(()->{gate.await(); try { return free.start(OWNER).session().getExamId(); }
+                catch(web.tosunsaeng.domain.exams.exception.ExamsException denied) { return null; }});
+            var b=pool.submit(()->{gate.await(); return preparation.prepare(OWNER,key());}); gate.countDown();
+            String freeId=a.get(10,TimeUnit.SECONDS); var paid=b.get(10,TimeUnit.SECONDS);
+            assertThat(paid.getActiveGuard()).isTrue();
+            assertThat(paid.getReplacementSourceSessionId()).isEqualTo(freeId);
+            assertThat(mongo.count(new Query(),ExamSession.class)).isEqualTo(freeId==null?0:1);
+            assertThatThrownBy(()->free.start(OWNER)).isInstanceOf(web.tosunsaeng.domain.exams.exception.ExamsException.class);
+        } finally { pool.shutdownNow(); }
     }
     void mock(String id,int sequence) { mongo.insert(MockExam.builder().mockExamId(id).sequence(sequence).active(true)
             .questions(List.of(Question.builder().questionNumber(1).build(),Question.builder().questionNumber(2).build())).build()); }

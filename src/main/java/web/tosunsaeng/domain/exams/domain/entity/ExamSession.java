@@ -28,6 +28,22 @@ public class ExamSession {
 
     private String userId;
 
+    public static final String TRANSITION_FREE_V1 = "TRANSITION_FREE_V1";
+    private String creationOrigin;
+
+    /** Server-written provenance; never infer free admission from absent Billing metadata. */
+    public boolean isTransitionFree() {
+        if (creationOrigin == null) return false;
+        if (!TRANSITION_FREE_V1.equals(creationOrigin) || paidReservation != null || creationOperationId != null
+                || billingReservationId != null || attemptGroupId != null || billingReservationKind != null
+                || entitlementState != null || entitlementConfirmedAt != null || entitlementConfirmedUserId != null
+                || legacyClosureManifest != null || !Integer.valueOf(1).equals(submissionEvidenceVersion)
+                || requiredQuestionNumbers == null || requiredQuestionNumbers.isEmpty()
+                || requiredQuestionNumbers.stream().anyMatch(n -> n == null || n < 1))
+            throw new IllegalStateException("Invalid transition free provenance");
+        return true;
+    }
+
     private LocalDateTime createdAt;
 
     private String mockExamId;

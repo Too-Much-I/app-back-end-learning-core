@@ -1,5 +1,9 @@
 # LC–Billing 유료 시험 연동 구현 계획
 
+- 2026-10-17 최신 [공존 계획 R2](LC_BILLING_COEXISTENCE_IMPLEMENTATION_PLAN.md): 심사 기간 임시 호환으로 축소. 출처 한 필드·생성 스위치 한 개·기존 버전 검사/공통 서비스 재사용, 별도 정책 revision·장기 왕복 전환 제외. 진행 중 paid의 v1 신규 생성은 안전 거절한다. 실제 업데이트 배포 후 생성 OFF여도 기존 무료 시험 처리는 유지한다. 아래 R1 이력의 양방향 전환 설계는 R2로 대체하며 구현/배포는 미실행이다.
+
+- 2026-10-17 공존 방향 후속: [구앱 무료·신앱 Billing 공존 계획 R1](LC_BILLING_COEXISTENCE_IMPLEMENTATION_PLAN.md). 사용자 승인 방향으로 전환기간 구경로 신규 무료 시험을 허용하고 새경로만 Billing 필수로 분리한다. 기존 봉인 목록 불변·명시 서버 출처·공통 lifecycle/fence·무료 fallback 금지를 유지한다. 신규 route/field/flag는 제안이며 제품 구현/배포 승인은 아니다. 아래 일괄 cutover의 신규시험 Billing 필수 원칙은 공존 도입 시 새경로에 한정되며 현재 runtime은 아직 변경하지 않았다.
+
 - 2026-10-16 [test 한정 기동 준비](LC_BILLING_PAID_EXAM_TEST_ACTIVATION.md): 선행 legacy PR #44 머지 후 새 feat에서 구현. 명시적 test 승인/환경·sealed 목록/owner·필수index가 충족돼야 gate 통과하며 다른환경은 계속 차단한다. 실환경 설정/활성화·목록 설치 도구/공동E2E 완료는 아니다.
 
 - 2026-10-16 전환 절차 정리: [cutover runbook·후속 도구 기준](LC_BILLING_PAID_EXAM_CUTOVER_RUNBOOK.md). 환경/담당/접근제한 artifact→drain→동일snapshot export→별도승인→install/verify/seal→공동검증→유입재개의 순서와 실패시 증거 보존을 정의했다. 운영 입력/실제 실행 승인·도구 구현은 미완료이며 이번은 문서 작업이다.

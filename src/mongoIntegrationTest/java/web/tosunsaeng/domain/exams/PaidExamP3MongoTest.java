@@ -107,7 +107,8 @@ class PaidExamP3MongoTest {
         return new ReservationSnapshot(prepared.getOperationId(),RESERVATION,BillingReservationKind.INITIAL,status,
                 NEW_GROUP,status==ReservationStatus.CONFIRMED?AttemptGroupStatus.OPEN:null,"new","mock",null,null,
                 NOW.plusSeconds(300),status==ReservationStatus.RESERVED?null:NOW.minusSeconds(1),
-                PaidReservationProtocol.Source.SUBSCRIPTION,prepared.getPaidLegacySource()==null?new PaidReservationProtocol.Transition(OLD_GROUP,"old"):null,
+                PaidReservationProtocol.Source.SUBSCRIPTION,prepared.getPaidLegacySource()==null && prepared.getPaidLocalSourceOrigin()==null
+                        ?new PaidReservationProtocol.Transition(OLD_GROUP,"old"):null,
                 rejected?new PaidReservationProtocol.ConfirmRejection("ENTITLEMENT_REVOKED"):null);
     }
     <T> T leased(Supplier<T> work) { return execution.http(prepared.getCommandId(),work); }
@@ -147,6 +148,29 @@ class PaidExamP3MongoTest {
         assertThat(session("old").getSubmissionsClosedByOperationId()).isEqualTo(prepared.getOperationId());
         assertThat(session("old").getBillingReservationId()).isNull();
         assertThat(session("old").getSubmissionEvidenceVersion()).isNull();
+    }
+
+    @Test void transitionFreeInitialKeepsOldUsableUntilConfirmAndReplayDoesNotReopenIt() {
+        operations.deleteAll();
+        mongo.updateFirst(Query.query(Criteria.where("_id").is("old")),new Update().unset("attemptGroupId")
+                .set("creationOrigin",ExamSession.TRANSITION_FREE_V1),ExamSession.class);
+        prepared=ExamCreationOperation.prepared(USER,UUID.randomUUID().toString(),"new","mock",1,"old",null,"mock",NOW);
+        prepared.fixPaidSelection(new PaidExamSelection(PaidExamSelection.StartReason.RESTART_INCOMPLETE,List.of(1,2)));
+        prepared.fixPaidLocalSourceOrigin(ExamSession.TRANSITION_FREE_V1);
+        operations.insert(prepared); evidence.prepareRequest(USER,prepared.getCommandId());
+        pending();
+        assertThat(session("old").isActive()).isTrue();
+        assertThat(session("new").isActive()).isFalse();
+        leased(()->lifecycle.applyStatus(USER,prepared.getCommandId(),snapshot(ReservationStatus.CONFIRMED,false)));
+        assertThat(session("old").isTransitionFree()).isTrue();
+        assertThat(session("old").getSubmissionsClosedByOperationId()).isEqualTo(prepared.getOperationId());
+        assertThat(session("old").getLegacyClosureManifest()).isNull();
+        assertThat(session("old").isActive()).isFalse();
+        assertThat(session("new").isActive()).isTrue();
+        assertThat(op().getState()).isEqualTo(ExamCreationState.SUCCEEDED);
+        assertThat(op().getActiveGuard()).isFalse();
+        assertThat(session("old").getAttemptGroupId()).isNull();
+        verifyNoInteractions(billing);
     }
     @Test void legacyCanceledInitialPreservesOriginalSession() {
         legacyPrepared(); pending();

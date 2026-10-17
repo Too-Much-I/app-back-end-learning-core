@@ -72,7 +72,7 @@ public class PaidExamLifecycleService {
             require(op.getState()==ExamCreationState.PREPARED && op.getReservationId()==null && op.getPaidReservation()==null
                     && op.getRecovery().getDispatch()==ReservationRecovery.Dispatch.NOT_DISPATCHED);
             requireNoSession(op);
-            if (op.getPaidLegacySource()!=null) previous(op);
+            if (op.getPaidLegacySource()!=null || op.getPaidLocalSourceOrigin()!=null) previous(op);
             op.getRecovery().setDispatch(ReservationRecovery.Dispatch.MAY_HAVE_BEEN_SENT);
             return save(op);
         });
@@ -290,6 +290,10 @@ public class PaidExamLifecycleService {
             require(legacyRuntime!=null);
             legacyRuntime.requireBound(op,old);
         }
+        if (op.getPaidLocalSourceOrigin()!=null) {
+            require(op.getPaidLegacySource()==null && old.isTransitionFree()
+                    && Objects.equals(op.getPaidLocalSourceOrigin(),old.getCreationOrigin()));
+        } else require(!old.isTransitionFree());
         require(old.getSubmissionsClosedAt()==null || Objects.equals(old.getSubmissionsClosedByOperationId(),op.getOperationId()));
         return old; // Keep terminal status/results; never resurrect or close a different current Session.
     }

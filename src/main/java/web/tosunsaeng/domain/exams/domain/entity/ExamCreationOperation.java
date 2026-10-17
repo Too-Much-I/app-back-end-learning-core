@@ -56,10 +56,21 @@ public class ExamCreationOperation {
     private Instant detailPurgeEligibleAt;
     private PaidDeletedSource paidDeletedSource;
     private web.tosunsaeng.domain.exams.rollout.LegacyExamManifest.Summary paidLegacySource;
+    private String paidLocalSourceOrigin;
+
+    public void fixPaidLocalSourceOrigin(String origin) {
+        requireState(ExamCreationState.PREPARED);
+        if (!ExamSession.TRANSITION_FREE_V1.equals(origin) || paidLocalSourceOrigin != null
+                || paidLegacySource != null || paidDeletedSource != null || paidSelection == null
+                || paidSelection.startReason() == null || replacementSourceSessionId == null
+                || expectedAttemptGroupId != null || isPhoneContinuation())
+            throw new IllegalStateException("Invalid local free source binding");
+        paidLocalSourceOrigin = origin;
+    }
 
     public void fixPaidLegacySource(web.tosunsaeng.domain.exams.rollout.LegacyExamManifest.Summary source) {
         requireState(ExamCreationState.PREPARED);
-        if (paidLegacySource != null || paidDeletedSource != null || paidSelection == null
+        if (paidLocalSourceOrigin != null || paidLegacySource != null || paidDeletedSource != null || paidSelection == null
                 || paidSelection.startReason() == null || replacementSourceSessionId == null
                 || expectedAttemptGroupId != null || isPhoneContinuation())
             throw new IllegalStateException("Invalid legacy source binding");
@@ -74,7 +85,7 @@ public class ExamCreationOperation {
     }
     public void fixPaidDeletedSource(PaidDeletedSource source) {
         requireState(ExamCreationState.PREPARED);
-        if (paidDeletedSource != null || paidLegacySource != null || paidSelection == null || isPhoneContinuation() || replacementSourceSessionId == null)
+        if (paidLocalSourceOrigin != null || paidDeletedSource != null || paidLegacySource != null || paidSelection == null || isPhoneContinuation() || replacementSourceSessionId == null)
             throw new IllegalStateException("Invalid deleted source binding");
         paidDeletedSource = java.util.Objects.requireNonNull(source);
     }
@@ -139,7 +150,7 @@ public class ExamCreationOperation {
                 cycleNumber, ExamCreationState.PREPARED, null, null, null,
                 replacementSourceSessionId, expectedAttemptGroupId, expectedMockExamId,
                 continuationReason, continuationId, null,
-                null, null, null, true, now, now, null, null, ReservationRecovery.prepared(now), null, null, null, null, null, null, null, null
+                null, null, null, true, now, now, null, null, ReservationRecovery.prepared(now), null, null, null, null, null, null, null, null, null
         );
     }
 

@@ -28,6 +28,7 @@ public final class LegacyExamRuntime {
      * Does not load the creation operation, which may legitimately expire after terminal retention.
      */
     public void requireKnown(ExamSession session) {
+        if (session != null && session.isTransitionFree()) return;
         if (manifest.containsLegacy(session)) {
             if (session.getEntitlementState() != null && session.getEntitlementState() != ExamEntitlementState.LEGACY
                     || session.getBillingReservationKind() != null || session.getEntitlementConfirmedAt() != null

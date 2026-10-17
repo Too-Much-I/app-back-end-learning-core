@@ -51,7 +51,7 @@ class ExamReadApiContractTest {
                 .findAndRegisterModules()
                 .disable(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS);
         mockMvc = MockMvcBuilders.standaloneSetup(
-                new ExamRestController(examService, examReadService)
+                new ExamRestController(examService, examReadService), new PaidExamRestController(examService)
         )
                 .setMessageConverters(new MappingJackson2HttpMessageConverter(objectMapper))
                 .build();
@@ -95,6 +95,17 @@ class ExamReadApiContractTest {
 
         verify(examReadService).getExamHistory();
         verifyNoInteractions(examService);
+    }
+
+    @Test void paidCreationHasSeparateRouteAndUnchangedSuccessShape() throws Exception {
+        String key = "30000000-0000-4000-8000-000000000001";
+        when(examService.createPaidExamSession(key)).thenReturn(ExamResponseDTO.CreateSessionResult.builder()
+                .examId("ex_paid").title("Exam").questions(List.of()).build());
+        mockMvc.perform(post("/api/v2/exams").header("Idempotency-Key",key))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.result.examId").value("ex_paid"))
+                .andExpect(jsonPath("$.result.userId").doesNotExist());
+        verify(examService).createPaidExamSession(key);
+        org.mockito.Mockito.verify(examService,org.mockito.Mockito.never()).createExamSession(org.mockito.ArgumentMatchers.any());
     }
 
     @Test
