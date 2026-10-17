@@ -74,7 +74,7 @@ public class PaidExamPreparationService {
         if (operations.findByUserIdAndActiveGuardTrue(userId).isPresent())
             throw new ExamsException(ErrorStatus._EXAM_CREATION_PROCESSING, 1);
         ExamSession previous = mongo.findOne(Query.query(Criteria.where("userId").is(userId))
-                .with(Sort.by(Sort.Direction.DESC, "createdAt", "_id")), ExamSession.class);
+                .with(Sort.by(Sort.Direction.DESC, "createdAt", "active", "_id")), ExamSession.class);
         web.tosunsaeng.domain.learningrecorddeletion.domain.DeletedExamContinuation deleted = null;
         if (previous == null && mongo.exists(Query.query(Criteria.where("userId").is(userId)),"learning_record_billing_continuations")) {
             if (deletedSources == null) throw new IllegalStateException("Deletion evidence reader unavailable");
@@ -84,7 +84,7 @@ public class PaidExamPreparationService {
         PaidExamSelection.StartReason reason = null;
         web.tosunsaeng.domain.exams.rollout.LegacyExamManifest.Summary legacySource = null;
         if (previous != null) {
-            if (previous.getAttemptGroupId() == null) {
+            if (previous.getAttemptGroupId() == null && !previous.isTransitionFree()) {
                 if (legacyRuntime == null) throw new IllegalStateException("Verified legacy inventory unavailable");
                 legacySource = legacyRuntime.requireLegacy(previous);
             }
@@ -132,6 +132,8 @@ public class PaidExamPreparationService {
                 previous != null ? previous.getMockExamId() : deleted != null ? deleted.getMockExamId() : null, clock.instant());
         operation.fixPaidSelection(new PaidExamSelection(reason, required));
         if (legacySource != null) operation.fixPaidLegacySource(legacySource);
+        if (previous != null && previous.isTransitionFree())
+            operation.fixPaidLocalSourceOrigin(previous.getCreationOrigin());
         if (phone != null) {
             operation = ExamCreationOperation.prepared(userId,operationId,operation.getSessionId(),selected.getMockExamId(),cycle,
                     null,phone.attemptGroupId(),phone.mockExamId(),phone.continuationReason(),phone.continuationId(),clock.instant());

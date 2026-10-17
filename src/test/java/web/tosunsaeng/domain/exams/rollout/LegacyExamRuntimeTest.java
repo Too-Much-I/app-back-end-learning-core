@@ -30,6 +30,36 @@ class LegacyExamRuntimeTest {
                 ExamSession.builder().examId("new").build()));
     }
 
+    @Test void explicitFreeOriginIsReadableAfterSwitchOffWithoutManifestMutation() {
+        var free = free();
+        runtime.requireKnown(free);
+        free.closeSubmissions(OP,NOW);
+        runtime.requireKnown(free);
+        assertFalse(free.isActive());
+        assertNull(free.getAttemptGroupId());
+        assertThrows(IllegalStateException.class, () -> runtime.requireLegacy(free));
+    }
+
+    @Test void unknownMixedOrUncoveredFreeOriginsAreRejected() {
+        for (String field : List.of("creationOrigin", "creationOperationId", "billingReservationId", "attemptGroupId")) {
+            var free = free();
+            ReflectionTestUtils.setField(free,field,"unexpected");
+            assertThrows(IllegalStateException.class, () -> runtime.requireKnown(free),field);
+        }
+        var free = free();
+        ReflectionTestUtils.setField(free,"submissionEvidenceVersion",null);
+        assertThrows(IllegalStateException.class, () -> runtime.requireKnown(free));
+        var paid = paid();
+        ReflectionTestUtils.setField(paid,"creationOrigin",ExamSession.TRANSITION_FREE_V1);
+        assertThrows(IllegalStateException.class, () -> runtime.requireKnown(paid));
+    }
+
+    private ExamSession free() {
+        return ExamSession.builder().examId("free").creationOrigin(ExamSession.TRANSITION_FREE_V1)
+                .submissionEvidenceVersion(1).requiredQuestionNumbers(List.of(1,2))
+                .status(ExamSessionStatus.IN_PROGRESS).active(true).build();
+    }
+
     @Test void manifestMemberCannotBeReinterpretedAsPaid() {
         var session = paid();
         ReflectionTestUtils.setField(session, "examId", "legacy");

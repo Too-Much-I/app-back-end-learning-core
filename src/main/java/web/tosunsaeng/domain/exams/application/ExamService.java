@@ -9,6 +9,8 @@ public interface ExamService {
 
     ExamResponseDTO.CreateSessionResult createExamSession(String idempotencyKey);
 
+    ExamResponseDTO.CreateSessionResult createPaidExamSession(String idempotencyKey);
+
     default ExamResponseDTO.CreateSessionResult createExamSession() {
         return createExamSession(null);
     }

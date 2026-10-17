@@ -1,5 +1,22 @@
 # 프로젝트 목적
 
+## 2026-10-17 공존 R2 구현·test 전달 승인
+
+- 사용자 「브랜치 파서 하고 끝나면 커밋 푸시 하고 테스트 서버에 배포」로 공존 R2 코드·격리 테스트와 feat 브랜치 commit/push/PR/develop 머지·LC test 배포를 승인했다. main/prod·Billing/Identity·실DB/index/manifest 변경은 제외한다. 사용자 DS_Store는 전달하지 않는다.
+- `/api/v1/exams`는 명시 무료 writer, `/api/v2/exams`는 기존 paid saga로 분리한다. OFF 신규 v1은 기존 `409 EXAM_CREATION_PROCESSING`, Retry-After 1로 거절한다. 기존 무료 시험 reader는 OFF와 무관하게 유지한다. 이 승인 범위에서 기존 v1의 전역 paid 분기를 대체한다.
+
+## 2026-10-17 심사 기간 공존 단순화 계획 R2
+
+- 사용자 「지금까지 이야기한 걸로 계획서 수정」 요청을 반영해 공존을 심사 기간 임시 호환으로 한정한다. 기존 버전 검사 재사용, 서버 무료 출처 한 필드와 구경로 신규 생성 ON/OFF 한 설정을 유지하며 별도 정책 revision/관리 UI/장기 왕복 전환은 제외한다.
+- 진행 중 Billing 시험/미완료 paid operation의 구경로 신규 생성은 안전 거절하고 정상 paid→무료 교체 기능을 만들지 않는다. 기존 시험의 조회/제출/채점/완료, 삭제/탈퇴/owner·공통 생성 fence, 새경로 무료 fallback 금지는 유지한다. 완료된 Billing 이력만으로 영구 계정 차단을 추가하지 않는다.
+- 기준 `docs/codex/LC_BILLING_COEXISTENCE_IMPLEMENTATION_PLAN.md` R2. 이번은 계획/ADR 동기화이며 코드/DB/봉인·서버 설정/배포·commit/push 승인이 아니다. exact 신규 route/field/오류 명칭은 구현 전 대조한다.
+
+## 2026-10-17 구앱 무료·신앱 Billing 공존 계획 작성
+
+- 사용자 「좋아 해줘」로 `docs/codex/LC_BILLING_COEXISTENCE_IMPLEMENTATION_PLAN.md`의 공존 구현 계획·새 생성 API 제안 정리를 요청했다. 이번은 문서/ADR 동기화이며 제품 코드·실DB/봉인·설정·배포·commit/push 승인이 아니다.
+- 승인 방향: 전환기간 구경로 무료 시험 생성·제출/채점/완료 유지, 신앱/심사 앱 동일 Billing 필수 경로, 양쪽 삭제/탈퇴/owner 차단, 새경로 오류 무료 fallback 금지. 직접 구경로 호출의 무료 우회 위험은 수용하며 종료일은 별도다.
+- 기존 manifest bytes/hash/count를 변경하거나 source 누락을 무료로 추론하지 않는다. 서버가 생성 시 기록하는 신규 무료 출처와 공통 reader/lifecycle·생성/삭제 fence를 설계한다. 신규 route/field/flag는 제안이며 기존 runtime guard를 임의 해제하지 않는다. Billing 원장/무료권 소비·복원 근거를 소급 생성하지 않는다.
+
 ## 2026-10-16 LC test TLS 코드 전달 승인
 
 - 사용자 「어 해줘」로 TLS 주입 코드의 commit/push/PR/develop 머지 및 기존 test 자동 배포·확인을 승인했다. 기능 OFF와 기존 서버 설정을 유지한다. main/prod·네트워크·DB/index 변경 및 기능 활성화는 제외한다. 사용자 DS_Store는 전달하지 않는다.

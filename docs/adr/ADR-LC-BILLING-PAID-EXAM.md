@@ -1,5 +1,9 @@
 # ADR — LC 유료 시험의 접수 기준 전환과 복구 경계
 
+- 2026-10-17 단순화 개정: [공존 계획 R2](../codex/LC_BILLING_COEXISTENCE_IMPLEMENTATION_PLAN.md). 심사 기간에만 구앱을 지원하고 기존 버전 검사를 재사용한다. 서버 출처는 creationOrigin 하나, 신규 v1 생성 ON/OFF 하나이며 정책 revision/관리 UI는 추가하지 않는다. 진행 중 paid→무료 교체는 정상 기능에서 제외하고 안전 거절한다. 무료→paid 기존 INITIAL/confirm 후 마무리·기존 시험 reader·삭제/owner fence는 유지한다. 완료된 과거 Billing 이력만으로 영구 계정 차단하지 않는다. 이번은 문서 개정이며 실환경/코드 변경이 아니다.
+
+- 2026-10-17 공존 설계 방향: [공존 계획 R1](../codex/LC_BILLING_COEXISTENCE_IMPLEMENTATION_PLAN.md). 구앱 무료 생성·전체 lifecycle을 전환기간 유지하고 신앱/심사 앱은 동일 Billing 필수 경로를 사용한다. 구경로 우회 위험 수용은 사용자 정책이며 새경로 오류의 무료 fallback은 금지한다. manifest를 늘리지 않고 서버가 명시한 신규 구경로 출처로 reader를 확장한다. 공통 owner/생성/삭제 fence·기접수 처리·권리 비이전 유지. 신규 route/field/flag와 교차 전환 이벤트 의미는 검토안이며 코드/설정/배포를 바꾸지 않는다. 기존 신규시험 전부 Billing 필수 방향은 공존 도입 시 새경로에 한정하는 후속 정책이며 구writer 차단을 지금 해제한 것은 아니다.
+
 - 2026-10-16 test 한정 활성화 예외: [준비검사](../codex/LC_BILLING_PAID_EXAM_TEST_ACTIVATION.md). 기본OFF와 비test 차단은 유지하되 test 단일profile/승인property·환경일치·검증runtime/owner·엄격한필수index 조건에서만 paid/revoke 기동을 허용한다. test에서 평소 생략하는 필수index 검사를 읽기전용으로 수행한다. 승인값은 실환경/공동E2E 성공의 대체물이 아니다. 이번은 코드·격리검증 승인, 실제설정/기능활성화 승인 아님.
 
 - 2026-10-16 rollback 방어: 기존 rollout state가 설치된 경우 feature flag OFF여도 구writer의 신규 preparation/reserve/Session commit을 허용하지 않는다. 기존 결과 replay/복구와 분리하고 상태 불명/조회 실패는 fail-closed. 이 읽기 검사를 실제 구writer drain이나 설치 Transaction lock으로 간주하지 않는다. 별도 state 삭제/installer/활성화 변경 없음.

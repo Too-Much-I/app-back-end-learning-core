@@ -1,5 +1,99 @@
 # Learning Core Current State
 
+- 2026-10-17 공존 R2 로컬 구현 검증 완료: `feat/lc-review-coexistence`에서 v1 무료/v2 paid 생성 분리·명시 무료 출처·공통 fence·무료→paid exact 로컬 원대상 연결을 구현했다. clean test 1374통과/기존 skip1, Mongo333개·Node64개·원본 fixture hash 통과. PR/test 전달 진행 중이며 실제 공동 Billing/AI E2E·prod 변경 없음. 상세 `LC_BILLING_COEXISTENCE_DELIVERY.md`. 관련 TMI-116/TMI-128/TMI-125/TMI-217/TMI-220/TMI-193.
+
+- 공존 계획 R2 설명의 현재 턴 식별자를 WORKLOG에 보완했다. 계획 설명 완료·공존 구현 미완료 상태 유지, 추가 계획/코드/DB/서버 변경 없음. 관련 TMI-116/TMI-128/TMI-122/TMI-125/TMI-217/TMI-220/TMI-193/TMI-136.
+
+- 2026-10-17 공존 계획 R2 설명 완료: 심사 중 구앱 무료·신앱 Billing, 출처 하나/생성 스위치 하나, 기존 버전 검사 재사용·기존 시험 계속 처리 및 새 시험 confirm 후 교체를 구분했다. exact API/오류 대조·앱/Billing 확인/구현/검증은 후속. 이번 계획/코드/DB/서버 변경 없음. 관련 TMI-116/TMI-128/TMI-122/TMI-125/TMI-217/TMI-220/TMI-193/TMI-136.
+
+- 공존 계획 R2 개정의 현재 턴 식별자 기록을 보완했다. 계획/ADR/AGENTS 동기화 완료 및 코드/DB/서버 미변경 상태 유지. 관련 TMI-116/TMI-128/TMI-122/TMI-125/TMI-217/TMI-220/TMI-193/TMI-136.
+
+- 2026-10-17 사용자 요청으로 공존 계획 R2 및 상위 계획/ADR/AGENTS 동기화 완료. 심사 기간 한정·기존 버전 검사 재사용·무료 출처 하나/구경로 생성 스위치 하나 유지, 정책 revision/관리 UI/장기 양방향 전환 제외. 진행 중 paid/미완료 작업의 v1 생성은 안전 거절, 생성 OFF 뒤 기존 시험 처리 유지. 신규 route/오류 명칭은 대조 후 확정. 이번 코드/DB/서버 변경 없음. 관련 TMI-116/TMI-128/TMI-122/TMI-125/TMI-217/TMI-220/TMI-193/TMI-136.
+
+- 2026-10-17 최소 공존 장치 권장: 서버 기록 무료 출처 한 필드와 구경로 신규 생성 ON/OFF 한 설정은 유지할 가치가 있다. 기존 환경설정 재사용, 별도 관리 UI/정책revision 없음. OFF는 신규 생성만 차단하고 기존 시험 lifecycle·새 Billing 경로는 유지한다. 이번은 권장/기록이며 계획/코드/서버 미변경. 관련 TMI-116/TMI-128/TMI-122/TMI-125/TMI-217/TMI-220.
+
+- 기존 버전 검사 재사용 설명의 현재 턴 식별자 기록을 보완했다. 서버 강제 여부 미검증·직접 API 호출 잔여 위험 구분 및 별도 강제 업데이트 기능 불필요 방향 유지. 추가 계획/코드/서버 변경 없음. 관련 TMI-116/TMI-128/TMI-122/TMI-125/TMI-217/TMI-220.
+
+- 2026-10-17 사용자 확인: 배포 후 기존 버전 검사로 구앱 차단 예정. 별도 강제업데이트 체계 대신 기존 검사 재사용 방향이며, 서버의 해당 API 차단 여부는 미검증이다. 앱 검사만의 직접 호출 잔여 위험과 기존 무료 우회 수용을 구분한다. 중복 종료 장치를 무조건 필수로 추가하지 않는다. 이번 계획/코드/서버 변경 없음. 관련 TMI-116/TMI-128/TMI-122/TMI-125/TMI-217/TMI-220.
+
+- 심사 기간 한정 공존 설명의 현재 턴 식별자를 WORKLOG 끝에 보완했다. 임시 구경로 지원→실배포/강제 업데이트→서버 신규 생성 차단 방향 및 기존 시험 처리 유지 원칙은 동일하다. 추가 계획/코드/서버 변경 없음. 관련 TMI-116/TMI-128/TMI-122/TMI-125/TMI-217/TMI-220.
+
+- 2026-10-17 사용자 범위 명확화: 구앱 호환은 업데이트 심사 기간 한정, 성공 후 강제 업데이트 예정. 장기 공존 대신 임시 구경로 신규 생성 switch 중심 단순화 권장. 해당 플랫폼 실제 배포/설치 가능 확인 뒤 강제 업데이트와 서버 구경로 신규 생성 차단을 연계하되 기존 시험 lifecycle 처리는 유지한다. 이번은 설명/기록만, 계획 본문·코드·서버 변경 없음. 관련 TMI-116/TMI-128/TMI-122/TMI-125/TMI-217/TMI-220.
+
+- 구앱 재진입 설명의 현재 턴 식별자를 WORKLOG 끝에 보완했다. 일반 업데이트 흐름 중심 단순화 권장과 예외 요청 안전 거절 검토 상태 유지, 정책/코드/서버 추가 변경 없음. 관련 TMI-116/TMI-128/TMI-122/TMI-125/TMI-217/TMI-220.
+
+- 2026-10-17 구앱 재진입 설명: 동일 기기의 일반 스토어 업데이트에서는 드문 흐름이나 다른 기기의 구버전/수동설치/구API 호출 가능성과 구분한다. 드문 혼합 흐름에 복잡한 정상 전환을 추가하기보다 안전 거절을 검토하는 단순화 방향 권장. 정책/계획/코드/서버는 미변경, 출처 축소·재사용 권장 및 필수 fence 유지. 관련 TMI-116/TMI-128/TMI-122/TMI-125/TMI-217/TMI-220.
+
+- 공존 단순화 검토 턴 기록 보완 완료. 출처 필드 축소·공통 서비스 재사용 권장, 진행 중 유료→무료 교체 제한은 추가 승인 후보로 유지한다. 계획/코드/서버 미변경. 관련 TMI-116/TMI-128/TMI-122/TMI-125/TMI-217/TMI-220.
+
+- 2026-10-17 공존 계획 단순화 검토: creationPolicyRevision 별도 필드 생략·명시 creationOrigin 하나 유지, 기존 생성/응답/접수/채점 서비스 재사용과 route adapter 분리 권장. 선택적 제품 변경으로 paid 미완료 operation 또는 진행 중 Billing 시험이 있으면 v1 신규 생성을409 거절하여 paid→무료 활성교체를 제외할 수 있으나, 구앱 재진입 제한이라는 비용과 사용자 추가 승인이 필요하다. 현재 계획/코드/서버는 변경하지 않았다. 공통 fence·삭제/탈퇴·출처검증·v2 fallback 금지는 단순화 제외. 관련 TMI-116/TMI-128/TMI-122/TMI-125/TMI-217/TMI-220.
+
+- 공존 계획 R1 작성 턴 식별자 기록 보완 완료. 문서/ADR/AGENTS 동기화 및 API·저장 규격 제안 상태 유지, 구현·배포 미실행. 추가 외부 변경 없이 WORKLOG/CURRENT_STATE만 보완했다. 관련 TMI-116/TMI-128/TMI-122/TMI-125/TMI-217/TMI-220/TMI-193/TMI-136.
+
+- 2026-10-17 공존 구현 계획 R1 작성: `LC_BILLING_COEXISTENCE_IMPLEMENTATION_PLAN.md`. v1 무료 보존/v2 생성 제안·서버 출처·공통 reader와 생성/삭제 fence·양방향 전환·회귀표 및 C0~C4 단계 정리. 상위 계획/ADR/AGENTS 동기화. route/field/flag는 검토안, Billing 교차 전환 이벤트와 앱 수락 후속. 코드/DB/봉인/서버 상태 변경 없음. 관련 TMI-116/TMI-128/TMI-122/TMI-125/TMI-217/TMI-220/TMI-193/TMI-136.
+
+- 2026-10-17 사용자 전환 공존 방향 접수: 기존 앱 구경로 무료 생성·제출/채점/완료 유지, 새 앱/심사 앱 새경로 Billing 필수, 양쪽 삭제/탈퇴 차단 및 새경로 실패 무료 fallback 금지. 구경로 종료는 별도 결정. 현재 sealed state는 LegacyExamWriterGuard로 구writer를 막고 LegacyExamRuntime은 manifest 외 미연결 Session을 거절하므로 설정만으로 공존 불가. 서버가 기록하는 신규 구경로 출처·공통 reader/접수/채점 허용·사용자 생성/삭제 fence 및 명시 route 분리 설계가 필요하다. 이번은 검토/기록만, 코드/DB/봉인/서버 설정 변경 없음. 관련 TMI-116/TMI-128/TMI-217/TMI-125/TMI-220.
+
+- task41 필수 활성화·TLS smoke 완료 턴 기록 식별자 보완 완료. 배포 COMPLETED/실행1, health200·무인증 LC/Billing401 확인과 정상서명/업무E2E 미완료 구분 유지. 추가 외부 변경 없이 WORKLOG/CURRENT_STATE 기록만 보완했다. 관련 TMI-116/TMI-128/TMI-217/TMI-125/TMI-220.
+
+- LC test task41 활성화 배포 최종 COMPLETED·실행1/보류0/실패0 확인. 아래 필수조합 ON/TLS smoke 결과 유지, 정상서명 업무 검증은 미완료. Billing 업무·phone/outbox/삭제 연동 및 reconciliation 운영값은 별도 후속. 관련 TMI-116/TMI-128/TMI-217/TMI-125/TMI-220.
+
+- 2026-10-17 LC test task41 필수 조합(paid/saga/workload sender/access receiver 및 test 승인) ON·봉인summary 적용. 앱 Started/8080·8444 기동, 새 target healthy. test NAT smoke 재실행 health200/LC access401·Billing status401(빈body/no-store·TLS 검증) 확인; 첫rolling502와 구분. 정상서명/업무E2E 미실행. phone/reconciliation/outbox writer·publisher/삭제sender OFF, Billing 업무 활성화·경보 운영값 확인 후속. 환경변수 외 task 설정 보존, Billing/Identity/prod/DB/Secret·코드 변경 없음. 관련 TMI-116/TMI-128/TMI-217/TMI-125/TMI-220.
+
+- 2026-10-17 활성화 순서 검토: DB 봉인/index 준비 다음은 test 설정 적용·기동 및 실연동 검증이다. 모든 flag 일괄ON이 아니라 paid/saga/workload sender/access receiver/user-merged writer 필수 조합과 legacy summary를 함께 적용하고, Billing 대상/키·TLS 확인 뒤 phone/reconciliation/outbox/삭제sender를 각 gate에 맞춰 검증한다. 이번은 문서 대조/안내만 수행, 서버 최신 상태 재조회·설정 변경 없음. 관련 TMI-116/TMI-128/TMI-217/TMI-125/TMI-220.
+
+- 2026-10-17 01:19~01:21 KST LC test 복구6/outbox3 index 설치 및 빈 legacy manifest 봉인 완료. revision `lc-test-legacy-20261017-r1`, count0, hash `66508198c1deae88e5b39b6d9ea88d01c70b5250a074d8a671d821933b274070`. 별도 읽기 태스크의 동일 snapshot에서 Session/operation/entry0·SEALED state1, 새9개 index exact 대조 통과. outbox expiresAt TTL은 사용자 별도 승인으로 설치. 기존 업무 문서 변경/삭제 없음. 설치/검증 태스크 exit0·STOPPED, 임시 정의 INACTIVE. task40/실행1 및 기능OFF·네트워크/target 유지. 봉인 이후 old creator409, paid 활성화·실8444 TLS/E2E·완료조회 성능index는 잔여. Node27/선택 Java17 통과. 상세 근거는 LC_BILLING_TEST_CONNECTION_PREPARATION.md. 관련 TMI-116/TMI-128/TMI-125/TMI-217/TMI-220.
+
+- 일회성 LC test 읽기 점검 완료 턴 기록 보완 완료. index15개 일치·동일 snapshot 시험/미완료 생성0 확인 결과와 미설치 구조/manifest 봉인·실TLS 검증 잔여 상태를 유지한다. 추가 DB/서버 변경 없음. 관련 TMI-116/TMI-128/TMI-125/TMI-217/TMI-220.
+
+- 2026-10-17 01:07 KST 일회성 LC test 읽기 ECS 점검 성공(exit0/STOPPED). 기존 task40/네트워크/target 연결 동일·서비스 실행1. 같은 snapshot 시험/활성/연결/operation/미완료/manifest/state 모두0. legacy 후보 lc-test-legacy-20261017-r1 count0/hash66508198c1deae88e5b39b6d9ea88d01c70b5250a074d8a671d821933b274070 산출(미봉인). saga7+배정2+owner4+revoke2 index exact15 일치, recovery6/outbox·publisher state/manifest state 미설치 및 완료조회 성능index 누락 확인. 추가 DB/index/기능 변경 없이 상세 준비 문서 갱신, Node13개 통과. 관련 TMI-116/TMI-128/TMI-125/TMI-217/TMI-220.
+
+- 브라우저 지정 재검증 턴 기록 보완 완료. Chrome 발견/선택 성공과 실제 제어 요청 timeout을 구분한 상태를 유지한다. 일회성 ECS 점검 미실행이며 추가 서버/DB 변경 없음. 관련 TMI-116/TMI-128/TMI-125/TMI-217/TMI-220.
+
+- 2026-10-17 브라우저 지정 재검증: 현재 Chrome ID1 목록 조회/선택은 성공, 과거ID4는 unavailable. 이후 이 대화의 세션 명명 및 기존 전용 CloudShell 직접 연결은 timeout. 브라우저 전체 장애로 단정하지 않으며 다른 Codex 충돌 원인도 미확인이다. 승인된 일회성 읽기 ECS 태스크 미실행, 추가 서버/DB/권한 변경 없음. 관련 TMI-116/TMI-128/TMI-125/TMI-217/TMI-220.
+
+- 2026-10-17 재시도 결과: 사용자 요청 후 브라우저 상태 조회 두 차례가 다시 timeout으로 실패했다. 승인된 일회성 LC test 읽기 점검 태스크는 아직 생성/실행하지 못했다. 브라우저 연결 복구 필요, snapshot/hash·전체 index 검증 미완료. 이번 서버/DB/Secret/권한 변경 없음. 관련 TMI-116/TMI-128/TMI-125/TMI-217/TMI-220.
+
+- 2026-10-17 일회성 LC test 읽기 전용 ECS 점검 실행 승인 접수. 브라우저 연결 두 차례 timeout 및 로컬 AWS NoCredentials로 실제 태스크 생성/실행은 미실행이다. 목록 snapshot/hash·전체 index exact 검증은 연결 복구 후 진행한다. 이번 추가 서버/DB/권한/기능 변경 없음, 이전 task40 배포 완료 및 기능 OFF 상태 기록 유지. 관련 TMI-116/TMI-128/TMI-125/TMI-217/TMI-220.
+
+- 2026-10-17 후속 확인: ECS 실제 조회로 task40 COMPLETED/실행1·보류0,8080 및8444 target healthy 확인(구8080 target draining). health는8080 기준이며 실제8444 TLS 검증은 아니다. 승인된 전용 CloudShell 새 terminal에서 Secret 값 노출 없이 LC test DB ping을 시도했으나 MongoServerSelectionError로 실패. snapshot/인덱스 exact/목록 봉인은 미완료. 기존 test 네트워크에서 일회성 읽기 전용 ECS 점검 실행 승인 요청, IAM/Atlas 접근 확대·DB 변경·기능 활성화 없음. 관련 TMI-116/TMI-128/TMI-125/TMI-217/TMI-220.
+
+- 2026-10-17 test TLS 경로 적용: 승인된 ALB SG→LC test SG TCP8444 추가, 전용 HTTPS target group 및 ALB38 허용/39 빈404 차단 규칙 생성. 기존17규칙·8080 유지. task40은 port mapping8444/env port만 추가, 기존env68/Secret7·이미지·OFF 보존. 서비스 두 target 연결 배포 진행 중(최종 안정화 미확인). 외부 health200·환불POST404/0bytes·TLS verify0 확인. Atlas 재로그인/시험0·생성작업0 재확인, 정확 snapshot/전체 index 옵션 및 봉인 미완료. 전용 새 CloudShell 세션 사용 승인 요청, 기존 타 Codex 세션 미사용. 관련 TMI-116/TMI-128/TMI-125/TMI-217/TMI-220.
+
+- test 목록/잔여 index/TLS 후속 요청: Atlas 로그아웃으로 DB 재검증·목록 확정 대기, 사용자 로그인 요청. AWS test task39 실행1/보류0·ALB 정상1/배포성공 재확인. LC SG는 ALB SG→8080만 허용, 공유 HTTPS 리스너17규칙 확인. test 전용8444 및 api-test exact refund 경로/NAT 제한 추가의 적용 직전 승인 요청 상태이며 실제 변경 없음. 목록 봉인·TLS 연결 완료가 아니다. 관련 TMI-116/TMI-128/TMI-125/TMI-217/TMI-220.
+
+- TTL 설명 확인: exam_creation_operations의 date형 purgeAt 경과만 자동 삭제 대상. 현재 paid operation은 완료 후에도 purgeAt=null이며 terminal+120일/요청 보장 경계 이후 읽기 전용 적격성 검토만 구현돼 있다. 시험/답안/결과 자동 삭제 또는 paid120일 자동 purge를 활성화한 것이 아니다. 이번 정적 확인 외 DB/서버 변경 없음. 관련 TMI-116/TMI-128/TMI-220.
+
+- test DB 준비 적용 턴 식별자 기록 보완 완료. 컬렉션2개·인덱스9개 Ready 및 승인된 operation TTL 적용 상태이며, 추가 DB/서버 변경 없이 기능 OFF와 잔여 전환·TLS·검증 작업을 유지한다. 관련 TMI-116/TMI-128/TMI-217/TMI-125/TMI-220.
+
+- LC test Atlas DB 준비 적용: exam_creation_operations와 billing_access_revocations 생성, saga operation4/Session3/revoke2 인덱스 총9개 추가 후 Ready 확인. operation purgeAt TTL은 적용 직전 사용자 별도 승인, 기존 Session4 인덱스와 학습·챌린지 자료 보존. legacy snapshot/봉인·복구/outbox 준비·엄격 전체 index 검증·TLS 경로 및 활성화/E2E는 미완료. 서버 전체 중지는 요구하지 않으며 기존 test 생성 요청 자제/진행 writer 확인 절차 유지. 관련 TMI-116/TMI-128/TMI-217/TMI-125/TMI-220.
+
+- Atlas 콘솔 점검 턴 식별자 기록 완료. 시험0건·필수 DB 구조 미설치 결과와 기존 학습 데이터 보존 방침은 동일하며 추가 DB/서버/활성화 변경 없음. 관련 TMI-116/TMI-128/TMI-217/TMI-125/TMI-220.
+
+- Atlas 콘솔 점검: LC test exam_sessions 무필터 조회0건, exam_creation_operations 검색 결과 없음. saga Session 인덱스3개 및 LC legacy/revoke/outbox 관련 컬렉션 미설치 확인. 기존 owner 컬렉션과 학습·챌린지 데이터는 존재하므로 전체 DB 초기화 금지. 별개 콘솔 조회로 snapshot/봉인 증거는 아니며 DB 수정·기능 활성화는 미실행. 관련 TMI-116/TMI-128/TMI-217/TMI-125/TMI-220.
+
+- 사용자 로컬 AWS 로그인 불가 회신으로 CLI 로그인 대기 경로를 중단했다. 기존 AWS/MongoDB 콘솔에서 가능한 점검 대안을 안내했으며 snapshot manifest 생성/설치 실행 수단은 별도 확인 필요. 다른 Codex CloudShell 사용·인증정보 추출 없이 진행한다. 이번 추가 서버/DB/활성화 변경 없음. 관련 TMI-116/TMI-128/TMI-217/TMI-125/TMI-220.
+
+- test 활성화 사전 준비 턴 식별자 기록 완료. 읽기 전용 도구·Node43개 통과, AWS CLI 인증 연결 대기 상태 유지. 실제 DB 조회/설치·서버 설정·기능 활성화는 추가 수행하지 않았다. 관련 TMI-116/TMI-128/TMI-217/TMI-125/TMI-220.
+
+- test 일괄 활성화 준비 진행·인증 대기: task39의 실제 test DB/클러스터를 확인해 다른 로컬 DB 설정 사용을 배제했다. 계정/Secret/host/DB 고정 read-only 점검 도구 추가, 로컬 Node43개 통과. AWS CLI NoCredentials로 실제 DB 조회·설치·활성화는 미실행, 사용자 aws login 연결 요청. 기존 삭제 flags ON/paid 관련 OFF 상태 보존. 네트워크 확대·Billing 설정 변경 없음. 관련 TMI-116/TMI-128/TMI-217/TMI-125/TMI-220.
+
+- test 일괄 활성화 검토 턴 식별자 기록 완료. 필요한 준비와 관련 기능 활성화를 묶는 방향을 설명했으며 실제 적용은 미실행이다. task39 기능 OFF 상태 유지, 추가 서버/DB 변경 없음. 관련 TMI-116/TMI-128/TMI-217/TMI-125/TMI-220.
+
+- test 일괄 활성화 가능 여부 검토: 관련 기능을 묶어 적용하는 것은 가능하지만 현 코드의 legacy 목록/필수 index/owner 및 JWT·TLS 기동 조건을 먼저 충족해야 한다. 테스트 환경 특성상 수동 생성 중단으로 절차를 단순화할 수 있으며 불필요한 기능까지 전부 ON은 권장하지 않는다. 이번은 설명/정적 확인만, 서버·DB·flags 변경 없음. 관련 TMI-116/TMI-128/TMI-217/TMI-125/TMI-220.
+
+- TLS 참조 연결 완료 턴 식별자 기록 보완 완료. task39 배포·기동/health 성공, 기능 OFF 및 실제 TLS/공동E2E 미완료 상태 유지. 추가 서버 변경 없음. 관련 TMI-116/TMI-128/TMI-217/TMI-125/TMI-220.
+
+- TLS Secret 연결 완료: LC test task39 배포 ohJnK1tjqf3XG9_QARQwh가 23:06 KST 성공(4분45초). FCM 준비 유지·TLS helper 연결·Secret 필드2개/alias 등록 후 신규 앱 Started, 실행1/보류0·ALB 정상1/비정상0·외부health200 확인. receiver/sender/paid OFF, 실제 PKCS12/TLS·공동E2E와 네트워크·DB 준비는 남는다. 관련 TMI-116/TMI-128/TMI-217/TMI-125/TMI-220.
+
+- TLS 참조 연결 진행: test task38의 FCM 시작 override를 발견해 알림 준비는 보존하고 TLS helper 호출로 마지막 exec만 연결, TLS Secret 참조2개/alias1개를 추가한 task39 배포 요청 완료(ohJnK1tjqf3XG9_QARQwh). 기존 환경67/Secret5·이미지·roles·ports·OFF flags 보존. 최종 안정화는 대기이며 실TLS/네트워크/DB/활성화 변경 없음. 관련 TMI-116/TMI-128/TMI-217/TMI-125/TMI-220.
+
+- TLS 코드 전달·test 배포 완료 턴 식별자 기록 완료. PR #47 머지·CI/배포/health 성공, 기능 OFF 및 실제 TLS 수신/E2E 미완료 상태 유지. 추가 서버 변경 없음. 관련 TMI-116/TMI-128/TMI-217/TMI-125/TMI-220.
+
+- TLS 코드 test 배포 완료: PR #47/develop 0d2aeb9, CI38909980587 및 배포38910572703 성공. 2026-10-16 22:56 KST ECS 안정화·test health 성공 확인. 기존 task37 기반 설정 유지, TLS Secret 참조 추가·수신 ON·네트워크/DB·paid 활성화는 미실행. 아래 배포 진행 기록을 대체한다. 관련 TMI-116/TMI-128/TMI-217/TMI-125/TMI-220.
+
+- TLS 코드 fd55208 전달 완료: PR #47 전체 CI38909980587 성공 후 develop 0d2aeb9로 머지했다. test 배포38910572703 진행 중이며 최종 서버/health 결과는 대기다. 기능 OFF·기존 설정 유지, 별도 TLS 참조/네트워크/DB/활성화 미변경. 관련 TMI-116/TMI-128/TMI-217/TMI-125/TMI-220.
+
 - TLS 코드 전달 승인 접수: 최신 origin/develop d02fe0f에서 feat/lc-test-access-tls 생성, 기존 변경 보존. Node30개/shell syntax/diff 통과, PR CI 후 develop 머지·test 자동 배포 확인을 진행한다. 기능 OFF·서버 설정 유지, main/prod·네트워크·DB 변경 제외. 관련 TMI-116/TMI-128/TMI-217/TMI-125/TMI-220.
 
 - TLS 배포 준비 턴 식별자를 WORKLOG에 보완했다. Node30개 통과·전달/머지 및 test 자동배포 승인 확인 대기 상태는 동일하며 추가 서버 변경 없음. 관련 TMI-116/TMI-128/TMI-217/TMI-125/TMI-220.
