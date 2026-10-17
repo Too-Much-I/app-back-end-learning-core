@@ -1,5 +1,9 @@
 # 프로젝트 목적
 
+## 2026-10-17 운영 기동 준비 코드 보완 승인
+
+- Billing 측 운영 호환 점검 후 사용자 「어 해줘」로 LC 운영 readiness 코드·격리 테스트 보완을 승인했다. test 승인과 분리된 production 승인 기본 OFF, prod→production 환경 매핑과 기존 sealed manifest/owner/index·JWT/TLS 검증을 유지한다. 아래 test-only 금지는 이 준비 코드 범위에서 대체하며 실제 prod 활성화·DB 설치·배포·commit/push는 수행하지 않는다.
+
 ## 2026-10-17 공존 R2 구현·test 전달 승인
 
 - 사용자 「브랜치 파서 하고 끝나면 커밋 푸시 하고 테스트 서버에 배포」로 공존 R2 코드·격리 테스트와 feat 브랜치 commit/push/PR/develop 머지·LC test 배포를 승인했다. main/prod·Billing/Identity·실DB/index/manifest 변경은 제외한다. 사용자 DS_Store는 전달하지 않는다.

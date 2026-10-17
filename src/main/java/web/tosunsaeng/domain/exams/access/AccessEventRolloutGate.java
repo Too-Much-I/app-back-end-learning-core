@@ -4,7 +4,7 @@ import org.springframework.beans.factory.InitializingBean;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
-/** Default closed; shared readiness permits an explicit test-only exception, not a general rollout. */
+/** Default closed; shares the environment-specific paid rollout readiness checks. */
 @Component
 public final class AccessEventRolloutGate implements InitializingBean {
     @org.springframework.beans.factory.annotation.Autowired(required = false)

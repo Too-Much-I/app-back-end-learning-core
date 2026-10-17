@@ -56,6 +56,7 @@ app:
         legacy-create-enabled: ${BILLING_LEGACY_EXAM_CREATE_ENABLED:false}
       enabled: ${BILLING_PAID_EXAM_ENABLED:false}
       test-activation-approved: ${BILLING_PAID_EXAM_TEST_ACTIVATION_APPROVED:false}
+      production-activation-approved: ${BILLING_PAID_EXAM_PRODUCTION_ACTIVATION_APPROVED:false}
       legacy:
         environment: ${BILLING_PAID_EXAM_LEGACY_ENVIRONMENT:}
         database: ${BILLING_PAID_EXAM_LEGACY_DATABASE:}
