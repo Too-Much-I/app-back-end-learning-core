@@ -16423,3 +16423,7 @@
 - 첫 task 등록의 빈 tags 오류는 등록 전 거절됐고 옵션 제거 후 성공했다. 새 task의 초기 unhealthy가 해소되는 것을 확인했고, 이전 target drain 완료까지 기다렸다. IAM/네트워크/키/DB·manifest 변경 및 prod/Billing/Identity 수정 없음.
 - clean test1374통과/기존 조건부skip1, Mongo333통과, Node64통과 및 원본 hash 유지. 실제 유저 권리 소비·시험/AI 공동 E2E는 미실행으로 분리한다. 앱 v2 고정 호출/동일key 재시도 검증이 다음 과제다.
 - 사후 실행 문서를 같은 작업 브랜치에 추가 commit/push한다. 문서 기록은 제품 이미지 변경이 아니므로 추가 배포하지 않는다. 사용자 DS_Store와 기존 운영 준비 변경은 그대로 보존했다. Secret/Token 기록 없음.
+
+### 최종 상태 표현 보완
+
+- 위의 「이전 target drain 완료」는 ECS rollout COMPLETED 확인과 구분한다. 최종 화면에서 새 task44 running1/pending0·두 포트 healthy 및 ECS COMPLETED를 확인했으며, ALB 목록에는 이전 target의 잔여 draining 표시가 있었다. ALB 잔여 항목 제거까지 완료됐다는 의미로 보고하지 않는다. 추가 설정/코드 변경 없음.
