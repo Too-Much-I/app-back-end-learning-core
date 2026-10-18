@@ -46,7 +46,7 @@ public final class DeletionPersistenceFence implements BeforeSaveCallback<Object
         boolean exam = EXAMS.contains(collection);
         String rootCollection = exam ? "exam_sessions" : "challenge_10s_attempts";
         boolean rootWrite = rootCollection.equals(collection);
-        String id = document.getString(rootWrite ? "_id" : exam ? "examId" : "attemptId");
+        String id = document.getString(rootWrite ? "_id" : exam ? DeletionChildFields.examReference(collection) : "attemptId");
         if (id == null) throw new IllegalStateException("Learning aggregate reference is missing");
         if (access.sealed(exam ? DeletionTarget.Type.EXAM : DeletionTarget.Type.CHALLENGE, id)) throw DeletionFailure.blocked();
         Document root = mongo.findById(id, Document.class, rootCollection);

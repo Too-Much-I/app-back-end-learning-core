@@ -1,5 +1,7 @@
 "use strict";
 
+const examReference = collection => collection === "azure_results" ? "exam_id" : "examId";
+
 // DDL only. Does not delete content, backfill guards, approve rollout, or enable runtime flags.
 const INDEXES = [
     {collection: "learning_record_deletion_operations", name: "uq_deletion_active_owner", key: {userId: 1},
@@ -17,7 +19,7 @@ const INDEXES = [
     {collection: "learning_activity_daily_aggregates", name: "uq_learning_activity_day", key: {bucketDate: 1, metric: 1, examType: 1, outcome: 1}, unique: true},
     ...["exam_sessions", "challenge_10s_attempts"].map(collection => ({collection, name: "idx_deletion_owner_inventory", key: {userId: 1, _id: 1}})),
     ...["exam_results", "exam_summaries", "question_grading_jobs", "summary_grading_jobs", "azure_results", "speechace_results"]
-        .map(collection => ({collection, name: "idx_deletion_exam_cleanup", key: {examId: 1, _id: 1}})),
+        .map(collection => ({collection, name: "idx_deletion_exam_cleanup", key: {[examReference(collection)]: 1, _id: 1}})),
     ...["challenge_10s_grading_jobs", "challenge_10s_submit_receipts", "challenge_10s_callback_receipts"]
         .map(collection => ({collection, name: "idx_deletion_attempt_cleanup", key: {attemptId: 1, _id: 1}}))
 ];
@@ -66,8 +68,9 @@ async function inspect(database) {
     ]).toArray();
     let orphanChildren = 0, ownerMismatches = 0;
     for (const spec of INDEXES.filter(i => i.name === "idx_deletion_exam_cleanup" || i.name === "idx_deletion_attempt_cleanup")) {
-        const field = spec.name === "idx_deletion_exam_cleanup" ? "examId" : "attemptId";
-        const lookup = {$lookup: {from: field === "examId" ? "exam_sessions" : "challenge_10s_attempts",
+        const exam = spec.name === "idx_deletion_exam_cleanup";
+        const field = exam ? examReference(spec.collection) : "attemptId";
+        const lookup = {$lookup: {from: exam ? "exam_sessions" : "challenge_10s_attempts",
             localField: field, foreignField: "_id", as: "parent"}};
         const orphan = await database.getCollection(spec.collection).aggregate([lookup,
             {$match: {"parent.0": {$exists: false}}}, {$count: "count"}]).toArray();

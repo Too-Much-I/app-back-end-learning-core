@@ -79,6 +79,7 @@ class DeletionFlowMongoTest {
     @Test void completeDeletesOnlySealedOldTargetsAndKeepsAnonymousAggregateAndNewLearning() {
         mongo.insert(ExamSession.builder().examId("old").userId(OWNER).build());
         mongo.insert(new Document("_id", "old-result").append("examId", "old").append("userId", OWNER), "exam_results");
+        mongo.insert(web.tosunsaeng.domain.exams.domain.entity.AzureResult.builder().id("old-azure").examId("old").build());
         mongo.insert(new Document("_id", "old:1").append("examId", "old").append("questionNumber", 1), "exam_submission_receipts");
         mongo.insert(new Document("_id", "day-count").append("count", 120L), "learning_activity_daily_aggregates");
         commands.request(OWNER, KEY);
@@ -87,6 +88,7 @@ class DeletionFlowMongoTest {
         assertThatCode(() -> access.requirePublicWrite(OWNER)).doesNotThrowAnyException();
         mongo.insert(ExamSession.builder().examId("new").userId(OWNER).build());
         mongo.insert(new Document("_id", "new-result").append("examId", "new").append("userId", OWNER), "exam_results");
+        mongo.insert(web.tosunsaeng.domain.exams.domain.entity.AzureResult.builder().id("new-azure").examId("new").build());
         mongo.insert(new Document("_id", "new:1").append("examId", "new").append("questionNumber", 1), "exam_submission_receipts");
         clock.now = clock.now.plusSeconds(360);
         for (int i = 0; i < 80 && commands.latest(OWNER).isActiveGuard(); i++) step();
@@ -94,6 +96,8 @@ class DeletionFlowMongoTest {
         assertThat(completed.getStatus()).isEqualTo(DeletionOperation.Status.COMPLETED);
         assertThat(mongo.findById("old", ExamSession.class)).isNull();
         assertThat(mongo.findById("old-result", Document.class, "exam_results")).isNull();
+        assertThat(mongo.findById("old-azure", Document.class, "azure_results")).isNull();
+        assertThat(mongo.findById("new-azure", Document.class, "azure_results").getString("exam_id")).isEqualTo("new");
         assertThat(mongo.findById("old:1", Document.class, "exam_submission_receipts")).isNull();
         assertThat(mongo.findById("new:1", Document.class, "exam_submission_receipts")).isNotNull();
         assertThat(mongo.findById("new", ExamSession.class)).isNotNull();
@@ -158,10 +162,31 @@ class DeletionFlowMongoTest {
         mongo.insert(ExamSession.builder().examId("old").userId(OWNER).build());
         commands.request(OWNER, KEY); progressToCheckpoint(); clock.now = clock.now.plusSeconds(360);
         for (int i = 0; i < 50 && commands.latest(OWNER).getStage() != DeletionOperation.Stage.VERIFYING; i++) step();
-        mongo.insert(new Document("_id", "unexpected").append("examId", "old"), "azure_results");
+        mongo.insert(web.tosunsaeng.domain.exams.domain.entity.AzureResult.builder().id("unexpected").examId("old").build());
         step();
         assertThat(commands.latest(OWNER).getStatus()).isEqualTo(DeletionOperation.Status.NEEDS_REVIEW);
         assertThat(commands.latest(OWNER).isWriteBlocked()).isTrue();
+    }
+
+    @Test void azurePersistenceFenceUsesMappedReferenceAndPreservesDeletionDeny() {
+        mongo.insert(ExamSession.builder().examId("azure-parent").userId(OWNER).build());
+        var guards = new UserOwnershipGuardService(mongo,
+                new MongoRepositoryFactory(mongo).getRepository(UserOwnershipGuardRepository.class));
+        var fence = new DeletionPersistenceFence(mongo, access, guards, clock);
+        var document = new Document();
+        mongo.getConverter().write(web.tosunsaeng.domain.exams.domain.entity.AzureResult.builder()
+                .id("azure-child").examId("azure-parent").build(), document);
+        assertThat(document.getString("exam_id")).isEqualTo("azure-parent");
+        assertThat(document).doesNotContainKey("examId");
+        assertThatCode(() -> tx.run(() -> { fence.check("azure_results", document); return null; }))
+                .doesNotThrowAnyException();
+        assertThatThrownBy(() -> tx.run(() -> {
+            fence.check("azure_results", new Document("examId", "azure-parent")); return null;
+        })).isInstanceOf(IllegalStateException.class);
+        commands.request(OWNER, KEY);
+        progressToCheckpoint();
+        assertThatThrownBy(() -> tx.run(() -> { fence.check("azure_results", document); return null; }))
+                .isInstanceOf(DeletionFailure.class);
     }
 
     void progressToCheckpoint() {
