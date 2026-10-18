@@ -32,3 +32,14 @@
 - ECR push는 blob HEAD에서 `403 Forbidden`으로 실패했다. 원격 태그 생성/최종 digest 검증은 완료되지 않았으며 ECR 전달 성공으로 보고하지 않는다.
 - 로컬 AWS CLI는 NoCredentials 상태다. Docker 기존 인증의 만료/저장소 권한 중 원인을 확정하지 않았으며 IAM 변경이나 Secret/Token 출력으로 우회하지 않았다. 승인된 계정의 정상 ECR 인증 연결 후 같은 후보 전달을 재개해야 한다.
 - 운영 서비스/task/ALB/기능·DB/봉인은 변경하지 않았다.
+
+## CloudShell 재전달 완료
+
+- 사용자 승인으로 기존 LC 전용 CloudShell 세션에서 전달했다. 기존 로그인 계정과 LC 저장소만 사용했고 IAM 권한을 추가하지 않았다. 위 로컬403은 이전 실패 기록이며 최종 전달은 아래와 같이 완료됐다.
+- 로컬 Docker save 파일158,905,856bytes를4조각으로 순차 업로드했다. 홈 여유98MiB 때문에 전용 `/tmp/lc-ecr-3d02300-etwbdur_`에 옮겨 결합했으며 SHA256 `f7ffa931c8482fb3a089fe5bd8ced5a4ad27529a2c24c928ce1703eee3cc6bca`가 원본과 일치한다.
+- CloudShell Docker load exit0, amd64 및 config ID `sha256:d9e24104b24ffced4ec6b9a052d0f14b755fad38c8ce4f0d32ecc2d4de1a4c45`, TLS entrypoint를 확인했다. Docker 저장 형식 차이로 로컬 index ID와 config ID를 혼동하지 않는다.
+- ECR 태그 `prod-candidate-3d02300`은 전달 직전 ImageNotFound였고 신규 push exit0. 최종 URI: `889384901776.dkr.ecr.ap-northeast-2.amazonaws.com/tosunsaeng-learning-core@sha256:d4e51241021b1982167682ea8f4e5257872e53f12d1a186bb75e3f945300b499`.
+- ECR batch_get_image로 위 digest와 config hash 일치·9개 layer를 확인했다. save/load/push 과정에서 registry manifest digest가 기존 로컬 index/manifest와 달라질 수 있으며 같은 digest라고 주장하지 않는다.
+- 최종 ECS 읽기 확인: LC prod:8, running1/pending0 유지. 태스크 등록/서비스 업데이트/배포/봉인/DB 변경 없음. 새 후보를 실행하지 않았다.
+- 전용 임시 Docker config의 ECR 인증은 logout exit0으로 제거했다. 인증값은 채팅/보고서에 출력하지 않았다. 공유 Docker 인증은 수정하지 않았다.
+- 사용자가 요청한 CloudShell의 오래된 미사용 LC 이미지는 전달 전 목록에 없었다(mongo:8.0만 존재). 삭제0건이며 Mongo/다른 작업 파일 보존. 새로 전달한 후보 이미지와 전송 임시 파일은 남겨뒀고 후속 정리 대상이다. 로컬 원본은 `/private/tmp/lc-ecr-transfer.AlzZR1`에 보존했다.
