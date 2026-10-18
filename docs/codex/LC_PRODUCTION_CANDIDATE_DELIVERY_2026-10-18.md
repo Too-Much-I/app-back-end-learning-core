@@ -24,3 +24,11 @@
 ## 운영 전에 남은 조건
 
 실제 봉인값·최종 task 설정/기존 전처리 보존·양측 연결·진행 요청 배출·검증 계정과 업무 영향 범위를 확인해야 한다. 구앱 사용 가능이나 ECR 업로드만으로 신앱 유료 경로 공동 검증이 완료되지 않는다. 새 쓰기 후 구버전 자동 rollback 금지. 운영 서버는 이번 전달 중에도 유지한다.
+
+## 전달 시도 결과
+
+- 후보 소스 커밋 `3d02300`, 브랜치 `codex/lc-production-candidate-20261018` 원격 push 성공. main/develop 머지·PR 생성·workflow dispatch 없음.
+- 기존 검증 이미지에 로컬 태그 `889384901776.dkr.ecr.ap-northeast-2.amazonaws.com/tosunsaeng-learning-core:prod-candidate-3d02300`을 추가했다. 기존 태그/이미지는 보존했다.
+- ECR push는 blob HEAD에서 `403 Forbidden`으로 실패했다. 원격 태그 생성/최종 digest 검증은 완료되지 않았으며 ECR 전달 성공으로 보고하지 않는다.
+- 로컬 AWS CLI는 NoCredentials 상태다. Docker 기존 인증의 만료/저장소 권한 중 원인을 확정하지 않았으며 IAM 변경이나 Secret/Token 출력으로 우회하지 않았다. 승인된 계정의 정상 ECR 인증 연결 후 같은 후보 전달을 재개해야 한다.
+- 운영 서비스/task/ALB/기능·DB/봉인은 변경하지 않았다.
