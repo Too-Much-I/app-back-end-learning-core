@@ -1,10 +1,7 @@
 package web.tosunsaeng.domain.exams.attemptgroup.application;
 
-import com.mongodb.MongoException;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.beans.factory.annotation.Qualifier;
-import org.springframework.dao.DuplicateKeyException;
-import org.springframework.dao.OptimisticLockingFailureException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.TransactionStatus;
 import org.springframework.transaction.support.TransactionOperations;
@@ -16,7 +13,6 @@ import java.util.Objects;
 
 @Service
 public class AttemptGroupSummaryCompletionService {
-    private static final int MAX_TRANSACTION_ATTEMPTS = 3;
     private final ExamSummaryRepository summaryRepository;
     private final ExamGradingService gradingService;
     private final AttemptGroupStateCoordinator coordinator;
@@ -48,18 +44,11 @@ public class AttemptGroupSummaryCompletionService {
         if (transactions == null || !coordinator.manages(examId)) {
             throw new IllegalStateException("AttemptGroup summary transaction is unavailable");
         }
-        for (int attempt = 1; attempt <= MAX_TRANSACTION_ATTEMPTS; attempt++) {
-            try {
-                Boolean completed = transactions.execute(status ->
-                        persistAndCompleteInTransaction(summary, examId, generationAttempt, status));
-                return Boolean.TRUE.equals(completed);
-            } catch (RuntimeException failure) {
-                if (attempt == MAX_TRANSACTION_ATTEMPTS || !retryableTransactionFailure(failure)) {
-                    throw failure;
-                }
-            }
-        }
-        throw new IllegalStateException("AttemptGroup summary transaction retry exhausted");
+        return AttemptGroupTransactionRetry.execute(() -> {
+            Boolean completed = transactions.execute(status ->
+                    persistAndCompleteInTransaction(summary, examId, generationAttempt, status));
+            return Boolean.TRUE.equals(completed);
+        });
     }
 
     private boolean persistAndCompleteInTransaction(
@@ -110,26 +99,5 @@ public class AttemptGroupSummaryCompletionService {
                 .weaknesses(summary.getWeaknesses())
                 .recommendedPractice(summary.getRecommendedPractice())
                 .build();
-    }
-
-    private boolean retryableTransactionFailure(RuntimeException failure) {
-        Throwable current = failure;
-        for (int depth = 0; current != null && depth < 16; depth++) {
-            if (current instanceof DuplicateKeyException
-                    || current instanceof OptimisticLockingFailureException) {
-                return true;
-            }
-            if (current instanceof MongoException mongoException
-                    && (mongoException.hasErrorLabel(MongoException.TRANSIENT_TRANSACTION_ERROR_LABEL)
-                    || mongoException.hasErrorLabel(MongoException.UNKNOWN_TRANSACTION_COMMIT_RESULT_LABEL))) {
-                return true;
-            }
-            Throwable cause = current.getCause();
-            if (cause == current) {
-                break;
-            }
-            current = cause;
-        }
-        return false;
     }
 }
