@@ -1,5 +1,72 @@
 # MongoDB maintenance scripts
 
+## TMI-126 Challenge preparation
+
+`challenge-10s-prepare.js`는 기존 연결에서 Challenge 전용 catalog·attempt·Job·receipt와 index를 검증한다.
+기본은 dry-run이며 apply는 `CHALLENGE_PREPARE_APPLY=true`와 `CHALLENGE_WRITERS_DRAINED=true`를 모두 요구한다.
+`MONGODB_URI`, 명시적인 `MONGODB_DATABASE`는 승인된 환경 주입으로 제공한다. 기준일·콘텐츠·기존 시험 데이터는 변경하지 않는다.
+
+```bash
+node scripts/mongodb/challenge-10s-prepare.js
+node --test scripts/mongodb/challenge-10s-prepare.test.js
+```
+
+활성화·중단·apply 절차는 [Challenge rollout](../../docs/codex/TEN_SECOND_CHALLENGE_ROLLOUT.md)을 따른다.
+
+## TMI-125 UserMerged guard preparation
+
+`user-merged-prepare.js`는 UserMerged consumer를 켜기 전에 기존 Session·Result·Summary
+소유자를 읽기 전용으로 점검하고 ACTIVE ownership guard와 owner migration index를 준비한다.
+기본은 dry-run이며 URI, credential과 실제 userId를 출력하지 않는다. Apply는 모든 구버전
+writer가 drain됐음을 명시적으로 확인한 경우에만 허용한다.
+
+```bash
+MONGODB_URI=<secret> MONGODB_DATABASE=<learning-core-db> \
+node scripts/mongodb/user-merged-prepare.js
+
+MONGODB_URI=<secret> MONGODB_DATABASE=<learning-core-db> \
+USER_MERGED_LEGACY_WRITERS_DRAINED=true \
+USER_MERGED_PREPARE_APPLY=true \
+node scripts/mongodb/user-merged-prepare.js
+```
+
+Apply 전에는 Learning Core 구버전 instance drain, Identity UserMerged publisher OFF, DB backup과
+dry-run blocker 0을 확인한다. `exam_results.userId`, `exam_summaries.userId` index와 모든 기존
+canonical owner의 ACTIVE guard를 idempotent하게 생성하며 기존 MERGED guard나 충돌 데이터는
+자동 변경하지 않는다.
+
+Dry-run은 다음 관계 오류도 건수만 출력하고 한 건이라도 있으면 apply를 차단한다.
+
+- Session이 없는 orphan `ExamResult`와 `ExamSummary`
+- Result/Summary의 `userId`와 참조 `ExamSession.userId` 불일치
+
+실제 userId, examId와 문서 ID는 출력하지 않는다. 관계 오류는 올바른 소유자를 자동으로
+판단할 수 없으므로 script가 삭제하거나 owner를 덮어쓰지 않는다. read-only inventory와 운영
+승인을 거친 별도 보정 계획으로 해결한 뒤 dry-run을 다시 실행한다.
+
+```bash
+node --test scripts/mongodb/user-merged-prepare.test.js
+```
+
+## TMI-116 Billing 시험 생성 saga indexes
+
+`tmi-116-migrate-billing-exam-saga.js`는 Billing saga feature flag를 켜기 전에
+`exam_creation_operations`와 `exam_sessions`에 필요한 unique, lookup, TTL index를 생성한다.
+대상 database를 명시적으로 선택한 `mongosh` 세션에서 실행하고 staging/prod에서는
+백업과 기존 중복 데이터 점검 후 적용한다. 애플리케이션은 staging/prod에서 flag가 켜졌을 때
+필수 index가 없거나 호환되지 않으면 시작을 중단한다.
+
+필수 환경변수는 `MONGODB_URI`, `MONGODB_DATABASE`다. 기본 실행은 dry-run이며 정확히
+`TMI116_BILLING_SAGA_INDEXES_APPLY=true`일 때만 index를 생성한다. URI와 credential은
+출력하지 않는다.
+
+```bash
+mongosh "$MONGODB_URI" --file scripts/mongodb/tmi-116-migrate-billing-exam-saga.js
+
+TMI116_BILLING_SAGA_INDEXES_APPLY=true \
+mongosh "$MONGODB_URI" --file scripts/mongodb/tmi-116-migrate-billing-exam-saga.js
+```
+
 ## Completed-history and retry-attempt read indexes
 
 `create-exam-read-indexes.js` validates and optionally creates the compound indexes used by the

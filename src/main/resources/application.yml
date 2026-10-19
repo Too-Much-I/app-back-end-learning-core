@@ -24,6 +24,91 @@ spring:
       max-request-size: 10MB
 
 app:
+  deployment:
+    environment: ${APP_DEPLOYMENT_ENVIRONMENT:}
+  answer-learning:
+    enabled: ${ANSWER_LEARNING_ENABLED:false}
+    grading-enabled: ${ANSWER_LEARNING_GRADING_ENABLED:false}
+    dataset-id: ${ANSWER_LEARNING_DATASET_ID:}
+    content-version: ${ANSWER_LEARNING_CONTENT_VERSION:}
+    bucket: ${ANSWER_LEARNING_S3_BUCKET:}
+    lambda-url: ${ANSWER_LEARNING_LAMBDA_URL:}
+    region: ${ANSWER_LEARNING_AWS_REGION:ap-northeast-2}
+    daily-submissions: ${ANSWER_LEARNING_DAILY_SUBMISSIONS:60}
+    poll-ms: ${ANSWER_LEARNING_POLL_MS:1500}
+  learning-record-deletion:
+    command-enabled: ${LEARNING_RECORD_DELETION_COMMAND_ENABLED:false}
+    read-fence-enabled: ${LEARNING_RECORD_DELETION_READ_FENCE_ENABLED:false}
+    writer-fence-enabled: ${LEARNING_RECORD_DELETION_WRITER_FENCE_ENABLED:false}
+    worker-enabled: ${LEARNING_RECORD_DELETION_WORKER_ENABLED:false}
+    billing-continuation-enabled: ${LEARNING_RECORD_DELETION_BILLING_CONTINUATION_ENABLED:false}
+    aggregate-enabled: ${LEARNING_RECORD_DELETION_AGGREGATE_ENABLED:false}
+  challenge:
+    enabled: ${CHALLENGE_ENABLED:false}
+    ai-endpoint: ${CHALLENGE_AI_ENDPOINT:}
+    outbound-credential: ${CHALLENGE_AI_OUTBOUND_CREDENTIAL:}
+    callback-credential: ${CHALLENGE_AI_CALLBACK_CREDENTIAL:}
+    poll-ms: ${CHALLENGE_POLL_MS:1000}
+    expiry-poll-ms: ${CHALLENGE_EXPIRY_POLL_MS:10000}
+  billing:
+    paid-exam:
+      coexistence:
+        legacy-create-enabled: ${BILLING_LEGACY_EXAM_CREATE_ENABLED:false}
+      enabled: ${BILLING_PAID_EXAM_ENABLED:false}
+      test-activation-approved: ${BILLING_PAID_EXAM_TEST_ACTIVATION_APPROVED:false}
+      production-activation-approved: ${BILLING_PAID_EXAM_PRODUCTION_ACTIVATION_APPROVED:false}
+      legacy:
+        environment: ${BILLING_PAID_EXAM_LEGACY_ENVIRONMENT:}
+        database: ${BILLING_PAID_EXAM_LEGACY_DATABASE:}
+        revision: ${BILLING_PAID_EXAM_LEGACY_REVISION:}
+        sha256: ${BILLING_PAID_EXAM_LEGACY_SHA256:}
+        count: ${BILLING_PAID_EXAM_LEGACY_COUNT:-1}
+    exam-deletion:
+      sender-enabled: ${BILLING_EXAM_DELETION_SENDER_ENABLED:false}
+    access-events:
+      # ON wiring is implemented; the separate rollout gate remains closed pending P6/V07 verification.
+      receiver-enabled: ${BILLING_ACCESS_EVENTS_RECEIVER_ENABLED:false}
+      environment: ${BILLING_ACCESS_EVENTS_ENVIRONMENT:}
+      consumer-scope-id: ${BILLING_ACCESS_EVENTS_CONSUMER_SCOPE_ID:}
+      billing-public-jwk-set: ${BILLING_ACCESS_EVENTS_BILLING_PUBLIC_JWK_SET:}
+      port: ${BILLING_ACCESS_EVENTS_PORT:0}
+      tls-key-store: ${BILLING_ACCESS_EVENTS_TLS_KEY_STORE:}
+      tls-key-store-password: ${BILLING_ACCESS_EVENTS_TLS_KEY_STORE_PASSWORD:}
+      tls-key-alias: ${BILLING_ACCESS_EVENTS_TLS_KEY_ALIAS:}
+    workload-jwt:
+      sender-enabled: ${BILLING_WORKLOAD_JWT_SENDER_ENABLED:false}
+      environment: ${BILLING_WORKLOAD_JWT_ENVIRONMENT:}
+      private-jwk: ${BILLING_WORKLOAD_JWT_PRIVATE_JWK:}
+    creation-saga-enabled: ${BILLING_CREATION_SAGA_ENABLED:false}
+    phone-continuation-enabled: ${BILLING_PHONE_CONTINUATION_ENABLED:false}
+    reconciliation:
+      enabled: ${BILLING_RECONCILIATION_ENABLED:false}
+      poll: ${BILLING_RECONCILIATION_POLL:PT10S}
+      batch-size: ${BILLING_RECONCILIATION_BATCH_SIZE:20}
+      concurrency: ${BILLING_RECONCILIATION_CONCURRENCY:2}
+      lease: ${BILLING_RECONCILIATION_LEASE:PT30S}
+      attempt-timeout: ${BILLING_RECONCILIATION_ATTEMPT_TIMEOUT:PT20S}
+      # Explicit operating values required only when enabled; no implicit alert retry policy.
+      alert-max-age: ${BILLING_RECONCILIATION_ALERT_MAX_AGE:}
+      alert-max-attempts: ${BILLING_RECONCILIATION_ALERT_MAX_ATTEMPTS:}
+    base-url: ${BILLING_BASE_URL:}
+    region: ${BILLING_AWS_REGION:ap-northeast-2}
+    connect-timeout: ${BILLING_CONNECT_TIMEOUT:PT2S}
+    read-timeout: ${BILLING_READ_TIMEOUT:PT5S}
+  attempt-group-events:
+    writer-enabled: ${ATTEMPT_GROUP_EVENT_WRITER_ENABLED:false}
+    publisher-enabled: ${ATTEMPT_GROUP_EVENT_PUBLISHER_ENABLED:false}
+    billing-base-url: ${BILLING_BASE_URL:}
+    aws-region: ${BILLING_AWS_REGION:ap-northeast-2}
+    grading-deadline: ${ATTEMPT_GROUP_GRADING_DEADLINE:PT30M}
+    poll-interval: ${ATTEMPT_GROUP_POLL_INTERVAL:PT1S}
+    batch-size: ${ATTEMPT_GROUP_BATCH_SIZE:20}
+    lease-duration: ${ATTEMPT_GROUP_LEASE_DURATION:PT30S}
+    auth-probe-interval: ${ATTEMPT_GROUP_AUTH_PROBE_INTERVAL:PT15M}
+    connect-timeout: ${ATTEMPT_GROUP_CONNECT_TIMEOUT:PT2S}
+    read-timeout: ${ATTEMPT_GROUP_READ_TIMEOUT:PT5S}
+    delivered-retention: ${ATTEMPT_GROUP_DELIVERED_RETENTION:P30D}
+    dead-letter-retention: ${ATTEMPT_GROUP_DEAD_LETTER_RETENTION:P90D}
   grading:
     pending-timeout: ${GRADING_PENDING_TIMEOUT:PT1M}
     processing-timeout: ${GRADING_PROCESSING_TIMEOUT:PT3M}
@@ -40,6 +125,30 @@ app:
       issuer: ${IDENTITY_ISSUER:}
       jwk-set-uri: ${IDENTITY_JWK_SET_URI:}
       audience: ${IDENTITY_AUDIENCE:}
+      clock-skew: ${IDENTITY_CLOCK_SKEW:PT60S}
+  user-withdrawn:
+    consumer-enabled: ${USER_WITHDRAWN_CONSUMER_ENABLED:false}
+    deny-gate-enabled: ${USER_WITHDRAWN_DENY_GATE_ENABLED:false}
+    max-accepted-access-token-lifetime: ${USER_WITHDRAWN_MAX_ACCESS_TOKEN_LIFETIME:}
+    allowed-verifier-clock-skew: ${USER_WITHDRAWN_ALLOWED_VERIFIER_CLOCK_SKEW:}
+    inbox-retention: ${USER_WITHDRAWN_INBOX_RETENTION:}
+    maximum-future-event-skew: ${USER_WITHDRAWN_MAXIMUM_FUTURE_EVENT_SKEW:}
+    workload:
+      issuer: ${USER_WITHDRAWN_WORKLOAD_ISSUER:}
+      jwk-set-uri: ${USER_WITHDRAWN_WORKLOAD_JWK_SET_URI:}
+      audience: ${USER_WITHDRAWN_WORKLOAD_AUDIENCE:}
+      principal-claim: ${USER_WITHDRAWN_WORKLOAD_PRINCIPAL_CLAIM:}
+      principal-value: ${USER_WITHDRAWN_WORKLOAD_PRINCIPAL_VALUE:}
+      max-token-lifetime: ${USER_WITHDRAWN_WORKLOAD_MAX_TOKEN_LIFETIME:}
+      clock-skew: ${USER_WITHDRAWN_WORKLOAD_CLOCK_SKEW:}
+  user-merged:
+    writer-enabled: ${USER_MERGED_WRITER_ENABLED:false}
+    consumer-enabled: ${USER_MERGED_CONSUMER_ENABLED:false}
+    source-deny-enabled: ${USER_MERGED_SOURCE_DENY_ENABLED:false}
+    workload:
+      issuer: ${USER_MERGED_WORKLOAD_ISSUER:}
+      jwk-set-uri: ${USER_MERGED_WORKLOAD_JWK_SET_URI:}
+      clock-skew: ${USER_MERGED_WORKLOAD_CLOCK_SKEW:PT30S}
   redis:
     key-prefix: ${REDIS_KEY_PREFIX:learning-core}
   s3:

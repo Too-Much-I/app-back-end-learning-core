@@ -125,6 +125,18 @@ class ExamGradingServiceTest {
     private MutableClock clock;
     private ExamGradingService service;
 
+    @Test
+    void unclassifiedSessionCannotCreateJobOrCallS3OrAi() {
+        var session = examSessionRepository.findById(EXAM_ID).orElseThrow();
+        var runtime = org.mockito.Mockito.mock(web.tosunsaeng.domain.exams.rollout.LegacyExamRuntime.class);
+        doThrow(new IllegalStateException("unclassified")).when(runtime).requireKnown(session);
+        ReflectionTestUtils.setField(service, "legacyExamRuntime", runtime);
+        assertThrows(IllegalStateException.class, () -> service.submitQuestion(EXAM_ID, 1, 0));
+        assertTrue(questionJobs.isEmpty());
+        assertTrue(summaryJobs.isEmpty());
+        org.mockito.Mockito.verifyNoInteractions(s3Client, dispatchService);
+    }
+
     @BeforeEach
     void setUp() {
         expectedQuestionNumbers = List.of(1);
@@ -166,6 +178,151 @@ class ExamGradingServiceTest {
                 clock
         );
         ReflectionTestUtils.setField(service, "bucketName", "test-learning-core-bucket");
+        ReflectionTestUtils.setField(service,"acceptedWorkPolicy",new ExamAcceptedWorkPolicy(questionJobRepository,
+                org.mockito.Mockito.mock(ExamSubmissionEvidence.class)));
+    }
+
+    @Test
+    void coveredSubmissionWithoutOwnerGuardFailsBeforeJobInsert() {
+        var evidence = org.mockito.Mockito.mock(ExamSubmissionEvidence.class);
+        ReflectionTestUtils.setField(service, "submissionEvidence", evidence);
+        when(evidence.covered(EXAM_ID)).thenReturn(true);
+        assertThrows(IllegalStateException.class, () -> service.submitQuestion(EXAM_ID, 1, 0));
+        verify(questionJobRepository, never()).insert(any(QuestionGradingJob.class));
+    }
+
+    @Test void paidPendingAndClosedSessionsRejectNewJobs() {
+        for (ExamSession session:List.of(ExamSession.builder().examId(EXAM_ID).status(ExamSessionStatus.ENTITLEMENT_CONFIRMING).build(),
+                ExamSession.builder().examId(EXAM_ID).status(ExamSessionStatus.IN_PROGRESS).submissionsClosedAt(NOW).build())) {
+            when(examSessionRepository.findById(EXAM_ID)).thenReturn(Optional.of(session));
+            assertThrows(ExamsException.class,()->service.submitQuestion(EXAM_ID,1,0));
+            assertThrows(ExamsException.class,()->service.submitQuestion(EXAM_ID,1,1));
+        }
+        verify(questionJobRepository,never()).insert(any(QuestionGradingJob.class));
+    }
+
+    @Test void closedUnsubmittedQuestionCannotBeReconstructedFromS3() {
+        var session=ExamSession.builder().examId(EXAM_ID).mockExamId(GradingKeys.LEGACY_MOCK_EXAM_ID)
+                .status(ExamSessionStatus.IN_PROGRESS).submissionsClosedAt(NOW).build();
+        when(examSessionRepository.findById(EXAM_ID)).thenReturn(Optional.of(session));
+        var result=service.retryExam(EXAM_ID);
+        assertEquals(List.of(1),result.getMissingSubmissionQuestionNumbers());
+        verify(s3Client,never()).headObject(any(HeadObjectRequest.class));
+        verify(questionJobRepository,never()).insert(any(QuestionGradingJob.class));
+    }
+
+    @Test void closedFullyAcceptedSessionCreatesDerivedSummaryOnce() {
+        expectedQuestionNumbers=List.of(1,2);
+        putCompletedQuestions(expectedQuestionNumbers);
+        var session=ExamSession.builder().examId(EXAM_ID).mockExamId(GradingKeys.LEGACY_MOCK_EXAM_ID)
+                .status(ExamSessionStatus.IN_PROGRESS).submissionEvidenceVersion(1).requiredQuestionNumbers(List.of(1,2))
+                .submissionCompletedAt(NOW.minusSeconds(1)).submissionsClosedAt(NOW).build();
+        when(examSessionRepository.findById(EXAM_ID)).thenReturn(Optional.of(session));
+        service.ensureSummaryStartedIfReady(EXAM_ID);
+        service.ensureSummaryStartedIfReady(EXAM_ID);
+        verify(summaryJobRepository,times(1)).insert(any(SummaryGradingJob.class));
+        assertEquals(EXAM_ID,storedSummary().getExamId());
+        verify(summaryDispatchScheduler,times(2)).schedulePending(GradingKeys.summaryJobId(EXAM_ID),1);
+    }
+
+    @Test void revokedProvenOldSessionAllowsDerivedSummaryButNeverNewRecording() {
+        expectedQuestionNumbers=List.of(1,2);
+        putCompletedQuestions(expectedQuestionNumbers);
+        var session=RevokedAcceptedWorkPolicyTest.confirmed(EXAM_ID,"owner",GradingKeys.LEGACY_MOCK_EXAM_ID);
+        session.closeSubmissions("closing",RevokedAcceptedWorkPolicyTest.NOW);
+        ReflectionTestUtils.setField(session,"accessRevoked",true);
+        ReflectionTestUtils.setField(session,"accessRevocationEventId","event");
+        ReflectionTestUtils.setField(session,"accessRevocationUserId","owner");
+        ReflectionTestUtils.setField(session,"submissionCompletedAt",NOW);
+        when(examSessionRepository.findById(EXAM_ID)).thenReturn(Optional.of(session));
+        service.ensureSummaryStartedIfReady(EXAM_ID);
+        service.ensureSummaryStartedIfReady(EXAM_ID);
+        verify(summaryJobRepository,times(1)).insert(any(SummaryGradingJob.class));
+        assertThrows(ExamsException.class,()->service.submitQuestion(EXAM_ID,1,1));
+    }
+
+    @Test void revokedOldRecoveryDoesNotReconstructUnacceptedQuestion() {
+        var session=RevokedAcceptedWorkPolicyTest.confirmed(EXAM_ID,"owner",GradingKeys.LEGACY_MOCK_EXAM_ID);
+        session.closeSubmissions("closing",RevokedAcceptedWorkPolicyTest.NOW);
+        ReflectionTestUtils.setField(session,"accessRevoked",true);
+        ReflectionTestUtils.setField(session,"accessRevocationEventId","event");
+        ReflectionTestUtils.setField(session,"accessRevocationUserId","owner");
+        when(examSessionRepository.findById(EXAM_ID)).thenReturn(Optional.of(session));
+        var result=service.retryExam(EXAM_ID);
+        assertEquals(List.of(1),result.getMissingSubmissionQuestionNumbers());
+        verify(s3Client,never()).headObject(any(HeadObjectRequest.class));
+        verify(questionJobRepository,never()).insert(any(QuestionGradingJob.class));
+    }
+
+    @Test void revokedOldRecoveryReopensExactCompletedJobWithoutChangingAdmissionTime() {
+        var session=RevokedAcceptedWorkPolicyTest.confirmed(EXAM_ID,"owner",GradingKeys.LEGACY_MOCK_EXAM_ID);
+        session.closeSubmissions("closing",RevokedAcceptedWorkPolicyTest.NOW);
+        ReflectionTestUtils.setField(session,"accessRevoked",true);
+        ReflectionTestUtils.setField(session,"accessRevocationEventId","event");
+        ReflectionTestUtils.setField(session,"accessRevocationUserId","owner");
+        when(examSessionRepository.findById(EXAM_ID)).thenReturn(Optional.of(session));
+        var accepted=NOW.minusSeconds(100);
+        var job=QuestionGradingJob.pending(GradingKeys.questionJobId(EXAM_ID,1,0),EXAM_ID,1,0,"key",
+                GradingKeys.LEGACY_MOCK_EXAM_ID,accepted).markUserSubmission(accepted);
+        job.complete(NOW.minusSeconds(1));
+        questionJobs.put(job.getJobId(),copy(job,0L));
+        service.retryExam(EXAM_ID);
+        verify(questionJobRepository).reopenCompletedMissingResult(eq(job.getJobId()),eq(job.effectiveRecoveryCycle()),any(Instant.class));
+        assertEquals(accepted,questionJobs.get(job.getJobId()).getFirstUserSubmittedAt());
+        assertEquals(NOW,questionJobs.get(job.getJobId()).getPendingAt());
+    }
+
+    @Test void closedPartialSubmissionCannotCreateSummaryEvenWithQueryableResults() {
+        putCompletedQuestions(List.of(1));
+        var session=ExamSession.builder().examId(EXAM_ID).status(ExamSessionStatus.IN_PROGRESS)
+                .submissionEvidenceVersion(1).requiredQuestionNumbers(List.of(1)).submissionsClosedAt(NOW).build();
+        when(examSessionRepository.findById(EXAM_ID)).thenReturn(Optional.of(session));
+        service.ensureSummaryStartedIfReady(EXAM_ID);
+        service.completeSummary(EXAM_ID);
+        verify(summaryJobRepository,never()).insert(any(SummaryGradingJob.class));
+        verify(summaryDispatchScheduler,never()).schedulePending(anyString(),anyInt());
+    }
+
+    @Test void closedUnacceptedCallbackCannotManufactureCompletedJob() {
+        when(examSessionRepository.findById(EXAM_ID)).thenReturn(Optional.of(ExamSession.builder().examId(EXAM_ID)
+                .status(ExamSessionStatus.IN_PROGRESS).submissionsClosedAt(NOW).build()));
+        service.completeQuestion(EXAM_ID,1,0);
+        verify(questionJobRepository,never()).insert(any(QuestionGradingJob.class));
+    }
+
+    @Test void closedAdmissionPreservesAlreadyAdmittedJobReplay() {
+        var owners=org.mockito.Mockito.mock(web.tosunsaeng.domain.usermerge.application.UserOwnedTransactionExecutor.class);
+        ReflectionTestUtils.setField(service,"userOwnedTransactionExecutor",owners);
+        when(owners.enabled()).thenReturn(true);
+        when(owners.executeExamCoordination(eq("owner"),eq(EXAM_ID),any())).thenAnswer(invocation ->
+                ((java.util.function.Supplier<?>)invocation.getArgument(2)).get());
+        ExamSession session=ExamSession.builder().examId(EXAM_ID).userId("owner").mockExamId(GradingKeys.LEGACY_MOCK_EXAM_ID)
+                .status(ExamSessionStatus.IN_PROGRESS).build();
+        when(examSessionRepository.findById(EXAM_ID)).thenReturn(Optional.of(session));
+        service.submitQuestion(EXAM_ID,1,0);
+        session.closeSubmissions("operation",NOW);
+        assertEquals(ExamStatus.PROCESSING,service.submitQuestion(EXAM_ID,1,0));
+        assertThrows(ExamsException.class,()->service.submitQuestion(EXAM_ID,1,1));
+        verify(questionJobRepository,times(1)).insert(any(QuestionGradingJob.class));
+    }
+
+    @Test
+    void coveredSubmissionRecordsEvidenceWithNotificationsAbsentOnlyOnFirstRetryZeroJob() {
+        var evidence = org.mockito.Mockito.mock(ExamSubmissionEvidence.class);
+        var owners = org.mockito.Mockito.mock(web.tosunsaeng.domain.usermerge.application.UserOwnedTransactionExecutor.class);
+        ReflectionTestUtils.setField(service, "submissionEvidence", evidence);
+        ReflectionTestUtils.setField(service, "userOwnedTransactionExecutor", owners);
+        when(evidence.covered(EXAM_ID)).thenReturn(true);
+        when(owners.enabled()).thenReturn(true);
+        when(examSessionRepository.findById(EXAM_ID)).thenReturn(Optional.of(ExamSession.builder()
+                .examId(EXAM_ID).userId("owner").mockExamId(GradingKeys.LEGACY_MOCK_EXAM_ID).build()));
+        when(owners.executeExamCoordination(eq("owner"), eq(EXAM_ID), any())).thenAnswer(invocation ->
+                ((java.util.function.Supplier<?>) invocation.getArgument(2)).get());
+        service.submitQuestion(EXAM_ID, 1, 0);
+        service.submitQuestion(EXAM_ID, 1, 0);
+        service.submitQuestion(EXAM_ID, 1, 1);
+        verify(evidence, times(1)).accepted(EXAM_ID, 1, 0, null, NOW);
+        verify(evidence, never()).accepted(eq(EXAM_ID), anyInt(), eq(1), any(), any());
     }
 
     @Test
@@ -200,6 +357,21 @@ class ExamGradingServiceTest {
                 () -> assertFalse(output.getOut().contains("temp/" + EXAM_ID + "/q_1_r0.wav"))
         );
         verify(dispatchService).dispatchQuestion(any(QuestionDispatchClaim.class));
+    }
+
+    @Test
+    void reminderTrackingWrapsUnguardedSubmitButNotReplayOrRetry() {
+        var tracker = org.mockito.Mockito.mock(web.tosunsaeng.domain.notification.NotificationSubmissionTracker.class);
+        when(tracker.enabled()).thenReturn(true);
+        when(tracker.transaction(any())).thenAnswer(invocation -> ((java.util.function.Supplier<?>) invocation.getArgument(0)).get());
+        ReflectionTestUtils.setField(service, "notificationSubmissionTracker", tracker);
+        service.submitQuestion(EXAM_ID, 1, 0);
+        service.submitQuestion(EXAM_ID, 1, 0);
+        service.submitQuestion(EXAM_ID, 1, 1);
+        verify(tracker, times(3)).transaction(any());
+        verify(tracker, times(1)).accepted(eq(EXAM_ID), eq(1), eq(0), eq(List.of(1)), eq(NOW));
+        verify(tracker, never()).accepted(anyString(), anyInt(), eq(1), any(), any());
+        verify(dispatchService, times(2)).dispatchQuestion(any(QuestionDispatchClaim.class));
     }
 
     @Test
@@ -303,6 +475,34 @@ class ExamGradingServiceTest {
                 ))
         );
         verify(dispatchService).dispatchQuestion(any(QuestionDispatchClaim.class));
+    }
+
+    @ParameterizedTest
+    @ValueSource(ints = {0, 1, 3, 11})
+    void elevenQuestionRecoveryDispatchesOnlyFailedQuestionsAndReplayDoesNotDuplicate(int failedCount) {
+        expectedQuestionNumbers = java.util.stream.IntStream.rangeClosed(1, 11).boxed().toList();
+        List<Integer> failedNumbers = expectedQuestionNumbers.subList(0, failedCount);
+        List<Integer> completedNumbers = expectedQuestionNumbers.subList(failedCount, 11);
+        putCompletedQuestions(completedNumbers);
+        failedNumbers.forEach(number ->
+                putQuestion(questionJob(number, 0, GradingJobStatus.FAILED, 1, NOW.minusSeconds(600))));
+
+        ExamResponseDTO.GradingRetryResult first = service.retryExam(EXAM_ID);
+        ExamResponseDTO.GradingRetryResult replay = service.retryExam(EXAM_ID);
+
+        assertEquals(failedNumbers, first.getRetriedQuestionNumbers());
+        assertTrue(replay.getRetriedQuestionNumbers().isEmpty());
+        assertEquals(failedNumbers, replay.getWaitingQuestionNumbers());
+        ArgumentCaptor<QuestionDispatchClaim> calls = ArgumentCaptor.forClass(QuestionDispatchClaim.class);
+        verify(dispatchService, times(failedCount)).dispatchQuestion(calls.capture());
+        assertEquals(failedNumbers, calls.getAllValues().stream()
+                .map(QuestionDispatchClaim::questionNumber).sorted().toList());
+        completedNumbers.forEach(number -> {
+            assertEquals(GradingJobStatus.COMPLETED, storedQuestion(number, 0).getStatus());
+            assertEquals(1, storedQuestion(number, 0).getDispatchAttempt());
+        });
+        failedNumbers.forEach(number -> assertEquals(2, storedQuestion(number, 0).getDispatchAttempt()));
+        verify(dispatchService, never()).dispatchSummary(any());
     }
 
     @Test
@@ -1454,6 +1654,8 @@ class ExamGradingServiceTest {
 
     private static QuestionGradingJob copy(QuestionGradingJob source, Long version) {
         return QuestionGradingJob.builder()
+                .activityUserSubmission(source.isActivityUserSubmission())
+                .firstUserSubmittedAt(source.getFirstUserSubmittedAt())
                 .jobId(source.getJobId())
                 .examId(source.getExamId())
                 .questionNumber(source.getQuestionNumber())

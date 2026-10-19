@@ -1,0 +1,538 @@
+<mxfile host="app.diagrams.net" agent="Codex" pages="3">
+  <diagram id="product-overview" name="1. 제품 · 사용자 흐름 구성도">
+    <mxGraphModel dx="2502" dy="1373" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1900" pageHeight="1300" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="background-layer" parent="0" value="배경" />
+        <mxCell id="prod-app-zone" parent="background-layer" style="swimlane;html=1;rounded=1;startSize=42;horizontal=1;fillColor=#f0fdf4;strokeColor=#82b366;strokeWidth=2;fontStyle=1;fontSize=17;" value="토선생 모바일 앱 · Too-Much-I/app-front-end · Expo / React Native" vertex="1">
+          <mxGeometry height="315" width="1570" x="280" y="120" as="geometry" />
+        </mxCell>
+        <mxCell id="prod-service-zone" parent="background-layer" style="swimlane;html=1;rounded=1;startSize=42;horizontal=1;fillColor=#f8fafc;strokeColor=#64748b;strokeWidth=2;fontStyle=1;fontSize=17;" value="AWS 앱 서비스 · 공개 API와 내부 비동기 처리" vertex="1">
+          <mxGeometry height="650" width="1570" x="280" y="490" as="geometry" />
+        </mxCell>
+        <mxCell id="edge-layer" parent="0" value="연결선" />
+        <mxCell id="pe-user" edge="1" parent="edge-layer" source="prod-user" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#2e7d32;strokeWidth=2;endArrow=block;endFill=1;fontSize=12;labelBackgroundColor=#ffffff;exitX=1;exitY=0.45;entryX=0;entryY=0.45;" target="prod-app-zone" value="사용">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="260" y="265" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="pe-auth" edge="1" parent="edge-layer" source="prod-app-auth" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#2563eb;strokeWidth=2;endArrow=block;endFill=1;fontSize=12;labelBackgroundColor=#ffffff;exitX=0.5;exitY=1;entryX=0.5;entryY=0;" target="prod-identity" value="인증·동의 HTTPS">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="420" y="470" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="pe-exam" edge="1" parent="edge-layer" source="prod-app-exam" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#2e7d32;strokeWidth=2;endArrow=block;endFill=1;fontSize=12;labelBackgroundColor=#ffffff;exitX=0.5;exitY=1;entryX=0.65;entryY=0;" target="prod-learning" value="시험·녹음·Polling">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="910" y="480" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="pe-challenge" edge="1" parent="edge-layer" source="prod-app-challenge" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#7e57c2;strokeWidth=2;endArrow=block;endFill=1;fontSize=12;labelBackgroundColor=#ffffff;exitX=0.5;exitY=1;entryX=0.88;entryY=0;" target="prod-learning" value="오늘 문제·attempt·결과">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="1155" y="465" />
+              <mxPoint x="1010" y="465" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="pe-feedback" edge="1" parent="edge-layer" source="prod-app-feedback" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#d79b00;strokeWidth=2;endArrow=block;endFill=1;fontSize=12;labelBackgroundColor=#ffffff;exitX=0.5;exitY=1;entryX=0.5;entryY=0;" target="prod-feedback-web" value="WebView">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="1400" y="475" />
+              <mxPoint x="1260" y="475" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="pe-ops" edge="1" parent="edge-layer" source="prod-app-ops" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#666666;strokeWidth=2;endArrow=block;endFill=1;fontSize=12;labelBackgroundColor=#ffffff;dashed=1;exitX=0.5;exitY=1;entryX=0.5;entryY=0;" target="prod-observability" value="오류·행동 이벤트">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="1675" y="480" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="pe-provider" edge="1" parent="edge-layer" source="prod-identity" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#6c8ebf;strokeWidth=2;endArrow=block;endFill=1;fontSize=12;labelBackgroundColor=#ffffff;startArrow=block;startFill=1;exitX=0.5;exitY=1;entryX=0.5;entryY=0;" target="prod-auth-provider" value="가입·link·검증">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="pe-jwks" edge="1" parent="edge-layer" source="prod-identity" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#2563eb;strokeWidth=2;endArrow=block;endFill=1;fontSize=12;labelBackgroundColor=#ffffff;dashed=1;exitX=1;exitY=0.5;entryX=0;entryY=0.35;" target="prod-learning" value="JWT/JWKS">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="pe-web" edge="1" parent="edge-layer" source="prod-feedback-web" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#d79b00;strokeWidth=2;endArrow=block;endFill=1;fontSize=12;labelBackgroundColor=#ffffff;startArrow=block;startFill=1;exitX=0;exitY=0.55;entryX=1;entryY=0.55;" target="prod-learning" value="Native bridge">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="pe-billing" edge="1" parent="edge-layer" source="prod-learning" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#d97706;strokeWidth=2;endArrow=block;endFill=1;fontSize=12;labelBackgroundColor=#ffffff;startArrow=block;startFill=1;exitX=0.15;exitY=1;entryX=0.75;entryY=0;" target="prod-billing" value="SigV4 · Reservation · event">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="700" y="800" />
+              <mxPoint x="805" y="800" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="pe-s3" edge="1" parent="edge-layer" source="prod-learning" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#d79b00;strokeWidth=2;endArrow=block;endFill=1;fontSize=12;labelBackgroundColor=#ffffff;startArrow=block;startFill=1;exitX=0.72;exitY=1;entryX=0.5;entryY=0;" target="prod-s3" value="URL 발급·다운로드">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="pe-upload" edge="1" parent="edge-layer" source="prod-app-zone" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#d79b00;strokeWidth=2;endArrow=block;endFill=1;fontSize=12;labelBackgroundColor=#ffffff;exitX=0.2;exitY=1;entryX=0.5;entryY=1;" target="prod-s3" value="앱 음성 Presigned PUT">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="590" y="465" />
+              <mxPoint x="590" y="1040" />
+              <mxPoint x="1030" y="1040" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="pe-ai" edge="1" parent="edge-layer" source="prod-learning" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#7e57c2;strokeWidth=2;endArrow=block;endFill=1;fontSize=12;labelBackgroundColor=#ffffff;startArrow=block;startFill=1;exitX=1;exitY=0.7;entryX=0;entryY=0.35;" target="prod-ai" value="평가 요청 ↔ Callback">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="1090" y="710" />
+              <mxPoint x="1090" y="885" />
+              <mxPoint x="1180" y="885" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="pe-ai-provider" edge="1" parent="edge-layer" source="prod-ai" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#9673a6;strokeWidth=2;endArrow=block;endFill=1;fontSize=12;labelBackgroundColor=#ffffff;startArrow=block;startFill=1;exitX=1;exitY=0.5;entryX=0;entryY=0.5;" target="prod-ai-provider" value="STT·Speech·LLM/VLM">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="foreground-layer" parent="0" value="도형·텍스트" />
+        <mxCell id="prod-title" parent="foreground-layer" style="text;html=1;align=center;verticalAlign=middle;fontSize=30;fontStyle=1;fontColor=#1f2937;" value="토선생 1차 업데이트 완료 기준 · 제품 전체 시스템 구성도" vertex="1">
+          <mxGeometry height="50" width="960" x="470" y="20" as="geometry" />
+        </mxCell>
+        <mxCell id="prod-subtitle" parent="foreground-layer" style="text;html=1;align=center;verticalAlign=middle;fontSize=14;fontColor=#4b5563;" value="사용자 경험 → 모바일 앱 → 공개 서비스 → 과금·음성·AI 처리 → 결과·관측" vertex="1">
+          <mxGeometry height="30" width="1100" x="400" y="70" as="geometry" />
+        </mxCell>
+        <mxCell id="prod-user" parent="foreground-layer" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;strokeWidth=2;fontSize=14;fontStyle=1;" value="학습자&#xa;&#xa;로그인·동의&#xa;모의고사 응시&#xa;10초 챌린지&#xa;피드백·재답변" vertex="1">
+          <mxGeometry height="175" width="210" x="30" y="185" as="geometry" />
+        </mxCell>
+        <mxCell id="prod-outcome" parent="foreground-layer" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d97706;strokeWidth=2;fontSize=14;fontStyle=1;" value="사용자가 얻는 가치&#xa;&#xa;• 11문항 실전 연습&#xa;• 발음·유창성·내용·문법 피드백&#xa;• 0~200 예상 점수·약점 리포트&#xa;• 재답변 성장 확인&#xa;• 매일 10초 말하기 습관" vertex="1">
+          <mxGeometry height="230" width="210" x="30" y="510" as="geometry" />
+        </mxCell>
+        <mxCell id="prod-legend" parent="foreground-layer" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#64748b;fontSize=13;" value="표현 기준&#xa;&#xa;초록: 앱·학습&#xa;파랑: 인증&#xa;주황: 과금·S3&#xa;보라: AI·비동기&#xa;회색: 관측·데이터&#xa;&#xa;연결선은 별도 하위 레이어" vertex="1">
+          <mxGeometry height="220" width="210" x="30" y="790" as="geometry" />
+        </mxCell>
+        <mxCell id="prod-app-auth" parent="foreground-layer" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;strokeWidth=2;fontSize=14;fontStyle=1;" value="인증·동의&#xa;&#xa;Guest 부트스트랩&#xa;SNS/Phone 로그인·link&#xa;Token·SecureStore&#xa;401 복구" vertex="1">
+          <mxGeometry height="195" width="220" x="310" y="190" as="geometry" />
+        </mxCell>
+        <mxCell id="prod-app-home" parent="foreground-layer" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#64748b;fontSize=13;" value="홈·내비게이션&#xa;&#xa;홈 / 모의고사 / 피드백&#xa;최근 피드백&#xa;챌린지 진입&#xa;알림·설정" vertex="1">
+          <mxGeometry height="195" width="220" x="555" y="190" as="geometry" />
+        </mxCell>
+        <mxCell id="prod-app-exam" parent="foreground-layer" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;strokeWidth=2;fontSize=14;fontStyle=1;" value="모의고사 11문항&#xa;&#xa;마이크·사운드 점검&#xa;파트 안내·녹음&#xa;Presigned PUT·제출&#xa;채점 Polling·복구" vertex="1">
+          <mxGeometry height="195" width="220" x="800" y="190" as="geometry" />
+        </mxCell>
+        <mxCell id="prod-app-challenge" parent="foreground-layer" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;strokeWidth=2;fontSize=14;fontStyle=1;" value="10초 챌린지&#xa;&#xa;오늘 문제·진행도&#xa;attempt·10초 녹음&#xa;멱등 업로드·제출&#xa;결과 Polling·교정" vertex="1">
+          <mxGeometry height="195" width="220" x="1045" y="190" as="geometry" />
+        </mxCell>
+        <mxCell id="prod-app-feedback" parent="foreground-layer" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d97706;strokeWidth=2;fontSize=14;fontStyle=1;" value="피드백·재답변&#xa;&#xa;응시·재답변 이력&#xa;종합/문항 WebView&#xa;Native data bridge&#xa;재채점·재답변" vertex="1">
+          <mxGeometry height="195" width="220" x="1290" y="190" as="geometry" />
+        </mxCell>
+        <mxCell id="prod-app-ops" parent="foreground-layer" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#666666;fontSize=13;" value="앱 품질·운영&#xa;&#xa;React Query·Zustand&#xa;Amplitude·Clarity&#xa;Sentry 오류 수집" vertex="1">
+          <mxGeometry height="195" width="280" x="1535" y="190" as="geometry" />
+        </mxCell>
+        <mxCell id="prod-identity" parent="foreground-layer" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;strokeWidth=2;fontSize=14;fontStyle=1;" value="Identity Service&#xa;&#xa;Guest / MEMBER&#xa;SNS·Phone 계정 연결&#xa;동의·탈퇴·merge&#xa;JWT·재발급·JWKS" vertex="1">
+          <mxGeometry height="190" width="240" x="310" y="570" as="geometry" />
+        </mxCell>
+        <mxCell id="prod-learning" parent="foreground-layer" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;strokeWidth=2;fontSize=14;fontStyle=1;" value="Learning Core&#xa;&#xa;시험 세션·소유권&#xa;무료 응시 Reservation saga&#xa;업로드·제출·채점 Job&#xa;결과·재채점·Challenge&#xa;AttemptGroup publisher" vertex="1">
+          <mxGeometry height="230" width="420" x="640" y="550" as="geometry" />
+        </mxCell>
+        <mxCell id="prod-feedback-web" parent="foreground-layer" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d97706;strokeWidth=2;fontSize=14;fontStyle=1;" value="앱 피드백 Web 콘텐츠&#xa;&#xa;종합·문항 리포트 렌더링&#xa;Native bridge로 데이터 수신&#xa;재답변·재채점 요청 전달" vertex="1">
+          <mxGeometry height="190" width="280" x="1120" y="570" as="geometry" />
+        </mxCell>
+        <mxCell id="prod-observability" parent="foreground-layer" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#666666;fontSize=13;" value="제품·운영 관측&#xa;&#xa;Amplitude · Clarity · Sentry&#xa;CloudWatch log/metric/alarm&#xa;민감 원문 비기록" vertex="1">
+          <mxGeometry height="190" width="330" x="1450" y="570" as="geometry" />
+        </mxCell>
+        <mxCell id="prod-auth-provider" parent="foreground-layer" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;strokeWidth=2;fontSize=14;fontStyle=1;" value="인증 Provider&#xa;&#xa;SNS / Phone verification&#xa;Google · Apple 등 계정 수단" vertex="1">
+          <mxGeometry height="150" width="240" x="310" y="850" as="geometry" />
+        </mxCell>
+        <mxCell id="prod-billing" parent="foreground-layer" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d97706;strokeWidth=2;fontSize=14;fontStyle=1;" value="Billing · 내부 전용&#xa;&#xa;무료 1회 entitlement&#xa;Reservation confirm/cancel&#xa;AttemptGroup·replacement&#xa;owner rebind·reconciliation" vertex="1">
+          <mxGeometry height="180" width="260" x="610" y="830" as="geometry" />
+        </mxCell>
+        <mxCell id="prod-s3" parent="foreground-layer" style="shape=cylinder3;whiteSpace=wrap;html=1;boundedLbl=1;backgroundOutline=1;size=15;fillColor=#ffe6cc;strokeColor=#d79b00;fontSize=14;" value="Amazon S3&#xa;&#xa;시험·Challenge 음성&#xa;서버 생성 key&#xa;앱 Presigned PUT&#xa;서버 다운로드" vertex="1">
+          <mxGeometry height="180" width="220" x="920" y="830" as="geometry" />
+        </mxCell>
+        <mxCell id="prod-ai" parent="foreground-layer" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;strokeWidth=2;fontSize=14;fontStyle=1;" value="Python AI · Too-Much-I/web-ai&#xa;&#xa;FastAPI → Redis → workers&#xa;Q1 Azure 발음 평가&#xa;Q2~Q11 STT+Azure+LLM/VLM&#xa;결정론 checklist 점수&#xa;한국어 피드백·요약 Callback&#xa;Challenge 전용 평가" vertex="1">
+          <mxGeometry height="220" width="280" x="1210" y="810" as="geometry" />
+        </mxCell>
+        <mxCell id="prod-ai-provider" parent="foreground-layer" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;strokeWidth=2;fontSize=14;fontStyle=1;" value="AI·Speech Provider&#xa;&#xa;OpenAI STT / LLM·VLM&#xa;Azure Speech&#xa;선택적 Bedrock 호환&#xa;안전한 fallback" vertex="1">
+          <mxGeometry height="180" width="240" x="1540" y="830" as="geometry" />
+        </mxCell>
+        <mxCell id="prod-data" parent="foreground-layer" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#666666;fontSize=13;" value="서비스별 데이터 · Identity MongoDB | Learning MongoDB·Redis | Billing MongoDB | AI Redis job state·임시 workspace | 환경별 분리·backup/restore" vertex="1">
+          <mxGeometry height="60" width="1470" x="310" y="1060" as="geometry" />
+        </mxCell>
+        <mxCell id="prod-delivery" parent="foreground-layer" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;strokeWidth=2;fontSize=14;fontStyle=1;" value="전달·배포 · 앱 GitHub CI → EAS iOS/Android build·store | 서버 GitHub Actions OIDC → ECR → ECS Fargate | 환경별 Secret·IAM·SG" vertex="1">
+          <mxGeometry height="65" width="1570" x="280" y="1170" as="geometry" />
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+  <diagram id="aws-overview" name="2. AWS · 배포 구성도">
+    <mxGraphModel dx="2502" dy="1373" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1900" pageHeight="1200" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="background-layer" parent="0" value="배경" />
+        <mxCell id="aws-cloud" parent="background-layer" style="swimlane;html=1;rounded=1;startSize=40;horizontal=1;fillColor=#fffaf0;strokeColor=#d79b00;strokeWidth=2;fontStyle=1;fontSize=17;" value="AWS Cloud · ap-northeast-2" vertex="1">
+          <mxGeometry height="970" width="1510" x="330" y="120" as="geometry" />
+        </mxCell>
+        <mxCell id="aws-vpc" parent="background-layer" style="swimlane;html=1;rounded=1;startSize=36;horizontal=1;fillColor=#f8fafc;strokeColor=#64748b;dashed=1;dashPattern=8 4;fontStyle=1;fontSize=15;" value="VPC · 환경별 SG / task role 경계" vertex="1">
+          <mxGeometry height="500" width="1470" x="370" y="285" as="geometry" />
+        </mxCell>
+        <mxCell id="aws-managed" parent="background-layer" style="swimlane;html=1;rounded=1;startSize=36;horizontal=1;fillColor=#ffffff;strokeColor=#d79b00;fontStyle=1;fontSize=15;" value="AWS managed / deployment plane" vertex="1">
+          <mxGeometry height="215" width="1470" x="370" y="815" as="geometry" />
+        </mxCell>
+        <mxCell id="aws-runtime" parent="background-layer" style="swimlane;html=1;rounded=1;startSize=42;horizontal=1;fillColor=#eef6ff;strokeColor=#6c8ebf;strokeWidth=2;fontStyle=1;fontSize=15;" value="Production ECS Fargate · tosunsaeng-production-cluster" vertex="1">
+          <mxGeometry height="375" width="1010" x="410" y="340" as="geometry" />
+        </mxCell>
+        <mxCell id="edge-layer" parent="0" value="연결선" />
+        <mxCell id="ae-app" edge="1" parent="edge-layer" source="aws-app" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#2e7d32;strokeWidth=2;endArrow=block;endFill=1;fontSize=12;labelBackgroundColor=#ffffff;exitX=1;exitY=0.35;entryX=0;entryY=0.5;" target="aws-ingress" value="공개 HTTPS">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="305" y="230" />
+              <mxPoint x="360" y="230" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="ae-id" edge="1" parent="edge-layer" source="aws-ingress" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#6c8ebf;strokeWidth=2;endArrow=block;endFill=1;fontSize=12;labelBackgroundColor=#ffffff;exitX=0.12;exitY=1;entryX=0.5;entryY=0;" target="aws-identity" value="Identity route">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="550" y="310" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="ae-learn" edge="1" parent="edge-layer" source="aws-ingress" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#6c8ebf;strokeWidth=2;endArrow=block;endFill=1;fontSize=12;labelBackgroundColor=#ffffff;exitX=0.28;exitY=1;entryX=0.5;entryY=0;" target="aws-learning" value="Learning route">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="775" y="310" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="ae-provider" edge="1" parent="edge-layer" source="aws-provider" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#6c8ebf;strokeWidth=2;endArrow=block;endFill=1;fontSize=12;labelBackgroundColor=#ffffff;exitX=1;exitY=0.5;entryX=0;entryY=0.45;" target="aws-identity" value="인증수단">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="310" y="443" />
+              <mxPoint x="410" y="443" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="ae-jwks" edge="1" parent="edge-layer" source="aws-learning" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#2563eb;strokeWidth=2;endArrow=block;endFill=1;fontSize=12;labelBackgroundColor=#ffffff;dashed=1;exitX=0;exitY=0.75;entryX=1;entryY=0.75;" target="aws-identity" value="JWKS">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="ae-lattice" edge="1" parent="edge-layer" source="aws-learning" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#d97706;strokeWidth=2;endArrow=block;endFill=1;fontSize=12;labelBackgroundColor=#ffffff;exitX=1;exitY=0.68;entryX=0;entryY=0.7;" target="aws-lattice" value="Reservation·event·SigV4">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="900" y="535" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="ae-billing" edge="1" parent="edge-layer" source="aws-lattice" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#d97706;strokeWidth=2;endArrow=block;endFill=1;fontSize=12;labelBackgroundColor=#ffffff;exitX=1;exitY=0.5;entryX=0;entryY=0.5;" target="aws-billing" value="HTTPS 443 → HTTP 8082">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="ae-ai" edge="1" parent="edge-layer" source="aws-learning" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#7e57c2;strokeWidth=2;endArrow=block;endFill=1;fontSize=12;labelBackgroundColor=#ffffff;startArrow=block;startFill=1;exitX=1;exitY=0.82;entryX=0;entryY=0.35;" target="aws-ai" value="평가 요청 ↔ Callback">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="900" y="560" />
+              <mxPoint x="900" y="750" />
+              <mxPoint x="1495" y="750" />
+              <mxPoint x="1495" y="455" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="ae-upload" edge="1" parent="edge-layer" source="aws-app" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#d79b00;strokeWidth=2;endArrow=block;endFill=1;fontSize=12;labelBackgroundColor=#ffffff;exitX=1;exitY=0.85;entryX=0.5;entryY=1;" target="aws-s3" value="Presigned PUT">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="310" y="305" />
+              <mxPoint x="310" y="1015" />
+              <mxPoint x="752" y="1015" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="ae-s3" edge="1" parent="edge-layer" source="aws-learning" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#d79b00;strokeWidth=2;endArrow=block;endFill=1;fontSize=12;labelBackgroundColor=#ffffff;startArrow=block;startFill=1;exitX=1;exitY=0.9;entryX=0.5;entryY=0;" target="aws-s3" value="발급·download">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="900" y="575" />
+              <mxPoint x="900" y="850" />
+              <mxPoint x="752" y="850" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="ae-ecr" edge="1" parent="edge-layer" source="aws-github" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#7e57c2;strokeWidth=2;endArrow=block;endFill=1;fontSize=12;labelBackgroundColor=#ffffff;exitX=1;exitY=0.45;entryX=0;entryY=0.35;" target="aws-ecr" value="OIDC·image push">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="310" y="820" />
+              <mxPoint x="310" y="915" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="ae-deploy" edge="1" parent="edge-layer" source="aws-ecr" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#7e57c2;strokeWidth=2;endArrow=block;endFill=1;fontSize=12;labelBackgroundColor=#ffffff;exitX=0.5;exitY=0;entryX=0.1;entryY=1;" target="aws-runtime" value="Task Definition revision">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="510" y="790" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="ae-data" edge="1" parent="edge-layer" source="aws-runtime" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#666666;strokeWidth=2;endArrow=block;endFill=1;fontSize=12;labelBackgroundColor=#ffffff;dashed=1;exitX=1;exitY=0.92;entryX=0;entryY=0.55;" target="aws-data" value="MongoDB·Redis">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="1450" y="700" />
+              <mxPoint x="1490" y="700" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="ae-ai-data" edge="1" parent="edge-layer" source="aws-ai" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#9673a6;strokeWidth=2;endArrow=block;endFill=1;fontSize=12;labelBackgroundColor=#ffffff;dashed=1;exitX=0.5;exitY=1;entryX=0.5;entryY=0;" target="aws-data" value="Redis job state">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="foreground-layer" parent="0" value="도형·텍스트" />
+        <mxCell id="aws-title" parent="foreground-layer" style="text;html=1;align=center;verticalAlign=middle;fontSize=30;fontStyle=1;fontColor=#1f2937;" value="토선생 1차 업데이트 완료 기준 · AWS 배포 구성도" vertex="1">
+          <mxGeometry height="50" width="900" x="500" y="20" as="geometry" />
+        </mxCell>
+        <mxCell id="aws-subtitle" parent="foreground-layer" style="text;html=1;align=center;verticalAlign=middle;fontSize=14;fontColor=#4b5563;" value="모바일 앱과 Identity·Learning Core·Billing·AI의 production 논리 구조" vertex="1">
+          <mxGeometry height="30" width="1060" x="420" y="70" as="geometry" />
+        </mxCell>
+        <mxCell id="aws-app" parent="foreground-layer" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;strokeWidth=2;fontSize=14;fontStyle=1;" value="토선생 모바일 앱&#xa;&#xa;Identity·Learning HTTPS&#xa;S3 Presigned PUT&#xa;Billing 직접 호출 없음" vertex="1">
+          <mxGeometry height="145" width="240" x="40" y="180" as="geometry" />
+        </mxCell>
+        <mxCell id="aws-provider" parent="foreground-layer" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;strokeWidth=2;fontSize=14;fontStyle=1;" value="인증 Provider&#xa;&#xa;SNS / Phone&#xa;Google · Apple" vertex="1">
+          <mxGeometry height="105" width="240" x="40" y="390" as="geometry" />
+        </mxCell>
+        <mxCell id="aws-github" parent="foreground-layer" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;strokeWidth=2;fontSize=14;fontStyle=1;" value="배포 파이프라인&#xa;&#xa;GitHub Actions·test/build&#xa;OIDC deploy role&#xa;canary·rollback" vertex="1">
+          <mxGeometry height="130" width="240" x="40" y="760" as="geometry" />
+        </mxCell>
+        <mxCell id="aws-ingress" parent="foreground-layer" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;strokeWidth=2;fontSize=14;fontStyle=1;" value="Public DNS / ALB ingress · Identity와 Learning Core 공개 HTTPS · Billing/AI public route 없음" vertex="1">
+          <mxGeometry height="75" width="1400" x="400" y="180" as="geometry" />
+        </mxCell>
+        <mxCell id="aws-identity" parent="foreground-layer" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;strokeWidth=2;fontSize=14;fontStyle=1;" value="Identity ECS&#xa;&#xa;Guest/MEMBER·SNS/Phone&#xa;JWT·JWKS&#xa;merge·withdrawal" vertex="1">
+          <mxGeometry height="170" width="195" x="445" y="420" as="geometry" />
+        </mxCell>
+        <mxCell id="aws-learning" parent="foreground-layer" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;strokeWidth=2;fontSize=14;fontStyle=1;" value="Learning Core ECS&#xa;&#xa;시험·무료응시 saga&#xa;결과·Challenge&#xa;S3·AI·outbox" vertex="1">
+          <mxGeometry height="170" width="200" x="675" y="420" as="geometry" />
+        </mxCell>
+        <mxCell id="aws-lattice" parent="foreground-layer" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d97706;strokeWidth=2;fontSize=14;fontStyle=1;" value="VPC Lattice&#xa;&#xa;HTTPS 443·AWS_IAM&#xa;환경별 auth policy·SG&#xa;SigV4" vertex="1">
+          <mxGeometry height="165" width="190" x="930" y="420" as="geometry" />
+        </mxCell>
+        <mxCell id="aws-billing" parent="foreground-layer" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d97706;strokeWidth=2;fontSize=14;fontStyle=1;" value="Billing ECS&#xa;&#xa;private·no public IP&#xa;ALB 없음·HTTP 8082&#xa;entitlement·Reservation&#xa;AttemptGroup" vertex="1">
+          <mxGeometry height="165" width="210" x="1160" y="420" as="geometry" />
+        </mxCell>
+        <mxCell id="aws-ai" parent="foreground-layer" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;strokeWidth=2;fontSize=14;fontStyle=1;" value="AI ECS · FastAPI&#xa;&#xa;ai-api + worker 4개&#xa;Redis queue&#xa;시험·Challenge 평가&#xa;Callback" vertex="1">
+          <mxGeometry height="200" width="270" x="1530" y="385" as="geometry" />
+        </mxCell>
+        <mxCell id="aws-data" parent="foreground-layer" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#666666;fontSize=13;" value="환경별 data plane&#xa;&#xa;Identity MongoDB&#xa;Learning MongoDB·Redis&#xa;Billing MongoDB&#xa;AI Redis job state&#xa;replica-set·backup/restore" vertex="1">
+          <mxGeometry height="145" width="270" x="1530" y="640" as="geometry" />
+        </mxCell>
+        <mxCell id="aws-ecr" parent="foreground-layer" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;strokeWidth=2;fontSize=14;fontStyle=1;" value="Amazon ECR&#xa;&#xa;Identity·Learning&#xa;Billing·AI image" vertex="1">
+          <mxGeometry height="110" width="205" x="405" y="875" as="geometry" />
+        </mxCell>
+        <mxCell id="aws-s3" parent="foreground-layer" style="shape=cylinder3;whiteSpace=wrap;html=1;boundedLbl=1;backgroundOutline=1;size=15;fillColor=#ffe6cc;strokeColor=#d79b00;fontSize=14;" value="Amazon S3&#xa;&#xa;시험·Challenge audio&#xa;Presigned PUT&#xa;server download" vertex="1">
+          <mxGeometry height="110" width="205" x="650" y="875" as="geometry" />
+        </mxCell>
+        <mxCell id="aws-iam" parent="foreground-layer" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#666666;fontSize=13;" value="IAM role · Secret&#xa;&#xa;deploy/execution/app 분리&#xa;환경별 Secret·SG&#xa;static credential 금지" vertex="1">
+          <mxGeometry height="110" width="235" x="895" y="875" as="geometry" />
+        </mxCell>
+        <mxCell id="aws-obs" parent="foreground-layer" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#666666;fontSize=13;" value="운영·관측&#xa;&#xa;CloudWatch&#xa;Lattice access log&#xa;Sentry·outbox lag" vertex="1">
+          <mxGeometry height="110" width="220" x="1170" y="875" as="geometry" />
+        </mxCell>
+        <mxCell id="aws-gate" parent="foreground-layer" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d97706;strokeWidth=2;fontSize=14;fontStyle=1;" value="1차 출시 gate 통과 · production/staging 리소스 분리 · mobile/SNS/Lattice/replica-set/multi-instance/response-loss E2E · canary/rollback 검증 완료" vertex="1">
+          <mxGeometry height="65" width="1470" x="370" y="1045" as="geometry" />
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+  <diagram id="backend-detail" name="3. 백엔드 기술 구성도">
+    <mxGraphModel dx="2012" dy="1198" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="827" pageHeight="1169" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="background-layer" value="배경" parent="0" />
+        <mxCell id="edge-layer" value="연결선" parent="0" />
+        <mxCell id="1" value="도형·텍스트" parent="0" />
+        <mxCell id="ceU27xpdp0LA_U6pvSD0-1" parent="1" style="text;html=1;align=center;verticalAlign=middle;fontSize=30;fontStyle=1;fontColor=#1f2937;" value="토선생 앱 시스템 구성도" vertex="1">
+          <mxGeometry height="50" width="900" x="500" y="20" as="geometry" />
+        </mxCell>
+        <mxCell id="ceU27xpdp0LA_U6pvSD0-3" parent="background-layer" style="swimlane;html=1;rounded=1;startSize=36;horizontal=1;fillColor=#f8fafc;strokeColor=#94a3b8;dashed=1;dashPattern=8 4;fontStyle=1;fontSize=15;fontColor=#334155;" value="AWS 앱 서버 / workload 영역" vertex="1">
+          <mxGeometry height="500" width="1390" x="350" y="120" as="geometry" />
+        </mxCell>
+        <mxCell id="ceU27xpdp0LA_U6pvSD0-4" parent="background-layer" style="swimlane;html=1;rounded=1;startSize=36;horizontal=1;fillColor=#ffffff;strokeColor=#94a3b8;dashed=1;dashPattern=8 4;fontStyle=1;fontSize=15;fontColor=#334155;" value="서비스별 데이터 소유권 / managed infrastructure" vertex="1">
+          <mxGeometry height="250" width="1390" x="350" y="680" as="geometry" />
+        </mxCell>
+        <mxCell id="ceU27xpdp0LA_U6pvSD0-5" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;strokeWidth=2;fontStyle=1;fontSize=17;spacing=10;" value="토선생 앱&#xa;&#xa;사용자 UI · 녹음&#xa;Access Token 전송&#xa;userId 직접 전송 금지" vertex="1">
+          <mxGeometry height="160" width="250" x="50" y="180" as="geometry" />
+        </mxCell>
+        <mxCell id="ceU27xpdp0LA_U6pvSD0-6" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#666666;fontSize=15;spacing=10;" value="외부 인증 Provider&#xa;&#xa;Firebase · SNS&#xa;Identity가 계정과 연결" vertex="1">
+          <mxGeometry height="125" width="250" x="50" y="400" as="geometry" />
+        </mxCell>
+        <mxCell id="ceU27xpdp0LA_U6pvSD0-7" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff;strokeColor=#64748b;fontSize=14;align=left;verticalAlign=top;spacing=12;" value="범위와 공개 경계&lt;br&gt;&lt;br&gt;• 앱은 Identity와 Learning Core만 호출&lt;br&gt;• Billing은 앱에 직접 노출하지 않음&lt;br&gt;• 공개 API와 내부 workload API 분리" vertex="1">
+          <mxGeometry height="115" width="250" x="50" y="580" as="geometry" />
+        </mxCell>
+        <mxCell id="ceU27xpdp0LA_U6pvSD0-8" parent="1" style="swimlane;html=1;rounded=1;startSize=52;horizontal=1;fillColor=#dae8fc;strokeColor=#6c8ebf;strokeWidth=2;fontStyle=1;fontSize=18;" value="Identity&lt;br&gt;사용자 · 인증의 원본" vertex="1">
+          <mxGeometry height="370" width="330" x="400" y="175" as="geometry" />
+        </mxCell>
+        <mxCell id="ceU27xpdp0LA_U6pvSD0-9" parent="ceU27xpdp0LA_U6pvSD0-8" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#6c8ebf;fontSize=14;" value="계정 · Guest/MEMBER&#xa;Firebase/Social/Phone 연결" vertex="1">
+          <mxGeometry height="70" width="280" x="25" y="80" as="geometry" />
+        </mxCell>
+        <mxCell id="ceU27xpdp0LA_U6pvSD0-10" parent="ceU27xpdp0LA_U6pvSD0-8" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#6c8ebf;fontSize=14;" value="RS256 Access Token · JWKS&#xa;Refresh Session 회전·폐기" vertex="1">
+          <mxGeometry height="70" width="280" x="25" y="170" as="geometry" />
+        </mxCell>
+        <mxCell id="ceU27xpdp0LA_U6pvSD0-11" parent="ceU27xpdp0LA_U6pvSD0-8" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#6c8ebf;fontSize=14;" value="사용자 lifecycle durable outbox&#xa;Phone eligibility · Withdrawn · Merged" vertex="1">
+          <mxGeometry height="75" width="280" x="25" y="260" as="geometry" />
+        </mxCell>
+        <mxCell id="ceU27xpdp0LA_U6pvSD0-12" parent="1" style="swimlane;html=1;rounded=1;startSize=58;horizontal=1;fillColor=#d5e8d4;strokeColor=#82b366;strokeWidth=2;fontStyle=1;fontSize=18;" value="Learning Core&lt;br&gt;시험 · 채점 · 결과의 원본" vertex="1">
+          <mxGeometry height="430" width="470" x="790" y="150" as="geometry" />
+        </mxCell>
+        <mxCell id="ceU27xpdp0LA_U6pvSD0-13" parent="ceU27xpdp0LA_U6pvSD0-12" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#82b366;fontSize=14;" value="ExamSession&#xa;examId → 실제 userId 소유권" vertex="1">
+          <mxGeometry height="75" width="200" x="25" y="85" as="geometry" />
+        </mxCell>
+        <mxCell id="ceU27xpdp0LA_U6pvSD0-14" parent="ceU27xpdp0LA_U6pvSD0-12" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#82b366;fontSize=14;" value="앱 공개 API&#xa;문제 · 업로드 URL · 제출 · Polling" vertex="1">
+          <mxGeometry height="75" width="200" x="245" y="85" as="geometry" />
+        </mxCell>
+        <mxCell id="ceU27xpdp0LA_U6pvSD0-15" parent="ceU27xpdp0LA_U6pvSD0-12" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#82b366;fontSize=14;" value="채점 orchestration&#xa;Question/Summary Job · Callback 멱등성" vertex="1">
+          <mxGeometry height="80" width="200" x="25" y="180" as="geometry" />
+        </mxCell>
+        <mxCell id="ceU27xpdp0LA_U6pvSD0-16" parent="ceU27xpdp0LA_U6pvSD0-12" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#82b366;fontSize=14;" value="ExamResult · ExamSummary&#xa;문항 결과 · 종합 결과" vertex="1">
+          <mxGeometry height="80" width="200" x="245" y="180" as="geometry" />
+        </mxCell>
+        <mxCell id="ceU27xpdp0LA_U6pvSD0-17" parent="ceU27xpdp0LA_U6pvSD0-12" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=14;" value="Billing 연동  [조건부 rollout]&#xa;시험 생성 saga · AttemptGroup outbox/publisher" vertex="1">
+          <mxGeometry height="80" width="420" x="25" y="285" as="geometry" />
+        </mxCell>
+        <mxCell id="ceU27xpdp0LA_U6pvSD0-18" parent="1" style="swimlane;html=1;rounded=1;startSize=58;horizontal=1;fillColor=#fff2cc;strokeColor=#d6b656;strokeWidth=2;fontStyle=1;fontSize=18;" value="Billing&lt;br&gt;혜택 · 사용권 · 원장의 원본" vertex="1">
+          <mxGeometry height="370" width="370" x="1320" y="175" as="geometry" />
+        </mxCell>
+        <mxCell id="ceU27xpdp0LA_U6pvSD0-19" parent="ceU27xpdp0LA_U6pvSD0-18" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#d6b656;fontSize=14;" value="TrialEligibility · Claim · Grant&#xa;append-only Entitlement Ledger" vertex="1">
+          <mxGeometry height="75" width="320" x="25" y="80" as="geometry" />
+        </mxCell>
+        <mxCell id="ceU27xpdp0LA_U6pvSD0-20" parent="ceU27xpdp0LA_U6pvSD0-18" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#d6b656;fontSize=14;" value="Reservation&#xa;reserve · confirm · cancel · status" vertex="1">
+          <mxGeometry height="65" width="320" x="25" y="175" as="geometry" />
+        </mxCell>
+        <mxCell id="ceU27xpdp0LA_U6pvSD0-21" parent="ceU27xpdp0LA_U6pvSD0-18" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#d6b656;fontSize=14;" value="AttemptGroup · AttemptSession projection&#xa;OPEN → GRADING → terminal" vertex="1">
+          <mxGeometry height="75" width="320" x="25" y="260" as="geometry" />
+        </mxCell>
+        <mxCell id="ceU27xpdp0LA_U6pvSD0-22" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;strokeWidth=2;fontSize=16;fontStyle=1;spacing=10;" value="Python AI 채점 서버  [외부 연동]&#xa;&#xa;음성 평가 · 피드백 · 전체 요약&#xa;AI user_id = examId&#xa;실제 userId 전송 금지" vertex="1">
+          <mxGeometry height="155" width="330" x="1360" y="980" as="geometry" />
+        </mxCell>
+        <mxCell id="ceU27xpdp0LA_U6pvSD0-23" parent="1" style="shape=cylinder3;whiteSpace=wrap;html=1;boundedLbl=1;backgroundOutline=1;size=15;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=14;" value="Identity MongoDB&#xa;User · Identity · RefreshSession&#xa;Outbox" vertex="1">
+          <mxGeometry height="115" width="220" x="400" y="750" as="geometry" />
+        </mxCell>
+        <mxCell id="ceU27xpdp0LA_U6pvSD0-24" parent="1" style="shape=cylinder3;whiteSpace=wrap;html=1;boundedLbl=1;backgroundOutline=1;size=15;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=14;" value="Learning MongoDB&#xa;ExamSession · Job · Result&#xa;Operation · Outbox" vertex="1">
+          <mxGeometry height="115" width="230" x="660" y="750" as="geometry" />
+        </mxCell>
+        <mxCell id="ceU27xpdp0LA_U6pvSD0-25" parent="1" style="shape=cylinder3;whiteSpace=wrap;html=1;boundedLbl=1;backgroundOutline=1;size=15;fillColor=#f8cecc;strokeColor=#b85450;fontSize=14;" value="Redis&#xa;&#xa;기존 시험 상태 projection&#xa;Lock 흐름" vertex="1">
+          <mxGeometry height="115" width="210" x="930" y="750" as="geometry" />
+        </mxCell>
+        <mxCell id="ceU27xpdp0LA_U6pvSD0-26" parent="1" style="shape=cylinder3;whiteSpace=wrap;html=1;boundedLbl=1;backgroundOutline=1;size=15;fillColor=#ffe6cc;strokeColor=#d79b00;fontSize=14;" value="AWS S3&#xa;&#xa;Presigned PUT&#xa;사용자 음성 object" vertex="1">
+          <mxGeometry height="115" width="210" x="1180" y="750" as="geometry" />
+        </mxCell>
+        <mxCell id="ceU27xpdp0LA_U6pvSD0-27" parent="1" style="shape=cylinder3;whiteSpace=wrap;html=1;boundedLbl=1;backgroundOutline=1;size=15;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=14;" value="Billing MongoDB&#xa;Eligibility · Grant · Ledger&#xa;Reservation · AttemptGroup" vertex="1">
+          <mxGeometry height="115" width="250" x="1430" y="750" as="geometry" />
+        </mxCell>
+        <mxCell id="ceU27xpdp0LA_U6pvSD0-28" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#64748b;fontSize=14;align=left;verticalAlign=top;spacing=12;" value="범례&#xa;&#xa;실선: 현재 실행 경로&#xa;파랑 점선: 인증·키 조회&#xa;주황 점선: feature flag / 운영 gate&#xa;보라: Python AI 요청·Callback&#xa;&#xa;DB는 각 서비스가 독립 소유" vertex="1">
+          <mxGeometry height="170" width="250" x="50" y="760" as="geometry" />
+        </mxCell>
+        <mxCell id="ceU27xpdp0LA_U6pvSD0-29" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#666666;fontSize=14;" value="운영·관측&#xa;Actuator · Micrometer · structured log · Sentry sanitizer&#xa;식별자·payload·credential의 log/trace 노출 금지" vertex="1">
+          <mxGeometry height="90" width="860" x="400" y="1010" as="geometry" />
+        </mxCell>
+        <mxCell id="ceU27xpdp0LA_U6pvSD0-30" edge="1" parent="edge-layer" source="ceU27xpdp0LA_U6pvSD0-5" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#2e7d32;strokeWidth=2;endArrow=block;endFill=1;fontSize=12;labelBackgroundColor=#ffffff;exitX=1;exitY=0.4;exitDx=0;exitDy=0;entryX=0;entryY=0.25;entryDx=0;entryDy=0;" target="ceU27xpdp0LA_U6pvSD0-8" value="로그인 · 토큰 API">
+          <mxGeometry relative="1" y="-1" as="geometry">
+            <mxPoint y="-18" as="offset" />
+            <Array as="points">
+              <mxPoint x="370" y="244" />
+              <mxPoint x="370" y="267.56" />
+            </Array>
+            <mxPoint x="370" y="270" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="ceU27xpdp0LA_U6pvSD0-31" edge="1" parent="edge-layer" source="ceU27xpdp0LA_U6pvSD0-5" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#2e7d32;strokeWidth=2;endArrow=block;endFill=1;fontSize=12;labelBackgroundColor=#ffffff;exitX=1;exitY=0.12;exitDx=0;exitDy=0;entryX=0;entryY=0.12;entryDx=0;entryDy=0;" target="ceU27xpdp0LA_U6pvSD0-12" value="시험 공개 API · Access Token">
+          <mxGeometry relative="1" y="-1" as="geometry">
+            <mxPoint y="-16" as="offset" />
+            <Array as="points">
+              <mxPoint x="300" y="135" />
+              <mxPoint x="770" y="135" />
+              <mxPoint x="770" y="201.56" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="ceU27xpdp0LA_U6pvSD0-32" edge="1" parent="edge-layer" source="ceU27xpdp0LA_U6pvSD0-6" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#666666;endArrow=block;endFill=1;fontSize=12;labelBackgroundColor=#ffffff;exitX=1;exitY=0.55;exitDx=0;exitDy=0;entryX=0;entryY=0.78;entryDx=0;entryDy=0;" target="ceU27xpdp0LA_U6pvSD0-8" value="인증수단 검증·연결">
+          <mxGeometry relative="1" y="-1" as="geometry">
+            <mxPoint y="-16" as="offset" />
+            <Array as="points">
+              <mxPoint x="325" y="469" />
+              <mxPoint x="375" y="469" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="ceU27xpdp0LA_U6pvSD0-33" edge="1" parent="edge-layer" source="ceU27xpdp0LA_U6pvSD0-12" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#2563eb;strokeWidth=2;dashed=1;dashPattern=8 4;endArrow=block;endFill=1;fontSize=12;labelBackgroundColor=#ffffff;exitX=0;exitY=0.86;exitDx=0;exitDy=0;entryX=1;entryY=0.86;entryDx=0;entryDy=0;" target="ceU27xpdp0LA_U6pvSD0-8" value="JWKS · RS256 검증">
+          <mxGeometry relative="1" y="-1" as="geometry">
+            <mxPoint y="18" as="offset" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="ceU27xpdp0LA_U6pvSD0-34" edge="1" parent="edge-layer" source="ceU27xpdp0LA_U6pvSD0-8" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#d97706;strokeWidth=2;dashed=1;dashPattern=8 4;endArrow=block;endFill=1;fontSize=12;labelBackgroundColor=#ffffff;exitX=0.5;exitY=0;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;" target="ceU27xpdp0LA_U6pvSD0-18" value="Eligibility event · SigV4">
+          <mxGeometry relative="1" x="0.3" y="-1" as="geometry">
+            <mxPoint y="-14" as="offset" />
+            <Array as="points">
+              <mxPoint x="565" y="110" />
+              <mxPoint x="1505" y="110" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="ceU27xpdp0LA_U6pvSD0-35" edge="1" parent="edge-layer" source="ceU27xpdp0LA_U6pvSD0-12" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#d97706;strokeWidth=3;dashed=1;dashPattern=8 4;endArrow=block;endFill=1;fontSize=12;labelBackgroundColor=#ffffff;exitX=0.7;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=1;entryDx=0;entryDy=0;" target="ceU27xpdp0LA_U6pvSD0-18" value="Reservation · AttemptGroup event · SigV4  [조건부]">
+          <mxGeometry relative="1" y="-1" as="geometry">
+            <mxPoint y="-16" as="offset" />
+            <Array as="points">
+              <mxPoint x="1119" y="610" />
+              <mxPoint x="1505" y="610" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="ceU27xpdp0LA_U6pvSD0-36" edge="1" parent="edge-layer" source="ceU27xpdp0LA_U6pvSD0-5" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#d79b00;strokeWidth=2;endArrow=block;endFill=1;fontSize=12;labelBackgroundColor=#ffffff;" target="ceU27xpdp0LA_U6pvSD0-26" value="Presigned PUT&#xa;audio/mp4">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="325" y="900" />
+              <mxPoint x="1285" y="900" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="ceU27xpdp0LA_U6pvSD0-37" edge="1" parent="edge-layer" source="ceU27xpdp0LA_U6pvSD0-12" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#d79b00;strokeWidth=2;endArrow=block;endFill=1;startArrow=block;startFill=1;fontSize=12;labelBackgroundColor=#ffffff;exitX=0.78;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;" target="ceU27xpdp0LA_U6pvSD0-26" value="Presigned URL · 음성 다운로드">
+          <mxGeometry relative="1" y="-1" as="geometry">
+            <mxPoint y="-14" as="offset" />
+            <Array as="points">
+              <mxPoint x="1157" y="650" />
+              <mxPoint x="1285" y="650" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="ceU27xpdp0LA_U6pvSD0-38" edge="1" parent="edge-layer" source="ceU27xpdp0LA_U6pvSD0-12" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#7e57c2;strokeWidth=2;endArrow=block;endFill=1;fontSize=12;labelBackgroundColor=#ffffff;exitX=0.88;exitY=1;exitDx=0;exitDy=0;entryX=0.42;entryY=0;entryDx=0;entryDy=0;" target="ceU27xpdp0LA_U6pvSD0-22" value="AI 평가 요청">
+          <mxGeometry relative="1" x="0.55" y="-1" as="geometry">
+            <mxPoint x="18" y="-12" as="offset" />
+            <Array as="points">
+              <mxPoint x="1204" y="665" />
+              <mxPoint x="1410" y="665" />
+              <mxPoint x="1410" y="950" />
+              <mxPoint x="1499" y="950" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="ceU27xpdp0LA_U6pvSD0-39" edge="1" parent="edge-layer" source="ceU27xpdp0LA_U6pvSD0-22" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#7e57c2;strokeWidth=2;dashed=1;dashPattern=4 4;endArrow=block;endFill=1;fontSize=12;labelBackgroundColor=#ffffff;exitX=1;exitY=0.55;exitDx=0;exitDy=0;entryX=0.58;entryY=1;entryDx=0;entryDy=0;" target="ceU27xpdp0LA_U6pvSD0-12" value="Callback · 멱등/generation 검증">
+          <mxGeometry relative="1" x="0.1" y="-1" as="geometry">
+            <mxPoint y="-14" as="offset" />
+            <Array as="points">
+              <mxPoint x="1770" y="1065" />
+              <mxPoint x="1770" y="640" />
+              <mxPoint x="1063" y="640" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="ceU27xpdp0LA_U6pvSD0-40" edge="1" parent="edge-layer" source="ceU27xpdp0LA_U6pvSD0-8" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#6c8ebf;endArrow=block;endFill=1;fontSize=11;labelBackgroundColor=#ffffff;" target="ceU27xpdp0LA_U6pvSD0-23" value="read/write">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="ceU27xpdp0LA_U6pvSD0-41" edge="1" parent="edge-layer" source="ceU27xpdp0LA_U6pvSD0-12" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#82b366;endArrow=block;endFill=1;fontSize=11;labelBackgroundColor=#ffffff;" target="ceU27xpdp0LA_U6pvSD0-24" value="read/write · Transaction">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="ceU27xpdp0LA_U6pvSD0-42" edge="1" parent="edge-layer" source="ceU27xpdp0LA_U6pvSD0-12" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#b85450;endArrow=block;endFill=1;fontSize=11;labelBackgroundColor=#ffffff;" target="ceU27xpdp0LA_U6pvSD0-25" value="상태 projection · Lock">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="ceU27xpdp0LA_U6pvSD0-43" edge="1" parent="edge-layer" source="ceU27xpdp0LA_U6pvSD0-18" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#d6b656;endArrow=block;endFill=1;fontSize=11;labelBackgroundColor=#ffffff;" target="ceU27xpdp0LA_U6pvSD0-27" value="read/write · Transaction">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="ceU27xpdp0LA_U6pvSD0-44" edge="1" parent="edge-layer" source="ceU27xpdp0LA_U6pvSD0-7" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;innerLoopWaypoints=1;exitX=0.5;exitY=1;exitDx=0;exitDy=0;" target="ceU27xpdp0LA_U6pvSD0-7">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>

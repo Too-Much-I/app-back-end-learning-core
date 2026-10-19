@@ -17,6 +17,7 @@ import web.tosunsaeng.domain.exams.application.ExamReadService;
 import web.tosunsaeng.domain.exams.application.ExamService;
 import web.tosunsaeng.domain.exams.domain.repository.AzureResultRepository;
 import web.tosunsaeng.domain.exams.domain.repository.ExamResultRepository;
+import web.tosunsaeng.domain.exams.domain.repository.ExamCreationOperationRepository;
 import web.tosunsaeng.domain.exams.domain.repository.ExamSessionRepository;
 import web.tosunsaeng.domain.exams.domain.repository.ExamSummaryRepository;
 import web.tosunsaeng.domain.exams.domain.repository.MockExamRepository;
@@ -79,6 +80,9 @@ class LegacySecurityIntegrationTest {
     private ExamSessionRepository examSessionRepository;
 
     @MockitoBean
+    private ExamCreationOperationRepository examCreationOperationRepository;
+
+    @MockitoBean
     private MockExamRepository mockExamRepository;
 
     @MockitoBean
@@ -101,7 +105,7 @@ class LegacySecurityIntegrationTest {
 
     @BeforeEach
     void setUp() {
-        when(examService.createExamSession()).thenReturn(
+        when(examService.createExamSession(null)).thenReturn(
                 ExamResponseDTO.CreateSessionResult.builder()
                         .examId("ex_legacy_test")
                         .title("Legacy test exam")

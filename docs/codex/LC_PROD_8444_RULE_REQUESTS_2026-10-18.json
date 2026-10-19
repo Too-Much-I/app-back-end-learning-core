@@ -1,0 +1,25 @@
+{
+  "status": "PREPARED_NOT_APPLIED",
+  "requestsInApplyOrder": [
+    {
+      "ListenerArn": "arn:aws:elasticloadbalancing:ap-northeast-2:889384901776:listener/app/tosunsaeng-staging-alb/455925e3ff93252c/fd9dacab3823ed54",
+      "Priority": 79,
+      "Conditions": [
+        {"Field": "host-header", "HostHeaderConfig": {"Values": ["api-prod.to-teacher.com"]}},
+        {"Field": "path-pattern", "PathPatternConfig": {"Values": ["/internal/v1/entitlements/access/events"]}}
+      ],
+      "Actions": [{"Type": "fixed-response", "FixedResponseConfig": {"StatusCode": "404", "ContentType": "text/plain"}}]
+    },
+    {
+      "ListenerArn": "arn:aws:elasticloadbalancing:ap-northeast-2:889384901776:listener/app/tosunsaeng-staging-alb/455925e3ff93252c/fd9dacab3823ed54",
+      "Priority": 78,
+      "Conditions": [
+        {"Field": "host-header", "HostHeaderConfig": {"Values": ["api-prod.to-teacher.com"]}},
+        {"Field": "http-request-method", "HttpRequestMethodConfig": {"Values": ["POST"]}},
+        {"Field": "path-pattern", "PathPatternConfig": {"Values": ["/internal/v1/entitlements/access/events"]}},
+        {"Field": "source-ip", "SourceIpConfig": {"Values": ["13.124.57.130/32"]}}
+      ],
+      "Actions": [{"Type": "forward", "TargetGroupArn": "arn:aws:elasticloadbalancing:ap-northeast-2:889384901776:targetgroup/lc-prod-access-events-8444/1041faca66350508"}]
+    }
+  ]
+}

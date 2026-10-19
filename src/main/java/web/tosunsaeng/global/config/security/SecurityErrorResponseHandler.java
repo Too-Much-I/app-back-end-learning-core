@@ -59,7 +59,7 @@ public class SecurityErrorResponseHandler implements AuthenticationEntryPoint, A
         writeErrorResponse(response, ErrorStatus._FORBIDDEN);
     }
 
-    private void writeErrorResponse(HttpServletResponse response, ErrorStatus errorStatus) throws IOException {
+    public void writeErrorResponse(HttpServletResponse response, ErrorStatus errorStatus) throws IOException {
         response.setStatus(errorStatus.getHttpStatus().value());
         response.setCharacterEncoding(StandardCharsets.UTF_8.name());
         response.setContentType(MediaType.APPLICATION_JSON_VALUE);

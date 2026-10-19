@@ -33,8 +33,9 @@ import java.util.stream.Collectors;
 @Slf4j
 @Service
 @RequiredArgsConstructor
-@Transactional(readOnly = true)
 public class ExamReadService {
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    private web.tosunsaeng.domain.exams.rollout.LegacyExamRuntime legacyExamRuntime;
 
     private static final int EXAM_MAX_SCORE = 200;
     private static final Comparator<ExamSession> HISTORY_ORDER = Comparator
@@ -53,6 +54,14 @@ public class ExamReadService {
     private final ExamResultRepository examResultRepository;
     private final QuestionGradingJobRepository questionGradingJobRepository;
     private final CurrentUserProvider currentUserProvider;
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    private web.tosunsaeng.domain.learningrecorddeletion.application.DeletionAccess deletionAccess;
+
+    private boolean hidden(ExamSession session) {
+        return deletionAccess != null && deletionAccess.hidden(
+                web.tosunsaeng.domain.learningrecorddeletion.domain.DeletionTarget.Type.EXAM,
+                session.getExamId(), session.getUserId());
+    }
 
     public ExamResponseDTO.ExamHistoryResult getExamHistory() {
         String currentUserId = currentUserProvider.getCurrentUserId();
@@ -62,6 +71,7 @@ public class ExamReadService {
                 .filter(session -> session != null
                         && Objects.equals(session.getUserId(), currentUserId)
                         && session.getCompletedAt() != null)
+                .filter(session -> !hidden(session))
                 .sorted(HISTORY_ORDER)
                 .toList();
 
@@ -71,6 +81,8 @@ public class ExamReadService {
                     .histories(List.of())
                     .build();
         }
+
+        if (legacyExamRuntime != null) completedSessions.forEach(legacyExamRuntime::requireKnown);
 
         Set<String> examIds = completedSessions.stream()
                 .map(ExamSession::getExamId)
@@ -186,6 +198,11 @@ public class ExamReadService {
             );
             throw new ExamsException(ErrorStatus._FORBIDDEN);
         }
+        if (hidden(session)) throw new ExamsException(ErrorStatus._EXAM_NOT_FOUND);
+        if (session.isEntitlementConfirming()) {
+            throw new ExamsException(ErrorStatus._EXAM_CREATION_PROCESSING, 1);
+        }
+        if (legacyExamRuntime != null) legacyExamRuntime.requireKnown(session);
         return session;
     }
 

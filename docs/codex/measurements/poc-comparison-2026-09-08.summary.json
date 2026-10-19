@@ -1,0 +1,443 @@
+{
+  "source": "docs/codex/measurements/poc-comparison-2026-09-08.json",
+  "provenance": {
+    "webHead": "89c8f9d23761678e1a03328550d0f45f4d1a680f",
+    "appHead": "cb5f6ee0aa48c8c3b4288d01f91eeaea9d03578c",
+    "webStatus": "",
+    "appJavaSource": {
+      "files": 212,
+      "sha256": "192e9e75a4a09e4f3f7e906ba8cc2794994b79a862443aacd9acdbbc0c42bcc7"
+    },
+    "webJavaSource": {
+      "files": 174,
+      "sha256": "62062da4215137cd9b66a65bc6d87a5645ceed75f4951bf9dae284aa4b09b0a9"
+    },
+    "sourceHashTiming": "After run. App working tree contains pre-existing uncommitted changes; hashes identify observed source, not an immutable saved snapshot.",
+    "sharedDependencies": "Both variants compiled and run against app testRuntimeClasspath; product bootstrap/config/security not loaded.",
+    "platform": "darwin",
+    "arch": "arm64",
+    "node": "v26.5.0"
+  },
+  "summary": [
+    {
+      "key": "normal/1/web",
+      "offered": 24,
+      "complete": 24,
+      "failed": 0,
+      "premature": 0,
+      "aiCalls": 264,
+      "summaryCalls": 24,
+      "callbackErrors": 0,
+      "httpErrors": 0,
+      "submitP95Ms": {
+        "median": 61.94429200000013,
+        "min": 61.68879200000083,
+        "max": 62.09083400000236
+      },
+      "completionP95Ms": {
+        "median": 1176.1456670000043,
+        "min": 1172.2077080000017,
+        "max": 1176.550459
+      },
+      "pollP95Ms": {
+        "median": 6.742166000010911,
+        "min": 6.292500000010477,
+        "max": 6.957875000000058
+      },
+      "busyMean": {
+        "median": 0.6910377358490566,
+        "min": 0.6792452830188679,
+        "max": 0.7004716981132075
+      },
+      "busyP95": {
+        "median": 2,
+        "min": 2,
+        "max": 2
+      },
+      "observedCompletedPerMinuteIncludingDrain": {
+        "median": 56.647135136508915,
+        "min": 56.636119788638226,
+        "max": 56.657473464761296
+      },
+      "maxGeneratorLagMs": 1.2348339999998643
+    },
+    {
+      "key": "normal/5/web",
+      "offered": 120,
+      "complete": 120,
+      "failed": 0,
+      "premature": 0,
+      "aiCalls": 1320,
+      "summaryCalls": 120,
+      "callbackErrors": 0,
+      "httpErrors": 0,
+      "submitP95Ms": {
+        "median": 57.222042000008514,
+        "min": 57.01004200000898,
+        "max": 57.4576670000024
+      },
+      "completionP95Ms": {
+        "median": 1158.662249999994,
+        "min": 1158.6491249999963,
+        "max": 1159.5624580000003
+      },
+      "pollP95Ms": {
+        "median": 3.8317910000041593,
+        "min": 3.8015420000010636,
+        "max": 4.071583999990253
+      },
+      "busyMean": {
+        "median": 2.793103448275862,
+        "min": 2.7300215982721383,
+        "max": 2.8060344827586206
+      },
+      "busyP95": {
+        "median": 5,
+        "min": 5,
+        "max": 5
+      },
+      "observedCompletedPerMinuteIncludingDrain": {
+        "median": 258.97253741880354,
+        "min": 258.89137249746955,
+        "max": 259.12443492831653
+      },
+      "maxGeneratorLagMs": 1.3323329999984708
+    },
+    {
+      "key": "normal/15/web",
+      "offered": 360,
+      "complete": 360,
+      "failed": 0,
+      "premature": 0,
+      "aiCalls": 3960,
+      "summaryCalls": 360,
+      "callbackErrors": 0,
+      "httpErrors": 0,
+      "submitP95Ms": {
+        "median": 55.16229200000089,
+        "min": 54.941791999997804,
+        "max": 55.260166000021854
+      },
+      "completionP95Ms": {
+        "median": 1148.3982083333249,
+        "min": 1148.341207999998,
+        "max": 1149.8052080000052
+      },
+      "pollP95Ms": {
+        "median": 2.7809999999881256,
+        "min": 2.6505830000096466,
+        "max": 2.8809170000022277
+      },
+      "busyMean": {
+        "median": 7.816631130063966,
+        "min": 7.782515991471215,
+        "max": 7.872068230277185
+      },
+      "busyP95": {
+        "median": 10,
+        "min": 10,
+        "max": 11
+      },
+      "observedCompletedPerMinuteIncludingDrain": {
+        "median": 766.9361300878467,
+        "min": 766.8710567656033,
+        "max": 767.3210879699109
+      },
+      "maxGeneratorLagMs": 1.3297500000007858
+    },
+    {
+      "key": "duplicate/5/web",
+      "offered": 120,
+      "complete": 120,
+      "failed": 0,
+      "premature": 0,
+      "aiCalls": 2640,
+      "summaryCalls": 240,
+      "callbackErrors": 0,
+      "httpErrors": 0,
+      "submitP95Ms": {
+        "median": 56.63091700000223,
+        "min": 56.553665999999794,
+        "max": 56.725875000003725
+      },
+      "completionP95Ms": {
+        "median": 1158.5050830000037,
+        "min": 1157.20220900001,
+        "max": 1158.5144999999902
+      },
+      "pollP95Ms": {
+        "median": 3.392416000002413,
+        "min": 3.2569170000206213,
+        "max": 3.446916999993846
+      },
+      "busyMean": {
+        "median": 5.3498920086393085,
+        "min": 5.327586206896552,
+        "max": 5.406047516198704
+      },
+      "busyP95": {
+        "median": 8,
+        "min": 8,
+        "max": 10
+      },
+      "observedCompletedPerMinuteIncludingDrain": {
+        "median": 259.1235489748095,
+        "min": 259.086446176722,
+        "max": 259.15486494083444
+      },
+      "maxGeneratorLagMs": 1.327000000004773
+    },
+    {
+      "key": "reordered/1/web",
+      "offered": 12,
+      "complete": 12,
+      "failed": 0,
+      "premature": 12,
+      "aiCalls": 132,
+      "summaryCalls": 12,
+      "callbackErrors": 0,
+      "httpErrors": 0,
+      "submitP95Ms": {
+        "median": 58.63233300000138,
+        "min": 58.42079200001899,
+        "max": 58.71741700000712
+      },
+      "completionP95Ms": {
+        "median": 2633.815999999999,
+        "min": 2629.7708750000165,
+        "max": 2637.667167000007
+      },
+      "pollP95Ms": {
+        "median": 4.229374999995343,
+        "min": 4.03366700001061,
+        "max": 4.33145799999329
+      },
+      "busyMean": {
+        "median": 0.48484848484848486,
+        "min": 0.48148148148148145,
+        "max": 0.4983164983164983
+      },
+      "busyP95": {
+        "median": 2,
+        "min": 2,
+        "max": 2
+      },
+      "observedCompletedPerMinuteIncludingDrain": {
+        "median": 40.43902401990633,
+        "min": 40.41203436706748,
+        "max": 40.464079431497645
+      },
+      "maxGeneratorLagMs": 1.230875000008382
+    },
+    {
+      "key": "normal/1/app",
+      "offered": 24,
+      "complete": 24,
+      "failed": 0,
+      "premature": 0,
+      "aiCalls": 264,
+      "summaryCalls": 24,
+      "callbackErrors": 0,
+      "httpErrors": 0,
+      "submitP95Ms": {
+        "median": 71.72229199996218,
+        "min": 71.31783300000097,
+        "max": 75.28462500000023
+      },
+      "completionP95Ms": {
+        "median": 1213.6502920000057,
+        "min": 1211.0681660000118,
+        "max": 1216.674457999994
+      },
+      "pollP95Ms": {
+        "median": 19.005666999990353,
+        "min": 18.78441700001713,
+        "max": 19.443500000001222
+      },
+      "busyMean": {
+        "median": 0.8967136150234741,
+        "min": 0.892018779342723,
+        "max": 0.9154929577464789
+      },
+      "busyP95": {
+        "median": 3,
+        "min": 2,
+        "max": 3
+      },
+      "observedCompletedPerMinuteIncludingDrain": {
+        "median": 56.37580227244403,
+        "min": 56.35231908406322,
+        "max": 56.39384506268005
+      },
+      "maxGeneratorLagMs": 1.2371659999989788
+    },
+    {
+      "key": "normal/5/app",
+      "offered": 120,
+      "complete": 120,
+      "failed": 0,
+      "premature": 0,
+      "aiCalls": 1320,
+      "summaryCalls": 120,
+      "callbackErrors": 0,
+      "httpErrors": 0,
+      "submitP95Ms": {
+        "median": 63.18795799999498,
+        "min": 63.179457999998704,
+        "max": 64.39262500000768
+      },
+      "completionP95Ms": {
+        "median": 1167.343916999991,
+        "min": 1166.7816250000033,
+        "max": 1167.808917000002
+      },
+      "pollP95Ms": {
+        "median": 6.205749999993714,
+        "min": 5.907124999968801,
+        "max": 6.222000000008848
+      },
+      "busyMean": {
+        "median": 3.3211206896551726,
+        "min": 3.206896551724138,
+        "max": 3.372844827586207
+      },
+      "busyP95": {
+        "median": 5,
+        "min": 5,
+        "max": 5
+      },
+      "observedCompletedPerMinuteIncludingDrain": {
+        "median": 258.6378009425646,
+        "min": 258.481809078227,
+        "max": 258.65150207279515
+      },
+      "maxGeneratorLagMs": 1.2159169999649748
+    },
+    {
+      "key": "normal/15/app",
+      "offered": 360,
+      "complete": 360,
+      "failed": 0,
+      "premature": 0,
+      "aiCalls": 3960,
+      "summaryCalls": 360,
+      "callbackErrors": 0,
+      "httpErrors": 0,
+      "submitP95Ms": {
+        "median": 61.43275000000722,
+        "min": 61.13400000002002,
+        "max": 61.76387500000419
+      },
+      "completionP95Ms": {
+        "median": 1163.3686659999948,
+        "min": 1163.045333333328,
+        "max": 1163.6985003332957
+      },
+      "pollP95Ms": {
+        "median": 6.286790999991354,
+        "min": 6.0686250000144355,
+        "max": 6.3188329999975394
+      },
+      "busyMean": {
+        "median": 9.408510638297873,
+        "min": 9.282978723404256,
+        "max": 9.504255319148935
+      },
+      "busyP95": {
+        "median": 13,
+        "min": 12,
+        "max": 13
+      },
+      "observedCompletedPerMinuteIncludingDrain": {
+        "median": 765.9451394553404,
+        "min": 765.6507114132422,
+        "max": 766.0621691369538
+      },
+      "maxGeneratorLagMs": 1.2486250000074506
+    },
+    {
+      "key": "duplicate/5/app",
+      "offered": 120,
+      "complete": 120,
+      "failed": 0,
+      "premature": 0,
+      "aiCalls": 1320,
+      "summaryCalls": 120,
+      "callbackErrors": 0,
+      "httpErrors": 0,
+      "submitP95Ms": {
+        "median": 61.09279200001038,
+        "min": 61.08795800001826,
+        "max": 61.416958000001614
+      },
+      "completionP95Ms": {
+        "median": 1164.0378340000025,
+        "min": 1161.6539579999808,
+        "max": 1164.214917000034
+      },
+      "pollP95Ms": {
+        "median": 5.539208999995026,
+        "min": 5.398832999984734,
+        "max": 5.663582999986829
+      },
+      "busyMean": {
+        "median": 3.5668103448275863,
+        "min": 3.2370689655172415,
+        "max": 3.5926724137931036
+      },
+      "busyP95": {
+        "median": 5,
+        "min": 5,
+        "max": 6
+      },
+      "observedCompletedPerMinuteIncludingDrain": {
+        "median": 258.6773496393946,
+        "min": 258.6041402442042,
+        "max": 258.79229990469156
+      },
+      "maxGeneratorLagMs": 1.2275839999929303
+    },
+    {
+      "key": "reordered/1/app",
+      "offered": 12,
+      "complete": 12,
+      "failed": 0,
+      "premature": 0,
+      "aiCalls": 132,
+      "summaryCalls": 12,
+      "callbackErrors": 0,
+      "httpErrors": 0,
+      "submitP95Ms": {
+        "median": 72.9699580000015,
+        "min": 69.88937499996973,
+        "max": 73.31054200002109
+      },
+      "completionP95Ms": {
+        "median": 2884.876457999999,
+        "min": 2883.996958999982,
+        "max": 2889.873957999982
+      },
+      "pollP95Ms": {
+        "median": 12.863041999997222,
+        "min": 12.717624999990221,
+        "max": 13.855417000013404
+      },
+      "busyMean": {
+        "median": 0.6245954692556634,
+        "min": 0.6019417475728155,
+        "max": 0.6763754045307443
+      },
+      "busyP95": {
+        "median": 2,
+        "min": 2,
+        "max": 2
+      },
+      "observedCompletedPerMinuteIncludingDrain": {
+        "median": 38.8023953236646,
+        "min": 38.76314450618885,
+        "max": 38.85886595696166
+      },
+      "maxGeneratorLagMs": 1.2258750000037253
+    }
+  ]
+}

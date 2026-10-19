@@ -22,6 +22,7 @@ import web.tosunsaeng.global.error.code.status.BaseErrorCode;
 import web.tosunsaeng.global.error.code.status.ErrorReasonDTO;
 import web.tosunsaeng.global.error.code.status.ErrorStatus;
 import web.tosunsaeng.global.sentry.UnexpectedExceptionReporter;
+import web.tosunsaeng.domain.exams.exception.ExamsException;
 
 import java.util.LinkedHashMap;
 import java.util.Map;
@@ -167,7 +168,12 @@ public class GlobalExceptionAdvice extends ResponseEntityExceptionHandler {
                 request.getRequestURI(),
                 generalException.getClass().getName()
         );
-        return handleExceptionInternal(generalException, generalException.getCode(), null, request);
+        HttpHeaders headers = new HttpHeaders();
+        if (generalException instanceof ExamsException examsException
+                && examsException.getRetryAfterSeconds() != null) {
+            headers.set(HttpHeaders.RETRY_AFTER, examsException.getRetryAfterSeconds().toString());
+        }
+        return handleExceptionInternal(generalException, generalException.getCode(), headers, request);
     }
 
     private void logRequestRejected(Exception exception, BaseErrorCode code, WebRequest request) {

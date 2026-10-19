@@ -2,6 +2,7 @@ package web.tosunsaeng.domain.exams.application;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.dao.DuplicateKeyException;
 import org.springframework.stereotype.Service;
 import web.tosunsaeng.domain.exams.domain.entity.ExamSession;
@@ -9,6 +10,11 @@ import web.tosunsaeng.domain.exams.domain.entity.MockExam;
 import web.tosunsaeng.domain.exams.domain.enums.ExamSessionStatus;
 import web.tosunsaeng.domain.exams.domain.repository.ExamSessionCompletionQuery;
 import web.tosunsaeng.domain.exams.domain.repository.ExamSessionRepository;
+import web.tosunsaeng.domain.exams.exception.ExamsException;
+import web.tosunsaeng.domain.usermerge.application.UserOwnedTransactionExecutor;
+import web.tosunsaeng.domain.usermerge.application.UserOwnershipGuardException;
+import web.tosunsaeng.domain.learningrecorddeletion.infrastructure.DeletedExamContinuationStore;
+import web.tosunsaeng.global.error.code.status.ErrorStatus;
 
 import java.time.Clock;
 import java.time.LocalDateTime;
@@ -19,11 +25,18 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import java.util.function.Supplier;
 
 @Slf4j
 @Service
 @RequiredArgsConstructor
 public class ExamSessionManager {
+    @Autowired(required = false)
+    private web.tosunsaeng.domain.exams.rollout.LegacyExamWriterGuard legacyWriterGuard;
+
+    private void requireLegacyWriterAllowed() {
+        if (legacyWriterGuard != null) legacyWriterGuard.requireAllowed();
+    }
 
     private static final DateTimeFormatter EXAM_ID_TIME_FORMAT = DateTimeFormatter.ofPattern("MMdd_HHmm");
     private static final int CREATE_ATTEMPTS = 3;
@@ -34,30 +47,103 @@ public class ExamSessionManager {
     private final MockExamCatalogService mockExamCatalogService;
     private final Clock clock;
 
-    public Assignment startNew(String userId) {
-        return startNew(userId, 1);
+    @Autowired(required = false)
+    private UserOwnedTransactionExecutor userOwnedTransactionExecutor;
+
+    @Autowired(required = false)
+    private DeletedExamContinuationStore deletedExamContinuations;
+
+    public boolean hasDeletedBillingContinuation(String userId) {
+        return deletedExamContinuations != null && deletedExamContinuations.findAvailable(userId).isPresent();
     }
 
-    private Assignment startNew(String userId, int attempt) {
+    public Assignment startNew(String userId) {
+        return inUserOwnedTransaction(userId, () -> startNewAttempt(userId, 1));
+    }
+
+    public PreparedAssignment prepareForBilling(String userId) {
+        return inUserOwnedTransaction(userId, () -> prepareForBillingInTransaction(userId));
+    }
+
+    private PreparedAssignment prepareForBillingInTransaction(String userId) {
+        requireLegacyWriterAllowed();
+        List<ExamSession> activeSessions = findInProgressSessions(userId);
+        ExamSession replacement = activeSessions.stream()
+                .filter(candidate -> candidate.getAttemptGroupId() != null
+                        && !candidate.getAttemptGroupId().isBlank())
+                .findFirst()
+                .orElse(null);
+
+        if (replacement == null) {
+            replacement = examSessionRepository.findLatestRetakeAvailableByUserId(userId)
+                    .orElse(null);
+        }
+
+        var deletedSource = deletedExamContinuations == null ? null
+                : deletedExamContinuations.findAvailable(userId).orElse(null);
+        if (deletedSource != null) {
+            // Coexisting untransferred evidence and a current source must be reconciled, not charged anew.
+            if (replacement != null || !activeSessions.isEmpty()) {
+                throw new IllegalStateException("Current Session conflicts with deleted continuation evidence");
+            }
+            MockExam mockExam = mockExamCatalogService.getRequiredExam(deletedSource.getMockExamId());
+            LocalDateTime now = LocalDateTime.ofInstant(clock.instant(), clock.getZone());
+            return new PreparedAssignment(newExamId(now), mockExam, deletedSource.getCycleNumber(), now,
+                    deletedSource.getSourceExamId(), deletedSource.getAttemptGroupId(), deletedSource.getMockExamId());
+        }
+
+        if (replacement != null) {
+            String mockExamId = GradingKeys.effectiveMockExamId(replacement.getMockExamId());
+            MockExam mockExam = mockExamCatalogService.getRequiredExam(mockExamId);
+            int cycleNumber = replacement.getCycleNumber() == null
+                    ? Math.toIntExact(completionCounts(userId).getOrDefault(mockExamId, 0L) + 1)
+                    : replacement.getCycleNumber();
+            LocalDateTime now = LocalDateTime.ofInstant(clock.instant(), clock.getZone());
+            return new PreparedAssignment(
+                    newExamId(now), mockExam, cycleNumber, now,
+                    replacement.getExamId(), replacement.getAttemptGroupId(), mockExamId);
+        }
+
+        SelectedExam selected = selectExam(userId);
+        LocalDateTime now = LocalDateTime.ofInstant(clock.instant(), clock.getZone());
+        return new PreparedAssignment(
+                newExamId(now),
+                selected.mockExam(),
+                Math.toIntExact(selected.completionCount() + 1),
+                now,
+                null,
+                null,
+                null
+        );
+    }
+
+    public PreparedAssignment preparePhoneReplacement(
+            String expectedAttemptGroupId,
+            String expectedMockExamId
+    ) {
+        requireLegacyWriterAllowed();
+        MockExam mockExam = mockExamCatalogService.getRequiredExam(expectedMockExamId);
+        LocalDateTime now = LocalDateTime.ofInstant(clock.instant(), clock.getZone());
+        return new PreparedAssignment(
+                newExamId(now), mockExam, 1, now,
+                null, expectedAttemptGroupId, expectedMockExamId
+        );
+    }
+
+    private Assignment startNewAttempt(String userId, int attempt) {
+        requireLegacyWriterAllowed();
+        if (deletedExamContinuations != null && deletedExamContinuations.findAvailable(userId).isPresent())
+            throw web.tosunsaeng.domain.learningrecorddeletion.application.DeletionFailure.temporary();
         List<String> abandonedExamIds = abandonInProgressSessions(userId);
 
-        List<MockExamCatalogService.CatalogExam> catalog = mockExamCatalogService.findAssignableExams();
-        Map<String, Long> completionCounts = completionCounts(userId);
-        MockExamCatalogService.CatalogExam selected = catalog.stream()
-                .min(Comparator
-                        .comparingLong((MockExamCatalogService.CatalogExam candidate) ->
-                                completionCounts.getOrDefault(candidate.mockExam().getMockExamId(), 0L))
-                        .thenComparingInt(MockExamCatalogService.CatalogExam::sequence))
-                .orElseThrow();
-
-        long completionCount = completionCounts.getOrDefault(selected.mockExam().getMockExamId(), 0L);
+        SelectedExam selected = selectExam(userId);
         LocalDateTime now = LocalDateTime.ofInstant(clock.instant(), clock.getZone());
         ExamSession newSession = ExamSession.builder()
                 .examId(newExamId(now))
                 .userId(userId)
                 .createdAt(now)
                 .mockExamId(selected.mockExam().getMockExamId())
-                .cycleNumber(Math.toIntExact(completionCount + 1))
+                .cycleNumber(Math.toIntExact(selected.completionCount() + 1))
                 .active(true)
                 .status(ExamSessionStatus.IN_PROGRESS)
                 .completedAt(null)
@@ -85,14 +171,29 @@ public class ExamSessionManager {
                     attempt,
                     attempt < CREATE_ATTEMPTS ? attempt + 1 : null
             );
+            if (userOwnedTransactionExecutor != null && userOwnedTransactionExecutor.enabled()) {
+                throw concurrentCreation;
+            }
             if (attempt < CREATE_ATTEMPTS) {
-                return startNew(userId, attempt + 1);
+                return startNewAttempt(userId, attempt + 1);
             }
             throw concurrentCreation;
         }
     }
 
     public boolean completeIfIncomplete(String examId) {
+        if (userOwnedTransactionExecutor == null || !userOwnedTransactionExecutor.enabled()) {
+            return completeIfIncompleteInTransaction(examId);
+        }
+        ExamSession session = examSessionRepository.findById(examId)
+                .orElseThrow(() -> new ExamsException(ErrorStatus._EXAM_NOT_FOUND));
+        return inUserOwnedTransaction(
+                session.getUserId(),
+                () -> completeIfIncompleteInTransaction(examId)
+        );
+    }
+
+    private boolean completeIfIncompleteInTransaction(String examId) {
         LocalDateTime completedAt = LocalDateTime.ofInstant(clock.instant(), clock.getZone());
         boolean completed = examSessionRepository.completeIfIncomplete(examId, completedAt) == 1;
         if (completed) {
@@ -106,6 +207,17 @@ public class ExamSessionManager {
             log.debug("시험 세션 완료 전환 생략 event=exam.session.completed outcome=noop examId={}", examId);
         }
         return completed;
+    }
+
+    private <T> T inUserOwnedTransaction(String userId, Supplier<T> command) {
+        if (userOwnedTransactionExecutor == null) {
+            return command.get();
+        }
+        try {
+            return userOwnedTransactionExecutor.execute(userId, command);
+        } catch (UserOwnershipGuardException merged) {
+            throw new ExamsException(ErrorStatus._ACCOUNT_MERGED_TOKEN_REJECTED);
+        }
     }
 
     private List<String> abandonInProgressSessions(String userId) {
@@ -124,7 +236,7 @@ public class ExamSessionManager {
         return List.copyOf(abandonedExamIds);
     }
 
-    private List<ExamSession> findInProgressSessions(String userId) {
+    public List<ExamSession> findInProgressSessions(String userId) {
         List<ExamSession> candidates = examSessionRepository.findActiveOrLegacyCandidatesByUserId(userId);
         if (candidates == null || candidates.isEmpty()) {
             return List.of();
@@ -133,7 +245,8 @@ public class ExamSessionManager {
         List<ExamSession> reusable = new ArrayList<>();
         for (ExamSession candidate : candidates) {
             if (candidate.getStatus() != null) {
-                if (candidate.isInProgress() && candidate.getCompletedAt() == null) {
+                if ((candidate.isInProgress() || candidate.isEntitlementConfirming())
+                        && candidate.getCompletedAt() == null) {
                     reusable.add(candidate);
                 }
                 continue;
@@ -208,11 +321,48 @@ public class ExamSessionManager {
         return counts;
     }
 
+    private SelectedExam selectExam(String userId) {
+        List<MockExamCatalogService.CatalogExam> catalog = mockExamCatalogService.findAssignableExams();
+        Map<String, Long> completionCounts = completionCounts(userId);
+        MockExamCatalogService.CatalogExam selected = catalog.stream()
+                .min(Comparator
+                        .comparingLong((MockExamCatalogService.CatalogExam candidate) ->
+                                completionCounts.getOrDefault(candidate.mockExam().getMockExamId(), 0L))
+                        .thenComparingInt(MockExamCatalogService.CatalogExam::sequence))
+                .orElseThrow();
+        return new SelectedExam(
+                selected.mockExam(),
+                completionCounts.getOrDefault(selected.mockExam().getMockExamId(), 0L)
+        );
+    }
+
     private static String newExamId(LocalDateTime now) {
         String uuidPart = UUID.randomUUID().toString().replace("-", "").substring(0, 10);
         return "ex_" + uuidPart + "_" + now.format(EXAM_ID_TIME_FORMAT);
     }
 
     public record Assignment(ExamSession session, MockExam mockExam, boolean created) {
+    }
+
+    public record PreparedAssignment(
+            String sessionId,
+            MockExam mockExam,
+            Integer cycleNumber,
+            LocalDateTime preparedAt,
+            String replacementSourceSessionId,
+            String expectedAttemptGroupId,
+            String expectedMockExamId
+    ) {
+        public PreparedAssignment(
+                String sessionId,
+                MockExam mockExam,
+                Integer cycleNumber,
+                LocalDateTime preparedAt
+        ) {
+            this(sessionId, mockExam, cycleNumber, preparedAt, null, null, null);
+        }
+    }
+
+    private record SelectedExam(MockExam mockExam, long completionCount) {
     }
 }

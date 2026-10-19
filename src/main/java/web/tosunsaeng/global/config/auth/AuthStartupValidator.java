@@ -10,13 +10,13 @@ import web.tosunsaeng.global.auth.LegacyCurrentUserProvider;
 
 import java.net.URI;
 import java.net.URISyntaxException;
+import java.time.Duration;
 import java.util.Locale;
 import java.util.Set;
 
 public class AuthStartupValidator implements InitializingBean, SmartInitializingSingleton {
 
     private static final Profiles LOCAL_OR_TEST = Profiles.of("local", "test");
-    private static final Profiles STAGING_OR_PROD = Profiles.of("staging", "prod");
     private static final Set<String> LOCAL_HOSTS = Set.of("localhost", "0.0.0.0", "::1", "[::1]");
     private static final Set<String> AUDIENCE_PLACEHOLDERS = Set.of(
             "change-me",
@@ -43,7 +43,7 @@ public class AuthStartupValidator implements InitializingBean, SmartInitializing
     public void afterPropertiesSet() {
         validateRawAuthMode();
 
-        boolean restrictedProfile = environment.acceptsProfiles(STAGING_OR_PROD);
+        boolean restrictedProfile = web.tosunsaeng.global.config.DeploymentEnvironment.restricted(environment);
         if (authProperties.getMode() == AuthMode.LEGACY) {
             if (restrictedProfile) {
                 throw new IllegalStateException("staging and prod profiles require jwt authentication mode");
@@ -65,6 +65,7 @@ public class AuthStartupValidator implements InitializingBean, SmartInitializing
                 "JWT JWKS URL must be a non-empty HTTP(S) URI"
         );
         requireAudience(identity.getAudience(), restrictedProfile);
+        requireNonNegative(identity.getClockSkew(), "JWT clock skew must be non-negative");
 
         if (restrictedProfile && isLocalHost(issuer)) {
             throw new IllegalStateException("staging and prod profiles cannot use a local Identity issuer");
@@ -76,7 +77,7 @@ public class AuthStartupValidator implements InitializingBean, SmartInitializing
 
     @Override
     public void afterSingletonsInstantiated() {
-        if (!environment.acceptsProfiles(STAGING_OR_PROD)) {
+        if (!web.tosunsaeng.global.config.DeploymentEnvironment.restricted(environment)) {
             return;
         }
 
@@ -124,6 +125,12 @@ public class AuthStartupValidator implements InitializingBean, SmartInitializing
         if (restrictedProfile
                 && AUDIENCE_PLACEHOLDERS.contains(audience.toLowerCase(Locale.ROOT))) {
             throw new IllegalStateException("staging and prod profiles require a non-placeholder JWT audience");
+        }
+    }
+
+    private void requireNonNegative(Duration value, String errorMessage) {
+        if (value == null || value.isNegative()) {
+            throw new IllegalStateException(errorMessage);
         }
     }
 

@@ -3,19 +3,14 @@ package web.tosunsaeng.global.config;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.context.annotation.Import;
 import org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor;
 import web.tosunsaeng.global.logging.MdcTaskDecorator;
 
-import java.time.Clock;
-
 @Configuration
+@Import(ClockConfiguration.class)
 @EnableConfigurationProperties(GradingProperties.class)
 public class GradingConfig {
-
-    @Bean
-    public Clock gradingClock() {
-        return Clock.systemUTC();
-    }
 
     @Bean(name = "summaryDispatchExecutor")
     public ThreadPoolTaskExecutor summaryDispatchExecutor(GradingProperties properties) {

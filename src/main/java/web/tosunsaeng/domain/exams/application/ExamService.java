@@ -7,7 +7,13 @@ import java.util.Map;
 
 public interface ExamService {
 
-    ExamResponseDTO.CreateSessionResult createExamSession();
+    ExamResponseDTO.CreateSessionResult createExamSession(String idempotencyKey);
+
+    ExamResponseDTO.CreateSessionResult createPaidExamSession(String idempotencyKey);
+
+    default ExamResponseDTO.CreateSessionResult createExamSession() {
+        return createExamSession(null);
+    }
 
     ExamResponseDTO.QuestionDTO getQuestionPrompt(String examId, Integer questionNumber);
 

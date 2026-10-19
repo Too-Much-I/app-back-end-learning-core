@@ -1,0 +1,142 @@
+[
+  {
+    "id": "E01",
+    "requirement": "MEMBER pending 내부503/4-field/true/Retry-After1 → 공개 기존503, 신규 소비0",
+    "execution": "NOT_EXECUTED_REQUIRES_IMPLEMENTATION"
+  },
+  {
+    "id": "E02",
+    "requirement": "아래 E02-a~h 대기 영속/재개·유실/cleanup 경합 검증, worker reserve 호출0",
+    "execution": "NOT_EXECUTED_REQUIRES_IMPLEMENTATION"
+  },
+  {
+    "id": "E02-a",
+    "requirement": "최초 pending commit·LC 대기 저장·앱 보강 후 same-key 성공/동일 Session·stable ref",
+    "execution": "NOT_EXECUTED_REQUIRES_IMPLEMENTATION"
+  },
+  {
+    "id": "E02-b",
+    "requirement": "최초 pending 응답 유실→status pending으로 LC 대기 복구, OPERATION_NOT_FOUND를 대기로 오인하지 않음",
+    "execution": "NOT_EXECUTED_REQUIRES_IMPLEMENTATION"
+  },
+  {
+    "id": "E02-c",
+    "requirement": "보강 전/후 status는 기록된 대기 반환, status에서 reserve/원장 생성0",
+    "execution": "NOT_EXECUTED_REQUIRES_IMPLEMENTATION"
+  },
+  {
+    "id": "E02-d",
+    "requirement": "HTTP 재개/worker cleanup CAS 양순서·lease 만료·stale version 쓰기 거절",
+    "execution": "NOT_EXECUTED_REQUIRES_IMPLEMENTATION"
+  },
+  {
+    "id": "E02-e",
+    "requirement": "안전한 PREPARED cleanup만 대기로 복원; 신규 pending Session/예약/cancel unknown 있으면 해제0",
+    "execution": "NOT_EXECUTED_REQUIRES_IMPLEMENTATION"
+  },
+  {
+    "id": "E02-f",
+    "requirement": "owner/탈퇴/삭제/auth 차단·불명 격리는 보강 성공만으로 해제0. NEEDS_REVIEW+retry_exhausted만 있으면 해제0; 동일 MEMBER 대기→소진 영속 원인과 현재 안전 조건이 모두 있으면 제한적 재개; 원인 혼재/이력 누락은 운영 확인",
+    "execution": "NOT_EXECUTED_REQUIRES_IMPLEMENTATION"
+  },
+  {
+    "id": "E02-g",
+    "requirement": "재개 reserve 성공 응답 유실·unknown commit→status 권위 결과 복구, 대기 덮어쓰기0",
+    "execution": "NOT_EXECUTED_REQUIRES_IMPLEMENTATION"
+  },
+  {
+    "id": "E02-h",
+    "requirement": "대기120일 상한·waitingSince 고정·일반 재시도격리 유지·처리중 TTL삭제0",
+    "execution": "NOT_EXECUTED_REQUIRES_IMPLEMENTATION"
+  },
+  {
+    "id": "E03",
+    "requirement": "WITHDRAWN 선행/늦은 MEMBER 증거는 부활0, JWT 원문 저장0",
+    "execution": "NOT_EXECUTED_REQUIRES_IMPLEMENTATION"
+  },
+  {
+    "id": "E04",
+    "requirement": "생성 중 삭제409·실행가능 deletion row0, 일반 응시 Session 삭제 가능",
+    "execution": "NOT_EXECUTED_REQUIRES_IMPLEMENTATION"
+  },
+  {
+    "id": "E05",
+    "requirement": "삭제 완료 뒤 과거 성공 key404 EXAM_4004/result 생략, 금융 성공 보존·Session 재생성0",
+    "execution": "NOT_EXECUTED_REQUIRES_IMPLEMENTATION"
+  },
+  {
+    "id": "E06",
+    "requirement": "J3 strict route/HTTP/code/retryable/4-field와 owner-blocked 기존 회귀 유지",
+    "execution": "NOT_EXECUTED_REQUIRES_IMPLEMENTATION"
+  },
+  {
+    "id": "T01",
+    "requirement": "firstAcceptedAt+D−1ms/정각/+1ms 보장 창 true/false/false",
+    "execution": "NOT_EXECUTED_REQUIRES_IMPLEMENTATION"
+  },
+  {
+    "id": "T02",
+    "requirement": "재전송/lease/로그인/clock 변경이 firstAcceptedAt를 갱신하지 않음",
+    "execution": "NOT_EXECUTED_REQUIRES_IMPLEMENTATION"
+  },
+  {
+    "id": "T03",
+    "requirement": "terminalAt+D 상세정리 경계·최소 근거 유지·unresolved 자동 삭제0",
+    "execution": "NOT_EXECUTED_REQUIRES_IMPLEMENTATION"
+  },
+  {
+    "id": "T04",
+    "requirement": "원 operation7일 cache 삭제 후120일 내 receipt replay, 다른 payload conflict",
+    "execution": "NOT_EXECUTED_REQUIRES_IMPLEMENTATION"
+  },
+  {
+    "id": "T05",
+    "requirement": "120일 이후 모든 key 전용 근거 폐기 뒤 같은 UUID가 새 요청일 수 있음(승인 위험). 남은 소비/복원 unique는 유지",
+    "execution": "NOT_EXECUTED_REQUIRES_IMPLEMENTATION"
+  },
+  {
+    "id": "T06",
+    "requirement": "backup 원 시각 보존·만료/deny 적용,24시간/200회 조기격리 유지",
+    "execution": "NOT_EXECUTED_REQUIRES_IMPLEMENTATION"
+  },
+  {
+    "id": "P01",
+    "requirement": "phone paid INITIAL/새group/echo/transition없음·status 동일 snapshot",
+    "execution": "NOT_EXECUTED_REQUIRES_IMPLEMENTATION"
+  },
+  {
+    "id": "P02",
+    "requirement": "phone free REPLACEMENT/원group·paid 불명 fallback0",
+    "execution": "NOT_EXECUTED_REQUIRES_IMPLEMENTATION"
+  },
+  {
+    "id": "P03",
+    "requirement": "discovery pending/204/원group완료·paid 신규생김/만료·revoke 조합",
+    "execution": "NOT_EXECUTED_REQUIRES_IMPLEMENTATION"
+  },
+  {
+    "id": "P04",
+    "requirement": "sourceA→targetB, C당 B복원1회·A기지급시0·반복재가입0",
+    "execution": "NOT_EXECUTED_REQUIRES_IMPLEMENTATION"
+  },
+  {
+    "id": "P05",
+    "requirement": "새 INITIAL에 구group 강제/echo유실/transition추가/다른mock/source 변조 거절",
+    "execution": "NOT_EXECUTED_REQUIRES_IMPLEMENTATION"
+  },
+  {
+    "id": "C01",
+    "requirement": "생성 fence 선행→삭제 미접수, 삭제 fence 선행→새 생성 차단",
+    "execution": "NOT_EXECUTED_REQUIRES_IMPLEMENTATION"
+  },
+  {
+    "id": "C02",
+    "requirement": "paid confirm/원 완료·삭제·refund 양 commit 순서, unknown commit replay",
+    "execution": "NOT_EXECUTED_REQUIRES_IMPLEMENTATION"
+  },
+  {
+    "id": "C03",
+    "requirement": "두 confirm/두owner 경쟁 시 C 복원1회·원claim 보존·새guard 보호",
+    "execution": "NOT_EXECUTED_REQUIRES_IMPLEMENTATION"
+  }
+]

@@ -1,0 +1,34 @@
+{
+  "contract_version": "v1",
+  "callback_id": "30000000-0000-4000-8000-000000000001",
+  "attempt_id": "10000000-0000-4000-8000-000000000001",
+  "job_id": "challenge:10000000-0000-4000-8000-000000000001:grading:1",
+  "grading_attempt": 1,
+  "outcome": "completed",
+  "transcript": "She wear black shoe.",
+  "verdict": "needs_improvement",
+  "corrected_answer": "She is wearing black shoes.",
+  "feedback": {
+    "summary": "현재진행형과 복수형을 사용하면 문장이 자연스러워져요.",
+    "correctedAnswer": "She is wearing black shoes.",
+    "correctionItems": [
+      {
+        "type": "GRAMMAR",
+        "original": "wear",
+        "issue": "현재진행형이 필요해요",
+        "explanation": "지금 입고 있는 상태를 말하므로 is wearing을 사용해요.",
+        "suggested": "is wearing",
+        "severity": "high"
+      },
+      {
+        "type": "GRAMMAR",
+        "original": "shoe",
+        "issue": "복수형이 필요해요",
+        "explanation": "한 켤레의 신발을 뜻하므로 shoes를 사용해요.",
+        "suggested": "shoes",
+        "severity": "medium"
+      }
+    ]
+  },
+  "error": null
+}

@@ -1,0 +1,57 @@
+package web.tosunsaeng.domain.challenge;
+
+import com.fasterxml.jackson.annotation.JsonInclude;
+import java.time.Instant;
+import java.util.List;
+import static web.tosunsaeng.domain.challenge.ChallengeModels.*;
+
+public final class ChallengeViews {
+    private ChallengeViews() {}
+    @JsonInclude(JsonInclude.Include.ALWAYS)
+    public record DateInfo(String challengeDate, Instant challengeDateExpiresAt, long expiresInSeconds) {}
+    @JsonInclude(JsonInclude.Include.ALWAYS)
+    public record Progress(String challengeDate, Instant challengeDateExpiresAt, long expiresInSeconds,
+                           String dailyStatus, int totalQuestionCount, Integer nextQuestionNumber,
+                           List<Integer> completedQuestionNumbers, List<QuestionStatus> questions) {}
+    @JsonInclude(JsonInclude.Include.ALWAYS)
+    public record QuestionStatus(int questionNumber, String attemptStatus, String gradingStatus, boolean resultAvailable) {}
+    public record QuestionView(String challengeDate, int questionNumber, int totalQuestionCount, String promptKo,
+                               int difficulty, String attemptStatus, String gradingStatus) {}
+    public record Start(String attemptId, String challengeDate, int questionNumber, String attemptStatus, Instant submissionDeadlineAt) {}
+    public record Upload(String method, String url, Instant expiresAt, String contentType, long maxBytes) {}
+    public record UploadResponse(String attemptId, Instant submissionDeadlineAt, Upload upload) {}
+    public record Submission(String attemptId, String challengeDate, int questionNumber, int difficulty,
+                             String attemptStatus, String gradingStatus, Instant acceptedAt,
+                             String referenceAnswer, boolean feedbackAvailable) {}
+    @JsonInclude(JsonInclude.Include.ALWAYS)
+    public record AiResult(String transcript, DetailedFeedback feedback) {}
+    @JsonInclude(JsonInclude.Include.ALWAYS)
+    public record Detail(int questionNumber, String promptKo, String attemptStatus,
+                         String gradingStatus, String referenceAnswer, AiResult aiResult) {}
+    public record Count(String challengeDate, int solvedQuestionCount) {}
+    @JsonInclude(JsonInclude.Include.ALWAYS)
+    public record Results(String challengeDate, int solvedQuestionCount, Detail question) {}
+    public record Day(String challengeDate, boolean participated, int solvedQuestionCount) {}
+    public record History(String yearMonth, List<Day> dates, int currentStreakDays) {}
+    public static Start start(Attempt a) { return new Start(a.id, a.challengeDate, a.questionNumber, "not_started", a.submissionDeadlineAt); }
+    public static Submission submitted(Attempt a) {
+        return new Submission(a.id, a.challengeDate, a.questionNumber, a.question.difficulty(), "submitted",
+                "pending", a.submittedAt, a.question.referenceAnswer(), false);
+    }
+    public static Detail detail(Attempt a) {
+        if (a == null || !a.submitted()) return null;
+        Result r = a.result;
+        AiResult ai = r == null ? null : new AiResult(r.transcript(), feedback(r));
+        return new Detail(a.questionNumber, a.question.korean(), "submitted",
+                a.gradingStatus, a.question.referenceAnswer(), ai);
+    }
+    private static DetailedFeedback feedback(Result result) {
+        if (result.detailedFeedback() != null) return result.detailedFeedback();
+        Feedback legacy = result.feedback();
+        if (legacy == null) return new DetailedFeedback(null, null, null);
+        // Historical feedback contains no per-error evidence: never fabricate correction items.
+        String summary = java.util.stream.Stream.of(legacy.meaning(), legacy.grammar(), legacy.pronunciation())
+                .filter(s -> s != null && !s.isBlank()).collect(java.util.stream.Collectors.joining("\n"));
+        return new DetailedFeedback(summary.isBlank() ? null : summary, result.correctedAnswer(), null);
+    }
+}

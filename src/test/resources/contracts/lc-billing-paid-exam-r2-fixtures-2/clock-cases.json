@@ -1,0 +1,27 @@
+[
+  {
+    "id": "expiry-minus-1ns",
+    "now": "2026-10-14T00:01:29.999999999Z",
+    "expectedEpochNanos": "1791936089999999999"
+  },
+  {
+    "id": "expiry-exact",
+    "now": "2026-10-14T00:01:30.000000000Z",
+    "expectedEpochNanos": "1791936090000000000"
+  },
+  {
+    "id": "expiry-plus-1ns",
+    "now": "2026-10-14T00:01:30.000000001Z",
+    "expectedEpochNanos": "1791936090000000001"
+  },
+  {
+    "id": "skew-minus-1ns",
+    "now": "2026-10-13T23:59:59.999999999Z",
+    "expectedEpochNanos": "1791935999999999999"
+  },
+  {
+    "id": "skew-plus-1ns",
+    "now": "2026-10-14T00:00:00.000000001Z",
+    "expectedEpochNanos": "1791936000000000001"
+  }
+]

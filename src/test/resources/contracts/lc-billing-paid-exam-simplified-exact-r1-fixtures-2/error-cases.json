@@ -1,0 +1,222 @@
+[
+  {
+    "id": "E01-reserve-member",
+    "input": {
+      "endpoint": "reserve",
+      "http": 503,
+      "retryAfter": "1",
+      "rawBodyBase64": "eyJjb2RlIjoiTUVNQkVSX0VWSURFTkNFX1BFTkRJTkciLCJtZXNzYWdlIjoiVGhlIG9wZXJhdGlvbiBpcyB3YWl0aW5nIGZvciBtZW1iZXIgZXZpZGVuY2UgYW5kIHJlcXVlc3QgcmVzdW1wdGlvbi4iLCJyZXRyeWFibGUiOnRydWUsImNvcnJlbGF0aW9uSWQiOiJmaXh0dXJlLWNvcnJlbGF0aW9uLWEifQ=="
+    },
+    "expected": "WAITING_MEMBER"
+  },
+  {
+    "id": "E01-status-member",
+    "input": {
+      "endpoint": "status",
+      "http": 503,
+      "retryAfter": "1",
+      "rawBodyBase64": "eyJjb2RlIjoiTUVNQkVSX0VWSURFTkNFX1BFTkRJTkciLCJtZXNzYWdlIjoiVGhlIG9wZXJhdGlvbiBpcyB3YWl0aW5nIGZvciBtZW1iZXIgZXZpZGVuY2UgYW5kIHJlcXVlc3QgcmVzdW1wdGlvbi4iLCJyZXRyeWFibGUiOnRydWUsImNvcnJlbGF0aW9uSWQiOiJmaXh0dXJlLWNvcnJlbGF0aW9uLWEifQ=="
+    },
+    "expected": "WAITING_MEMBER"
+  },
+  {
+    "id": "E01-correlation-changed",
+    "input": {
+      "endpoint": "reserve",
+      "http": 503,
+      "retryAfter": "1",
+      "rawBodyBase64": "eyJjb2RlIjoiTUVNQkVSX0VWSURFTkNFX1BFTkRJTkciLCJtZXNzYWdlIjoiVGhlIG9wZXJhdGlvbiBpcyB3YWl0aW5nIGZvciBtZW1iZXIgZXZpZGVuY2UgYW5kIHJlcXVlc3QgcmVzdW1wdGlvbi4iLCJyZXRyeWFibGUiOnRydWUsImNvcnJlbGF0aW9uSWQiOiJmaXh0dXJlLWIifQ=="
+    },
+    "expected": "WAITING_MEMBER"
+  },
+  {
+    "id": "E06-missing",
+    "input": {
+      "endpoint": "reserve",
+      "http": 503,
+      "retryAfter": "1",
+      "rawBodyBase64": "eyJjb2RlIjoiTUVNQkVSX0VWSURFTkNFX1BFTkRJTkciLCJyZXRyeWFibGUiOnRydWUsImNvcnJlbGF0aW9uSWQiOiJ4In0="
+    },
+    "expected": "CONTRACT_ERROR"
+  },
+  {
+    "id": "E06-unknown",
+    "input": {
+      "endpoint": "reserve",
+      "http": 503,
+      "retryAfter": "1",
+      "rawBodyBase64": "eyJjb2RlIjoiTUVNQkVSX0VWSURFTkNFX1BFTkRJTkciLCJtZXNzYWdlIjoiVGhlIG9wZXJhdGlvbiBpcyB3YWl0aW5nIGZvciBtZW1iZXIgZXZpZGVuY2UgYW5kIHJlcXVlc3QgcmVzdW1wdGlvbi4iLCJyZXRyeWFibGUiOnRydWUsImNvcnJlbGF0aW9uSWQiOiJmaXh0dXJlLWNvcnJlbGF0aW9uLWEiLCJleHRyYSI6MX0="
+    },
+    "expected": "CONTRACT_ERROR"
+  },
+  {
+    "id": "E06-string-bool",
+    "input": {
+      "endpoint": "reserve",
+      "http": 503,
+      "retryAfter": "1",
+      "rawBodyBase64": "eyJjb2RlIjoiTUVNQkVSX0VWSURFTkNFX1BFTkRJTkciLCJtZXNzYWdlIjoiVGhlIG9wZXJhdGlvbiBpcyB3YWl0aW5nIGZvciBtZW1iZXIgZXZpZGVuY2UgYW5kIHJlcXVlc3QgcmVzdW1wdGlvbi4iLCJyZXRyeWFibGUiOiJ0cnVlIiwiY29ycmVsYXRpb25JZCI6ImZpeHR1cmUtY29ycmVsYXRpb24tYSJ9"
+    },
+    "expected": "CONTRACT_ERROR"
+  },
+  {
+    "id": "E06-null-message",
+    "input": {
+      "endpoint": "reserve",
+      "http": 503,
+      "retryAfter": "1",
+      "rawBodyBase64": "eyJjb2RlIjoiTUVNQkVSX0VWSURFTkNFX1BFTkRJTkciLCJtZXNzYWdlIjpudWxsLCJyZXRyeWFibGUiOnRydWUsImNvcnJlbGF0aW9uSWQiOiJmaXh0dXJlLWNvcnJlbGF0aW9uLWEifQ=="
+    },
+    "expected": "CONTRACT_ERROR"
+  },
+  {
+    "id": "E06-array",
+    "input": {
+      "endpoint": "reserve",
+      "http": 503,
+      "retryAfter": "1",
+      "rawBodyBase64": "W10="
+    },
+    "expected": "CONTRACT_ERROR"
+  },
+  {
+    "id": "E06-duplicate",
+    "input": {
+      "endpoint": "reserve",
+      "http": 503,
+      "retryAfter": "1",
+      "rawBodyBase64": "eyJjb2RlIjoiTUVNQkVSX0VWSURFTkNFX1BFTkRJTkciLCJtZXNzYWdlIjoiVGhlIG9wZXJhdGlvbiBpcyB3YWl0aW5nIGZvciBtZW1iZXIgZXZpZGVuY2UgYW5kIHJlcXVlc3QgcmVzdW1wdGlvbi4iLCJyZXRyeWFibGUiOnRydWUsInJldHJ5YWJsZSI6dHJ1ZSwiY29ycmVsYXRpb25JZCI6ImZpeHR1cmUtY29ycmVsYXRpb24tYSJ9"
+    },
+    "expected": "CONTRACT_ERROR"
+  },
+  {
+    "id": "E06-trailing",
+    "input": {
+      "endpoint": "reserve",
+      "http": 503,
+      "retryAfter": "1",
+      "rawBodyBase64": "eyJjb2RlIjoiTUVNQkVSX0VWSURFTkNFX1BFTkRJTkciLCJtZXNzYWdlIjoiVGhlIG9wZXJhdGlvbiBpcyB3YWl0aW5nIGZvciBtZW1iZXIgZXZpZGVuY2UgYW5kIHJlcXVlc3QgcmVzdW1wdGlvbi4iLCJyZXRyeWFibGUiOnRydWUsImNvcnJlbGF0aW9uSWQiOiJmaXh0dXJlLWNvcnJlbGF0aW9uLWEifSB7fQ=="
+    },
+    "expected": "CONTRACT_ERROR"
+  },
+  {
+    "id": "E06-surrogate",
+    "input": {
+      "endpoint": "reserve",
+      "http": 503,
+      "retryAfter": "1",
+      "rawBodyBase64": "eyJjb2RlIjoiTUVNQkVSX0VWSURFTkNFX1BFTkRJTkciLCJtZXNzYWdlIjoiXHVkODAwIiwicmV0cnlhYmxlIjp0cnVlLCJjb3JyZWxhdGlvbklkIjoiZml4dHVyZS1jb3JyZWxhdGlvbi1hIn0="
+    },
+    "expected": "CONTRACT_ERROR"
+  },
+  {
+    "id": "E06-invalid-utf8",
+    "input": {
+      "endpoint": "reserve",
+      "http": 503,
+      "retryAfter": "1",
+      "rawBodyBase64": "/w=="
+    },
+    "expected": "CONTRACT_ERROR"
+  },
+  {
+    "id": "E06-wrong-http",
+    "input": {
+      "endpoint": "reserve",
+      "http": 409,
+      "retryAfter": "1",
+      "rawBodyBase64": "eyJjb2RlIjoiTUVNQkVSX0VWSURFTkNFX1BFTkRJTkciLCJtZXNzYWdlIjoiVGhlIG9wZXJhdGlvbiBpcyB3YWl0aW5nIGZvciBtZW1iZXIgZXZpZGVuY2UgYW5kIHJlcXVlc3QgcmVzdW1wdGlvbi4iLCJyZXRyeWFibGUiOnRydWUsImNvcnJlbGF0aW9uSWQiOiJmaXh0dXJlLWNvcnJlbGF0aW9uLWEifQ=="
+    },
+    "expected": "CONTRACT_ERROR"
+  },
+  {
+    "id": "E06-wrong-route",
+    "input": {
+      "endpoint": "cancel",
+      "http": 503,
+      "retryAfter": "1",
+      "rawBodyBase64": "eyJjb2RlIjoiTUVNQkVSX0VWSURFTkNFX1BFTkRJTkciLCJtZXNzYWdlIjoiVGhlIG9wZXJhdGlvbiBpcyB3YWl0aW5nIGZvciBtZW1iZXIgZXZpZGVuY2UgYW5kIHJlcXVlc3QgcmVzdW1wdGlvbi4iLCJyZXRyeWFibGUiOnRydWUsImNvcnJlbGF0aW9uSWQiOiJmaXh0dXJlLWNvcnJlbGF0aW9uLWEifQ=="
+    },
+    "expected": "CONTRACT_ERROR"
+  },
+  {
+    "id": "E06-wrong-retryable",
+    "input": {
+      "endpoint": "reserve",
+      "http": 503,
+      "retryAfter": "1",
+      "rawBodyBase64": "eyJjb2RlIjoiTUVNQkVSX0VWSURFTkNFX1BFTkRJTkciLCJtZXNzYWdlIjoiVGhlIG9wZXJhdGlvbiBpcyB3YWl0aW5nIGZvciBtZW1iZXIgZXZpZGVuY2UgYW5kIHJlcXVlc3QgcmVzdW1wdGlvbi4iLCJyZXRyeWFibGUiOmZhbHNlLCJjb3JyZWxhdGlvbklkIjoiZml4dHVyZS1jb3JyZWxhdGlvbi1hIn0="
+    },
+    "expected": "CONTRACT_ERROR"
+  },
+  {
+    "id": "E06-terminal-status",
+    "input": {
+      "endpoint": "status",
+      "http": 409,
+      "retryAfter": null,
+      "rawBodyBase64": "eyJjb2RlIjoiUkVTRVJWRV9SRUpFQ1RFRF9CRUZPUkVfQ1JFQVRJT04iLCJtZXNzYWdlIjoiVGhlIHJlc2VydmUgb3BlcmF0aW9uIHdhcyByZWplY3RlZCBiZWZvcmUgcmVzZXJ2YXRpb24gY3JlYXRpb24uIiwicmV0cnlhYmxlIjpmYWxzZSwiY29ycmVsYXRpb25JZCI6IngifQ=="
+    },
+    "expected": "PRE_RESERVE_TERMINAL"
+  },
+  {
+    "id": "E06-terminal-reserve",
+    "input": {
+      "endpoint": "reserve",
+      "http": 409,
+      "retryAfter": null,
+      "rawBodyBase64": "eyJjb2RlIjoiUkVTRVJWRV9SRUpFQ1RFRF9CRUZPUkVfQ1JFQVRJT04iLCJtZXNzYWdlIjoiVGhlIHJlc2VydmUgb3BlcmF0aW9uIHdhcyByZWplY3RlZCBiZWZvcmUgcmVzZXJ2YXRpb24gY3JlYXRpb24uIiwicmV0cnlhYmxlIjpmYWxzZSwiY29ycmVsYXRpb25JZCI6IngifQ=="
+    },
+    "expected": "CONTRACT_ERROR"
+  },
+  {
+    "id": "E06-terminal-true",
+    "input": {
+      "endpoint": "status",
+      "http": 409,
+      "retryAfter": null,
+      "rawBodyBase64": "eyJjb2RlIjoiUkVTRVJWRV9SRUpFQ1RFRF9CRUZPUkVfQ1JFQVRJT04iLCJtZXNzYWdlIjoiVGhlIHJlc2VydmUgb3BlcmF0aW9uIHdhcyByZWplY3RlZCBiZWZvcmUgcmVzZXJ2YXRpb24gY3JlYXRpb24uIiwicmV0cnlhYmxlIjp0cnVlLCJjb3JyZWxhdGlvbklkIjoieCJ9"
+    },
+    "expected": "CONTRACT_ERROR"
+  },
+  {
+    "id": "E06-owner",
+    "input": {
+      "endpoint": "status",
+      "http": 409,
+      "retryAfter": null,
+      "rawBodyBase64": "eyJjb2RlIjoiT1BFUkFUSU9OX09XTkVSX01JU01BVENIIiwibWVzc2FnZSI6IlRoZSBvcGVyYXRpb24gb3duZXIgZG9lcyBub3QgbWF0Y2ggdGhlIGN1cnJlbnQgb3duZXIuIiwicmV0cnlhYmxlIjpmYWxzZSwiY29ycmVsYXRpb25JZCI6IngifQ=="
+    },
+    "expected": "OWNER_BLOCKED"
+  },
+  {
+    "id": "E06-notfound",
+    "input": {
+      "endpoint": "status",
+      "http": 404,
+      "retryAfter": null,
+      "rawBodyBase64": "eyJjb2RlIjoiT1BFUkFUSU9OX05PVF9GT1VORCIsIm1lc3NhZ2UiOiJUaGUgcmVzZXJ2ZSBvcGVyYXRpb24gd2FzIHJlamVjdGVkIGJlZm9yZSByZXNlcnZhdGlvbiBjcmVhdGlvbi4iLCJyZXRyeWFibGUiOmZhbHNlLCJjb3JyZWxhdGlvbklkIjoieCJ9"
+    },
+    "expected": "OPERATION_NOT_FOUND"
+  },
+  {
+    "id": "E06-empty404",
+    "input": {
+      "endpoint": "status",
+      "http": 404,
+      "retryAfter": null,
+      "rawBodyBase64": ""
+    },
+    "expected": "CONTRACT_ERROR"
+  },
+  {
+    "id": "E06-temporary",
+    "input": {
+      "endpoint": "status",
+      "http": 503,
+      "retryAfter": "1",
+      "rawBodyBase64": "eyJjb2RlIjoiQklMTElOR19URU1QT1JBUklMWV9VTkFWQUlMQUJMRSIsIm1lc3NhZ2UiOiJUaGUgb3BlcmF0aW9uIGlzIHdhaXRpbmcgZm9yIG1lbWJlciBldmlkZW5jZSBhbmQgcmVxdWVzdCByZXN1bXB0aW9uLiIsInJldHJ5YWJsZSI6dHJ1ZSwiY29ycmVsYXRpb25JZCI6ImZpeHR1cmUtY29ycmVsYXRpb24tYSJ9"
+    },
+    "expected": "TEMPORARY_FAILURE"
+  }
+]

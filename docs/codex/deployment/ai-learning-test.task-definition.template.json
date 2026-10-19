@@ -1,0 +1,245 @@
+{
+  "family": "tosunsaeng-ai-learning-test",
+  "networkMode": "awsvpc",
+  "requiresCompatibilities": [
+    "FARGATE"
+  ],
+  "cpu": "512",
+  "memory": "1024",
+  "runtimePlatform": {
+    "cpuArchitecture": "X86_64",
+    "operatingSystemFamily": "LINUX"
+  },
+  "executionRoleArn": "arn:aws:iam::889384901776:role/tosunsaeng-ai-learning-test-execution-role",
+  "taskRoleArn": "arn:aws:iam::889384901776:role/tosunsaeng-ai-learning-test-task-role",
+  "containerDefinitions": [
+    {
+      "name": "learning-api",
+      "image": "889384901776.dkr.ecr.ap-northeast-2.amazonaws.com/tosunsaeng-ai-learning-worker@sha256:cf2ea719b9921cfeb6c32c54961447cf9a8d0a25cd1314809e77fc681003ca35",
+      "essential": true,
+      "stopTimeout": 30,
+      "environment": [
+        {
+          "name": "AWS_REGION",
+          "value": "ap-northeast-2"
+        },
+        {
+          "name": "REDIS_URL",
+          "value": "redis://tosunsaeng-staging-redis.pzyca7.ng.0001.apn2.cache.amazonaws.com:6379/2"
+        },
+        {
+          "name": "LEARNING_REDIS_QUEUE",
+          "value": "app-ai-learning-test:{learning-jobs}:pending"
+        },
+        {
+          "name": "LEARNING_REDIS_PROCESSING_QUEUE",
+          "value": "app-ai-learning-test:{learning-jobs}:processing"
+        },
+        {
+          "name": "LEARNING_REDIS_JOB_PREFIX",
+          "value": "app-ai-learning-test:{learning-jobs}:job"
+        },
+        {
+          "name": "LEARNING_AUDIO_BUCKET",
+          "value": "tosunsaeng-test-ai-audio"
+        },
+        {
+          "name": "LEARNING_JOB_TTL_SECONDS",
+          "value": "604800"
+        },
+        {
+          "name": "LEARNING_JOB_LEASE_SECONDS",
+          "value": "300"
+        },
+        {
+          "name": "LEARNING_JOB_RECOVERY_SCAN_INTERVAL_SECONDS",
+          "value": "30"
+        },
+        {
+          "name": "LEARNING_JOB_UPLOAD_DIR",
+          "value": "data/job_uploads"
+        },
+        {
+          "name": "LEARNING_JOB_KEEP_AUDIO",
+          "value": "0"
+        },
+        {
+          "name": "AUDIO_UPLOAD_MAX_BYTES",
+          "value": "2097152"
+        },
+        {
+          "name": "LOG_LEVEL",
+          "value": "INFO"
+        },
+        {
+          "name": "LANGSMITH_TRACING",
+          "value": "1"
+        },
+        {
+          "name": "LANGSMITH_PROJECT",
+          "value": "app-ai-learning-test"
+        },
+        {
+          "name": "LANGSMITH_TRACE_MAX_STRING_LENGTH",
+          "value": "12000"
+        }
+      ],
+      "secrets": [
+        {
+          "name": "LEARNING_CORE_TO_AI_CREDENTIAL",
+          "valueFrom": "arn:aws:secretsmanager:ap-northeast-2:889384901776:secret:tosunsaeng/test/ai-7MnVsF:LEARNING_CORE_TO_AI_CREDENTIAL::"
+        },
+        {
+          "name": "LANGSMITH_API_KEY",
+          "valueFrom": "arn:aws:secretsmanager:ap-northeast-2:889384901776:secret:tosunsaeng/test/ai-7MnVsF:LANGSMITH_API_KEY::"
+        }
+      ],
+      "logConfiguration": {
+        "logDriver": "awslogs",
+        "options": {
+          "awslogs-group": "/ecs/tosunsaeng-ai-learning-test",
+          "awslogs-region": "ap-northeast-2",
+          "awslogs-stream-prefix": "ecs"
+        }
+      },
+      "portMappings": [
+        {
+          "containerPort": 8000,
+          "hostPort": 8000,
+          "protocol": "tcp"
+        }
+      ],
+      "healthCheck": {
+        "command": [
+          "CMD",
+          "python",
+          "-c",
+          "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/ready',timeout=5)"
+        ],
+        "interval": 30,
+        "timeout": 10,
+        "retries": 3,
+        "startPeriod": 60
+      }
+    },
+    {
+      "name": "learning-worker",
+      "image": "889384901776.dkr.ecr.ap-northeast-2.amazonaws.com/tosunsaeng-ai-learning-worker@sha256:cf2ea719b9921cfeb6c32c54961447cf9a8d0a25cd1314809e77fc681003ca35",
+      "essential": true,
+      "stopTimeout": 30,
+      "environment": [
+        {
+          "name": "AWS_REGION",
+          "value": "ap-northeast-2"
+        },
+        {
+          "name": "REDIS_URL",
+          "value": "redis://tosunsaeng-staging-redis.pzyca7.ng.0001.apn2.cache.amazonaws.com:6379/2"
+        },
+        {
+          "name": "LEARNING_REDIS_QUEUE",
+          "value": "app-ai-learning-test:{learning-jobs}:pending"
+        },
+        {
+          "name": "LEARNING_REDIS_PROCESSING_QUEUE",
+          "value": "app-ai-learning-test:{learning-jobs}:processing"
+        },
+        {
+          "name": "LEARNING_REDIS_JOB_PREFIX",
+          "value": "app-ai-learning-test:{learning-jobs}:job"
+        },
+        {
+          "name": "LEARNING_AUDIO_BUCKET",
+          "value": "tosunsaeng-test-ai-audio"
+        },
+        {
+          "name": "LEARNING_JOB_TTL_SECONDS",
+          "value": "604800"
+        },
+        {
+          "name": "LEARNING_JOB_LEASE_SECONDS",
+          "value": "300"
+        },
+        {
+          "name": "LEARNING_JOB_RECOVERY_SCAN_INTERVAL_SECONDS",
+          "value": "30"
+        },
+        {
+          "name": "LEARNING_JOB_UPLOAD_DIR",
+          "value": "data/job_uploads"
+        },
+        {
+          "name": "LEARNING_JOB_KEEP_AUDIO",
+          "value": "0"
+        },
+        {
+          "name": "AUDIO_UPLOAD_MAX_BYTES",
+          "value": "2097152"
+        },
+        {
+          "name": "LOG_LEVEL",
+          "value": "INFO"
+        },
+        {
+          "name": "LANGSMITH_TRACING",
+          "value": "1"
+        },
+        {
+          "name": "LANGSMITH_PROJECT",
+          "value": "app-ai-learning-test"
+        },
+        {
+          "name": "LANGSMITH_TRACE_MAX_STRING_LENGTH",
+          "value": "12000"
+        },
+        {
+          "name": "OPENAI_TRANSCRIBE_MODEL",
+          "value": "gpt-transcribe"
+        },
+        {
+          "name": "LLM_MODEL",
+          "value": "gpt-6-luna"
+        },
+        {
+          "name": "LLM_REASONING_EFFORT",
+          "value": "none"
+        },
+        {
+          "name": "LLM_MAX_OUTPUT_TOKENS",
+          "value": "10000"
+        },
+        {
+          "name": "LEARNING_RESULT_CALLBACK_URL",
+          "value": "https://api-test.to-teacher.com/internal/v1/challenges/grading/callback"
+        }
+      ],
+      "secrets": [
+        {
+          "name": "OPENAI_API_KEY",
+          "valueFrom": "arn:aws:secretsmanager:ap-northeast-2:889384901776:secret:tosunsaeng/test/ai-7MnVsF:OPENAI_API_KEY::"
+        },
+        {
+          "name": "LANGSMITH_API_KEY",
+          "valueFrom": "arn:aws:secretsmanager:ap-northeast-2:889384901776:secret:tosunsaeng/test/ai-7MnVsF:LANGSMITH_API_KEY::"
+        },
+        {
+          "name": "LEARNING_RESULT_CALLBACK_TOKEN",
+          "valueFrom": "arn:aws:secretsmanager:ap-northeast-2:889384901776:secret:tosunsaeng/test/ai-7MnVsF:LEARNING_RESULT_CALLBACK_TOKEN::"
+        }
+      ],
+      "logConfiguration": {
+        "logDriver": "awslogs",
+        "options": {
+          "awslogs-group": "/ecs/tosunsaeng-ai-learning-test",
+          "awslogs-region": "ap-northeast-2",
+          "awslogs-stream-prefix": "ecs"
+        }
+      },
+      "command": [
+        "python",
+        "-m",
+        "app.jobs.worker"
+      ]
+    }
+  ]
+}

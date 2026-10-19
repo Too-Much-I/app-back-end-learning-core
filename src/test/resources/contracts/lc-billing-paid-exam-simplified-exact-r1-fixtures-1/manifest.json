@@ -1,0 +1,23 @@
+{
+  "revision": "lc-billing-paid-exam-simplified-exact-r1-fixtures-1",
+  "contractRevision": "lc-billing-paid-exam-simplified-exact-r1-draft-3",
+  "contractSha256": "79bcfe3d79225c21d712791266bea10d4aed9eed3dc0529ddf86f7b29673a482",
+  "contractPath": "docs/contracts/LC-BILLING-PAID-EXAM-SIMPLIFIED-EXACT-R1.md",
+  "counts": {
+    "errors": 22,
+    "publicExamples": 4,
+    "time": 14,
+    "memberResume": 29,
+    "phone": 11,
+    "stateScenarios": 28
+  },
+  "runtimeTested": false,
+  "httpExecuted": false,
+  "lcIndependentValidation": false,
+  "deferred": [
+    "deletion-route-auth",
+    "historical-owner-deletion",
+    "final-record-retention-purge"
+  ],
+  "testData": "SYNTHETIC_ONLY"
+}

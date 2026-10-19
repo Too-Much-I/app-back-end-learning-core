@@ -1,0 +1,39 @@
+{
+  "status": "ROLES_CREATED_WITH_INLINE_POLICIES_2026_09_23_NOT_RUNTIME_TESTED",
+  "trustPolicy": {
+    "Version": "2012-10-17",
+    "Statement": [{
+      "Effect": "Allow",
+      "Principal": {"Service": "ecs-tasks.amazonaws.com"},
+      "Action": "sts:AssumeRole",
+      "Condition": {
+        "StringEquals": {"aws:SourceAccount": "889384901776"},
+        "ArnLike": {"aws:SourceArn": "arn:aws:ecs:ap-northeast-2:889384901776:*"}
+      }
+    }]
+  },
+  "roles": [
+    {
+      "name": "tosunsaeng-learning-core-test-execution-role",
+      "policy": {
+        "Version": "2012-10-17",
+        "Statement": [
+          {"Effect": "Allow", "Action": "ecr:GetAuthorizationToken", "Resource": "*"},
+          {"Effect": "Allow", "Action": ["ecr:BatchCheckLayerAvailability", "ecr:GetDownloadUrlForLayer", "ecr:BatchGetImage"], "Resource": "arn:aws:ecr:ap-northeast-2:889384901776:repository/tosunsaeng-learning-core"},
+          {"Effect": "Allow", "Action": ["logs:CreateLogStream", "logs:PutLogEvents"], "Resource": "arn:aws:logs:ap-northeast-2:889384901776:log-group:/ecs/tosunsaeng-learning-core-test:log-stream:*"},
+          {"Effect": "Allow", "Action": "secretsmanager:GetSecretValue", "Resource": "arn:aws:secretsmanager:ap-northeast-2:889384901776:secret:tosunsaeng/test/learning-core/mongodb-NEcjAa"}
+        ]
+      }
+    },
+    {
+      "name": "tosunsaeng-learning-core-test-task-role",
+      "policy": {
+        "Version": "2012-10-17",
+        "Statement": [
+          {"Effect": "Allow", "Action": "s3:GetObject", "Resource": "arn:aws:s3:::tosunsaeng-test-audio/*"},
+          {"Effect": "Allow", "Action": "s3:PutObject", "Resource": "arn:aws:s3:::tosunsaeng-test-audio/temp/*"}
+        ]
+      }
+    }
+  ]
+}

@@ -1,0 +1,512 @@
+[
+  {
+    "id": "S01-legacy",
+    "given": {
+      "legacySession": "legacy-1",
+      "billingLink": null
+    },
+    "when": [
+      "new request",
+      "paid INITIAL confirm"
+    ],
+    "then": {
+      "oldConsumed": false,
+      "restoredUnits": 0,
+      "newGroup": "00000007-1111-4111-8111-111111111111"
+    },
+    "execution": "NOT_EXECUTED_REQUIRES_IMPLEMENTATION"
+  },
+  {
+    "id": "S02-incomplete",
+    "given": {
+      "reason": "RESTART_INCOMPLETE",
+      "oldMock": "mock-a",
+      "activePaid": false,
+      "freeGroupUsable": true
+    },
+    "when": [
+      "reserve"
+    ],
+    "then": {
+      "kind": "REPLACEMENT",
+      "mock": "mock-a",
+      "additionalConsumption": 0
+    },
+    "execution": "NOT_EXECUTED_REQUIRES_IMPLEMENTATION"
+  },
+  {
+    "id": "S03-exclude",
+    "given": {
+      "reason": "NEW_AFTER_SUBMISSION",
+      "previous": "mock-a",
+      "eligible": [
+        {
+          "id": "mock-a",
+          "count": 0,
+          "sequence": 1
+        },
+        {
+          "id": "mock-b",
+          "count": 1,
+          "sequence": 2
+        }
+      ]
+    },
+    "when": [
+      "select"
+    ],
+    "then": {
+      "mock": "mock-b",
+      "kind": "INITIAL"
+    },
+    "execution": "NOT_EXECUTED_REQUIRES_IMPLEMENTATION"
+  },
+  {
+    "id": "S03-empty-alternative",
+    "given": {
+      "previous": "mock-a",
+      "eligible": [
+        "mock-a"
+      ]
+    },
+    "when": [
+      "select after submission"
+    ],
+    "then": {
+      "mock": "mock-a",
+      "kind": "INITIAL"
+    },
+    "execution": "NOT_EXECUTED_REQUIRES_IMPLEMENTATION"
+  },
+  {
+    "id": "S03-catalog-error",
+    "given": {
+      "catalogFailure": true
+    },
+    "when": [
+      "select after submission"
+    ],
+    "then": {
+      "fallbackAllowed": false
+    },
+    "execution": "NOT_EXECUTED_REQUIRES_IMPLEMENTATION"
+  },
+  {
+    "id": "S04-open",
+    "given": {
+      "reason": "NEW_AFTER_SUBMISSION",
+      "billingState": "OPEN",
+      "selectedMock": "mock-a"
+    },
+    "when": [
+      "reserve"
+    ],
+    "then": {
+      "kind": "INITIAL",
+      "reuseOldConsumption": false
+    },
+    "execution": "NOT_EXECUTED_REQUIRES_IMPLEMENTATION"
+  },
+  {
+    "id": "S05-tracking-off",
+    "given": {
+      "tracking": false,
+      "marker": null,
+      "receiptExpired": true
+    },
+    "when": [
+      "classify"
+    ],
+    "then": {
+      "inferIncomplete": false,
+      "requiresProof": true
+    },
+    "execution": "NOT_EXECUTED_REQUIRES_IMPLEMENTATION"
+  },
+  {
+    "id": "S06-prepare-first",
+    "given": {
+      "required": [
+        1,
+        2,
+        3
+      ],
+      "accepted": [
+        1,
+        2
+      ]
+    },
+    "when": [
+      "prepare operation",
+      "accept answer 3",
+      "replay same key"
+    ],
+    "then": {
+      "reason": "RESTART_INCOMPLETE",
+      "mockUnchanged": true
+    },
+    "execution": "NOT_EXECUTED_REQUIRES_IMPLEMENTATION"
+  },
+  {
+    "id": "S06-submit-first",
+    "given": {
+      "required": [
+        1,
+        2,
+        3
+      ],
+      "accepted": [
+        1,
+        2
+      ]
+    },
+    "when": [
+      "accept answer 3",
+      "prepare operation",
+      "catalog changes",
+      "replay same key"
+    ],
+    "then": {
+      "reason": "NEW_AFTER_SUBMISSION",
+      "mockUnchanged": true
+    },
+    "execution": "NOT_EXECUTED_REQUIRES_IMPLEMENTATION"
+  },
+  {
+    "id": "S07-replay",
+    "given": {
+      "savedSuccess": true,
+      "currentSessionChanged": true,
+      "sameDigest": true,
+      "ownerAllowed": true
+    },
+    "when": [
+      "replay"
+    ],
+    "then": {
+      "reproduceSaved": true,
+      "staleConflict": false
+    },
+    "execution": "NOT_EXECUTED_REQUIRES_IMPLEMENTATION"
+  },
+  {
+    "id": "S07-owner-lost",
+    "given": {
+      "savedSuccess": true,
+      "ownerAllowed": false
+    },
+    "when": [
+      "replay"
+    ],
+    "then": {
+      "allow": false
+    },
+    "execution": "NOT_EXECUTED_REQUIRES_IMPLEMENTATION"
+  },
+  {
+    "id": "S08-invalid-combination",
+    "given": {
+      "reason": "NEW_AFTER_COMPLETION",
+      "responseKind": "REPLACEMENT"
+    },
+    "when": [
+      "validate response"
+    ],
+    "then": {
+      "category": "CONTRACT_ERROR"
+    },
+    "execution": "NOT_EXECUTED_REQUIRES_IMPLEMENTATION"
+  },
+  {
+    "id": "S09-restore",
+    "given": {
+      "source": "TRIAL_CLAIM",
+      "consumption": "fake-consumption",
+      "restored": false
+    },
+    "when": [
+      "two concurrent paid confirms",
+      "late old completion"
+    ],
+    "then": {
+      "restoredUnits": 1,
+      "oldGroupBlocked": true
+    },
+    "execution": "NOT_EXECUTED_REQUIRES_IMPLEMENTATION"
+  },
+  {
+    "id": "S09-no-right",
+    "given": {
+      "oldSessionOpen": true,
+      "newRightAvailable": false
+    },
+    "when": [
+      "reserve new source"
+    ],
+    "then": {
+      "oldSessionTerminated": false,
+      "newGrant": 0
+    },
+    "execution": "NOT_EXECUTED_REQUIRES_IMPLEMENTATION"
+  },
+  {
+    "id": "S09-no-rerestore",
+    "given": {
+      "source": "PAID_SWITCH_RESTORATION"
+    },
+    "when": [
+      "switch to paid"
+    ],
+    "then": {
+      "restoredUnits": 0
+    },
+    "execution": "NOT_EXECUTED_REQUIRES_IMPLEMENTATION"
+  },
+  {
+    "id": "S10-finalize-retry",
+    "given": {
+      "billingConfirmed": true,
+      "lcFinalized": false
+    },
+    "when": [
+      "LC transaction fails",
+      "worker retries"
+    ],
+    "then": {
+      "duplicateGrant": 0,
+      "ttlBeforeFinalization": false,
+      "guardUntilFinalization": true,
+      "publicSuccessAfterCommit": true
+    },
+    "execution": "NOT_EXECUTED_REQUIRES_IMPLEMENTATION"
+  },
+  {
+    "id": "S11-summary",
+    "given": {
+      "acceptedBeforeClose": true,
+      "summaryJobExists": false
+    },
+    "when": [
+      "close source",
+      "create summary",
+      "retry summary"
+    ],
+    "then": {
+      "allowDerived": true,
+      "allowNewUserSubmission": false
+    },
+    "execution": "NOT_EXECUTED_REQUIRES_IMPLEMENTATION"
+  },
+  {
+    "id": "S12-partial",
+    "given": {
+      "required": [
+        1,
+        2,
+        3
+      ],
+      "accepted": [
+        1,
+        2
+      ]
+    },
+    "when": [
+      "close source",
+      "finish accepted jobs"
+    ],
+    "then": {
+      "completed": false
+    },
+    "execution": "NOT_EXECUTED_REQUIRES_IMPLEMENTATION"
+  },
+  {
+    "id": "S12-late-old",
+    "given": {
+      "oldGroup": "00000003-1111-4111-8111-111111111111",
+      "newGroup": "00000007-1111-4111-8111-111111111111",
+      "newGuard": true
+    },
+    "when": [
+      "old completion event"
+    ],
+    "then": {
+      "newGuard": true
+    },
+    "execution": "NOT_EXECUTED_REQUIRES_IMPLEMENTATION"
+  },
+  {
+    "id": "S13-reject",
+    "given": {
+      "status": "CANCELED",
+      "terminalAt": "2026-10-14T00:00:00.000Z",
+      "confirmRejection": {
+        "code": "ENTITLEMENT_REVOKED"
+      }
+    },
+    "when": [
+      "cancel response omits reason",
+      "query status"
+    ],
+    "then": {
+      "publicCode": "ENTITLEMENT_REVOKED"
+    },
+    "execution": "NOT_EXECUTED_REQUIRES_IMPLEMENTATION"
+  },
+  {
+    "id": "S14-command-ttl",
+    "given": {
+      "commandExists": false,
+      "durableReceipt": {
+        "result": "CONFIRMED",
+        "digest": "fake-digest"
+      }
+    },
+    "when": [
+      "same caller owner digest replay"
+    ],
+    "then": {
+      "reproduce": "CONFIRMED",
+      "newConsumption": 0
+    },
+    "execution": "NOT_EXECUTED_REQUIRES_IMPLEMENTATION"
+  },
+  {
+    "id": "S16-manifest",
+    "given": {
+      "manifest": [
+        "legacy-1"
+      ],
+      "session": "new-1",
+      "source": null
+    },
+    "when": [
+      "read new session"
+    ],
+    "then": {
+      "grandfather": false
+    },
+    "execution": "NOT_EXECUTED_REQUIRES_IMPLEMENTATION"
+  },
+  {
+    "id": "V01-inbox-ttl",
+    "given": {
+      "inboxExpired": true,
+      "groupFact": {
+        "eventId": "00000001-1111-4111-8111-111111111111",
+        "eventType": "AttemptGroupAccessRevoked",
+        "schemaVersion": 1,
+        "producer": "billing",
+        "consumerScopeId": "fixture-test",
+        "occurredAt": "2026-10-14T00:00:00.000Z",
+        "userId": "00000002-1111-4111-8111-111111111111",
+        "attemptGroupId": "00000003-1111-4111-8111-111111111111",
+        "reason": "PURCHASE_REFUNDED",
+        "confirmedSessionId": null
+      }
+    },
+    "when": [
+      "retry same id and canonical body"
+    ],
+    "then": {
+      "http": 204
+    },
+    "execution": "NOT_EXECUTED_REQUIRES_IMPLEMENTATION"
+  },
+  {
+    "id": "V02-new-id",
+    "given": {
+      "groupFact": {
+        "eventId": "00000001-1111-4111-8111-111111111111",
+        "eventType": "AttemptGroupAccessRevoked",
+        "schemaVersion": 1,
+        "producer": "billing",
+        "consumerScopeId": "fixture-test",
+        "occurredAt": "2026-10-14T00:00:00.000Z",
+        "userId": "00000002-1111-4111-8111-111111111111",
+        "attemptGroupId": "00000003-1111-4111-8111-111111111111",
+        "reason": "PURCHASE_REFUNDED",
+        "confirmedSessionId": null
+      }
+    },
+    "when": [
+      {
+        "eventId": "00000008-1111-4111-8111-111111111111",
+        "eventType": "AttemptGroupAccessRevoked",
+        "schemaVersion": 1,
+        "producer": "billing",
+        "consumerScopeId": "fixture-test",
+        "occurredAt": "2026-10-14T00:00:00.000Z",
+        "userId": "00000002-1111-4111-8111-111111111111",
+        "attemptGroupId": "00000003-1111-4111-8111-111111111111",
+        "reason": "PURCHASE_REFUNDED",
+        "confirmedSessionId": null
+      }
+    ],
+    "then": {
+      "http": 409,
+      "code": "GROUP_REVOKE_CONFLICT"
+    },
+    "execution": "NOT_EXECUTED_REQUIRES_IMPLEMENTATION"
+  },
+  {
+    "id": "V02-event-conflict",
+    "given": {
+      "groupFact": {
+        "eventId": "00000001-1111-4111-8111-111111111111",
+        "eventType": "AttemptGroupAccessRevoked",
+        "schemaVersion": 1,
+        "producer": "billing",
+        "consumerScopeId": "fixture-test",
+        "occurredAt": "2026-10-14T00:00:00.000Z",
+        "userId": "00000002-1111-4111-8111-111111111111",
+        "attemptGroupId": "00000003-1111-4111-8111-111111111111",
+        "reason": "PURCHASE_REFUNDED",
+        "confirmedSessionId": null
+      }
+    },
+    "when": [
+      {
+        "eventId": "00000001-1111-4111-8111-111111111111",
+        "eventType": "AttemptGroupAccessRevoked",
+        "schemaVersion": 1,
+        "producer": "billing",
+        "consumerScopeId": "fixture-test",
+        "occurredAt": "2026-10-14T00:00:00.000Z",
+        "userId": "00000002-1111-4111-8111-111111111111",
+        "attemptGroupId": "00000003-1111-4111-8111-111111111111",
+        "reason": "PURCHASE_REVOKED",
+        "confirmedSessionId": null
+      }
+    ],
+    "then": {
+      "http": 409,
+      "code": "EVENT_ID_CONFLICT"
+    },
+    "execution": "NOT_EXECUTED_REQUIRES_IMPLEMENTATION"
+  },
+  {
+    "id": "V03-money-correction",
+    "given": {
+      "groupFact": {
+        "eventId": "00000001-1111-4111-8111-111111111111",
+        "eventType": "AttemptGroupAccessRevoked",
+        "schemaVersion": 1,
+        "producer": "billing",
+        "consumerScopeId": "fixture-test",
+        "occurredAt": "2026-10-14T00:00:00.000Z",
+        "userId": "00000002-1111-4111-8111-111111111111",
+        "attemptGroupId": "00000003-1111-4111-8111-111111111111",
+        "reason": "PURCHASE_REFUNDED",
+        "confirmedSessionId": null
+      }
+    },
+    "when": [
+      "extra refund monetary observation"
+    ],
+    "then": {
+      "newRevoke": false,
+      "protectedSession": null
+    },
+    "execution": "NOT_EXECUTED_REQUIRES_IMPLEMENTATION"
+  }
+]

@@ -1,0 +1,492 @@
+{
+  "revision": "lc-billing-workload-auth-r1-fixtures-1",
+  "notes": "null expectedStatus means normal request passes authentication or connector has no HTTP response; inspect transport/expectedStage. No LC runtime execution claimed.",
+  "cases": [
+    {
+      "id": "bearer-exact",
+      "group": "AUTH-10",
+      "identityEnabled": true,
+      "lcEnabled": true,
+      "target": "lc",
+      "method": "POST",
+      "path": "/internal/v1/reservations/status",
+      "localPort": 8444,
+      "queryString": null,
+      "authorization": [
+        "Bearer eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCIsImtpZCI6ImZha2Utc2hhcmVkLWtpZCJ9.eyJpc3MiOiJ1cm46dG9zdW5zYWVuZzp3b3JrbG9hZDpsZWFybmluZy1jb3JlOnRlc3QiLCJzdWIiOiJsZWFybmluZy1jb3JlLXNlcnZpY2UiLCJhdWQiOiJ0b3N1bnNhZW5nLWJpbGxpbmc6cmVzZXJ2YXRpb25zOnRlc3QiLCJpYXQiOjE3OTE4NDk2MDAsImV4cCI6MTc5MTg0OTY2MCwianRpIjoiMTExMTExMTEtMTExMS00MTExLTgxMTEtMTExMTExMTExMTExIn0.Qn86bFevl9qR86rF4jOS-q04xMsvNxd6A5rBCiRVVt4ihZFusF1NLdkcjTBTf0eZQ5v0njw7mr2Wg2g-lQP8JN1u3eOTseRFqW_wFugmw5SpLBPLyWMcmJbTBFjZStlL5UGsJb3-OsaaLml_U64HhwxzmvfKSfqxTEPMDNmroEOZswkfZIz3KfTP1T2kN-6aOuG3i3RUVjU9IVcnQgbRo_YgeeJdWB4Ln-7DNbNlnvKvaJcVnQAVMesZNCX227Ua8L7_1VH0VsQtfovH1GLbD8aaPm8CBGu8ckCut9hVRAf9w26s7bxERwUWmjnhIYyOezB5Mg4DmUW7VisFeh73_w"
+      ],
+      "expectedStatus": null,
+      "execution": "PENDING_B_LC_HTTP",
+      "expectedStage": "BUSINESS_AFTER_AUTH",
+      "authorizationHeaderName": "aUtHoRiZaTiOn"
+    },
+    {
+      "id": "bearer-lowercase",
+      "group": "AUTH-10",
+      "identityEnabled": true,
+      "lcEnabled": true,
+      "target": "lc",
+      "method": "POST",
+      "path": "/internal/v1/reservations/status",
+      "localPort": 8444,
+      "queryString": null,
+      "authorization": [
+        "bearer eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCIsImtpZCI6ImZha2Utc2hhcmVkLWtpZCJ9.eyJpc3MiOiJ1cm46dG9zdW5zYWVuZzp3b3JrbG9hZDpsZWFybmluZy1jb3JlOnRlc3QiLCJzdWIiOiJsZWFybmluZy1jb3JlLXNlcnZpY2UiLCJhdWQiOiJ0b3N1bnNhZW5nLWJpbGxpbmc6cmVzZXJ2YXRpb25zOnRlc3QiLCJpYXQiOjE3OTE4NDk2MDAsImV4cCI6MTc5MTg0OTY2MCwianRpIjoiMTExMTExMTEtMTExMS00MTExLTgxMTEtMTExMTExMTExMTExIn0.Qn86bFevl9qR86rF4jOS-q04xMsvNxd6A5rBCiRVVt4ihZFusF1NLdkcjTBTf0eZQ5v0njw7mr2Wg2g-lQP8JN1u3eOTseRFqW_wFugmw5SpLBPLyWMcmJbTBFjZStlL5UGsJb3-OsaaLml_U64HhwxzmvfKSfqxTEPMDNmroEOZswkfZIz3KfTP1T2kN-6aOuG3i3RUVjU9IVcnQgbRo_YgeeJdWB4Ln-7DNbNlnvKvaJcVnQAVMesZNCX227Ua8L7_1VH0VsQtfovH1GLbD8aaPm8CBGu8ckCut9hVRAf9w26s7bxERwUWmjnhIYyOezB5Mg4DmUW7VisFeh73_w"
+      ],
+      "expectedStatus": 401,
+      "execution": "PENDING_B_LC_HTTP",
+      "expectedStage": "INGRESS_OR_AUTH_REJECTION",
+      "authorizationHeaderName": "Authorization"
+    },
+    {
+      "id": "bearer-uppercase",
+      "group": "AUTH-10",
+      "identityEnabled": true,
+      "lcEnabled": true,
+      "target": "lc",
+      "method": "POST",
+      "path": "/internal/v1/reservations/status",
+      "localPort": 8444,
+      "queryString": null,
+      "authorization": [
+        "BEARER eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCIsImtpZCI6ImZha2Utc2hhcmVkLWtpZCJ9.eyJpc3MiOiJ1cm46dG9zdW5zYWVuZzp3b3JrbG9hZDpsZWFybmluZy1jb3JlOnRlc3QiLCJzdWIiOiJsZWFybmluZy1jb3JlLXNlcnZpY2UiLCJhdWQiOiJ0b3N1bnNhZW5nLWJpbGxpbmc6cmVzZXJ2YXRpb25zOnRlc3QiLCJpYXQiOjE3OTE4NDk2MDAsImV4cCI6MTc5MTg0OTY2MCwianRpIjoiMTExMTExMTEtMTExMS00MTExLTgxMTEtMTExMTExMTExMTExIn0.Qn86bFevl9qR86rF4jOS-q04xMsvNxd6A5rBCiRVVt4ihZFusF1NLdkcjTBTf0eZQ5v0njw7mr2Wg2g-lQP8JN1u3eOTseRFqW_wFugmw5SpLBPLyWMcmJbTBFjZStlL5UGsJb3-OsaaLml_U64HhwxzmvfKSfqxTEPMDNmroEOZswkfZIz3KfTP1T2kN-6aOuG3i3RUVjU9IVcnQgbRo_YgeeJdWB4Ln-7DNbNlnvKvaJcVnQAVMesZNCX227Ua8L7_1VH0VsQtfovH1GLbD8aaPm8CBGu8ckCut9hVRAf9w26s7bxERwUWmjnhIYyOezB5Mg4DmUW7VisFeh73_w"
+      ],
+      "expectedStatus": 401,
+      "execution": "PENDING_B_LC_HTTP",
+      "expectedStage": "INGRESS_OR_AUTH_REJECTION",
+      "authorizationHeaderName": "Authorization"
+    },
+    {
+      "id": "bearer-double-space",
+      "group": "AUTH-10",
+      "identityEnabled": true,
+      "lcEnabled": true,
+      "target": "lc",
+      "method": "POST",
+      "path": "/internal/v1/reservations/status",
+      "localPort": 8444,
+      "queryString": null,
+      "authorization": [
+        "Bearer  eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCIsImtpZCI6ImZha2Utc2hhcmVkLWtpZCJ9.eyJpc3MiOiJ1cm46dG9zdW5zYWVuZzp3b3JrbG9hZDpsZWFybmluZy1jb3JlOnRlc3QiLCJzdWIiOiJsZWFybmluZy1jb3JlLXNlcnZpY2UiLCJhdWQiOiJ0b3N1bnNhZW5nLWJpbGxpbmc6cmVzZXJ2YXRpb25zOnRlc3QiLCJpYXQiOjE3OTE4NDk2MDAsImV4cCI6MTc5MTg0OTY2MCwianRpIjoiMTExMTExMTEtMTExMS00MTExLTgxMTEtMTExMTExMTExMTExIn0.Qn86bFevl9qR86rF4jOS-q04xMsvNxd6A5rBCiRVVt4ihZFusF1NLdkcjTBTf0eZQ5v0njw7mr2Wg2g-lQP8JN1u3eOTseRFqW_wFugmw5SpLBPLyWMcmJbTBFjZStlL5UGsJb3-OsaaLml_U64HhwxzmvfKSfqxTEPMDNmroEOZswkfZIz3KfTP1T2kN-6aOuG3i3RUVjU9IVcnQgbRo_YgeeJdWB4Ln-7DNbNlnvKvaJcVnQAVMesZNCX227Ua8L7_1VH0VsQtfovH1GLbD8aaPm8CBGu8ckCut9hVRAf9w26s7bxERwUWmjnhIYyOezB5Mg4DmUW7VisFeh73_w"
+      ],
+      "expectedStatus": 401,
+      "execution": "PENDING_B_LC_HTTP",
+      "expectedStage": "INGRESS_OR_AUTH_REJECTION",
+      "authorizationHeaderName": "Authorization"
+    },
+    {
+      "id": "bearer-tab",
+      "group": "AUTH-10",
+      "identityEnabled": true,
+      "lcEnabled": true,
+      "target": "lc",
+      "method": "POST",
+      "path": "/internal/v1/reservations/status",
+      "localPort": 8444,
+      "queryString": null,
+      "authorization": [
+        "Bearer\teyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCIsImtpZCI6ImZha2Utc2hhcmVkLWtpZCJ9.eyJpc3MiOiJ1cm46dG9zdW5zYWVuZzp3b3JrbG9hZDpsZWFybmluZy1jb3JlOnRlc3QiLCJzdWIiOiJsZWFybmluZy1jb3JlLXNlcnZpY2UiLCJhdWQiOiJ0b3N1bnNhZW5nLWJpbGxpbmc6cmVzZXJ2YXRpb25zOnRlc3QiLCJpYXQiOjE3OTE4NDk2MDAsImV4cCI6MTc5MTg0OTY2MCwianRpIjoiMTExMTExMTEtMTExMS00MTExLTgxMTEtMTExMTExMTExMTExIn0.Qn86bFevl9qR86rF4jOS-q04xMsvNxd6A5rBCiRVVt4ihZFusF1NLdkcjTBTf0eZQ5v0njw7mr2Wg2g-lQP8JN1u3eOTseRFqW_wFugmw5SpLBPLyWMcmJbTBFjZStlL5UGsJb3-OsaaLml_U64HhwxzmvfKSfqxTEPMDNmroEOZswkfZIz3KfTP1T2kN-6aOuG3i3RUVjU9IVcnQgbRo_YgeeJdWB4Ln-7DNbNlnvKvaJcVnQAVMesZNCX227Ua8L7_1VH0VsQtfovH1GLbD8aaPm8CBGu8ckCut9hVRAf9w26s7bxERwUWmjnhIYyOezB5Mg4DmUW7VisFeh73_w"
+      ],
+      "expectedStatus": 401,
+      "execution": "PENDING_B_LC_HTTP",
+      "expectedStage": "INGRESS_OR_AUTH_REJECTION",
+      "authorizationHeaderName": "Authorization"
+    },
+    {
+      "id": "bearer-leading-space",
+      "group": "AUTH-10",
+      "identityEnabled": true,
+      "lcEnabled": true,
+      "target": "lc",
+      "method": "POST",
+      "path": "/internal/v1/reservations/status",
+      "localPort": 8444,
+      "queryString": null,
+      "authorization": [
+        " Bearer eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCIsImtpZCI6ImZha2Utc2hhcmVkLWtpZCJ9.eyJpc3MiOiJ1cm46dG9zdW5zYWVuZzp3b3JrbG9hZDpsZWFybmluZy1jb3JlOnRlc3QiLCJzdWIiOiJsZWFybmluZy1jb3JlLXNlcnZpY2UiLCJhdWQiOiJ0b3N1bnNhZW5nLWJpbGxpbmc6cmVzZXJ2YXRpb25zOnRlc3QiLCJpYXQiOjE3OTE4NDk2MDAsImV4cCI6MTc5MTg0OTY2MCwianRpIjoiMTExMTExMTEtMTExMS00MTExLTgxMTEtMTExMTExMTExMTExIn0.Qn86bFevl9qR86rF4jOS-q04xMsvNxd6A5rBCiRVVt4ihZFusF1NLdkcjTBTf0eZQ5v0njw7mr2Wg2g-lQP8JN1u3eOTseRFqW_wFugmw5SpLBPLyWMcmJbTBFjZStlL5UGsJb3-OsaaLml_U64HhwxzmvfKSfqxTEPMDNmroEOZswkfZIz3KfTP1T2kN-6aOuG3i3RUVjU9IVcnQgbRo_YgeeJdWB4Ln-7DNbNlnvKvaJcVnQAVMesZNCX227Ua8L7_1VH0VsQtfovH1GLbD8aaPm8CBGu8ckCut9hVRAf9w26s7bxERwUWmjnhIYyOezB5Mg4DmUW7VisFeh73_w"
+      ],
+      "expectedStatus": 401,
+      "execution": "PENDING_B_LC_HTTP",
+      "expectedStage": "INGRESS_OR_AUTH_REJECTION",
+      "authorizationHeaderName": "Authorization"
+    },
+    {
+      "id": "bearer-trailing-space",
+      "group": "AUTH-10",
+      "identityEnabled": true,
+      "lcEnabled": true,
+      "target": "lc",
+      "method": "POST",
+      "path": "/internal/v1/reservations/status",
+      "localPort": 8444,
+      "queryString": null,
+      "authorization": [
+        "Bearer eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCIsImtpZCI6ImZha2Utc2hhcmVkLWtpZCJ9.eyJpc3MiOiJ1cm46dG9zdW5zYWVuZzp3b3JrbG9hZDpsZWFybmluZy1jb3JlOnRlc3QiLCJzdWIiOiJsZWFybmluZy1jb3JlLXNlcnZpY2UiLCJhdWQiOiJ0b3N1bnNhZW5nLWJpbGxpbmc6cmVzZXJ2YXRpb25zOnRlc3QiLCJpYXQiOjE3OTE4NDk2MDAsImV4cCI6MTc5MTg0OTY2MCwianRpIjoiMTExMTExMTEtMTExMS00MTExLTgxMTEtMTExMTExMTExMTExIn0.Qn86bFevl9qR86rF4jOS-q04xMsvNxd6A5rBCiRVVt4ihZFusF1NLdkcjTBTf0eZQ5v0njw7mr2Wg2g-lQP8JN1u3eOTseRFqW_wFugmw5SpLBPLyWMcmJbTBFjZStlL5UGsJb3-OsaaLml_U64HhwxzmvfKSfqxTEPMDNmroEOZswkfZIz3KfTP1T2kN-6aOuG3i3RUVjU9IVcnQgbRo_YgeeJdWB4Ln-7DNbNlnvKvaJcVnQAVMesZNCX227Ua8L7_1VH0VsQtfovH1GLbD8aaPm8CBGu8ckCut9hVRAf9w26s7bxERwUWmjnhIYyOezB5Mg4DmUW7VisFeh73_w "
+      ],
+      "expectedStatus": 401,
+      "execution": "PENDING_B_LC_HTTP",
+      "expectedStage": "INGRESS_OR_AUTH_REJECTION",
+      "authorizationHeaderName": "Authorization"
+    },
+    {
+      "id": "bearer-empty",
+      "group": "AUTH-10",
+      "identityEnabled": true,
+      "lcEnabled": true,
+      "target": "lc",
+      "method": "POST",
+      "path": "/internal/v1/reservations/status",
+      "localPort": 8444,
+      "queryString": null,
+      "authorization": [
+        "Bearer "
+      ],
+      "expectedStatus": 401,
+      "execution": "PENDING_B_LC_HTTP",
+      "expectedStage": "INGRESS_OR_AUTH_REJECTION",
+      "authorizationHeaderName": "Authorization"
+    },
+    {
+      "id": "bearer-comma",
+      "group": "AUTH-10",
+      "identityEnabled": true,
+      "lcEnabled": true,
+      "target": "lc",
+      "method": "POST",
+      "path": "/internal/v1/reservations/status",
+      "localPort": 8444,
+      "queryString": null,
+      "authorization": [
+        "Bearer eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCIsImtpZCI6ImZha2Utc2hhcmVkLWtpZCJ9.eyJpc3MiOiJ1cm46dG9zdW5zYWVuZzp3b3JrbG9hZDpsZWFybmluZy1jb3JlOnRlc3QiLCJzdWIiOiJsZWFybmluZy1jb3JlLXNlcnZpY2UiLCJhdWQiOiJ0b3N1bnNhZW5nLWJpbGxpbmc6cmVzZXJ2YXRpb25zOnRlc3QiLCJpYXQiOjE3OTE4NDk2MDAsImV4cCI6MTc5MTg0OTY2MCwianRpIjoiMTExMTExMTEtMTExMS00MTExLTgxMTEtMTExMTExMTExMTExIn0.Qn86bFevl9qR86rF4jOS-q04xMsvNxd6A5rBCiRVVt4ihZFusF1NLdkcjTBTf0eZQ5v0njw7mr2Wg2g-lQP8JN1u3eOTseRFqW_wFugmw5SpLBPLyWMcmJbTBFjZStlL5UGsJb3-OsaaLml_U64HhwxzmvfKSfqxTEPMDNmroEOZswkfZIz3KfTP1T2kN-6aOuG3i3RUVjU9IVcnQgbRo_YgeeJdWB4Ln-7DNbNlnvKvaJcVnQAVMesZNCX227Ua8L7_1VH0VsQtfovH1GLbD8aaPm8CBGu8ckCut9hVRAf9w26s7bxERwUWmjnhIYyOezB5Mg4DmUW7VisFeh73_w, Bearer eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCIsImtpZCI6ImZha2Utc2hhcmVkLWtpZCJ9.eyJpc3MiOiJ1cm46dG9zdW5zYWVuZzp3b3JrbG9hZDpsZWFybmluZy1jb3JlOnRlc3QiLCJzdWIiOiJsZWFybmluZy1jb3JlLXNlcnZpY2UiLCJhdWQiOiJ0b3N1bnNhZW5nLWJpbGxpbmc6cmVzZXJ2YXRpb25zOnRlc3QiLCJpYXQiOjE3OTE4NDk2MDAsImV4cCI6MTc5MTg0OTY2MCwianRpIjoiMTExMTExMTEtMTExMS00MTExLTgxMTEtMTExMTExMTExMTExIn0.Qn86bFevl9qR86rF4jOS-q04xMsvNxd6A5rBCiRVVt4ihZFusF1NLdkcjTBTf0eZQ5v0njw7mr2Wg2g-lQP8JN1u3eOTseRFqW_wFugmw5SpLBPLyWMcmJbTBFjZStlL5UGsJb3-OsaaLml_U64HhwxzmvfKSfqxTEPMDNmroEOZswkfZIz3KfTP1T2kN-6aOuG3i3RUVjU9IVcnQgbRo_YgeeJdWB4Ln-7DNbNlnvKvaJcVnQAVMesZNCX227Ua8L7_1VH0VsQtfovH1GLbD8aaPm8CBGu8ckCut9hVRAf9w26s7bxERwUWmjnhIYyOezB5Mg4DmUW7VisFeh73_w"
+      ],
+      "expectedStatus": 401,
+      "execution": "PENDING_B_LC_HTTP",
+      "expectedStage": "INGRESS_OR_AUTH_REJECTION",
+      "authorizationHeaderName": "Authorization"
+    },
+    {
+      "id": "header-absent",
+      "group": "AUTH-10",
+      "identityEnabled": true,
+      "lcEnabled": true,
+      "target": "lc",
+      "method": "POST",
+      "path": "/internal/v1/reservations/status",
+      "localPort": 8444,
+      "queryString": null,
+      "authorization": [],
+      "expectedStatus": 401,
+      "execution": "PENDING_B_LC_HTTP",
+      "expectedStage": "INGRESS_OR_AUTH_REJECTION",
+      "authorizationHeaderName": "Authorization"
+    },
+    {
+      "id": "header-duplicate",
+      "group": "AUTH-10",
+      "identityEnabled": true,
+      "lcEnabled": true,
+      "target": "lc",
+      "method": "POST",
+      "path": "/internal/v1/reservations/status",
+      "localPort": 8444,
+      "queryString": null,
+      "authorization": [
+        "Bearer eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCIsImtpZCI6ImZha2Utc2hhcmVkLWtpZCJ9.eyJpc3MiOiJ1cm46dG9zdW5zYWVuZzp3b3JrbG9hZDpsZWFybmluZy1jb3JlOnRlc3QiLCJzdWIiOiJsZWFybmluZy1jb3JlLXNlcnZpY2UiLCJhdWQiOiJ0b3N1bnNhZW5nLWJpbGxpbmc6cmVzZXJ2YXRpb25zOnRlc3QiLCJpYXQiOjE3OTE4NDk2MDAsImV4cCI6MTc5MTg0OTY2MCwianRpIjoiMTExMTExMTEtMTExMS00MTExLTgxMTEtMTExMTExMTExMTExIn0.Qn86bFevl9qR86rF4jOS-q04xMsvNxd6A5rBCiRVVt4ihZFusF1NLdkcjTBTf0eZQ5v0njw7mr2Wg2g-lQP8JN1u3eOTseRFqW_wFugmw5SpLBPLyWMcmJbTBFjZStlL5UGsJb3-OsaaLml_U64HhwxzmvfKSfqxTEPMDNmroEOZswkfZIz3KfTP1T2kN-6aOuG3i3RUVjU9IVcnQgbRo_YgeeJdWB4Ln-7DNbNlnvKvaJcVnQAVMesZNCX227Ua8L7_1VH0VsQtfovH1GLbD8aaPm8CBGu8ckCut9hVRAf9w26s7bxERwUWmjnhIYyOezB5Mg4DmUW7VisFeh73_w",
+        "Bearer eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCIsImtpZCI6ImZha2Utc2hhcmVkLWtpZCJ9.eyJpc3MiOiJ1cm46dG9zdW5zYWVuZzp3b3JrbG9hZDpsZWFybmluZy1jb3JlOnRlc3QiLCJzdWIiOiJsZWFybmluZy1jb3JlLXNlcnZpY2UiLCJhdWQiOiJ0b3N1bnNhZW5nLWJpbGxpbmc6cmVzZXJ2YXRpb25zOnRlc3QiLCJpYXQiOjE3OTE4NDk2MDAsImV4cCI6MTc5MTg0OTY2MCwianRpIjoiMTExMTExMTEtMTExMS00MTExLTgxMTEtMTExMTExMTExMTExIn0.Qn86bFevl9qR86rF4jOS-q04xMsvNxd6A5rBCiRVVt4ihZFusF1NLdkcjTBTf0eZQ5v0njw7mr2Wg2g-lQP8JN1u3eOTseRFqW_wFugmw5SpLBPLyWMcmJbTBFjZStlL5UGsJb3-OsaaLml_U64HhwxzmvfKSfqxTEPMDNmroEOZswkfZIz3KfTP1T2kN-6aOuG3i3RUVjU9IVcnQgbRo_YgeeJdWB4Ln-7DNbNlnvKvaJcVnQAVMesZNCX227Ua8L7_1VH0VsQtfovH1GLbD8aaPm8CBGu8ckCut9hVRAf9w26s7bxERwUWmjnhIYyOezB5Mg4DmUW7VisFeh73_w"
+      ],
+      "expectedStatus": 401,
+      "execution": "PENDING_B_LC_HTTP",
+      "expectedStage": "INGRESS_OR_AUTH_REJECTION",
+      "authorizationHeaderName": "Authorization"
+    },
+    {
+      "id": "query-x=1",
+      "group": "QUERY",
+      "identityEnabled": true,
+      "lcEnabled": true,
+      "target": "lc",
+      "method": "POST",
+      "path": "/internal/v1/reservations/status",
+      "localPort": 8444,
+      "queryString": "x=1",
+      "authorization": [
+        "Bearer eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCIsImtpZCI6ImZha2Utc2hhcmVkLWtpZCJ9.eyJpc3MiOiJ1cm46dG9zdW5zYWVuZzp3b3JrbG9hZDpsZWFybmluZy1jb3JlOnRlc3QiLCJzdWIiOiJsZWFybmluZy1jb3JlLXNlcnZpY2UiLCJhdWQiOiJ0b3N1bnNhZW5nLWJpbGxpbmc6cmVzZXJ2YXRpb25zOnRlc3QiLCJpYXQiOjE3OTE4NDk2MDAsImV4cCI6MTc5MTg0OTY2MCwianRpIjoiMTExMTExMTEtMTExMS00MTExLTgxMTEtMTExMTExMTExMTExIn0.Qn86bFevl9qR86rF4jOS-q04xMsvNxd6A5rBCiRVVt4ihZFusF1NLdkcjTBTf0eZQ5v0njw7mr2Wg2g-lQP8JN1u3eOTseRFqW_wFugmw5SpLBPLyWMcmJbTBFjZStlL5UGsJb3-OsaaLml_U64HhwxzmvfKSfqxTEPMDNmroEOZswkfZIz3KfTP1T2kN-6aOuG3i3RUVjU9IVcnQgbRo_YgeeJdWB4Ln-7DNbNlnvKvaJcVnQAVMesZNCX227Ua8L7_1VH0VsQtfovH1GLbD8aaPm8CBGu8ckCut9hVRAf9w26s7bxERwUWmjnhIYyOezB5Mg4DmUW7VisFeh73_w"
+      ],
+      "expectedStatus": 401,
+      "execution": "PENDING_B_LC_HTTP",
+      "expectedStage": "INGRESS_OR_AUTH_REJECTION",
+      "authorizationHeaderName": "Authorization"
+    },
+    {
+      "id": "query-x=",
+      "group": "QUERY",
+      "identityEnabled": true,
+      "lcEnabled": true,
+      "target": "lc",
+      "method": "POST",
+      "path": "/internal/v1/reservations/status",
+      "localPort": 8444,
+      "queryString": "x=",
+      "authorization": [
+        "Bearer eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCIsImtpZCI6ImZha2Utc2hhcmVkLWtpZCJ9.eyJpc3MiOiJ1cm46dG9zdW5zYWVuZzp3b3JrbG9hZDpsZWFybmluZy1jb3JlOnRlc3QiLCJzdWIiOiJsZWFybmluZy1jb3JlLXNlcnZpY2UiLCJhdWQiOiJ0b3N1bnNhZW5nLWJpbGxpbmc6cmVzZXJ2YXRpb25zOnRlc3QiLCJpYXQiOjE3OTE4NDk2MDAsImV4cCI6MTc5MTg0OTY2MCwianRpIjoiMTExMTExMTEtMTExMS00MTExLTgxMTEtMTExMTExMTExMTExIn0.Qn86bFevl9qR86rF4jOS-q04xMsvNxd6A5rBCiRVVt4ihZFusF1NLdkcjTBTf0eZQ5v0njw7mr2Wg2g-lQP8JN1u3eOTseRFqW_wFugmw5SpLBPLyWMcmJbTBFjZStlL5UGsJb3-OsaaLml_U64HhwxzmvfKSfqxTEPMDNmroEOZswkfZIz3KfTP1T2kN-6aOuG3i3RUVjU9IVcnQgbRo_YgeeJdWB4Ln-7DNbNlnvKvaJcVnQAVMesZNCX227Ua8L7_1VH0VsQtfovH1GLbD8aaPm8CBGu8ckCut9hVRAf9w26s7bxERwUWmjnhIYyOezB5Mg4DmUW7VisFeh73_w"
+      ],
+      "expectedStatus": 401,
+      "execution": "PENDING_B_LC_HTTP",
+      "expectedStage": "INGRESS_OR_AUTH_REJECTION",
+      "authorizationHeaderName": "Authorization"
+    },
+    {
+      "id": "query-userId=22222222-2222-4222-8222-222222222222",
+      "group": "QUERY",
+      "identityEnabled": true,
+      "lcEnabled": true,
+      "target": "lc",
+      "method": "POST",
+      "path": "/internal/v1/reservations/status",
+      "localPort": 8444,
+      "queryString": "userId=22222222-2222-4222-8222-222222222222",
+      "authorization": [
+        "Bearer eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCIsImtpZCI6ImZha2Utc2hhcmVkLWtpZCJ9.eyJpc3MiOiJ1cm46dG9zdW5zYWVuZzp3b3JrbG9hZDpsZWFybmluZy1jb3JlOnRlc3QiLCJzdWIiOiJsZWFybmluZy1jb3JlLXNlcnZpY2UiLCJhdWQiOiJ0b3N1bnNhZW5nLWJpbGxpbmc6cmVzZXJ2YXRpb25zOnRlc3QiLCJpYXQiOjE3OTE4NDk2MDAsImV4cCI6MTc5MTg0OTY2MCwianRpIjoiMTExMTExMTEtMTExMS00MTExLTgxMTEtMTExMTExMTExMTExIn0.Qn86bFevl9qR86rF4jOS-q04xMsvNxd6A5rBCiRVVt4ihZFusF1NLdkcjTBTf0eZQ5v0njw7mr2Wg2g-lQP8JN1u3eOTseRFqW_wFugmw5SpLBPLyWMcmJbTBFjZStlL5UGsJb3-OsaaLml_U64HhwxzmvfKSfqxTEPMDNmroEOZswkfZIz3KfTP1T2kN-6aOuG3i3RUVjU9IVcnQgbRo_YgeeJdWB4Ln-7DNbNlnvKvaJcVnQAVMesZNCX227Ua8L7_1VH0VsQtfovH1GLbD8aaPm8CBGu8ckCut9hVRAf9w26s7bxERwUWmjnhIYyOezB5Mg4DmUW7VisFeh73_w"
+      ],
+      "expectedStatus": 401,
+      "execution": "PENDING_B_LC_HTTP",
+      "expectedStage": "INGRESS_OR_AUTH_REJECTION",
+      "authorizationHeaderName": "Authorization"
+    },
+    {
+      "id": "query-x=1&x=2",
+      "group": "QUERY",
+      "identityEnabled": true,
+      "lcEnabled": true,
+      "target": "lc",
+      "method": "POST",
+      "path": "/internal/v1/reservations/status",
+      "localPort": 8444,
+      "queryString": "x=1&x=2",
+      "authorization": [
+        "Bearer eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCIsImtpZCI6ImZha2Utc2hhcmVkLWtpZCJ9.eyJpc3MiOiJ1cm46dG9zdW5zYWVuZzp3b3JrbG9hZDpsZWFybmluZy1jb3JlOnRlc3QiLCJzdWIiOiJsZWFybmluZy1jb3JlLXNlcnZpY2UiLCJhdWQiOiJ0b3N1bnNhZW5nLWJpbGxpbmc6cmVzZXJ2YXRpb25zOnRlc3QiLCJpYXQiOjE3OTE4NDk2MDAsImV4cCI6MTc5MTg0OTY2MCwianRpIjoiMTExMTExMTEtMTExMS00MTExLTgxMTEtMTExMTExMTExMTExIn0.Qn86bFevl9qR86rF4jOS-q04xMsvNxd6A5rBCiRVVt4ihZFusF1NLdkcjTBTf0eZQ5v0njw7mr2Wg2g-lQP8JN1u3eOTseRFqW_wFugmw5SpLBPLyWMcmJbTBFjZStlL5UGsJb3-OsaaLml_U64HhwxzmvfKSfqxTEPMDNmroEOZswkfZIz3KfTP1T2kN-6aOuG3i3RUVjU9IVcnQgbRo_YgeeJdWB4Ln-7DNbNlnvKvaJcVnQAVMesZNCX227Ua8L7_1VH0VsQtfovH1GLbD8aaPm8CBGu8ckCut9hVRAf9w26s7bxERwUWmjnhIYyOezB5Mg4DmUW7VisFeh73_w"
+      ],
+      "expectedStatus": 401,
+      "execution": "PENDING_B_LC_HTTP",
+      "expectedStage": "INGRESS_OR_AUTH_REJECTION",
+      "authorizationHeaderName": "Authorization"
+    },
+    {
+      "id": "query-empty",
+      "group": "QUERY",
+      "identityEnabled": true,
+      "lcEnabled": true,
+      "target": "lc",
+      "method": "POST",
+      "path": "/internal/v1/reservations/status",
+      "localPort": 8444,
+      "queryString": "",
+      "authorization": [
+        "Bearer eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCIsImtpZCI6ImZha2Utc2hhcmVkLWtpZCJ9.eyJpc3MiOiJ1cm46dG9zdW5zYWVuZzp3b3JrbG9hZDpsZWFybmluZy1jb3JlOnRlc3QiLCJzdWIiOiJsZWFybmluZy1jb3JlLXNlcnZpY2UiLCJhdWQiOiJ0b3N1bnNhZW5nLWJpbGxpbmc6cmVzZXJ2YXRpb25zOnRlc3QiLCJpYXQiOjE3OTE4NDk2MDAsImV4cCI6MTc5MTg0OTY2MCwianRpIjoiMTExMTExMTEtMTExMS00MTExLTgxMTEtMTExMTExMTExMTExIn0.Qn86bFevl9qR86rF4jOS-q04xMsvNxd6A5rBCiRVVt4ihZFusF1NLdkcjTBTf0eZQ5v0njw7mr2Wg2g-lQP8JN1u3eOTseRFqW_wFugmw5SpLBPLyWMcmJbTBFjZStlL5UGsJb3-OsaaLml_U64HhwxzmvfKSfqxTEPMDNmroEOZswkfZIz3KfTP1T2kN-6aOuG3i3RUVjU9IVcnQgbRo_YgeeJdWB4Ln-7DNbNlnvKvaJcVnQAVMesZNCX227Ua8L7_1VH0VsQtfovH1GLbD8aaPm8CBGu8ckCut9hVRAf9w26s7bxERwUWmjnhIYyOezB5Mg4DmUW7VisFeh73_w"
+      ],
+      "expectedStatus": 401,
+      "execution": "PENDING_B_LC_HTTP",
+      "expectedStage": "INGRESS_OR_AUTH_REJECTION",
+      "authorizationHeaderName": "Authorization"
+    },
+    {
+      "id": "identity-to-lc",
+      "group": "AUTH-08",
+      "identityEnabled": true,
+      "lcEnabled": true,
+      "target": "lc",
+      "method": "POST",
+      "path": "/internal/v1/reservations/status",
+      "localPort": 8444,
+      "queryString": null,
+      "authorization": [
+        "Bearer eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCIsImtpZCI6ImZha2Utc2hhcmVkLWtpZCJ9.eyJpc3MiOiJ1cm46dG9zdW5zYWVuZzp3b3JrbG9hZDppZGVudGl0eTp0ZXN0Iiwic3ViIjoiaWRlbnRpdHktc2VydmljZSIsImF1ZCI6InRvc3Vuc2FlbmctYmlsbGluZzp3aXRoZHJhd2FsLWV2ZW50czp0ZXN0IiwiaWF0IjoxNzkxODQ5NjAwLCJleHAiOjE3OTE4NDk2NjAsImp0aSI6IjExMTExMTExLTExMTEtNDExMS04MTExLTExMTExMTExMTExMSJ9.kDJKckg8vaw-EUUHcBOdlJH5FtGyiMs-YRX6VslnkRb77h9MjlIkh7yowd8FC1sYve818CZDJyEm8xwm17kpc-JrVhAdFIerHTNUVLOHpgNctw93WDiH1uBES_WIboFzL8172PI-m0phrFyGe6cjgXfxYQy7dGkbg6KuDHrsXxbQMkXBMs9FwTjabG-fBlMG8AtZxJU_Q1jWQ6BLdolsp_2BcQ2IO1eDXU6_nluaype9C6qiHXKxyiiuyhwAuCBv3oXT2YKtEdttgWoo69CNSK7TQdtDLLjl9TdAyw579r0PonVjGcbOcJtp8Djpj98PJFp8Vic5pzuNG1frqp0w5Q"
+      ],
+      "expectedStatus": 403,
+      "execution": "PENDING_B_LC_HTTP",
+      "expectedStage": "INGRESS_OR_AUTH_REJECTION",
+      "authorizationHeaderName": "Authorization"
+    },
+    {
+      "id": "lc-to-identity",
+      "group": "AUTH-08",
+      "identityEnabled": true,
+      "lcEnabled": true,
+      "target": "identity",
+      "method": "POST",
+      "path": "/internal/v1/payments/accounts/withdrawal/events",
+      "localPort": 8444,
+      "queryString": null,
+      "authorization": [
+        "Bearer eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCIsImtpZCI6ImZha2Utc2hhcmVkLWtpZCJ9.eyJpc3MiOiJ1cm46dG9zdW5zYWVuZzp3b3JrbG9hZDpsZWFybmluZy1jb3JlOnRlc3QiLCJzdWIiOiJsZWFybmluZy1jb3JlLXNlcnZpY2UiLCJhdWQiOiJ0b3N1bnNhZW5nLWJpbGxpbmc6cmVzZXJ2YXRpb25zOnRlc3QiLCJpYXQiOjE3OTE4NDk2MDAsImV4cCI6MTc5MTg0OTY2MCwianRpIjoiMTExMTExMTEtMTExMS00MTExLTgxMTEtMTExMTExMTExMTExIn0.Qn86bFevl9qR86rF4jOS-q04xMsvNxd6A5rBCiRVVt4ihZFusF1NLdkcjTBTf0eZQ5v0njw7mr2Wg2g-lQP8JN1u3eOTseRFqW_wFugmw5SpLBPLyWMcmJbTBFjZStlL5UGsJb3-OsaaLml_U64HhwxzmvfKSfqxTEPMDNmroEOZswkfZIz3KfTP1T2kN-6aOuG3i3RUVjU9IVcnQgbRo_YgeeJdWB4Ln-7DNbNlnvKvaJcVnQAVMesZNCX227Ua8L7_1VH0VsQtfovH1GLbD8aaPm8CBGu8ckCut9hVRAf9w26s7bxERwUWmjnhIYyOezB5Mg4DmUW7VisFeh73_w"
+      ],
+      "expectedStatus": 403,
+      "execution": "PENDING_B_LC_HTTP",
+      "expectedStage": "INGRESS_OR_AUTH_REJECTION",
+      "authorizationHeaderName": "Authorization"
+    },
+    {
+      "id": "identity-off-token-to-lc",
+      "group": "AUTH-08",
+      "identityEnabled": false,
+      "lcEnabled": true,
+      "target": "lc",
+      "method": "POST",
+      "path": "/internal/v1/reservations/status",
+      "localPort": 8444,
+      "queryString": null,
+      "authorization": [
+        "Bearer eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCIsImtpZCI6ImZha2Utc2hhcmVkLWtpZCJ9.eyJpc3MiOiJ1cm46dG9zdW5zYWVuZzp3b3JrbG9hZDppZGVudGl0eTp0ZXN0Iiwic3ViIjoiaWRlbnRpdHktc2VydmljZSIsImF1ZCI6InRvc3Vuc2FlbmctYmlsbGluZzp3aXRoZHJhd2FsLWV2ZW50czp0ZXN0IiwiaWF0IjoxNzkxODQ5NjAwLCJleHAiOjE3OTE4NDk2NjAsImp0aSI6IjExMTExMTExLTExMTEtNDExMS04MTExLTExMTExMTExMTExMSJ9.kDJKckg8vaw-EUUHcBOdlJH5FtGyiMs-YRX6VslnkRb77h9MjlIkh7yowd8FC1sYve818CZDJyEm8xwm17kpc-JrVhAdFIerHTNUVLOHpgNctw93WDiH1uBES_WIboFzL8172PI-m0phrFyGe6cjgXfxYQy7dGkbg6KuDHrsXxbQMkXBMs9FwTjabG-fBlMG8AtZxJU_Q1jWQ6BLdolsp_2BcQ2IO1eDXU6_nluaype9C6qiHXKxyiiuyhwAuCBv3oXT2YKtEdttgWoo69CNSK7TQdtDLLjl9TdAyw579r0PonVjGcbOcJtp8Djpj98PJFp8Vic5pzuNG1frqp0w5Q"
+      ],
+      "expectedStatus": 401,
+      "execution": "PENDING_B_LC_HTTP",
+      "expectedStage": "INGRESS_OR_AUTH_REJECTION",
+      "authorizationHeaderName": "Authorization"
+    },
+    {
+      "id": "lc-off-token-to-identity",
+      "group": "AUTH-08",
+      "identityEnabled": true,
+      "lcEnabled": false,
+      "target": "identity",
+      "method": "POST",
+      "path": "/internal/v1/payments/accounts/withdrawal/events",
+      "localPort": 8444,
+      "queryString": null,
+      "authorization": [
+        "Bearer eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCIsImtpZCI6ImZha2Utc2hhcmVkLWtpZCJ9.eyJpc3MiOiJ1cm46dG9zdW5zYWVuZzp3b3JrbG9hZDpsZWFybmluZy1jb3JlOnRlc3QiLCJzdWIiOiJsZWFybmluZy1jb3JlLXNlcnZpY2UiLCJhdWQiOiJ0b3N1bnNhZW5nLWJpbGxpbmc6cmVzZXJ2YXRpb25zOnRlc3QiLCJpYXQiOjE3OTE4NDk2MDAsImV4cCI6MTc5MTg0OTY2MCwianRpIjoiMTExMTExMTEtMTExMS00MTExLTgxMTEtMTExMTExMTExMTExIn0.Qn86bFevl9qR86rF4jOS-q04xMsvNxd6A5rBCiRVVt4ihZFusF1NLdkcjTBTf0eZQ5v0njw7mr2Wg2g-lQP8JN1u3eOTseRFqW_wFugmw5SpLBPLyWMcmJbTBFjZStlL5UGsJb3-OsaaLml_U64HhwxzmvfKSfqxTEPMDNmroEOZswkfZIz3KfTP1T2kN-6aOuG3i3RUVjU9IVcnQgbRo_YgeeJdWB4Ln-7DNbNlnvKvaJcVnQAVMesZNCX227Ua8L7_1VH0VsQtfovH1GLbD8aaPm8CBGu8ckCut9hVRAf9w26s7bxERwUWmjnhIYyOezB5Mg4DmUW7VisFeh73_w"
+      ],
+      "expectedStatus": 401,
+      "execution": "PENDING_B_LC_HTTP",
+      "expectedStage": "INGRESS_OR_AUTH_REJECTION",
+      "authorizationHeaderName": "Authorization"
+    },
+    {
+      "id": "identity-target-off",
+      "group": "AUTH-08",
+      "identityEnabled": false,
+      "lcEnabled": true,
+      "target": "identity",
+      "method": "POST",
+      "path": "/internal/v1/payments/accounts/withdrawal/events",
+      "localPort": 8444,
+      "queryString": null,
+      "authorization": [
+        "Bearer eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCIsImtpZCI6ImZha2Utc2hhcmVkLWtpZCJ9.eyJpc3MiOiJ1cm46dG9zdW5zYWVuZzp3b3JrbG9hZDpsZWFybmluZy1jb3JlOnRlc3QiLCJzdWIiOiJsZWFybmluZy1jb3JlLXNlcnZpY2UiLCJhdWQiOiJ0b3N1bnNhZW5nLWJpbGxpbmc6cmVzZXJ2YXRpb25zOnRlc3QiLCJpYXQiOjE3OTE4NDk2MDAsImV4cCI6MTc5MTg0OTY2MCwianRpIjoiMTExMTExMTEtMTExMS00MTExLTgxMTEtMTExMTExMTExMTExIn0.Qn86bFevl9qR86rF4jOS-q04xMsvNxd6A5rBCiRVVt4ihZFusF1NLdkcjTBTf0eZQ5v0njw7mr2Wg2g-lQP8JN1u3eOTseRFqW_wFugmw5SpLBPLyWMcmJbTBFjZStlL5UGsJb3-OsaaLml_U64HhwxzmvfKSfqxTEPMDNmroEOZswkfZIz3KfTP1T2kN-6aOuG3i3RUVjU9IVcnQgbRo_YgeeJdWB4Ln-7DNbNlnvKvaJcVnQAVMesZNCX227Ua8L7_1VH0VsQtfovH1GLbD8aaPm8CBGu8ckCut9hVRAf9w26s7bxERwUWmjnhIYyOezB5Mg4DmUW7VisFeh73_w"
+      ],
+      "expectedStatus": 404,
+      "execution": "PENDING_B_LC_HTTP",
+      "expectedStage": "INGRESS_OR_AUTH_REJECTION",
+      "authorizationHeaderName": "Authorization"
+    },
+    {
+      "id": "lc-target-off",
+      "group": "AUTH-08",
+      "identityEnabled": true,
+      "lcEnabled": false,
+      "target": "lc",
+      "method": "POST",
+      "path": "/internal/v1/reservations/status",
+      "localPort": 8444,
+      "queryString": "x=1",
+      "authorization": [
+        "invalid"
+      ],
+      "expectedStatus": 404,
+      "execution": "PENDING_B_LC_HTTP",
+      "expectedStage": "INGRESS_OR_AUTH_REJECTION",
+      "authorizationHeaderName": "Authorization"
+    },
+    {
+      "id": "cross-issuer-tampered",
+      "group": "AUTH-08",
+      "identityEnabled": true,
+      "lcEnabled": true,
+      "target": "lc",
+      "method": "POST",
+      "path": "/internal/v1/reservations/status",
+      "localPort": 8444,
+      "queryString": null,
+      "authorization": [
+        "Bearer eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCIsImtpZCI6ImZha2Utc2hhcmVkLWtpZCJ9.eyJpc3MiOiJ1cm46dG9zdW5zYWVuZzp3b3JrbG9hZDppZGVudGl0eTp0ZXN0Iiwic3ViIjoiaWRlbnRpdHktc2VydmljZSIsImF1ZCI6InRvc3Vuc2FlbmctYmlsbGluZzp3aXRoZHJhd2FsLWV2ZW50czp0ZXN0IiwiaWF0IjoxNzkxODQ5NjAwLCJleHAiOjE3OTE4NDk2NjAsImp0aSI6IjExMTExMTExLTExMTEtNDExMS04MTExLTExMTExMTExMTExMSJ9.kTJKckg8vaw-EUUHcBOdlJH5FtGyiMs-YRX6VslnkRb77h9MjlIkh7yowd8FC1sYve818CZDJyEm8xwm17kpc-JrVhAdFIerHTNUVLOHpgNctw93WDiH1uBES_WIboFzL8172PI-m0phrFyGe6cjgXfxYQy7dGkbg6KuDHrsXxbQMkXBMs9FwTjabG-fBlMG8AtZxJU_Q1jWQ6BLdolsp_2BcQ2IO1eDXU6_nluaype9C6qiHXKxyiiuyhwAuCBv3oXT2YKtEdttgWoo69CNSK7TQdtDLLjl9TdAyw579r0PonVjGcbOcJtp8Djpj98PJFp8Vic5pzuNG1frqp0w5Q"
+      ],
+      "expectedStatus": 401,
+      "execution": "PENDING_B_LC_HTTP",
+      "expectedStage": "INGRESS_OR_AUTH_REJECTION",
+      "authorizationHeaderName": "Authorization"
+    },
+    {
+      "id": "wrong-local-port",
+      "group": "INGRESS",
+      "identityEnabled": true,
+      "lcEnabled": true,
+      "target": "lc",
+      "method": "POST",
+      "path": "/internal/v1/reservations/status",
+      "localPort": 8082,
+      "queryString": null,
+      "authorization": [
+        "Bearer eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCIsImtpZCI6ImZha2Utc2hhcmVkLWtpZCJ9.eyJpc3MiOiJ1cm46dG9zdW5zYWVuZzp3b3JrbG9hZDpsZWFybmluZy1jb3JlOnRlc3QiLCJzdWIiOiJsZWFybmluZy1jb3JlLXNlcnZpY2UiLCJhdWQiOiJ0b3N1bnNhZW5nLWJpbGxpbmc6cmVzZXJ2YXRpb25zOnRlc3QiLCJpYXQiOjE3OTE4NDk2MDAsImV4cCI6MTc5MTg0OTY2MCwianRpIjoiMTExMTExMTEtMTExMS00MTExLTgxMTEtMTExMTExMTExMTExIn0.Qn86bFevl9qR86rF4jOS-q04xMsvNxd6A5rBCiRVVt4ihZFusF1NLdkcjTBTf0eZQ5v0njw7mr2Wg2g-lQP8JN1u3eOTseRFqW_wFugmw5SpLBPLyWMcmJbTBFjZStlL5UGsJb3-OsaaLml_U64HhwxzmvfKSfqxTEPMDNmroEOZswkfZIz3KfTP1T2kN-6aOuG3i3RUVjU9IVcnQgbRo_YgeeJdWB4Ln-7DNbNlnvKvaJcVnQAVMesZNCX227Ua8L7_1VH0VsQtfovH1GLbD8aaPm8CBGu8ckCut9hVRAf9w26s7bxERwUWmjnhIYyOezB5Mg4DmUW7VisFeh73_w"
+      ],
+      "expectedStatus": 404,
+      "execution": "PENDING_B_LC_HTTP",
+      "expectedStage": "INGRESS_OR_AUTH_REJECTION",
+      "authorizationHeaderName": "Authorization"
+    },
+    {
+      "id": "wrong-method",
+      "group": "INGRESS",
+      "identityEnabled": true,
+      "lcEnabled": true,
+      "target": "lc",
+      "method": "GET",
+      "path": "/internal/v1/reservations/status",
+      "localPort": 8444,
+      "queryString": null,
+      "authorization": [
+        "Bearer eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCIsImtpZCI6ImZha2Utc2hhcmVkLWtpZCJ9.eyJpc3MiOiJ1cm46dG9zdW5zYWVuZzp3b3JrbG9hZDpsZWFybmluZy1jb3JlOnRlc3QiLCJzdWIiOiJsZWFybmluZy1jb3JlLXNlcnZpY2UiLCJhdWQiOiJ0b3N1bnNhZW5nLWJpbGxpbmc6cmVzZXJ2YXRpb25zOnRlc3QiLCJpYXQiOjE3OTE4NDk2MDAsImV4cCI6MTc5MTg0OTY2MCwianRpIjoiMTExMTExMTEtMTExMS00MTExLTgxMTEtMTExMTExMTExMTExIn0.Qn86bFevl9qR86rF4jOS-q04xMsvNxd6A5rBCiRVVt4ihZFusF1NLdkcjTBTf0eZQ5v0njw7mr2Wg2g-lQP8JN1u3eOTseRFqW_wFugmw5SpLBPLyWMcmJbTBFjZStlL5UGsJb3-OsaaLml_U64HhwxzmvfKSfqxTEPMDNmroEOZswkfZIz3KfTP1T2kN-6aOuG3i3RUVjU9IVcnQgbRo_YgeeJdWB4Ln-7DNbNlnvKvaJcVnQAVMesZNCX227Ua8L7_1VH0VsQtfovH1GLbD8aaPm8CBGu8ckCut9hVRAf9w26s7bxERwUWmjnhIYyOezB5Mg4DmUW7VisFeh73_w"
+      ],
+      "expectedStatus": 403,
+      "execution": "PENDING_B_LC_HTTP",
+      "expectedStage": "INGRESS_OR_AUTH_REJECTION",
+      "authorizationHeaderName": "Authorization"
+    },
+    {
+      "id": "unknown-internal-path",
+      "group": "INGRESS",
+      "identityEnabled": true,
+      "lcEnabled": true,
+      "target": "lc",
+      "method": "POST",
+      "path": "/internal/v1/unknown",
+      "localPort": 8444,
+      "queryString": null,
+      "authorization": [
+        "Bearer eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCIsImtpZCI6ImZha2Utc2hhcmVkLWtpZCJ9.eyJpc3MiOiJ1cm46dG9zdW5zYWVuZzp3b3JrbG9hZDpsZWFybmluZy1jb3JlOnRlc3QiLCJzdWIiOiJsZWFybmluZy1jb3JlLXNlcnZpY2UiLCJhdWQiOiJ0b3N1bnNhZW5nLWJpbGxpbmc6cmVzZXJ2YXRpb25zOnRlc3QiLCJpYXQiOjE3OTE4NDk2MDAsImV4cCI6MTc5MTg0OTY2MCwianRpIjoiMTExMTExMTEtMTExMS00MTExLTgxMTEtMTExMTExMTExMTExIn0.Qn86bFevl9qR86rF4jOS-q04xMsvNxd6A5rBCiRVVt4ihZFusF1NLdkcjTBTf0eZQ5v0njw7mr2Wg2g-lQP8JN1u3eOTseRFqW_wFugmw5SpLBPLyWMcmJbTBFjZStlL5UGsJb3-OsaaLml_U64HhwxzmvfKSfqxTEPMDNmroEOZswkfZIz3KfTP1T2kN-6aOuG3i3RUVjU9IVcnQgbRo_YgeeJdWB4Ln-7DNbNlnvKvaJcVnQAVMesZNCX227Ua8L7_1VH0VsQtfovH1GLbD8aaPm8CBGu8ckCut9hVRAf9w26s7bxERwUWmjnhIYyOezB5Mg4DmUW7VisFeh73_w"
+      ],
+      "expectedStatus": 403,
+      "execution": "PENDING_B_LC_HTTP",
+      "expectedStage": "INGRESS_OR_AUTH_REJECTION",
+      "authorizationHeaderName": "Authorization"
+    },
+    {
+      "id": "both-off-no-connector",
+      "group": "INGRESS",
+      "identityEnabled": false,
+      "lcEnabled": false,
+      "target": "lc",
+      "method": "POST",
+      "path": "/internal/v1/reservations/status",
+      "localPort": 8444,
+      "queryString": null,
+      "authorization": [
+        "Bearer eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCIsImtpZCI6ImZha2Utc2hhcmVkLWtpZCJ9.eyJpc3MiOiJ1cm46dG9zdW5zYWVuZzp3b3JrbG9hZDpsZWFybmluZy1jb3JlOnRlc3QiLCJzdWIiOiJsZWFybmluZy1jb3JlLXNlcnZpY2UiLCJhdWQiOiJ0b3N1bnNhZW5nLWJpbGxpbmc6cmVzZXJ2YXRpb25zOnRlc3QiLCJpYXQiOjE3OTE4NDk2MDAsImV4cCI6MTc5MTg0OTY2MCwianRpIjoiMTExMTExMTEtMTExMS00MTExLTgxMTEtMTExMTExMTExMTExIn0.Qn86bFevl9qR86rF4jOS-q04xMsvNxd6A5rBCiRVVt4ihZFusF1NLdkcjTBTf0eZQ5v0njw7mr2Wg2g-lQP8JN1u3eOTseRFqW_wFugmw5SpLBPLyWMcmJbTBFjZStlL5UGsJb3-OsaaLml_U64HhwxzmvfKSfqxTEPMDNmroEOZswkfZIz3KfTP1T2kN-6aOuG3i3RUVjU9IVcnQgbRo_YgeeJdWB4Ln-7DNbNlnvKvaJcVnQAVMesZNCX227Ua8L7_1VH0VsQtfovH1GLbD8aaPm8CBGu8ckCut9hVRAf9w26s7bxERwUWmjnhIYyOezB5Mg4DmUW7VisFeh73_w"
+      ],
+      "transport": "connection-refused",
+      "expectedStatus": null,
+      "execution": "PENDING_B_LC_HTTP",
+      "expectedStage": "NO_HTTP_RESPONSE",
+      "authorizationHeaderName": "Authorization"
+    }
+  ]
+}

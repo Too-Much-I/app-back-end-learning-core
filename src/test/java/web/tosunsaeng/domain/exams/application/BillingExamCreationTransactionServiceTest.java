@@ -1,0 +1,202 @@
+package web.tosunsaeng.domain.exams.application;
+
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
+import org.mockito.Mock;
+import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.beans.factory.ObjectProvider;
+import org.springframework.transaction.support.SimpleTransactionStatus;
+import org.springframework.transaction.support.TransactionCallback;
+import org.springframework.transaction.support.TransactionOperations;
+import web.tosunsaeng.domain.exams.domain.entity.ExamCreationOperation;
+import web.tosunsaeng.domain.exams.domain.entity.ExamSession;
+import web.tosunsaeng.domain.exams.domain.enums.BillingReservationKind;
+import web.tosunsaeng.domain.exams.domain.enums.ExamEntitlementState;
+import web.tosunsaeng.domain.exams.domain.enums.ExamSessionStatus;
+import web.tosunsaeng.domain.exams.domain.repository.ExamCreationOperationRepository;
+import web.tosunsaeng.domain.exams.domain.repository.ExamSessionRepository;
+import web.tosunsaeng.domain.exams.domain.enums.BillingContinuationReason;
+
+import java.time.Instant;
+import java.time.LocalDateTime;
+import java.time.ZoneOffset;
+import java.util.List;
+import java.util.Optional;
+
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
+
+@ExtendWith(MockitoExtension.class)
+class BillingExamCreationTransactionServiceTest {
+
+    @Mock
+    private ExamCreationOperationRepository operationRepository;
+    @Mock
+    private ExamSessionRepository sessionRepository;
+    @Mock
+    private ExamSessionManager sessionManager;
+    @Mock
+    private ObjectProvider<TransactionOperations> transactionProvider;
+
+    private BillingExamCreationTransactionService service;
+
+    @Test void cutoverBlocksPreparedInsertAndReservedCommitButNotAlreadyCommittedReplay() {
+        var now = Instant.parse("2026-10-16T00:00:00Z");
+        var operation = ExamCreationOperation.prepared("00000000-0000-4000-8000-000000000001",
+                "018f6f36-2f42-4bf5-8c17-0be35de4872c", "ex_new", "mock", 1, now);
+        var guard = org.mockito.Mockito.mock(web.tosunsaeng.domain.exams.rollout.LegacyExamWriterGuard.class);
+        org.mockito.Mockito.doThrow(new IllegalStateException("stopped")).when(guard).requireAllowed();
+        org.springframework.test.util.ReflectionTestUtils.setField(service,"legacyWriterGuard",guard);
+        org.junit.jupiter.api.Assertions.assertThrows(IllegalStateException.class, () -> service.insertPrepared(operation));
+        operation.markReserved("018f6f36-2f42-4bf5-8c17-0be35de4872d", BillingReservationKind.INITIAL,
+                "018f6f36-2f42-4bf5-8c17-0be35de4872e", now.plusSeconds(300), now);
+        when(operationRepository.findById(operation.getCommandId())).thenReturn(Optional.of(operation));
+        org.junit.jupiter.api.Assertions.assertThrows(IllegalStateException.class,
+                () -> service.commitReservedSession(operation.getCommandId(), now, ZoneOffset.UTC));
+        operation.markSessionCommitted(now);
+        org.junit.jupiter.api.Assertions.assertSame(operation,
+                service.commitReservedSession(operation.getCommandId(), now, ZoneOffset.UTC));
+        org.mockito.Mockito.verifyNoInteractions(sessionRepository, sessionManager);
+        org.mockito.Mockito.verify(operationRepository, org.mockito.Mockito.never()).insert(any(ExamCreationOperation.class));
+        org.mockito.Mockito.verify(operationRepository, org.mockito.Mockito.never()).save(any());
+    }
+
+    @BeforeEach
+    void setUp() {
+        TransactionOperations directTransactions = new TransactionOperations() {
+            @Override
+            public <T> T execute(TransactionCallback<T> action) {
+                return action.doInTransaction(new SimpleTransactionStatus());
+            }
+        };
+        when(transactionProvider.getIfAvailable()).thenReturn(directTransactions);
+        service = new BillingExamCreationTransactionService(
+                operationRepository,
+                sessionRepository,
+                sessionManager,
+                transactionProvider
+        );
+    }
+
+    @Test
+    void revokedGroupCannotCommitOrFinalizeThroughExistingWriter() {
+        Instant now = Instant.parse("2026-10-14T00:00:00Z");
+        var operation = ExamCreationOperation.prepared("00000000-0000-4000-8000-000000000001",
+                "018f6f36-2f42-4bf5-8c17-0be35de4872c", "ex_new", "mock", 1, now);
+        operation.markReserved("018f6f36-2f42-4bf5-8c17-0be35de4872d", BillingReservationKind.INITIAL,
+                "018f6f36-2f42-4bf5-8c17-0be35de4872e", now.plusSeconds(300), now);
+        when(operationRepository.findById(operation.getCommandId())).thenReturn(Optional.of(operation));
+        var store = org.mockito.Mockito.mock(web.tosunsaeng.domain.exams.access.AccessRevocationStore.class);
+        org.springframework.test.util.ReflectionTestUtils.setField(service, "accessRevocations", store);
+        when(store.denied(operation.getAttemptGroupId(), "ex_new", operation.getUserId())).thenReturn(true);
+        org.junit.jupiter.api.Assertions.assertThrows(IllegalStateException.class,
+                () -> service.commitReservedSession(operation.getCommandId(), now, ZoneOffset.UTC));
+        operation.markSessionCommitted(now);
+        org.junit.jupiter.api.Assertions.assertThrows(IllegalStateException.class,
+                () -> service.finalizeConfirmed(operation.getCommandId(), now));
+        org.mockito.Mockito.verifyNoInteractions(sessionRepository, sessionManager);
+        org.mockito.Mockito.verify(operationRepository, org.mockito.Mockito.never()).save(any());
+    }
+
+    @Test
+    void commitAtomicallyAbandonsOldSessionAndInsertsConfirmingSessionWithBillingMapping() {
+        Instant preparedAt = Instant.parse("2026-08-28T03:00:00Z");
+        Instant committedAt = Instant.parse("2026-08-28T03:00:01Z");
+        ExamCreationOperation operation = ExamCreationOperation.prepared(
+                "00000000-0000-4000-8000-000000000001",
+                "018f6f36-2f42-4bf5-8c17-0be35de4872c",
+                "ex_new",
+                "mock_exam_003",
+                2,
+                preparedAt
+        );
+        operation.markReserved(
+                "018f6f36-2f42-4bf5-8c17-0be35de4872d",
+                BillingReservationKind.REPLACEMENT,
+                "018f6f36-2f42-4bf5-8c17-0be35de4872e",
+                preparedAt.plusSeconds(300),
+                preparedAt
+        );
+        ExamSession oldSession = ExamSession.builder()
+                .examId("ex_old")
+                .userId(operation.getUserId())
+                .active(true)
+                .status(ExamSessionStatus.IN_PROGRESS)
+                .build();
+        when(operationRepository.findById(operation.getCommandId()))
+                .thenReturn(Optional.of(operation));
+        when(sessionManager.findInProgressSessions(operation.getUserId()))
+                .thenReturn(List.of(oldSession));
+        when(sessionRepository.insert(any(ExamSession.class)))
+                .thenAnswer(invocation -> invocation.getArgument(0));
+        when(operationRepository.save(operation)).thenReturn(operation);
+
+        service.commitReservedSession(operation.getCommandId(), committedAt, ZoneOffset.UTC);
+
+        verify(sessionRepository).abandonIfInProgress("ex_old");
+        ArgumentCaptor<ExamSession> inserted = ArgumentCaptor.forClass(ExamSession.class);
+        verify(sessionRepository).insert(inserted.capture());
+        ExamSession session = inserted.getValue();
+        assertEquals("ex_new", session.getExamId());
+        assertEquals(ExamSessionStatus.ENTITLEMENT_CONFIRMING, session.getStatus());
+        assertEquals(ExamEntitlementState.CONFIRMING, session.getEntitlementState());
+        assertEquals(operation.getOperationId(), session.getCreationOperationId());
+        assertEquals(operation.getReservationId(), session.getBillingReservationId());
+        assertEquals(operation.getAttemptGroupId(), session.getAttemptGroupId());
+        assertNull(session.getEntitlementConfirmedAt());
+        assertEquals(committedAt, operation.getSessionCommittedAt());
+    }
+
+    @Test
+    void phoneContinuationCommitsNewTargetSessionAgainstExistingBillingGroup() {
+        Instant preparedAt = Instant.parse("2026-08-28T03:00:00Z");
+        String targetUserId = "00000000-0000-4000-8000-000000000009";
+        String groupId = "018f6f36-2f42-4bf5-8c17-0be35de4872e";
+        ExamCreationOperation operation = ExamCreationOperation.prepared(
+                targetUserId,
+                "018f6f36-2f42-4bf5-8c17-0be35de4872c",
+                "ex_phone_target",
+                "mock_exam_003",
+                1,
+                null,
+                groupId,
+                "mock_exam_003",
+                BillingContinuationReason.PHONE_REJOIN,
+                "018f6f36-2f42-4bf5-8c17-0be35de4872f",
+                preparedAt
+        );
+        operation.markReserved(
+                "018f6f36-2f42-4bf5-8c17-0be35de4872d",
+                BillingReservationKind.REPLACEMENT,
+                groupId,
+                preparedAt.plusSeconds(300),
+                preparedAt
+        );
+        when(operationRepository.findById(operation.getCommandId()))
+                .thenReturn(Optional.of(operation));
+        when(sessionManager.findInProgressSessions(targetUserId)).thenReturn(List.of());
+        when(sessionRepository.insert(any(ExamSession.class)))
+                .thenAnswer(invocation -> invocation.getArgument(0));
+        when(operationRepository.save(operation)).thenReturn(operation);
+
+        service.commitReservedSession(
+                operation.getCommandId(), preparedAt.plusSeconds(1), ZoneOffset.UTC
+        );
+
+        ArgumentCaptor<ExamSession> inserted = ArgumentCaptor.forClass(ExamSession.class);
+        verify(sessionRepository).insert(inserted.capture());
+        ExamSession session = inserted.getValue();
+        assertEquals(targetUserId, session.getUserId());
+        assertEquals("ex_phone_target", session.getExamId());
+        assertEquals("mock_exam_003", session.getMockExamId());
+        assertEquals(1, session.getCycleNumber());
+        assertEquals(BillingReservationKind.REPLACEMENT, session.getBillingReservationKind());
+        assertEquals(groupId, session.getAttemptGroupId());
+        assertEquals(ExamSessionStatus.ENTITLEMENT_CONFIRMING, session.getStatus());
+    }
+}

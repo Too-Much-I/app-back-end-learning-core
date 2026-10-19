@@ -65,6 +65,16 @@ class ExamSessionManagerTest {
     private ExamSessionManager manager;
     private List<MockExamCatalogService.CatalogExam> catalog;
 
+    @Test void cutoverGuardBlocksBeforeAbandonmentOrProblemSelection() {
+        var guard = org.mockito.Mockito.mock(web.tosunsaeng.domain.exams.rollout.LegacyExamWriterGuard.class);
+        org.mockito.Mockito.doThrow(new IllegalStateException("stopped")).when(guard).requireAllowed();
+        org.springframework.test.util.ReflectionTestUtils.setField(manager,"legacyWriterGuard",guard);
+        org.junit.jupiter.api.Assertions.assertThrows(IllegalStateException.class, () -> manager.startNew(USER_ID));
+        org.junit.jupiter.api.Assertions.assertThrows(IllegalStateException.class, () -> manager.prepareForBilling(USER_ID));
+        org.junit.jupiter.api.Assertions.assertThrows(IllegalStateException.class, () -> manager.preparePhoneReplacement("group","mock"));
+        org.mockito.Mockito.verifyNoInteractions(examSessionRepository,examSessionCompletionQuery,completionEvidenceService,mockExamCatalogService);
+    }
+
     @BeforeEach
     void setUp() {
         manager = new ExamSessionManager(
@@ -85,6 +95,112 @@ class ExamSessionManagerTest {
 
         assertSelected(assignment, 1, 1);
         verify(examSessionRepository, never()).abandonIfInProgress(any());
+    }
+
+    @Test
+    void deletedSourceFeedsExistingReplacementContractWithoutRecreatingOldSession() {
+        var store = org.mockito.Mockito.mock(web.tosunsaeng.domain.learningrecorddeletion.infrastructure.DeletedExamContinuationStore.class);
+        org.springframework.test.util.ReflectionTestUtils.setField(manager, "deletedExamContinuations", store);
+        var deleted = web.tosunsaeng.domain.learningrecorddeletion.domain.DeletedExamContinuation.capture(
+                "139f345b-9be8-43a3-a63d-9108df972741", ExamSession.builder()
+                        .examId("deleted-source").userId(USER_ID).mockExamId("mock_exam_002").cycleNumber(3)
+                        .attemptGroupId("018f6f36-2f42-4bf5-8c17-0be35de4872e")
+                        .billingReservationId("reservation-old").creationOperationId("operation-old")
+                        .entitlementState(web.tosunsaeng.domain.exams.domain.enums.ExamEntitlementState.CONFIRMED)
+                        .status(ExamSessionStatus.IN_PROGRESS)
+                        .attemptGroupProjectionStatus(web.tosunsaeng.domain.exams.attemptgroup.domain.AttemptGroupProjectionStatus.OPEN)
+                        .build(), NOW);
+        when(store.findAvailable(USER_ID)).thenReturn(java.util.Optional.of(deleted));
+        when(examSessionRepository.findActiveOrLegacyCandidatesByUserId(USER_ID)).thenReturn(List.of());
+        when(examSessionRepository.findLatestRetakeAvailableByUserId(USER_ID)).thenReturn(java.util.Optional.empty());
+        when(mockExamCatalogService.getRequiredExam("mock_exam_002")).thenReturn(mockExam(2));
+
+        var prepared = manager.prepareForBilling(USER_ID);
+
+        assertEquals("deleted-source", prepared.replacementSourceSessionId());
+        assertEquals(deleted.getAttemptGroupId(), prepared.expectedAttemptGroupId());
+        assertEquals(3, prepared.cycleNumber());
+        assertNotEquals("deleted-source", prepared.sessionId());
+        verify(examSessionRepository, never()).insert(any(ExamSession.class));
+        verify(examSessionRepository, never()).abandonIfInProgress(any());
+    }
+
+    @Test
+    void billingPreparationKeepsExistingAttemptGroupMockExamWithoutMutatingSessions() {
+        ExamSession existing = ExamSession.builder()
+                .examId("exam_group_active")
+                .userId(USER_ID)
+                .mockExamId("mock_exam_002")
+                .cycleNumber(3)
+                .active(true)
+                .status(ExamSessionStatus.IN_PROGRESS)
+                .attemptGroupId("018f6f36-2f42-4bf5-8c17-0be35de4872e")
+                .build();
+        when(examSessionRepository.findActiveOrLegacyCandidatesByUserId(USER_ID))
+                .thenReturn(List.of(existing));
+        when(mockExamCatalogService.getRequiredExam("mock_exam_002"))
+                .thenReturn(mockExam(2));
+
+        ExamSessionManager.PreparedAssignment prepared = manager.prepareForBilling(USER_ID);
+
+        assertAll(
+                () -> assertEquals("mock_exam_002", prepared.mockExam().getMockExamId()),
+                () -> assertEquals(3, prepared.cycleNumber()),
+                () -> assertEquals(LocalDateTime.of(2026, 7, 29, 6, 30), prepared.preparedAt()),
+                () -> assertTrue(prepared.sessionId().matches("^ex_[0-9a-f]{10}_0729_0630$"))
+        );
+        verify(examSessionRepository, never()).abandonIfInProgress(any());
+        verify(examSessionRepository, never()).insert(any(ExamSession.class));
+    }
+
+    @Test
+    void billingPreparationUsesLatestRetakeAvailableAsExactReplacementSource() {
+        ExamSession retake = ExamSession.builder()
+                .examId("exam_retake")
+                .userId(USER_ID)
+                .mockExamId("mock_exam_002")
+                .cycleNumber(4)
+                .active(false)
+                .status(ExamSessionStatus.RETAKE_AVAILABLE)
+                .attemptGroupId("018f6f36-2f42-4bf5-8c17-0be35de4872e")
+                .build();
+        when(examSessionRepository.findActiveOrLegacyCandidatesByUserId(USER_ID))
+                .thenReturn(List.of());
+        when(examSessionRepository.findLatestRetakeAvailableByUserId(USER_ID))
+                .thenReturn(java.util.Optional.of(retake));
+        when(mockExamCatalogService.getRequiredExam("mock_exam_002"))
+                .thenReturn(mockExam(2));
+
+        ExamSessionManager.PreparedAssignment prepared = manager.prepareForBilling(USER_ID);
+
+        assertAll(
+                () -> assertEquals("exam_retake", prepared.replacementSourceSessionId()),
+                () -> assertEquals(retake.getAttemptGroupId(), prepared.expectedAttemptGroupId()),
+                () -> assertEquals("mock_exam_002", prepared.expectedMockExamId()),
+                () -> assertEquals(4, prepared.cycleNumber())
+        );
+    }
+
+    @Test
+    void phoneReplacementUsesExactBillingGroupAndMockWithoutReadingUserHistory() {
+        String groupId = "018f6f36-2f42-4bf5-8c17-0be35de4872e";
+        when(mockExamCatalogService.getRequiredExam("mock_exam_002"))
+                .thenReturn(mockExam(2));
+
+        ExamSessionManager.PreparedAssignment prepared = manager.preparePhoneReplacement(
+                groupId, "mock_exam_002"
+        );
+
+        assertAll(
+                () -> assertEquals("mock_exam_002", prepared.mockExam().getMockExamId()),
+                () -> assertEquals(1, prepared.cycleNumber()),
+                () -> assertNull(prepared.replacementSourceSessionId()),
+                () -> assertEquals(groupId, prepared.expectedAttemptGroupId()),
+                () -> assertEquals("mock_exam_002", prepared.expectedMockExamId()),
+                () -> assertTrue(prepared.sessionId().matches("^ex_[0-9a-f]{10}_0729_0630$"))
+        );
+        verify(examSessionRepository, never()).findActiveOrLegacyCandidatesByUserId(USER_ID);
+        verify(examSessionRepository, never()).findLatestRetakeAvailableByUserId(USER_ID);
     }
 
     @Test

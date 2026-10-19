@@ -30,6 +30,7 @@ import web.tosunsaeng.domain.exams.domain.repository.ExamSummaryRepository;
 import web.tosunsaeng.domain.exams.domain.repository.SpeechAceResultRepository;
 import web.tosunsaeng.domain.exams.dto.ExamResponseDTO;
 import web.tosunsaeng.domain.exams.exception.ExamsException;
+import web.tosunsaeng.domain.exams.billing.BillingSagaProperties;
 import web.tosunsaeng.global.auth.CurrentUserProvider;
 import web.tosunsaeng.global.error.code.status.ErrorStatus;
 
@@ -56,6 +57,9 @@ import static org.mockito.Mockito.when;
 
 @ExtendWith({MockitoExtension.class, OutputCaptureExtension.class})
 class ExamServiceImplTest {
+
+    @Mock private TransitionFreeExamService transitionFreeExamService;
+    @Mock private PaidExamCreationSaga paidExamCreationSaga;
 
     private static final String LEGACY_USER_ID = "00000000-0000-0000-0000-000000000001";
 
@@ -104,16 +108,61 @@ class ExamServiceImplTest {
     @Mock
     private ExamSessionManager examSessionManager;
 
+    @Mock
+    private BillingExamCreationSaga billingExamCreationSaga;
+
+    @Mock
+    private BillingSagaProperties billingSagaProperties;
+
     @InjectMocks
     private ExamServiceImpl examService;
 
     private ExamSession assignedSession;
 
+    @Test
+    void callbackRejectsUnclassifiedSessionBeforeSavingFeedback() {
+        org.mockito.Mockito.lenient().when(currentUserProvider.getCurrentUserId()).thenReturn(LEGACY_USER_ID);
+        when(examSessionRepository.findById(assignedSession.getExamId())).thenReturn(java.util.Optional.of(assignedSession));
+        var runtime = org.mockito.Mockito.mock(web.tosunsaeng.domain.exams.rollout.LegacyExamRuntime.class);
+        org.mockito.Mockito.doThrow(new IllegalStateException("unclassified")).when(runtime).requireKnown(assignedSession);
+        ReflectionTestUtils.setField(examService, "legacyExamRuntime", runtime);
+        var request = new web.tosunsaeng.domain.exams.dto.ExamRequestDTO.AiResultReq();
+        ReflectionTestUtils.setField(request, "examId", assignedSession.getExamId());
+        ReflectionTestUtils.setField(request, "questionNumber", 1);
+        ReflectionTestUtils.setField(request, "retryCount", 0);
+        org.junit.jupiter.api.Assertions.assertThrows(IllegalStateException.class, () -> examService.updateExamResult(request));
+        org.mockito.Mockito.verifyNoInteractions(examResultRepository, gradingService);
+    }
+
+    @Test
+    void ownerMismatchIsRejectedBeforeInspectingClassification() {
+        var foreign = ExamSession.builder().examId("foreign").userId("different-owner").build();
+        when(examSessionRepository.findById("foreign")).thenReturn(java.util.Optional.of(foreign));
+        var runtime = org.mockito.Mockito.mock(web.tosunsaeng.domain.exams.rollout.LegacyExamRuntime.class);
+        ReflectionTestUtils.setField(examService, "legacyExamRuntime", runtime);
+        org.junit.jupiter.api.Assertions.assertThrows(web.tosunsaeng.domain.exams.exception.ExamsException.class,
+                () -> examService.getQuestionPrompt("foreign", 1));
+        org.mockito.Mockito.verifyNoInteractions(runtime, mockExamCatalogService, s3Presigner);
+    }
+
+    @Test
+    void promptRejectsUnclassifiedOwnedSessionBeforeCatalogOrPresigning() {
+        when(examSessionRepository.findById(assignedSession.getExamId())).thenReturn(java.util.Optional.of(assignedSession));
+        var runtime = org.mockito.Mockito.mock(web.tosunsaeng.domain.exams.rollout.LegacyExamRuntime.class);
+        org.mockito.Mockito.doThrow(new IllegalStateException("unclassified")).when(runtime).requireKnown(assignedSession);
+        ReflectionTestUtils.setField(examService, "legacyExamRuntime", runtime);
+        org.junit.jupiter.api.Assertions.assertThrows(IllegalStateException.class,
+                () -> examService.getQuestionPrompt(assignedSession.getExamId(), 1));
+        org.mockito.Mockito.verifyNoInteractions(mockExamCatalogService, s3Presigner);
+    }
+
     @BeforeEach
     void setUp() throws Exception {
+        ReflectionTestUtils.setField(examService, "transitionFreeExamService", transitionFreeExamService);
+        ReflectionTestUtils.setField(examService, "paidExamCreationSaga", paidExamCreationSaga);
         ReflectionTestUtils.setField(examService, "bucketName", "test-learning-core-bucket");
         lenient().when(redisTemplate.opsForValue()).thenReturn(valueOperations);
-        when(currentUserProvider.getCurrentUserId()).thenReturn(LEGACY_USER_ID);
+        lenient().when(currentUserProvider.getCurrentUserId()).thenReturn(LEGACY_USER_ID);
 
         Question question = Question.builder()
                 .partNumber(1)
@@ -133,7 +182,7 @@ class ExamServiceImplTest {
                 .cycleNumber(1)
                 .active(true)
                 .build();
-        when(examSessionManager.startNew(LEGACY_USER_ID))
+        lenient().when(transitionFreeExamService.start(LEGACY_USER_ID))
                 .thenReturn(new ExamSessionManager.Assignment(assignedSession, mockExam, true));
 
         lenient().when(s3Presigner.presignGetObject(any(GetObjectPresignRequest.class)))
@@ -150,13 +199,13 @@ class ExamServiceImplTest {
 
         InOrder creationOrder = inOrder(
                 valueOperations,
-                examSessionManager,
+                transitionFreeExamService,
                 s3Presigner,
                 currentUserProvider,
                 examSessionRepository
         );
         creationOrder.verify(currentUserProvider).getCurrentUserId();
-        creationOrder.verify(examSessionManager).startNew(LEGACY_USER_ID);
+        creationOrder.verify(transitionFreeExamService).start(LEGACY_USER_ID);
         creationOrder.verify(valueOperations)
                 .set(expectedRedisKey, ExamStatus.PENDING.name(), 1, TimeUnit.HOURS);
         creationOrder.verify(s3Presigner).presignGetObject(any(GetObjectPresignRequest.class));
@@ -192,6 +241,45 @@ class ExamServiceImplTest {
     }
 
     @Test
+    void paidRouteUsesPaidSagaAndNeverFallsBack() {
+        String operationId = "018f6f36-2f42-4bf5-8c17-0be35de4872c";
+        ReflectionTestUtils.setField(examService, "paidExamEnabled", true);
+        when(paidExamCreationSaga.start(LEGACY_USER_ID, operationId))
+                .thenReturn(new ExamSessionManager.Assignment(
+                        assignedSession,
+                        MockExam.builder()
+                                .mockExamId("mock_exam_003")
+                                .title("Test mock exam")
+                                .questions(List.of(Question.builder()
+                                        .partNumber(1)
+                                        .questionNumber(1)
+                                        .question("Test question")
+                                        .build()))
+                                .build(),
+                        false
+                ));
+
+        ExamResponseDTO.CreateSessionResult result = examService.createPaidExamSession(operationId);
+
+        assertEquals(assignedSession.getExamId(), result.getExamId());
+        verify(paidExamCreationSaga).start(LEGACY_USER_ID, operationId);
+        verifyNoInteractions(transitionFreeExamService, billingExamCreationSaga);
+        verify(examSessionManager, never()).startNew(LEGACY_USER_ID);
+    }
+
+    @Test void freeRouteIgnoresPaidFlagAndKey() {
+        ReflectionTestUtils.setField(examService,"paidExamEnabled",true);
+        examService.createExamSession("not-a-paid-key");
+        verify(transitionFreeExamService).start(LEGACY_USER_ID);
+        verifyNoInteractions(paidExamCreationSaga,billingExamCreationSaga);
+    }
+
+    @Test void disabledPaidRouteCannotCreateFreeSession() {
+        assertThrows(ExamsException.class, () -> examService.createPaidExamSession(null));
+        verifyNoInteractions(transitionFreeExamService,paidExamCreationSaga);
+    }
+
+    @Test
     void createExamSessionPartFourReturnsStoredOpaqueTableContextWithoutTableImage() throws Exception {
         String storedTableImageUrl = "https://cdn.example.com/mock-exam/001/part4/q8.png";
         Map<String, Object> storedTableContext = Map.of(
@@ -219,7 +307,7 @@ class ExamServiceImplTest {
                 .mockExamId("mock_exam_001")
                 .active(true)
                 .build();
-        when(examSessionManager.startNew(LEGACY_USER_ID))
+        when(transitionFreeExamService.start(LEGACY_USER_ID))
                 .thenReturn(new ExamSessionManager.Assignment(session, mockExam, true));
         when(presignedGetObjectRequest.url())
                 .thenReturn(URI.create("https://example.com/questions/mock_exam_001/q_8.wav").toURL());
@@ -269,7 +357,7 @@ class ExamServiceImplTest {
                 .mockExamId("mock_exam_001")
                 .active(true)
                 .build();
-        when(examSessionManager.startNew(LEGACY_USER_ID))
+        when(transitionFreeExamService.start(LEGACY_USER_ID))
                 .thenReturn(new ExamSessionManager.Assignment(session, mockExam, true));
 
         ExamsException exception = assertThrows(
@@ -307,7 +395,7 @@ class ExamServiceImplTest {
                 .cycleNumber(1)
                 .active(true)
                 .build();
-        when(examSessionManager.startNew(LEGACY_USER_ID)).thenReturn(
+        when(transitionFreeExamService.start(LEGACY_USER_ID)).thenReturn(
                 new ExamSessionManager.Assignment(firstSession, selectedPaper, true),
                 new ExamSessionManager.Assignment(secondSession, selectedPaper, true)
         );
@@ -334,7 +422,7 @@ class ExamServiceImplTest {
                 ), requestCaptor.getAllValues().stream()
                         .map(request -> request.getObjectRequest().key())
                         .toList());
-        verify(examSessionManager, times(2)).startNew(LEGACY_USER_ID);
+        verify(transitionFreeExamService, times(2)).start(LEGACY_USER_ID);
         verify(valueOperations).set(
                 "exam:status:ex_new_first_002", ExamStatus.PENDING.name(), 1, TimeUnit.HOURS);
         verify(valueOperations).set(
@@ -372,7 +460,7 @@ class ExamServiceImplTest {
                 .mockExamId("mock_exam_002")
                 .active(true)
                 .build();
-        when(examSessionManager.startNew(LEGACY_USER_ID))
+        when(transitionFreeExamService.start(LEGACY_USER_ID))
                 .thenReturn(new ExamSessionManager.Assignment(selectedSession, selectedPaper, true));
 
         examService.createExamSession();

@@ -7,8 +7,11 @@ import web.tosunsaeng.domain.exams.domain.entity.ExamSession;
 
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Optional;
 
 public interface ExamSessionRepository extends MongoRepository<ExamSession, String> {
+
+    boolean existsByUserId(String userId);
 
     @Query(
             value = "{ 'userId': ?0, 'completedAt': { '$exists': true, '$ne': null } }",
@@ -20,6 +23,7 @@ public interface ExamSessionRepository extends MongoRepository<ExamSession, Stri
     @Query(
             value = "{ 'userId': ?0, '$or': ["
                     + "{ 'status': 'IN_PROGRESS' },"
+                    + "{ 'status': 'ENTITLEMENT_CONFIRMING' },"
                     + "{ '$and': ["
                     + "{ '$or': [ { 'status': null }, { 'status': { '$exists': false } } ] },"
                     + "{ '$or': [ { 'active': true }, { 'active': null },"
@@ -60,10 +64,40 @@ public interface ExamSessionRepository extends MongoRepository<ExamSession, Stri
             + "{ 'completedAt': { '$exists': false } } ] },"
             + "{ '$or': ["
             + "{ 'status': 'IN_PROGRESS' },"
+            + "{ 'status': 'ENTITLEMENT_CONFIRMING' },"
             + "{ '$and': ["
             + "{ '$or': [ { 'status': null }, { 'status': { '$exists': false } } ] },"
             + "{ '$or': [ { 'active': true }, { 'active': null },"
             + "{ 'active': { '$exists': false } } ] } ] } ] } ] }")
     @Update("{ '$set': { 'status': 'ABANDONED', 'active': false } }")
     long abandonIfInProgress(String examId);
+
+    @Query("{ '_id': ?0, 'status': 'ENTITLEMENT_CONFIRMING', 'active': true, 'accessRevoked': { '$ne': true } }")
+    @Update("{ '$set': { 'status': 'IN_PROGRESS', 'entitlementState': 'CONFIRMED', "
+            + "'entitlementConfirmedAt': ?1 } }")
+    long confirmEntitlementIfConfirming(String examId, java.time.Instant confirmedAt);
+
+    @Query("{ '_id': ?0, 'status': 'ENTITLEMENT_CONFIRMING' }")
+    @Update("{ '$set': { 'status': 'ABANDONED', 'active': false } }")
+    long abandonIfEntitlementConfirming(String examId);
+
+    java.util.Optional<ExamSession> findByUserIdAndCreationOperationId(
+            String userId,
+            String creationOperationId
+    );
+
+    @Query(value = "{ 'userId': ?0, 'status': 'RETAKE_AVAILABLE', "
+            + "'attemptGroupId': { '$exists': true, '$ne': null } }",
+            sort = "{ 'createdAt': -1, '_id': -1 }")
+    Optional<ExamSession> findLatestRetakeAvailableByUserId(String userId);
+
+    @Query("{ 'entitlementState': 'CONFIRMED', 'attemptGroupId': { '$exists': true, '$ne': null }, "
+            + "'attemptGroupProjectionStatus': { '$exists': true, '$ne': null }, "
+            + "'$or': [ { 'terminalEventId': null }, { 'terminalEventId': { '$exists': false } } ] }")
+    List<ExamSession> findAttemptGroupReconciliationCandidates();
+
+    @Query("{ 'entitlementState': 'CONFIRMED', 'attemptGroupId': { '$exists': true, '$ne': null }, "
+            + "'$or': [ { 'attemptGroupProjectionStatus': null }, "
+            + "{ 'attemptGroupProjectionStatus': { '$exists': false } } ] }")
+    List<ExamSession> findAttemptGroupBackfillCandidates();
 }

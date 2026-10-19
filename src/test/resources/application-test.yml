@@ -16,9 +16,39 @@ spring:
         bucket: test-learning-core-bucket
 
 app:
+  billing:
+    creation-saga-enabled: false
+    phone-continuation-enabled: false
+    base-url: ""
+    region: ap-northeast-2
+    connect-timeout: PT1S
+    read-timeout: PT1S
+  attempt-group-events:
+    writer-enabled: false
+    publisher-enabled: false
+    billing-base-url: ""
+    aws-region: ap-northeast-2
+    grading-deadline: PT30M
+    poll-interval: PT1S
+    batch-size: 20
+    lease-duration: PT30S
+    auth-probe-interval: PT15M
+    connect-timeout: PT1S
+    read-timeout: PT1S
+    delivered-retention: P30D
+    dead-letter-retention: P90D
   auth:
     mode: legacy
     legacy-user-id: 00000000-0000-0000-0000-000000000001
+    identity:
+      clock-skew: PT60S
+  user-withdrawn:
+    consumer-enabled: false
+    deny-gate-enabled: false
+  user-merged:
+    writer-enabled: false
+    consumer-enabled: false
+    source-deny-enabled: false
 
 sentry:
   dsn: ""

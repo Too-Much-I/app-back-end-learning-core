@@ -1,6 +1,7 @@
 package web.tosunsaeng.global.sentry;
 
 import io.sentry.Hint;
+import web.tosunsaeng.domain.exams.billing.reconciliation.ReservationReconciliationAlertReporter;
 import io.sentry.SentryEvent;
 import io.sentry.SentryOptions;
 import io.sentry.protocol.Mechanism;
@@ -43,7 +44,8 @@ public class SentryEventSanitizer implements SentryOptions.BeforeSendCallback {
     );
     private static final Set<String> CAPTURE_SOURCES = Set.of(
             SentryUnexpectedExceptionReporter.CAPTURE_SOURCE,
-            SentryUnexpectedExceptionReporter.UNHANDLED_CAPTURE_SOURCE
+            SentryUnexpectedExceptionReporter.UNHANDLED_CAPTURE_SOURCE,
+            ReservationReconciliationAlertReporter.SOURCE
     );
 
     @Override
@@ -67,6 +69,9 @@ public class SentryEventSanitizer implements SentryOptions.BeforeSendCallback {
 
         Map<String, String> safeTags = sanitizeTags(event.getTags());
         String requestId = extractRequestId(event.getContexts().get(CORRELATION_CONTEXT_KEY));
+        boolean recovery = ReservationReconciliationAlertReporter.SOURCE.equals(safeTags.get(CAPTURE_SOURCE_TAG));
+        String incident = recovery ? extractRequestId(event.getContexts().get(
+                ReservationReconciliationAlertReporter.INCIDENT_CONTEXT)) : null;
 
         event.setMessage(null);
         event.setLogger(null);
@@ -95,6 +100,14 @@ public class SentryEventSanitizer implements SentryOptions.BeforeSendCallback {
             );
         }
 
+        if (recovery) {
+            if (incident != null) event.getContexts().put(ReservationReconciliationAlertReporter.INCIDENT_CONTEXT, Map.of("value", incident));
+            String reason = safeTags.get("reconciliation.reason");
+            if (reason != null) event.setFingerprints(List.of("learning-core", ReservationReconciliationAlertReporter.SOURCE, reason));
+            event.getContexts().remove(CORRELATION_CONTEXT_KEY);
+            event.removeTag(HTTP_STATUS_CODE_TAG);
+            event.removeTag(HTTP_METHOD_TAG);
+        }
         sanitizeExceptions(event.getExceptions());
         event.setThrowable(null);
         return event;
@@ -133,6 +146,10 @@ public class SentryEventSanitizer implements SentryOptions.BeforeSendCallback {
                 CAPTURE_SOURCES
         );
 
+        if (ReservationReconciliationAlertReporter.SOURCE.equals(tags.get(CAPTURE_SOURCE_TAG))) {
+            putIfAllowed(safeTags, "reconciliation.reason", tags.get("reconciliation.reason"),
+                    ReservationReconciliationAlertReporter.REASONS);
+        }
         String service = tags.get(SERVICE_TAG);
         if (SentryUnexpectedExceptionReporter.SERVICE_NAME.equals(service)) {
             safeTags.put(SERVICE_TAG, service);

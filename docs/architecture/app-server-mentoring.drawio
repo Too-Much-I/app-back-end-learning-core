@@ -1,0 +1,678 @@
+<mxfile host="app.diagrams.net" agent="Codex" pages="8">
+  <diagram id="concept-map" name="1. 통합 컨셉맵">
+    <mxGraphModel dx="1400" dy="900" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1600" pageHeight="1000" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+        <mxCell id="title" value="토선생 앱 서버 통합 컨셉맵" style="text;html=1;align=center;verticalAlign=middle;fontSize=28;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="420" y="20" width="760" height="50" as="geometry" />
+        </mxCell>
+        <mxCell id="identity" value="Identity&#xa;사용자와 인증의 원본" style="swimlane;html=1;rounded=1;startSize=45;fillColor=#dae8fc;strokeColor=#6c8ebf;fontStyle=1;fontSize=16;" vertex="1" parent="1">
+          <mxGeometry x="40" y="110" width="440" height="700" as="geometry" />
+        </mxCell>
+        <mxCell id="i1" value="User&#xa;userId · accountType · lifecycle" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontStyle=1;" vertex="1" parent="identity">
+          <mxGeometry x="40" y="75" width="360" height="70" as="geometry" />
+        </mxCell>
+        <mxCell id="i2" value="인증수단&#xa;LOCAL · Guest · Firebase · Social · Phone" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;" vertex="1" parent="identity">
+          <mxGeometry x="40" y="175" width="360" height="75" as="geometry" />
+        </mxCell>
+        <mxCell id="i3" value="Token / Session&#xa;RS256 Access Token · RefreshSession · JWKS" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;" vertex="1" parent="identity">
+          <mxGeometry x="40" y="280" width="360" height="75" as="geometry" />
+        </mxCell>
+        <mxCell id="i4" value="사용자 lifecycle outbox&#xa;PhoneEligibility · UserMerged · UserWithdrawn" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;" vertex="1" parent="identity">
+          <mxGeometry x="40" y="390" width="360" height="80" as="geometry" />
+        </mxCell>
+        <mxCell id="i5" value="candidate&#xa;raw phone이 아닌 scope별 중복 비교값" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;" vertex="1" parent="identity">
+          <mxGeometry x="40" y="510" width="360" height="70" as="geometry" />
+        </mxCell>
+        <mxCell id="learning" value="Learning Core&#xa;시험·음성·채점의 원본" style="swimlane;html=1;rounded=1;startSize=45;fillColor=#d5e8d4;strokeColor=#82b366;fontStyle=1;fontSize=16;" vertex="1" parent="1">
+          <mxGeometry x="580" y="110" width="440" height="700" as="geometry" />
+        </mxCell>
+        <mxCell id="l1" value="MockExam / Question&#xa;배정 가능한 시험지와 문항 정의" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;" vertex="1" parent="learning">
+          <mxGeometry x="40" y="75" width="360" height="70" as="geometry" />
+        </mxCell>
+        <mxCell id="l2" value="ExamSession&#xa;examId → userId · mockExamId · lifecycle" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontStyle=1;" vertex="1" parent="learning">
+          <mxGeometry x="40" y="175" width="360" height="75" as="geometry" />
+        </mxCell>
+        <mxCell id="l3" value="Grading Job&#xa;QuestionGradingJob · SummaryGradingJob" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;" vertex="1" parent="learning">
+          <mxGeometry x="40" y="280" width="360" height="75" as="geometry" />
+        </mxCell>
+        <mxCell id="l4" value="Result&#xa;ExamResult · ExamSummary · provider 결과" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;" vertex="1" parent="learning">
+          <mxGeometry x="40" y="390" width="360" height="75" as="geometry" />
+        </mxCell>
+        <mxCell id="l5" value="ExamCreationOperation&#xa;Idempotency-Key로 Billing saga 수렴" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;" vertex="1" parent="learning">
+          <mxGeometry x="40" y="500" width="360" height="80" as="geometry" />
+        </mxCell>
+        <mxCell id="billing" value="Billing&#xa;혜택·사용권·원장의 원본" style="swimlane;html=1;rounded=1;startSize=45;fillColor=#ffe6cc;strokeColor=#d79b00;fontStyle=1;fontSize=16;" vertex="1" parent="1">
+          <mxGeometry x="1120" y="110" width="440" height="700" as="geometry" />
+        </mxCell>
+        <mxCell id="b1" value="TrialEligibility&#xa;verified/revoked 현재 projection" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;" vertex="1" parent="billing">
+          <mxGeometry x="40" y="75" width="360" height="70" as="geometry" />
+        </mxCell>
+        <mxCell id="b2" value="BenefitDefinition → TrialClaim / Grant&#xa;혜택 정책 · 중복 수급 방지 · 실제 권리" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;" vertex="1" parent="billing">
+          <mxGeometry x="40" y="175" width="360" height="80" as="geometry" />
+        </mxCell>
+        <mxCell id="b3" value="Reservation / Allocation / Ledger&#xa;hold · consume · release와 추적 이력" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;" vertex="1" parent="billing">
+          <mxGeometry x="40" y="285" width="360" height="80" as="geometry" />
+        </mxCell>
+        <mxCell id="b4" value="AttemptGroup / AttemptSession&#xa;최초 시험·replacement 소비 단위와 fencing" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;" vertex="1" parent="billing">
+          <mxGeometry x="40" y="395" width="360" height="80" as="geometry" />
+        </mxCell>
+        <mxCell id="b5" value="상태 event consumer&#xa;GRADING · COMPLETED · RETAKE_AVAILABLE" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffe6cc;strokeColor=#d79b00;dashed=1;" vertex="1" parent="billing">
+          <mxGeometry x="40" y="510" width="360" height="75" as="geometry" />
+        </mxCell>
+        <mxCell id="e1" value="JWT sub = userId" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#6c8ebf;endArrow=block;endFill=1;" edge="1" parent="1" source="i3" target="l2">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e2" value="phone eligibility event" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;strokeColor=#d79b00;dashed=1;endArrow=block;" edge="1" parent="1" source="i4" target="b1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e3" value="reserve / confirm / status" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;strokeColor=#6c8ebf;endArrow=block;" edge="1" parent="1" source="l5" target="b3">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e4" value="attemptGroupId 내부 저장" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;strokeColor=#6c8ebf;endArrow=block;" edge="1" parent="1" source="b4" target="l2">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e5" value="상태 outbox/publisher 미구현" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;strokeColor=#d79b00;dashed=1;endArrow=block;" edge="1" parent="1" source="l3" target="b5">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="legend" value="범례  초록=구현  파랑=조건부/연결  주황 점선=계약·미구현" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#666666;fontSize=13;" vertex="1" parent="1">
+          <mxGeometry x="520" y="850" width="560" height="55" as="geometry" />
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+  <diagram id="architecture" name="2. 시스템 아키텍처">
+    <mxGraphModel dx="1548" dy="920" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1600" pageHeight="1000" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+        <mxCell id="t" parent="1" style="text;html=1;align=center;fontSize=28;fontStyle=1;" value="현재 앱 서버 시스템 아키텍처" vertex="1">
+          <mxGeometry height="50" width="720" x="440" y="20" as="geometry" />
+        </mxCell>
+        <mxCell id="app" parent="1" style="shape=mxgraph.basic.actor;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontStyle=1;" value="앱 클라이언트&#xa;Access Token · Idempotency-Key · audio" vertex="1">
+          <mxGeometry height="110" width="170" x="60" y="330" as="geometry" />
+        </mxCell>
+        <mxCell id="id" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontStyle=1;fontSize=16;" value="Identity Service&#xa;인증·사용자·outbox" vertex="1">
+          <mxGeometry height="130" width="280" x="360" y="120" as="geometry" />
+        </mxCell>
+        <mxCell id="lc" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontStyle=1;fontSize=16;" value="Learning Core&#xa;시험·S3·채점·결과·saga" vertex="1">
+          <mxGeometry height="145" width="280" x="360" y="360" as="geometry" />
+        </mxCell>
+        <mxCell id="bill" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffe6cc;strokeColor=#d79b00;fontStyle=1;fontSize=16;" value="Billing Service&#xa;혜택·원장·Reservation·Attempt" vertex="1">
+          <mxGeometry height="145" width="300" x="820" y="360" as="geometry" />
+        </mxCell>
+        <mxCell id="idmongo" parent="1" style="shape=cylinder3;whiteSpace=wrap;html=1;boundedLbl=1;backgroundOutline=1;fillColor=#dae8fc;strokeColor=#6c8ebf;" value="Identity MongoDB" vertex="1">
+          <mxGeometry height="90" width="160" x="420" y="700" as="geometry" />
+        </mxCell>
+        <mxCell id="lcmongo" parent="1" style="shape=cylinder3;whiteSpace=wrap;html=1;boundedLbl=1;backgroundOutline=1;fillColor=#d5e8d4;strokeColor=#82b366;" value="Learning MongoDB" vertex="1">
+          <mxGeometry height="90" width="160" x="650" y="700" as="geometry" />
+        </mxCell>
+        <mxCell id="redis" parent="1" style="shape=cylinder3;whiteSpace=wrap;html=1;boundedLbl=1;backgroundOutline=1;fillColor=#f8cecc;strokeColor=#b85450;" value="Redis&#xa;채점 상태 projection" vertex="1">
+          <mxGeometry height="90" width="160" x="840" y="700" as="geometry" />
+        </mxCell>
+        <mxCell id="bmongo" parent="1" style="shape=cylinder3;whiteSpace=wrap;html=1;boundedLbl=1;backgroundOutline=1;fillColor=#ffe6cc;strokeColor=#d79b00;" value="Billing MongoDB" vertex="1">
+          <mxGeometry height="90" width="160" x="1060" y="700" as="geometry" />
+        </mxCell>
+        <mxCell id="jwks" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;" value="JWKS&#xa;Public Key" vertex="1">
+          <mxGeometry height="90" width="150" x="800" y="120" as="geometry" />
+        </mxCell>
+        <mxCell id="firebase" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#666666;" value="Firebase / SNS" vertex="1">
+          <mxGeometry height="90" width="170" x="1090" y="120" as="geometry" />
+        </mxCell>
+        <mxCell id="s3" parent="1" style="shape=cylinder3;whiteSpace=wrap;html=1;boundedLbl=1;backgroundOutline=1;fillColor=#fff2cc;strokeColor=#d6b656;" value="AWS S3&#xa;사용자 audio" vertex="1">
+          <mxGeometry height="100" width="150" x="1240" y="310" as="geometry" />
+        </mxCell>
+        <mxCell id="ai" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;" value="Python AI / 채점 Provider&#xa;user_id = examId" vertex="1">
+          <mxGeometry height="105" width="210" x="1220" y="490" as="geometry" />
+        </mxCell>
+        <mxCell id="lattice" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;" value="VPC Lattice AWS_IAM&#xa;route별 task role" vertex="1">
+          <mxGeometry height="130" width="110" x="680" y="365" as="geometry" />
+        </mxCell>
+        <mxCell id="e1" edge="1" parent="1" source="app" style="edgeStyle=orthogonalEdgeStyle;html=1;strokeColor=#6c8ebf;endArrow=block;" target="id" value="인증·계정 API">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e2" edge="1" parent="1" source="app" style="edgeStyle=orthogonalEdgeStyle;html=1;strokeColor=#82b366;endArrow=block;" target="lc" value="시험 API + Bearer">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e3" edge="1" parent="1" source="id" style="edgeStyle=orthogonalEdgeStyle;html=1;strokeColor=#9673a6;endArrow=block;" target="jwks" value="RS256 공개키">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e4" edge="1" parent="1" source="jwks" style="edgeStyle=orthogonalEdgeStyle;html=1;strokeColor=#9673a6;endArrow=block;" target="lc" value="서명 로컬 검증">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e5" edge="1" parent="1" source="lc" style="edgeStyle=orthogonalEdgeStyle;html=1;strokeColor=#6c8ebf;endArrow=block;" target="lattice" value="SigV4 reserve/confirm">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e6" edge="1" parent="1" source="lattice" style="edgeStyle=orthogonalEdgeStyle;html=1;strokeColor=#6c8ebf;endArrow=block;" target="bill" value="internal API">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e7" edge="1" parent="1" source="id" style="edgeStyle=orthogonalEdgeStyle;html=1;strokeColor=#d79b00;dashed=1;endArrow=block;" target="lattice" value="eligibility: 현재 transport 정렬 필요">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e8" edge="1" parent="1" source="app" style="edgeStyle=orthogonalEdgeStyle;html=1;strokeColor=#d6b656;endArrow=block;" target="s3" value="Presigned PUT">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e9" edge="1" parent="1" source="lc" style="edgeStyle=orthogonalEdgeStyle;html=1;strokeColor=#d6b656;endArrow=block;" target="s3" value="audio 다운로드">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e10" edge="1" parent="1" source="lc" style="edgeStyle=orthogonalEdgeStyle;html=1;strokeColor=#9673a6;endArrow=block;" target="ai" value="채점 요청">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e11" edge="1" parent="1" source="ai" style="edgeStyle=orthogonalEdgeStyle;html=1;strokeColor=#b85450;dashed=1;endArrow=block;" target="lc" value="Callback (현재 permitAll)">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e12" edge="1" parent="1" source="id" style="edgeStyle=orthogonalEdgeStyle;html=1;strokeColor=#666666;endArrow=block;" target="firebase" value="Firebase credential 검증">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="ed1" edge="1" parent="1" source="id" style="edgeStyle=orthogonalEdgeStyle;html=1;strokeColor=#6c8ebf;endArrow=block;" target="idmongo">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="ed2" edge="1" parent="1" source="lc" style="edgeStyle=orthogonalEdgeStyle;html=1;strokeColor=#82b366;endArrow=block;" target="lcmongo">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="ed3" edge="1" parent="1" source="lc" style="edgeStyle=orthogonalEdgeStyle;html=1;strokeColor=#b85450;endArrow=block;" target="redis">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="ed4" edge="1" parent="1" source="bill" style="edgeStyle=orthogonalEdgeStyle;html=1;strokeColor=#d79b00;endArrow=block;" target="bmongo">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="legend" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#666666;" value="초록=현재 기능  파랑=조건부/인증 경계  주황 점선=연결 gate  빨강 점선=보완할 신뢰 경계" vertex="1">
+          <mxGeometry height="55" width="730" x="430" y="860" as="geometry" />
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+  <diagram id="feature-map" name="3. Feature Map">
+    <mxGraphModel dx="1548" dy="920" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1600" pageHeight="1000" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+        <mxCell id="t" parent="1" style="text;html=1;align=center;fontSize=28;fontStyle=1;" value="앱 서버 Feature Map" vertex="1">
+          <mxGeometry height="50" width="600" x="500" y="20" as="geometry" />
+        </mxCell>
+        <mxCell id="i" parent="1" style="swimlane;html=1;rounded=1;startSize=45;fillColor=#dae8fc;strokeColor=#6c8ebf;fontStyle=1;fontSize=17;" value="Identity" vertex="1">
+          <mxGeometry height="760" width="480" x="40" y="100" as="geometry" />
+        </mxCell>
+        <mxCell id="i1" parent="i" style="rounded=1;whiteSpace=wrap;html=1;align=left;spacingLeft=15;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=14;" value="✅ LOCAL 가입·로그인&#xa;✅ Guest 인증&#xa;✅ Firebase/SNS exchange·가입&#xa;✅ Guest 승격·병합" vertex="1">
+          <mxGeometry height="160" width="410" x="35" y="75" as="geometry" />
+        </mxCell>
+        <mxCell id="i2" parent="i" style="rounded=1;whiteSpace=wrap;html=1;align=left;spacingLeft=15;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=14;" value="✅ JWT/JWKS·Refresh rotation&#xa;✅ logout·logout-all&#xa;✅ 프로필·동의·탈퇴" vertex="1">
+          <mxGeometry height="135" width="410" x="35" y="260" as="geometry" />
+        </mxCell>
+        <mxCell id="i3" parent="i" style="rounded=1;whiteSpace=wrap;html=1;align=left;spacingLeft=15;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=14;" value="🔵 PhoneEligibility outbox&#xa;🔵 UserWithdrawn outbox&#xa;🟠 UserMerged downstream 미완성&#xa;⚪ 다중 JWT key rotation·프로필 수정" vertex="1">
+          <mxGeometry height="160" width="410" x="35" y="425" as="geometry" />
+        </mxCell>
+        <mxCell id="l" parent="1" style="swimlane;html=1;rounded=1;startSize=45;fillColor=#d5e8d4;strokeColor=#82b366;fontStyle=1;fontSize=17;" value="Learning Core" vertex="1">
+          <mxGeometry height="760" width="480" x="560" y="100" as="geometry" />
+        </mxCell>
+        <mxCell id="l1" parent="l" style="rounded=1;whiteSpace=wrap;html=1;align=left;spacingLeft=15;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=14;" value="✅ 시험 생성·시험지 배정&#xa;✅ 문제·이력·재응시 조회&#xa;✅ S3 업로드 URL·제출&#xa;✅ 문항/전체 polling" vertex="1">
+          <mxGeometry height="160" width="410" x="35" y="75" as="geometry" />
+        </mxCell>
+        <mxCell id="l2" parent="l" style="rounded=1;whiteSpace=wrap;html=1;align=left;spacingLeft=15;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=14;" value="✅ 문항 결과·종합 결과&#xa;✅ AI 요청·Callback 멱등성&#xa;✅ 시험 단위 채점 복구&#xa;🔵 Billing 시험 생성 saga" vertex="1">
+          <mxGeometry height="160" width="410" x="35" y="260" as="geometry" />
+        </mxCell>
+        <mxCell id="l3" parent="l" style="rounded=1;whiteSpace=wrap;html=1;align=left;spacingLeft=15;fillColor=#ffe6cc;strokeColor=#d79b00;fontSize=14;dashed=1;" value="🔵 탈퇴 사용자 deny consumer&#xa;🟠 AttemptGroup outbox/publisher&#xa;🟠 UserMerged consumer&#xa;🟠 10초 챌린지 v1 API" vertex="1">
+          <mxGeometry height="160" width="410" x="35" y="445" as="geometry" />
+        </mxCell>
+        <mxCell id="b" parent="1" style="swimlane;html=1;rounded=1;startSize=45;fillColor=#ffe6cc;strokeColor=#d79b00;fontStyle=1;fontSize=17;" value="Billing" vertex="1">
+          <mxGeometry height="760" width="480" x="1080" y="100" as="geometry" />
+        </mxCell>
+        <mxCell id="b1" parent="b" style="rounded=1;whiteSpace=wrap;html=1;align=left;spacingLeft=15;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=14;" value="✅ eligibility event inbox/projection&#xa;✅ BenefitDefinition catalog&#xa;✅ TrialClaim·Grant lazy 발급&#xa;✅ append-only ledger" vertex="1">
+          <mxGeometry height="160" width="410" x="35" y="75" as="geometry" />
+        </mxCell>
+        <mxCell id="b2" parent="b" style="rounded=1;whiteSpace=wrap;html=1;align=left;spacingLeft=15;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=14;" value="✅ reserve·confirm·cancel·status&#xa;✅ Reservation expiry worker&#xa;✅ AttemptGroup/Session 생성 projection&#xa;🔵 VPC Lattice ingress 모드" vertex="1">
+          <mxGeometry height="160" width="410" x="35" y="260" as="geometry" />
+        </mxCell>
+        <mxCell id="b3" parent="b" style="rounded=1;whiteSpace=wrap;html=1;align=left;spacingLeft=15;fillColor=#ffe6cc;strokeColor=#d79b00;fontSize=14;dashed=1;" value="🟠 AttemptGroup 상태 consumer&#xa;⚪ owner rebind·reconciliation&#xa;⚪ App Store/Google Play·구독&#xa;⛔ 앱용 공개 Billing API 없음" vertex="1">
+          <mxGeometry height="160" width="410" x="35" y="445" as="geometry" />
+        </mxCell>
+        <mxCell id="legend" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#666666;fontSize=14;" value="✅ 구현  🔵 조건부·운영 gate  🟠 계약/미구현  ⚪ 후속  ⛔ 의도적 비노출" vertex="1">
+          <mxGeometry height="50" width="660" x="470" y="890" as="geometry" />
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+  <diagram id="ia" name="4. 앱 IA">
+    <mxGraphModel dx="1548" dy="920" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1600" pageHeight="1000" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+        <mxCell id="t" parent="1" style="text;html=1;align=center;fontSize=28;fontStyle=1;" value="앱 관점 Information Architecture" vertex="1">
+          <mxGeometry height="50" width="700" x="450" y="20" as="geometry" />
+        </mxCell>
+        <mxCell id="app" parent="1" style="ellipse;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontStyle=1;fontSize=18;" value="토선생 앱" vertex="1">
+          <mxGeometry height="80" width="220" x="680" y="90" as="geometry" />
+        </mxCell>
+        <mxCell id="auth" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontStyle=1;fontSize=16;" value="시작·인증&#xa;Identity" vertex="1">
+          <mxGeometry height="90" width="280" x="80" y="240" as="geometry" />
+        </mxCell>
+        <mxCell id="account" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontStyle=1;fontSize=16;" value="내 계정&#xa;Identity" vertex="1">
+          <mxGeometry height="90" width="280" x="430" y="240" as="geometry" />
+        </mxCell>
+        <mxCell id="exam" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontStyle=1;fontSize=16;" value="모의고사&#xa;Learning Core" vertex="1">
+          <mxGeometry height="90" width="280" x="780" y="240" as="geometry" />
+        </mxCell>
+        <mxCell id="challenge" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffe6cc;strokeColor=#d79b00;dashed=1;fontStyle=1;fontSize=16;" value="10초 챌린지&#xa;Learning Core · 계약" vertex="1">
+          <mxGeometry height="90" width="280" x="1130" y="240" as="geometry" />
+        </mxCell>
+        <mxCell id="authd" parent="1" style="rounded=1;whiteSpace=wrap;html=1;align=left;spacingLeft=18;fillColor=#f5f5f5;strokeColor=#6c8ebf;fontSize=14;" value="이메일 가입·로그인&#xa;Guest 시작&#xa;Firebase/SNS&#xa;Guest 승격·병합&#xa;토큰 재발급·로그아웃" vertex="1">
+          <mxGeometry height="190" width="280" x="80" y="390" as="geometry" />
+        </mxCell>
+        <mxCell id="accountd" parent="1" style="rounded=1;whiteSpace=wrap;html=1;align=left;spacingLeft=18;fillColor=#f5f5f5;strokeColor=#6c8ebf;fontSize=14;" value="프로필 조회&#xa;동의 조회·변경&#xa;회원 탈퇴" vertex="1">
+          <mxGeometry height="150" width="280" x="430" y="390" as="geometry" />
+        </mxCell>
+        <mxCell id="examd" parent="1" style="rounded=1;whiteSpace=wrap;html=1;align=left;spacingLeft=18;fillColor=#f5f5f5;strokeColor=#82b366;fontSize=14;" value="시험 시작&#xa;문제 조회 → 녹음 → 제출&#xa;문항/전체 상태 polling&#xa;문항 결과·최초 비교·재응시&#xa;종합 결과·완료 이력&#xa;채점 복구" vertex="1">
+          <mxGeometry height="215" width="280" x="780" y="390" as="geometry" />
+        </mxCell>
+        <mxCell id="challenged" parent="1" style="rounded=1;whiteSpace=wrap;html=1;align=left;spacingLeft=18;fillColor=#f5f5f5;strokeColor=#d79b00;fontSize=14;dashed=1;" value="오늘 진행도·문제&#xa;attempt 생성&#xa;upload URL·제출&#xa;날짜별 결과·월 이력&#xa;&#xa;현재 API 미구현" vertex="1">
+          <mxGeometry height="195" width="280" x="1130" y="390" as="geometry" />
+        </mxCell>
+        <mxCell id="billing" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffe6cc;strokeColor=#d79b00;fontStyle=1;fontSize=15;" value="사용권은 앱 IA에 직접 노출하지 않음&#xa;시험 시작 중 Learning Core→Billing 내부 처리" vertex="1">
+          <mxGeometry height="100" width="580" x="500" y="710" as="geometry" />
+        </mxCell>
+        <mxCell id="private" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;fontSize=14;" value="내부 전용: userId · reservationId · attemptGroupId · jobId · S3 object key · AI credential" vertex="1">
+          <mxGeometry height="55" width="800" x="390" y="860" as="geometry" />
+        </mxCell>
+        <mxCell id="e1" edge="1" parent="1" source="app" style="edgeStyle=orthogonalEdgeStyle;html=1;strokeColor=#666666;endArrow=block;" target="auth">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e2" edge="1" parent="1" source="app" style="edgeStyle=orthogonalEdgeStyle;html=1;strokeColor=#666666;endArrow=block;" target="account">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e3" edge="1" parent="1" source="app" style="edgeStyle=orthogonalEdgeStyle;html=1;strokeColor=#666666;endArrow=block;" target="exam">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e4" edge="1" parent="1" source="app" style="edgeStyle=orthogonalEdgeStyle;html=1;strokeColor=#d79b00;dashed=1;endArrow=block;" target="challenge">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e5" edge="1" parent="1" source="auth" style="edgeStyle=orthogonalEdgeStyle;html=1;strokeColor=#6c8ebf;endArrow=block;" target="authd">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e6" edge="1" parent="1" source="account" style="edgeStyle=orthogonalEdgeStyle;html=1;strokeColor=#6c8ebf;endArrow=block;" target="accountd">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e7" edge="1" parent="1" source="exam" style="edgeStyle=orthogonalEdgeStyle;html=1;strokeColor=#82b366;endArrow=block;" target="examd">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e8" edge="1" parent="1" source="challenge" style="edgeStyle=orthogonalEdgeStyle;html=1;strokeColor=#d79b00;dashed=1;endArrow=block;" target="challenged">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e9" edge="1" parent="1" source="exam" style="edgeStyle=orthogonalEdgeStyle;html=1;strokeColor=#d79b00;endArrow=block;" target="billing" value="내부 entitlement">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+  <diagram id="learning-detail" name="5. Learning Core 상세">
+    <mxGraphModel dx="1400" dy="900" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1600" pageHeight="1000" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+        <mxCell id="t" value="Learning Core 내부 책임과 흐름" style="text;html=1;align=center;fontSize=28;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="450" y="20" width="700" height="50" as="geometry" />
+        </mxCell>
+        <mxCell id="api" value="API 경계" style="swimlane;html=1;rounded=1;startSize=35;fillColor=#d5e8d4;strokeColor=#82b366;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="50" y="100" width="310" height="700" as="geometry" />
+        </mxCell>
+        <mxCell id="a1" value="사용자 Exam API&#xa;생성·조회·upload·submit·polling" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;" vertex="1" parent="api">
+          <mxGeometry x="30" y="70" width="250" height="100" as="geometry" />
+        </mxCell>
+        <mxCell id="a2" value="AI Callback API&#xa;feedback · SpeechAce · Azure" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;" vertex="1" parent="api">
+          <mxGeometry x="30" y="220" width="250" height="95" as="geometry" />
+        </mxCell>
+        <mxCell id="a3" value="UserWithdrawn internal API&#xa;workload JWT · 204" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;" vertex="1" parent="api">
+          <mxGeometry x="30" y="370" width="250" height="95" as="geometry" />
+        </mxCell>
+        <mxCell id="app" value="Application" style="swimlane;html=1;rounded=1;startSize=35;fillColor=#dae8fc;strokeColor=#6c8ebf;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="400" y="100" width="500" height="700" as="geometry" />
+        </mxCell>
+        <mxCell id="s1" value="Exam Session / Read&#xa;ExamSessionManager · ExamReadService · Catalog" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;" vertex="1" parent="app">
+          <mxGeometry x="35" y="65" width="430" height="90" as="geometry" />
+        </mxCell>
+        <mxCell id="s2" value="Question/Summary Grading&#xa;ExamGradingService · DispatchService · Scheduler" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;" vertex="1" parent="app">
+          <mxGeometry x="35" y="190" width="430" height="95" as="geometry" />
+        </mxCell>
+        <mxCell id="s3" value="ExamServiceImpl facade&#xa;API orchestration + Callback + result assembly&#xa;약 835 LOC" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;" vertex="1" parent="app">
+          <mxGeometry x="35" y="320" width="430" height="105" as="geometry" />
+        </mxCell>
+        <mxCell id="s4" value="Billing Exam Creation Saga&#xa;Operation · local Transaction · SigV4 client" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;" vertex="1" parent="app">
+          <mxGeometry x="35" y="460" width="430" height="95" as="geometry" />
+        </mxCell>
+        <mxCell id="s5" value="후속 모듈 경계&#xa;exam-session / question-grading / summary / read / integrations" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffe6cc;strokeColor=#d79b00;dashed=1;" vertex="1" parent="app">
+          <mxGeometry x="35" y="585" width="430" height="80" as="geometry" />
+        </mxCell>
+        <mxCell id="domain" value="Domain &amp; Data" style="swimlane;html=1;rounded=1;startSize=35;fillColor=#e1d5e7;strokeColor=#9673a6;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="940" y="100" width="610" height="700" as="geometry" />
+        </mxCell>
+        <mxCell id="d1" value="ExamSession · MockExam · Question" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;" vertex="1" parent="domain">
+          <mxGeometry x="35" y="65" width="250" height="75" as="geometry" />
+        </mxCell>
+        <mxCell id="d2" value="Question/Summary GradingJob" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;" vertex="1" parent="domain">
+          <mxGeometry x="320" y="65" width="250" height="75" as="geometry" />
+        </mxCell>
+        <mxCell id="d3" value="ExamResult · ExamSummary&#xa;Azure · SpeechAce" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;" vertex="1" parent="domain">
+          <mxGeometry x="35" y="180" width="250" height="85" as="geometry" />
+        </mxCell>
+        <mxCell id="d4" value="ExamCreationOperation" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;" vertex="1" parent="domain">
+          <mxGeometry x="320" y="180" width="250" height="85" as="geometry" />
+        </mxCell>
+        <mxCell id="mongo" value="MongoDB" style="shape=cylinder3;whiteSpace=wrap;html=1;boundedLbl=1;backgroundOutline=1;fillColor=#e1d5e7;strokeColor=#9673a6;" vertex="1" parent="domain">
+          <mxGeometry x="35" y="330" width="160" height="90" as="geometry" />
+        </mxCell>
+        <mxCell id="redis" value="Redis" style="shape=cylinder3;whiteSpace=wrap;html=1;boundedLbl=1;backgroundOutline=1;fillColor=#f8cecc;strokeColor=#b85450;" vertex="1" parent="domain">
+          <mxGeometry x="225" y="330" width="160" height="90" as="geometry" />
+        </mxCell>
+        <mxCell id="s3ext" value="S3" style="shape=cylinder3;whiteSpace=wrap;html=1;boundedLbl=1;backgroundOutline=1;fillColor=#fff2cc;strokeColor=#d6b656;" vertex="1" parent="domain">
+          <mxGeometry x="415" y="330" width="150" height="90" as="geometry" />
+        </mxCell>
+        <mxCell id="ai" value="Python AI&#xa;Callback" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;" vertex="1" parent="domain">
+          <mxGeometry x="85" y="485" width="190" height="90" as="geometry" />
+        </mxCell>
+        <mxCell id="billing" value="Billing&#xa;SigV4" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffe6cc;strokeColor=#d79b00;" vertex="1" parent="domain">
+          <mxGeometry x="330" y="485" width="190" height="90" as="geometry" />
+        </mxCell>
+        <mxCell id="risk" value="주의: Callback permitAll · raw Map · LocalDateTime · 큰 facade" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="450" y="850" width="700" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="e1" style="edgeStyle=orthogonalEdgeStyle;html=1;strokeColor=#82b366;endArrow=block;" edge="1" parent="1" source="a1" target="s3">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e2" style="edgeStyle=orthogonalEdgeStyle;html=1;strokeColor=#b85450;endArrow=block;" edge="1" parent="1" source="a2" target="s3">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e3" style="edgeStyle=orthogonalEdgeStyle;html=1;strokeColor=#6c8ebf;endArrow=block;" edge="1" parent="1" source="s3" target="s1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e4" style="edgeStyle=orthogonalEdgeStyle;html=1;strokeColor=#6c8ebf;endArrow=block;" edge="1" parent="1" source="s3" target="s2">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e5" style="edgeStyle=orthogonalEdgeStyle;html=1;strokeColor=#6c8ebf;endArrow=block;" edge="1" parent="1" source="s3" target="s4">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e6" style="edgeStyle=orthogonalEdgeStyle;html=1;strokeColor=#9673a6;endArrow=block;" edge="1" parent="1" source="s1" target="d1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e7" style="edgeStyle=orthogonalEdgeStyle;html=1;strokeColor=#9673a6;endArrow=block;" edge="1" parent="1" source="s2" target="d2">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e8" style="edgeStyle=orthogonalEdgeStyle;html=1;strokeColor=#9673a6;endArrow=block;" edge="1" parent="1" source="s3" target="d3">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e9" style="edgeStyle=orthogonalEdgeStyle;html=1;strokeColor=#6c8ebf;endArrow=block;" edge="1" parent="1" source="s4" target="d4">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+  <diagram id="identity-detail" name="6. Identity 상세">
+    <mxGraphModel dx="1400" dy="900" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1600" pageHeight="1000" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+        <mxCell id="t" value="Identity 내부 Capability Map" style="text;html=1;align=center;fontSize=28;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="480" y="20" width="640" height="50" as="geometry" />
+        </mxCell>
+        <mxCell id="api" value="앱 API" style="swimlane;html=1;rounded=1;startSize=35;fillColor=#dae8fc;strokeColor=#6c8ebf;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="50" y="100" width="360" height="720" as="geometry" />
+        </mxCell>
+        <mxCell id="a1" value="AuthController&#xa;LOCAL · Guest · token session" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;" vertex="1" parent="api">
+          <mxGeometry x="35" y="70" width="290" height="90" as="geometry" />
+        </mxCell>
+        <mxCell id="a2" value="FirebaseExchangeController&#xa;exchange · signup · prepare · upgrade · merge · sync" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;" vertex="1" parent="api">
+          <mxGeometry x="35" y="200" width="290" height="115" as="geometry" />
+        </mxCell>
+        <mxCell id="a3" value="UserController&#xa;profile · consent · withdrawal" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;" vertex="1" parent="api">
+          <mxGeometry x="35" y="360" width="290" height="90" as="geometry" />
+        </mxCell>
+        <mxCell id="a4" value="JWKS Controller&#xa;Public JWK only" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;" vertex="1" parent="api">
+          <mxGeometry x="35" y="500" width="290" height="80" as="geometry" />
+        </mxCell>
+        <mxCell id="cap" value="Application Capability" style="swimlane;html=1;rounded=1;startSize=35;fillColor=#d5e8d4;strokeColor=#82b366;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="450" y="100" width="650" height="720" as="geometry" />
+        </mxCell>
+        <mxCell id="c1" value="local / registration&#xa;signup · login · guest" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;" vertex="1" parent="cap">
+          <mxGeometry x="35" y="65" width="260" height="90" as="geometry" />
+        </mxCell>
+        <mxCell id="c2" value="session&#xa;issue · rotate · revoke" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;" vertex="1" parent="cap">
+          <mxGeometry x="350" y="65" width="260" height="90" as="geometry" />
+        </mxCell>
+        <mxCell id="c3" value="firebase federation&#xa;verification · enrollment · merge · cleanup" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;" vertex="1" parent="cap">
+          <mxGeometry x="35" y="195" width="260" height="105" as="geometry" />
+        </mxCell>
+        <mxCell id="c4" value="phone identity&#xa;ownership · fingerprint · eligibility binding" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;" vertex="1" parent="cap">
+          <mxGeometry x="350" y="195" width="260" height="105" as="geometry" />
+        </mxCell>
+        <mxCell id="c5" value="user lifecycle&#xa;profile · consent · withdrawal · external cleanup" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;" vertex="1" parent="cap">
+          <mxGeometry x="35" y="340" width="260" height="110" as="geometry" />
+        </mxCell>
+        <mxCell id="c6" value="durable outbox&#xa;PhoneEligibility · UserMerged · UserWithdrawn" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;" vertex="1" parent="cap">
+          <mxGeometry x="350" y="340" width="260" height="110" as="geometry" />
+        </mxCell>
+        <mxCell id="c7" value="Port / Adapter&#xa;Firebase Admin · JDK HTTP delivery · workload credential" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;" vertex="1" parent="cap">
+          <mxGeometry x="100" y="510" width="450" height="100" as="geometry" />
+        </mxCell>
+        <mxCell id="infra" value="Domain &amp; Infrastructure" style="swimlane;html=1;rounded=1;startSize=35;fillColor=#e1d5e7;strokeColor=#9673a6;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="1140" y="100" width="410" height="720" as="geometry" />
+        </mxCell>
+        <mxCell id="d1" value="User · UserConsents&#xa;Identity models · RefreshSession" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;" vertex="1" parent="infra">
+          <mxGeometry x="35" y="70" width="340" height="90" as="geometry" />
+        </mxCell>
+        <mxCell id="d2" value="Outbox · Lifecycle · Cleanup aggregate" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;" vertex="1" parent="infra">
+          <mxGeometry x="35" y="205" width="340" height="90" as="geometry" />
+        </mxCell>
+        <mxCell id="mongo" value="Identity MongoDB" style="shape=cylinder3;whiteSpace=wrap;html=1;boundedLbl=1;backgroundOutline=1;fillColor=#dae8fc;strokeColor=#6c8ebf;" vertex="1" parent="infra">
+          <mxGeometry x="115" y="350" width="180" height="95" as="geometry" />
+        </mxCell>
+        <mxCell id="firebase" value="Firebase / SNS" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#666666;" vertex="1" parent="infra">
+          <mxGeometry x="35" y="500" width="150" height="90" as="geometry" />
+        </mxCell>
+        <mxCell id="down" value="Learning / Billing&#xa;outbox delivery" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffe6cc;strokeColor=#d79b00;" vertex="1" parent="infra">
+          <mxGeometry x="225" y="500" width="150" height="90" as="geometry" />
+        </mxCell>
+        <mxCell id="risk" value="구조 과제: auth subtree 탐색 비용 · Identity→Billing SigV4 전환 · UserMerged downstream 미완성" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="340" y="865" width="920" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="e1" style="edgeStyle=orthogonalEdgeStyle;html=1;strokeColor=#6c8ebf;endArrow=block;" edge="1" parent="1" source="a1" target="c1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e2" style="edgeStyle=orthogonalEdgeStyle;html=1;strokeColor=#6c8ebf;endArrow=block;" edge="1" parent="1" source="a2" target="c3">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e3" style="edgeStyle=orthogonalEdgeStyle;html=1;strokeColor=#6c8ebf;endArrow=block;" edge="1" parent="1" source="a3" target="c5">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e4" style="edgeStyle=orthogonalEdgeStyle;html=1;strokeColor=#9673a6;endArrow=block;" edge="1" parent="1" source="c6" target="down">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e5" style="edgeStyle=orthogonalEdgeStyle;html=1;strokeColor=#9673a6;endArrow=block;" edge="1" parent="1" source="c3" target="firebase">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e6" style="edgeStyle=orthogonalEdgeStyle;html=1;strokeColor=#9673a6;endArrow=block;" edge="1" parent="1" source="c5" target="d1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e7" style="edgeStyle=orthogonalEdgeStyle;html=1;strokeColor=#9673a6;endArrow=block;" edge="1" parent="1" source="d1" target="mongo">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+  <diagram id="billing-detail" name="7. Billing 상세">
+    <mxGraphModel dx="1400" dy="900" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1600" pageHeight="1000" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+        <mxCell id="t" value="Billing 무료 사용권 모델과 lifecycle" style="text;html=1;align=center;fontSize=28;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="430" y="20" width="740" height="50" as="geometry" />
+        </mxCell>
+        <mxCell id="elig" value="1. 자격 projection&#xa;TrialEligibility&#xa;VERIFIED / REVOKED" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="70" y="160" width="240" height="115" as="geometry" />
+        </mxCell>
+        <mxCell id="catalog" value="2. 혜택 정책&#xa;BenefitDefinition&#xa;FREE_EXAM_ONCE" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="380" y="160" width="240" height="115" as="geometry" />
+        </mxCell>
+        <mxCell id="claim" value="3. 발급 근거·권리&#xa;TrialClaim + aliases&#xa;EntitlementGrant 1 unit" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="690" y="160" width="260" height="115" as="geometry" />
+        </mxCell>
+        <mxCell id="reserve" value="4. 임시 hold&#xa;Reservation RESERVED&#xa;Allocation HELD&#xa;Ledger RESERVED" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="1020" y="160" width="250" height="125" as="geometry" />
+        </mxCell>
+        <mxCell id="confirm" value="5. Session commit 후 확정&#xa;Allocation CONSUMED&#xa;Grant consumed + Ledger&#xa;AttemptGroup OPEN" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="1340" y="150" width="230" height="145" as="geometry" />
+        </mxCell>
+        <mxCell id="cancel" value="cancel / 5분 expiry&#xa;HELD → RELEASED&#xa;Grant available 복원&#xa;TrialClaim은 유지" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;" vertex="1" parent="1">
+          <mxGeometry x="1015" y="385" width="260" height="125" as="geometry" />
+        </mxCell>
+        <mxCell id="group" value="AttemptGroup lifecycle&#xa;OPEN → GRADING → COMPLETED&#xa;또는 RETAKE_AVAILABLE" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffe6cc;strokeColor=#d79b00;dashed=1;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="1315" y="385" width="270" height="125" as="geometry" />
+        </mxCell>
+        <mxCell id="inbox" value="Identity eligibility event&#xa;strict decoder · inbox · digest · revision&#xa;event만으로 Claim/Grant를 만들지 않음" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;" vertex="1" parent="1">
+          <mxGeometry x="70" y="600" width="340" height="125" as="geometry" />
+        </mxCell>
+        <mxCell id="command" value="IdempotencyCommand&#xa;operationId · payloadHash · response snapshot&#xa;same-key replay" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;" vertex="1" parent="1">
+          <mxGeometry x="470" y="600" width="340" height="125" as="geometry" />
+        </mxCell>
+        <mxCell id="ledger" value="append-only audit core&#xa;GRANTED · RESERVED · RELEASED · CONSUMED&#xa;subject mapping은 분리" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;" vertex="1" parent="1">
+          <mxGeometry x="870" y="600" width="340" height="125" as="geometry" />
+        </mxCell>
+        <mxCell id="mongo" value="Billing MongoDB&#xa;Transaction · unique/partial index · CAS" style="shape=cylinder3;whiteSpace=wrap;html=1;boundedLbl=1;backgroundOutline=1;fillColor=#ffe6cc;strokeColor=#d79b00;" vertex="1" parent="1">
+          <mxGeometry x="1290" y="600" width="250" height="125" as="geometry" />
+        </mxCell>
+        <mxCell id="note" value="Billing은 문제·음성·점수·피드백을 저장하지 않는다. AttemptSession은 active/stale fencing projection이다." style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#666666;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="380" y="835" width="840" height="65" as="geometry" />
+        </mxCell>
+        <mxCell id="e1" style="edgeStyle=orthogonalEdgeStyle;html=1;strokeColor=#666666;endArrow=block;" edge="1" parent="1" source="elig" target="catalog">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e2" value="최초 reserve에서 lazy" style="edgeStyle=orthogonalEdgeStyle;html=1;strokeColor=#666666;endArrow=block;" edge="1" parent="1" source="catalog" target="claim">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e3" style="edgeStyle=orthogonalEdgeStyle;html=1;strokeColor=#666666;endArrow=block;" edge="1" parent="1" source="claim" target="reserve">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e4" value="confirm" style="edgeStyle=orthogonalEdgeStyle;html=1;strokeColor=#82b366;endArrow=block;" edge="1" parent="1" source="reserve" target="confirm">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e5" value="실패 전용" style="edgeStyle=orthogonalEdgeStyle;html=1;strokeColor=#b85450;endArrow=block;" edge="1" parent="1" source="reserve" target="cancel">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e6" value="상태 event 미구현" style="edgeStyle=orthogonalEdgeStyle;html=1;strokeColor=#d79b00;dashed=1;endArrow=block;" edge="1" parent="1" source="confirm" target="group">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e7" style="edgeStyle=orthogonalEdgeStyle;html=1;strokeColor=#6c8ebf;endArrow=block;" edge="1" parent="1" source="inbox" target="elig">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e8" style="edgeStyle=orthogonalEdgeStyle;html=1;strokeColor=#6c8ebf;endArrow=block;" edge="1" parent="1" source="command" target="reserve">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e9" style="edgeStyle=orthogonalEdgeStyle;html=1;strokeColor=#9673a6;endArrow=block;" edge="1" parent="1" source="claim" target="ledger">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e10" style="edgeStyle=orthogonalEdgeStyle;html=1;strokeColor=#d79b00;endArrow=block;" edge="1" parent="1" source="ledger" target="mongo">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+  <diagram id="flows-gaps" name="8. 서비스 흐름과 Gap">
+    <mxGraphModel dx="1400" dy="900" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1600" pageHeight="1000" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+        <mxCell id="t" value="서비스 간 핵심 흐름과 미완성 연결" style="text;html=1;align=center;fontSize=28;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="420" y="20" width="760" height="50" as="geometry" />
+        </mxCell>
+        <mxCell id="f1" value="A. 사용자 인증" style="swimlane;html=1;rounded=1;startSize=35;fillColor=#dae8fc;strokeColor=#6c8ebf;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="50" y="100" width="720" height="220" as="geometry" />
+        </mxCell>
+        <mxCell id="a1" value="앱" style="ellipse;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;" vertex="1" parent="f1">
+          <mxGeometry x="35" y="80" width="120" height="70" as="geometry" />
+        </mxCell>
+        <mxCell id="a2" value="Identity&#xa;JWT 발급" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;" vertex="1" parent="f1">
+          <mxGeometry x="220" y="70" width="150" height="85" as="geometry" />
+        </mxCell>
+        <mxCell id="a3" value="Learning Core&#xa;JWKS 로컬 검증&#xa;sub=userId" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;" vertex="1" parent="f1">
+          <mxGeometry x="450" y="65" width="190" height="95" as="geometry" />
+        </mxCell>
+        <mxCell id="ae1" value="로그인" style="edgeStyle=orthogonalEdgeStyle;html=1;endArrow=block;" edge="1" parent="f1" source="a1" target="a2">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="ae2" value="Bearer" style="edgeStyle=orthogonalEdgeStyle;html=1;endArrow=block;" edge="1" parent="f1" source="a1" target="a3">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="f2" value="B. 시험 생성 + Billing saga (조건부)" style="swimlane;html=1;rounded=1;startSize=35;fillColor=#d5e8d4;strokeColor=#82b366;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="820" y="100" width="730" height="220" as="geometry" />
+        </mxCell>
+        <mxCell id="b1" value="앱&#xa;Idempotency-Key" style="ellipse;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;" vertex="1" parent="f2">
+          <mxGeometry x="30" y="75" width="135" height="80" as="geometry" />
+        </mxCell>
+        <mxCell id="b2" value="Learning Core&#xa;Operation→Session commit" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;" vertex="1" parent="f2">
+          <mxGeometry x="220" y="65" width="190" height="95" as="geometry" />
+        </mxCell>
+        <mxCell id="b3" value="Billing&#xa;reserve→confirm&#xa;AttemptGroup OPEN" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffe6cc;strokeColor=#d79b00;" vertex="1" parent="f2">
+          <mxGeometry x="480" y="60" width="190" height="105" as="geometry" />
+        </mxCell>
+        <mxCell id="be1" style="edgeStyle=orthogonalEdgeStyle;html=1;endArrow=block;" edge="1" parent="f2" source="b1" target="b2">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="be2" value="SigV4" style="edgeStyle=orthogonalEdgeStyle;html=1;strokeColor=#6c8ebf;endArrow=block;" edge="1" parent="f2" source="b2" target="b3">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="f3" value="C. 음성 채점" style="swimlane;html=1;rounded=1;startSize=35;fillColor=#e1d5e7;strokeColor=#9673a6;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="50" y="370" width="720" height="250" as="geometry" />
+        </mxCell>
+        <mxCell id="c1" value="앱 + S3&#xa;upload · submit" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;" vertex="1" parent="f3">
+          <mxGeometry x="30" y="85" width="150" height="85" as="geometry" />
+        </mxCell>
+        <mxCell id="c2" value="Learning Core&#xa;durable Job · audio download" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;" vertex="1" parent="f3">
+          <mxGeometry x="250" y="75" width="190" height="105" as="geometry" />
+        </mxCell>
+        <mxCell id="c3" value="Python AI&#xa;user_id=examId" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;" vertex="1" parent="f3">
+          <mxGeometry x="510" y="80" width="160" height="95" as="geometry" />
+        </mxCell>
+        <mxCell id="ce1" style="edgeStyle=orthogonalEdgeStyle;html=1;endArrow=block;" edge="1" parent="f3" source="c1" target="c2">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="ce2" value="multipart" style="edgeStyle=orthogonalEdgeStyle;html=1;endArrow=block;" edge="1" parent="f3" source="c2" target="c3">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="ce3" value="Callback: 인증 보완 필요" style="edgeStyle=orthogonalEdgeStyle;html=1;strokeColor=#b85450;dashed=1;endArrow=block;" edge="1" parent="f3" source="c3" target="c2">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="f4" value="D. 사용자 lifecycle / Attempt lifecycle" style="swimlane;html=1;rounded=1;startSize=35;fillColor=#ffe6cc;strokeColor=#d79b00;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="820" y="370" width="730" height="250" as="geometry" />
+        </mxCell>
+        <mxCell id="d1" value="Identity Outbox&#xa;Eligibility · Merged · Withdrawn" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;" vertex="1" parent="f4">
+          <mxGeometry x="30" y="75" width="190" height="105" as="geometry" />
+        </mxCell>
+        <mxCell id="d2" value="Learning Core&#xa;Withdrawn consumer 구현&#xa;Merged consumer 미구현" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;" vertex="1" parent="f4">
+          <mxGeometry x="270" y="70" width="190" height="115" as="geometry" />
+        </mxCell>
+        <mxCell id="d3" value="Billing&#xa;Eligibility consumer 구현&#xa;Attempt status 미구현" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffe6cc;strokeColor=#d79b00;" vertex="1" parent="f4">
+          <mxGeometry x="510" y="70" width="190" height="115" as="geometry" />
+        </mxCell>
+        <mxCell id="de1" value="JWT transport" style="edgeStyle=orthogonalEdgeStyle;html=1;strokeColor=#6c8ebf;endArrow=block;" edge="1" parent="f4" source="d1" target="d2">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="de2" value="SigV4 전환 필요" style="edgeStyle=orthogonalEdgeStyle;html=1;strokeColor=#d79b00;dashed=1;endArrow=block;" edge="1" parent="f4" source="d1" target="d3">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="g1" value="출시 전 Gate 1&#xa;Identity→Billing SigV4 + route/IAM" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="100" y="720" width="310" height="100" as="geometry" />
+        </mxCell>
+        <mxCell id="g2" value="출시 전 Gate 2&#xa;Billing Attempt consumer → Learning outbox/publisher" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="465" y="720" width="350" height="100" as="geometry" />
+        </mxCell>
+        <mxCell id="g3" value="출시 전 Gate 3&#xa;Mongo migration · Lattice · failure injection · staging E2E" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="870" y="720" width="350" height="100" as="geometry" />
+        </mxCell>
+        <mxCell id="g4" value="구조 개선&#xa;AI Callback trust boundary + Learning capability 분리" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="1270" y="720" width="280" height="100" as="geometry" />
+        </mxCell>
+        <mxCell id="order" value="권장 순서: 운영 연결 닫기 → Learning Core 내부 모듈화 → 10초 챌린지 별도 aggregate → 관측성/IaC" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#666666;fontSize=15;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="320" y="875" width="960" height="55" as="geometry" />
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>
