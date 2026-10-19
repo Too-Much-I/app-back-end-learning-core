@@ -25,6 +25,13 @@ public class AttemptGroupStateReconciler {
         sessionRepository.findAttemptGroupReconciliationCandidates().stream()
                 .limit(properties.batchSize())
                 .map(ExamSession::getExamId)
-                .forEach(coordinator::reconcile);
+                .forEach(examId -> {
+                    try {
+                        coordinator.reconcile(examId);
+                    } catch (RuntimeException failure) {
+                        // Preserve the failed candidate; one owner must not starve the rest.
+                        AttemptGroupTransactionRetry.reportFailure(AttemptGroupTransactionRetry.classify(failure), 0);
+                    }
+                });
     }
 }

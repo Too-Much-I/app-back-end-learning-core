@@ -30,6 +30,9 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
+import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.times;
 
 @ExtendWith(MockitoExtension.class)
 class AttemptGroupStateCoordinatorTransactionTest {
@@ -41,6 +44,22 @@ class AttemptGroupStateCoordinatorTransactionTest {
     @Mock AttemptGroupTraceContext traceContext;
     @Mock AttemptGroupEventMetrics metrics;
     @Mock ObjectProvider<TransactionOperations> transactionProvider;
+
+    @Test
+    void directReconciliationRetriesAbortedTransactionsButPropagatesExhaustion() {
+        TransactionOperations transactions = mock(TransactionOperations.class);
+        when(transactionProvider.getIfAvailable()).thenReturn(transactions);
+        com.mongodb.MongoException mongo = new com.mongodb.MongoException(112, "conflict");
+        mongo.addLabel(com.mongodb.MongoException.TRANSIENT_TRANSACTION_ERROR_LABEL);
+        var wrapped = new org.springframework.dao.DataIntegrityViolationException("wrapped", mongo);
+        doThrow(wrapped).when(transactions).executeWithoutResult(any());
+        var coordinator = new AttemptGroupStateCoordinator(properties(), sessionRepository, outboxStore,
+                evaluator, new AttemptGroupEventCanonicalizer(new ObjectMapper()), traceContext, metrics,
+                transactionProvider, Clock.fixed(NOW, ZoneOffset.UTC));
+        assertThrows(org.springframework.dao.DataIntegrityViolationException.class, () -> coordinator.reconcile("ex"));
+        verify(transactions, times(3)).executeWithoutResult(any());
+        verify(outboxStore, never()).insert(any());
+    }
 
     @Test
     void participatingTransactionPropagatesDuplicateForOuterRetry() {
