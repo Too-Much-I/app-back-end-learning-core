@@ -4,8 +4,6 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.dao.DuplicateKeyException;
-import org.springframework.dao.OptimisticLockingFailureException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.support.TransactionOperations;
 import web.tosunsaeng.domain.exams.attemptgroup.domain.AttemptGroupEventOutbox;
@@ -73,12 +71,10 @@ public class AttemptGroupStateCoordinator {
         if (transactions == null) {
             throw new IllegalStateException("AttemptGroup writer requires Mongo transactions");
         }
-        try {
+        AttemptGroupTransactionRetry.execute(() -> {
             transactions.executeWithoutResult(status -> reconcileWithinTransaction(examId));
-        } catch (DuplicateKeyException | OptimisticLockingFailureException race) {
-            // The unique event slot and ExamSession version make concurrent writers converge.
-            log.debug("AttemptGroup 상태 동시 전환 감지 outcome=converged");
-        }
+            return null;
+        });
     }
 
     void reconcileWithinTransaction(String examId) {
