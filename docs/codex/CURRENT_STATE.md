@@ -1,5 +1,7 @@
 # Learning Core Current State
 
+- 2026-10-19 main 자동배포 정리(TMI-126): 사용자 main→prod 자동배포 유지 선택에 따라 service/family/health를 현재 prod로 수정하고 실제 컨테이너의 역사적 이름 learning-core-test는 유지했다. Node88 통과. AWS 배포 역할 Policy는 여전히 옛 LC service 및 옛 execution/task role만 허용하므로 IAM 대상 교체 승인 전 main 머지·배포 보류. develop 대상/공개 API/운영 설정은 불변.
+
 - 2026-10-19 코드·Jira 정리: 코드 `4a7341a`를 후보 브랜치에 푸시했다. 저장된 운영 JAR과 재빌드 SHA256 일치, unit 1,402 통과/기존1skip·삭제 Mongo39·Node88 통과. TMI-193/198 검토 중 전환, TMI-116/217/220에 LC 근거/잔여 검증 댓글 반영. main 머지·재배포·DB 변경 없음. 상세: [운영 코드 동기화](LC_PRODUCTION_CODE_SYNC_2026-10-19.md).
 
 - 2026-10-19 — AI 중지 결과 인계 기록 완료(TMI-126 참고): 직전 검증에서 지정 AI2개 STOPPED, 구 Identity 실행0, 운영 서비스 유지 결과를 안내했다. 이번 종료 기록은 추가 AWS 조회/변경 없이 문서만 갱신하며 서비스 정의·공유 인프라·로그 비용과 태스크 실행 비용을 구분한다.

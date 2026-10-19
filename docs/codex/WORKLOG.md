@@ -17710,3 +17710,10 @@
 - TMI-193/198 설명 최신화 후 검토 중 전환. TMI-116 완료 유지·후속 계약 댓글, TMI-217/220 LC 결과 및 공동 검증 미완료 댓글. Billing 이슈 상태는 이번 작업에서 변경하지 않았다. FCM 수락과 실제 단말 수신/정규 scheduler 검증을 구분했다.
 - 운영 동기화 보고서 생성, preflight 현재 배포 포함 여부 정정, CURRENT_STATE 갱신. 과거 WORKLOG는 보존하며 기존 미커밋 운영 준비/배포 문서도 이력으로 함께 전달한다. 코드/문서 비밀값 패턴 검사 및 diff check 수행. 문서 커밋·동일 후보 브랜치 푸시 대상으로 준비했다.
 - main은 fetch 시89defb7, develop509fee0; Azure 동등 수정은 후보에 이미 포함. main/develop 머지·새 배포·DB/설정 변경은 하지 않았다. main 정리 시 자동 운영 배포 승인은 별도다. 상세는 LC_PRODUCTION_CODE_SYNC_2026-10-19.md.
+
+## 2026-10-19 — main 자동 배포 대상 정정 및 IAM 승인 대기
+
+- 관련 TMI-126. 사용자 main 반영 요청 후 main 자동 배포 유지/현재 prod 대상 수정을 명시 선택했다. 기존 select-target은 옛 learning-core-service/family와 api-staging 주소여서 prod-service/prod family/api-prod로 수정했다. 실제 prod 컨테이너 이름은 learning-core-test이므로 family와 분리해 유지했다. main push/수동 실행 gate 및 develop PR 자동배포 정책은 유지한다.
+- workflow gate 표시명만 실제 동작에 맞게 정정. Node 배포 테스트88 통과, diff check 통과. Java 제품 코드/공개 API/AI 계약 변경 없음으로 Gradle 재실행하지 않았다. 기존 DS_Store는 제외·보존한다.
+- GitHub 변수 AWS_ROLE_ARN은 tosunsaeng-github-learning-core-deploy-role. AWS IAM 콘솔에서 이 역할의 유일 inline Policy를 읽어 ecs Describe/Update 대상이 옛 LC service, PassRole이 옛 execution/task role임을 확인했다. ECR 대상은 현재 LC 저장소이며 task definition Describe/Register는 기존 Resource=*다. 로컬 AWS 인증은 없어 콘솔 읽기로 확인했고 Secret/Token은 조회하지 않았다.
+- IAM 변경은 미실행. prod service 및 prod execution/task role로 권한 대상을 교체할 별도 사용자 승인 전 main 머지·자동배포를 보류한다. PR 준비와 후보 브랜치 전달까지만 진행하며 현재 서버/DB/설정은 변경하지 않는다.
