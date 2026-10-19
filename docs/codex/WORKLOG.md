@@ -17717,3 +17717,7 @@
 - workflow gate 표시명만 실제 동작에 맞게 정정. Node 배포 테스트88 통과, diff check 통과. Java 제품 코드/공개 API/AI 계약 변경 없음으로 Gradle 재실행하지 않았다. 기존 DS_Store는 제외·보존한다.
 - GitHub 변수 AWS_ROLE_ARN은 tosunsaeng-github-learning-core-deploy-role. AWS IAM 콘솔에서 이 역할의 유일 inline Policy를 읽어 ecs Describe/Update 대상이 옛 LC service, PassRole이 옛 execution/task role임을 확인했다. ECR 대상은 현재 LC 저장소이며 task definition Describe/Register는 기존 Resource=*다. 로컬 AWS 인증은 없어 콘솔 읽기로 확인했고 Secret/Token은 조회하지 않았다.
 - IAM 변경은 미실행. prod service 및 prod execution/task role로 권한 대상을 교체할 별도 사용자 승인 전 main 머지·자동배포를 보류한다. PR 준비와 후보 브랜치 전달까지만 진행하며 현재 서버/DB/설정은 변경하지 않는다.
+
+<!-- codex-turn:01a1525d-c52c-7862-a23f-08490d27884a -->
+
+- 전달 결과: 코드/기록 `0d5aede` 후보 브랜치 push 완료, main 대상 PR #50 생성·현재 작업에 연결. PR 본문에 IAM 승인 전 머지 금지 명시. 운영 배포 미실행이며 다음 권한 교체 승인 필요. https://github.com/Too-Much-I/app-back-end-learning-core/pull/50
