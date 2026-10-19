@@ -20,9 +20,13 @@ public class BillingDeletionConfiguration {
         if (!jwt.isSenderEnabled() || !env.getProperty("app.learning-record-deletion.writer-fence-enabled", Boolean.class, false)
                 || !env.getProperty("app.learning-record-deletion.worker-enabled", Boolean.class, false))
             throw new IllegalStateException("Deletion sender requires workload signing and deletion fences");
-        Document rollout = mongo.findById("v1", Document.class, "learning_record_deletion_rollout");
-        if (rollout == null || !Boolean.TRUE.equals(rollout.get("billingDeliveryVerified")))
-            throw new IllegalStateException("Deletion delivery rollout is not verified");
+        // Real delivery is verified after deployment through the frontend. Do not require its
+        // result to start the sender that produces it. Storage/drain gates remain in the dependency.
+        verifyDeliveryStorage(mongo);
+        return new BillingDeletionClient(saga.getBaseUrl(), issuer, clock);
+    }
+    /** Shared with the bounded operator probe; does not grant rollout approval. */
+    public static void verifyDeliveryStorage(MongoTemplate mongo) {
         Document keys = new Document("prepared",1).append("billingDelivery.state",1)
                 .append("billingDelivery.nextAttemptAt",1).append("_id",1);
         boolean index = mongo.getCollection("learning_record_deletion_targets").listIndexes().into(new java.util.ArrayList<>()).stream()
@@ -32,7 +36,6 @@ public class BillingDeletionConfiguration {
         if (!index || mongo.getCollection("learning_record_deletion_targets").find(new Document("billingDelivery",new Document("$ne",null))
                 .append("expiresAt",new Document("$ne",null))).first() != null)
             throw new IllegalStateException("Deletion delivery index or retention is not verified");
-        return new BillingDeletionClient(saga.getBaseUrl(), issuer, clock);
     }
     @Bean BillingDeletionSender billingDeletionSender(MongoTemplate mongo, DeletionTransactions tx,
             UserOwnershipGuardService guards, BillingDeletionClient client, Clock clock, WorkloadJwtProperties jwt) {

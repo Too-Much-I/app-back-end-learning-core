@@ -29,10 +29,56 @@ public final class BillingDeletionSender {
                 .orOperator(Criteria.where("billingDelivery.leaseUntil").is(null), Criteria.where("billingDelivery.leaseUntil").lte(now)))
                 .with(Sort.by("billingDelivery.nextAttemptAt", "_id")), DeletionTarget.class);
         if (candidate == null) return false;
+        return deliver(candidate, null);
+    }
+
+    /** One-shot operator path: never selects a different target or resets retry/lease evidence. */
+    public boolean sendExact(ExactTarget expected) {
+        Objects.requireNonNull(expected);
+        var candidate = mongo.findById(expected.targetId(), DeletionTarget.class);
+        if (!expected.matches(candidate)) throw new IllegalStateException("Deletion preflight target mismatch");
+        var delivery = candidate.getBillingDelivery();
+        if (!Objects.equals(environment, delivery.getEnvironment()))
+            throw new IllegalStateException("Deletion preflight environment mismatch");
+        if (delivery.getState() != BillingDeletionDelivery.State.PENDING
+                || delivery.getNextAttemptAt() == null || delivery.getNextAttemptAt().isAfter(clock.instant())
+                || (delivery.getLeaseUntil() != null && delivery.getLeaseUntil().isAfter(clock.instant()))) return false;
+        return deliver(candidate, expected);
+    }
+
+    public record ExactTarget(String targetId, String userId, String eventId, String payloadDigest) {
+        public ExactTarget {
+            DeletionIdentifiers.userId(userId);
+            DeletionIdentifiers.uuidV4(eventId);
+            if (targetId == null || !targetId.matches("[a-f0-9-]{36}:EXAM:[A-Za-z0-9_-]{1,128}")
+                    || payloadDigest == null || !payloadDigest.matches("[a-f0-9]{64}"))
+                throw new IllegalArgumentException("Invalid deletion preflight selection");
+            DeletionIdentifiers.uuidV4(targetId.substring(0, 36));
+        }
+        public boolean matches(DeletionTarget target) {
+            if (target == null || !targetId.equals(target.getId()) || !userId.equals(target.getUserId())
+                    || target.getTargetType() != DeletionTarget.Type.EXAM || !target.isPrepared()
+                    || target.getCallbackFence() != DeletionTarget.CallbackFence.SEALED
+                    || !target.isReferencesInventoried() || target.getExpiresAt() != null
+                    || !targetId.equals(target.getDeletionId() + ":EXAM:" + target.getAggregateId())) return false;
+            var d = target.getBillingDelivery();
+            if (d == null || !eventId.equals(d.getEventId()) || !payloadDigest.equals(d.getPayloadDigest())
+                    || !payloadDigest.equals(DeletionIdentifiers.sha256(d.getPayload()))) return false;
+            var body = org.bson.Document.parse(d.getPayload());
+            return eventId.equals(body.getString("eventId")) && userId.equals(body.getString("userId"))
+                    && target.getDeletionId().equals(body.getString("deletionOperationId"))
+                    && target.getAggregateId().equals(body.getString("sessionId"));
+        }
+        @Override public String toString() { return "ExactTarget[redacted]"; }
+    }
+
+    private boolean deliver(DeletionTarget candidate, ExactTarget expected) {
         String token = UUID.randomUUID().toString();
         DeletionTarget claimed = tx.run(() -> {
             var current = mongo.findById(candidate.getId(), DeletionTarget.class);
             if (current == null || !Objects.equals(current.getVersion(), candidate.getVersion())) return null;
+            if (expected != null && !expected.matches(current)) throw new IllegalStateException("Deletion preflight target changed");
+            if (expected != null) requireExistingOwner(current.getUserId());
             guards.touchActive(current.getUserId(), clock.instant());
             var delivery = current.getBillingDelivery();
             if (!Objects.equals(environment, delivery.getEnvironment())
@@ -51,12 +97,15 @@ public final class BillingDeletionSender {
         var fresh = mongo.findById(claimed.getId(), DeletionTarget.class);
         if (fresh == null || !Objects.equals(fresh.getVersion(), claimed.getVersion())
                 || !fresh.getBillingDelivery().maySend(token, clock.instant())) return true;
+        if (expected != null && !expected.matches(fresh)) throw new IllegalStateException("Deletion preflight target changed");
         var result = client.send(fresh.getBillingDelivery().getPayload());
         tx.run(() -> {
             var current = mongo.findById(claimed.getId(), DeletionTarget.class);
             if (current == null || !Objects.equals(current.getVersion(), claimed.getVersion())) return null;
+            if (expected != null && !expected.matches(current)) throw new IllegalStateException("Deletion preflight target changed");
             var delivery = current.getBillingDelivery();
             if (!delivery.owned(token, clock.instant()) || !Objects.equals(delivery.getPayloadDigest(), claimed.getBillingDelivery().getPayloadDigest())) return null;
+            if (expected != null) requireExistingOwner(current.getUserId());
             guards.touchActive(current.getUserId(), clock.instant());
             if (result.acknowledged()) delivery.acknowledge(clock.instant());
             else if (result.failure() != null) delivery.review(result.failure());
@@ -64,5 +113,10 @@ public final class BillingDeletionSender {
             mongo.save(current); return null;
         });
         return true;
+    }
+    private void requireExistingOwner(String userId) {
+        var owner = guards.find(userId).orElseThrow(() -> new IllegalStateException("Missing preflight owner evidence"));
+        if (owner.getState() != web.tosunsaeng.domain.usermerge.domain.OwnershipGuardState.ACTIVE)
+            throw new IllegalStateException("Preflight owner is not active");
     }
 }
