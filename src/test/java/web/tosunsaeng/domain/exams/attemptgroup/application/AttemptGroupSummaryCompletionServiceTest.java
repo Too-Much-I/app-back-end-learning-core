@@ -84,7 +84,7 @@ class AttemptGroupSummaryCompletionServiceTest {
     }
 
     @Test
-    void unknownCommitResultRetriesTheWholeUnit() {
+    void unknownCommitResultDoesNotReplayTheWholeUnit() {
         MongoException mongoFailure = new MongoException("unknown commit result");
         mongoFailure.addLabel(MongoException.UNKNOWN_TRANSACTION_COMMIT_RESULT_LABEL);
         TransactionSystemException unknownCommit =
@@ -92,14 +92,12 @@ class AttemptGroupSummaryCompletionServiceTest {
         doThrow(unknownCommit)
                 .doAnswer(invocation -> callback(invocation).doInTransaction(transactionStatus))
                 .when(transactions).execute(any());
-        when(summaryRepository.findById(summary.getId())).thenReturn(Optional.of(summary));
-        when(gradingService.completeSummary(EXAM_ID, GENERATION_ATTEMPT)).thenReturn(true);
+        assertThrows(TransactionSystemException.class,
+                () -> service.persistAndComplete(summary, EXAM_ID, GENERATION_ATTEMPT));
 
-        assertTrue(service.persistAndComplete(summary, EXAM_ID, GENERATION_ATTEMPT));
-
-        verify(transactions, times(2)).execute(any());
+        verify(transactions, times(1)).execute(any());
         verify(summaryRepository, never()).insert(any(ExamSummary.class));
-        verify(coordinator).reconcileWithinTransaction(EXAM_ID);
+        verify(coordinator, never()).reconcileWithinTransaction(EXAM_ID);
     }
 
     @Test
