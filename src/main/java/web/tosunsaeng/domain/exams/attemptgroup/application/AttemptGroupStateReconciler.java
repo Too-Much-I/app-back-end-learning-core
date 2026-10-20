@@ -19,11 +19,17 @@ public class AttemptGroupStateReconciler {
     private final ExamSessionRepository sessionRepository;
     private final AttemptGroupStateCoordinator coordinator;
     private final AttemptGroupEventProperties properties;
+    private String afterId = "";
 
     @Scheduled(fixedDelayString = "${app.attempt-group-events.poll-interval:PT1S}")
-    public void reconcile() {
-        sessionRepository.findAttemptGroupReconciliationCandidates().stream()
-                .limit(properties.batchSize())
+    public synchronized void reconcile() {
+        var candidates = sessionRepository.findAttemptGroupReconciliationCandidatesAfter(afterId,
+                org.springframework.data.domain.PageRequest.of(0, properties.batchSize()));
+        if (candidates.isEmpty()) {
+            afterId = "";
+            return;
+        }
+        candidates.stream()
                 .map(ExamSession::getExamId)
                 .forEach(examId -> {
                     try {
@@ -31,6 +37,9 @@ public class AttemptGroupStateReconciler {
                     } catch (RuntimeException failure) {
                         // Preserve the failed candidate; one owner must not starve the rest.
                         AttemptGroupTransactionRetry.reportFailure(AttemptGroupTransactionRetry.classify(failure), 0);
+                    } finally {
+                        // Advance even on failure/in-progress; wrap next cycle and retry from durable state.
+                        afterId = examId;
                     }
                 });
     }
