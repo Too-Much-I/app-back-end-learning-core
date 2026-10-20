@@ -40,6 +40,9 @@ public class AttemptGroupStateCoordinator {
     @Autowired(required = false)
     private UserOwnedTransactionExecutor userOwnedTransactionExecutor;
 
+    @Autowired(required = false)
+    private web.tosunsaeng.domain.exams.application.ExamSubmissionEvidence submissionEvidence;
+
     public AttemptGroupStateCoordinator(
             AttemptGroupEventProperties properties,
             ExamSessionRepository sessionRepository,
@@ -82,6 +85,35 @@ public class AttemptGroupStateCoordinator {
             return;
         }
         reconcileInTransaction(examId);
+    }
+
+    /** Only called after submitQuestion has returned successfully; never retries submission or dispatch. */
+    public void reconcileAfterSubmission(String examId, int question, int retry, Runnable verifyPublicAccess) {
+        try {
+            reconcile(examId);
+        } catch (RuntimeException failure) {
+            var detail = AttemptGroupTransactionRetry.classify(failure);
+            if (!detail.retryable() || !detail.transientError() || detail.unknownCommit()
+                    || org.springframework.transaction.support.TransactionSynchronizationManager.isActualTransactionActive()
+                    || !properties.writerEnabled() || submissionEvidence == null
+                    || userOwnedTransactionExecutor == null || !userOwnedTransactionExecutor.enabled()) {
+                throw failure;
+            }
+            // Read after the aborted transaction. These existing documents survive process restart
+            // and are rediscovered by the writer's reconciler; no best-effort failure marker is needed.
+            ExamSession session = sessionRepository.findById(examId).orElse(null);
+            boolean recoveryCandidate = eligible(session) && session.getTerminalEventId() == null;
+            // Explicit server provenance only: these submissions have no Billing projection to repair.
+            boolean noBillingProjection = session != null && session.isTransitionFree();
+            if ((!recoveryCandidate && !noBillingProjection)
+                    || !submissionEvidence.acceptedQuestion(session, question, retry)) {
+                throw failure;
+            }
+            // Do not turn a concurrent ownership/deletion denial into an accepted response.
+            userOwnedTransactionExecutor.requireDeferredExamCoordinationAllowed(session.getUserId(), examId);
+            verifyPublicAccess.run();
+            log.debug("AttemptGroup transaction event=attempt_group.transaction outcome=deferred_after_submission");
+        }
     }
 
     String touchCurrentOwnerWithinTransaction(String examId) {

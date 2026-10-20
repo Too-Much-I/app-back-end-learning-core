@@ -93,6 +93,20 @@ public class UserOwnedTransactionExecutor {
         if (deletionAccess != null) deletionAccess.requirePublicWrite(userId);
     }
 
+    /** Read-only recheck after an aborted post-submission transaction; never replaces a writer fence. */
+    public void requireDeferredExamCoordinationAllowed(String userId, String examId) {
+        if (!enabled()) throw new IllegalStateException("User-owned writer guard is disabled");
+        var guard = guardService.find(userId).orElseThrow(() ->
+                new UserOwnershipGuardException(UserOwnershipGuardException.Reason.STATE_CONFLICT));
+        if (guard.isMerged()) throw new UserOwnershipGuardException(UserOwnershipGuardException.Reason.ALREADY_MERGED);
+        if (guard.getState() != web.tosunsaeng.domain.usermerge.domain.OwnershipGuardState.ACTIVE)
+            throw new UserOwnershipGuardException(UserOwnershipGuardException.Reason.STATE_CONFLICT);
+        if (deletionAccess != null) deletionAccess.examCoordination(examId, () -> {
+            deletionAccess.requireWriter(userId);
+            return null;
+        });
+    }
+
     public <T> T executeExamCoordination(String userId, String examId, Supplier<T> command) {
         return deletionAccess == null ? execute(userId, command)
                 : deletionAccess.examCoordination(examId, () -> execute(userId, command));

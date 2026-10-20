@@ -375,8 +375,11 @@ public class ExamServiceImpl implements ExamService {
         if (deletionAccess != null) deletionAccess.requirePublicWrite(currentUserProvider.getCurrentUserId());
         requireOwnedNotAbandonedSession(examId);
         ExamStatus status = gradingService.submitQuestion(examId, questionNumber, retryCount);
-        if (GradingKeys.canonicalRetryCount(retryCount) == 0) {
-            reconcileAttemptGroup(examId);
+        if (GradingKeys.canonicalRetryCount(retryCount) == 0 && attemptGroupStateCoordinator != null) {
+            attemptGroupStateCoordinator.reconcileAfterSubmission(examId, questionNumber, 0, () -> {
+                if (deletionAccess != null) deletionAccess.requirePublicWrite(currentUserProvider.getCurrentUserId());
+                requireOwnedNotAbandonedSession(examId);
+            });
         }
         return ExamConverter.toSubmitResult(status);
     }

@@ -1,7 +1,8 @@
 # 모의고사 접수 후 상태 정리 오류 복구 계획
 
 - 작성일: 2026-10-19
-- 상태: 계획 작성 완료 / 구현·배포 미착수
+- 상태: 1차 제한 재시도·worker 격리 구현 및 test/prod 배포 완료. P2 정상 접수 응답 전환은 후속 구현 대상.
+- 2026-10-19 후속 상세안: [정상 접수 응답·후속 상태 복구 계획](LC_SUBMISSION_ACCEPTANCE_RECOVERY_PLAN.md). 아래 본문은 최초 계획 기준이며 현재 구현 상태는 [1차 보고서](LC_EXAM_COORDINATION_RECOVERY_IMPLEMENTATION_2026-10-19.md), P2의 최신 범위·완료 조건은 후속 상세안을 우선한다.
 - 신규 Jira: 없음. 관련 구현 이력: TMI-118(AttemptGroup), TMI-125(owner 보호).
 - 승인 범위: 이번 요청은 문서 작성만. 코드 수정·실DB 변경·AWS 설정·commit/push·배포는 포함하지 않는다.
 
