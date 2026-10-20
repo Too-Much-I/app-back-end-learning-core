@@ -54,5 +54,14 @@ class LearningCatalogTest {
         var summary=list.getList("units",Document.class).getFirst();
         assertThat(summary).containsOnlyKeys("id","part","title","thumbnail","lessons");
         assertThat(summary.getList("lessons",Document.class).getFirst().getBoolean("completed")).isTrue();
+        Document sourceSentence = answers.getFirst().getList("sentences", Document.class).getFirst();
+        assertThat(answer.getList("sentences", Document.class).getFirst().get("words"))
+                .isEqualTo(sourceSentence.get("words"));
+        sourceSentence.put("text", "Example  sentence.");
+        assertThatThrownBy(() -> catalog.detail(OWNER, "unit", "AL"))
+                .isInstanceOfSatisfying(LearningFailure.class, failure -> {
+                    assertThat(failure.status).isEqualTo(503);
+                    assertThat(failure.code).isEqualTo("LEARNING_UNAVAILABLE");
+                });
     }
 }
