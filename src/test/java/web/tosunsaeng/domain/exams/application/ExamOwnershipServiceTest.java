@@ -179,6 +179,33 @@ class ExamOwnershipServiceTest {
     }
 
     @Test
+    void acceptedSubmissionReturnsOriginalStatusAfterDeferredCoordination() {
+        stubOwnedSession();
+        var coordinator = org.mockito.Mockito.mock(
+                web.tosunsaeng.domain.exams.attemptgroup.application.AttemptGroupStateCoordinator.class);
+        ReflectionTestUtils.setField(examService, "attemptGroupStateCoordinator", coordinator);
+        when(gradingService.submitQuestion(EXAM_ID, 4, 0)).thenReturn(ExamStatus.PROCESSING);
+        org.mockito.Mockito.doAnswer(call -> { ((Runnable) call.getArgument(3)).run(); return null; })
+                .when(coordinator).reconcileAfterSubmission(org.mockito.ArgumentMatchers.eq(EXAM_ID),
+                        org.mockito.ArgumentMatchers.eq(4), org.mockito.ArgumentMatchers.eq(0), any());
+        assertEquals(ExamStatus.PROCESSING, examService.submitAudio(EXAM_ID, 4, 0).getStatus());
+        verify(gradingService).submitQuestion(EXAM_ID, 4, 0);
+        verify(coordinator, never()).reconcile(any());
+    }
+
+    @Test
+    void submissionFailureNeverEntersDeferredCoordination() {
+        stubOwnedSession();
+        var coordinator = org.mockito.Mockito.mock(
+                web.tosunsaeng.domain.exams.attemptgroup.application.AttemptGroupStateCoordinator.class);
+        ReflectionTestUtils.setField(examService, "attemptGroupStateCoordinator", coordinator);
+        var failure = new ExamsException(ErrorStatus._AI_SERVER_CONNECTION_ERROR);
+        when(gradingService.submitQuestion(EXAM_ID, 4, 0)).thenThrow(failure);
+        assertSame(failure, assertThrows(ExamsException.class, () -> examService.submitAudio(EXAM_ID, 4, 0)));
+        verifyNoInteractions(coordinator);
+    }
+
+    @Test
     void ownerCanReadExamStatusAfterOwnershipCheck() {
         stubOwnedSession();
         when(gradingService.calculateAndCacheOverallStatus(EXAM_ID)).thenReturn(ExamStatus.PROCESSING);
