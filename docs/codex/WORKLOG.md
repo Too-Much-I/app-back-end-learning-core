@@ -17750,3 +17750,9 @@
 - 사용자 승인에 따라 draft-5 무차감 조회, 전용 workload 목적, completed retry>0 접수, Job+승인 증거 원자 저장 경로와 dispatch/Callback 허용을 구현했다. 기존 closure/권한·삭제·환불/AI·공개API 계약 유지, 기본OFF. 부족402/탈퇴401/일시503/연동결함500 구분.
 - `./gradlew clean test`1,482건 중1,481통과/1skip/실패0. 신규 service fixture 수정 후 전체 성공. `mongoIntegrationTest --tests '*ReanswerApprovalMongoTest'` Docker provider 연결 실패로 실제Mongo 검증 불가. diff check 통과. 승인 시각 BSON string 왕복/rollback용 테스트를 추가했지만 실행 성공으로 표시하지 않는다.
 - 변경 범위는 reanswer 패키지, 시험 서비스/접수정책/Job, workload signer, 설정, 관련 테스트와 인계서·기록. 기존 사용자 dirty 보존, 예상 밖 제품 변경 없음. 신규 Jira·Billing/Identity 변경·외부발송·실DB/index·커밋/푸시/배포 없음. 공동fixture와 실제Billing/시각동기화/권한경합 E2E·격리Mongo 검증 후 활성화. 기존 Reservation/AttemptGroup circuit은 변경하지 않았고 신규조회 운영 차단 연결은 점검대상. Secret/Token 미기록.
+
+## 2026-10-22 — upload-url 공통 guard 쓰기 제거
+
+- 사용자 브랜치 생성·수정·운영 직접 배포 승인으로 origin/main c32df4a에서 codex/fix-upload-url-guard 생성. root/이전 worktree dirty를 보존했다. 관련 TMI-125/TMI-193.
+- URL 발급만 read-only guard 검사로 분리하고 서명 전후 현재 소유권·삭제·merged/refund 차단 및 재답변 승인 만료 검사를 수행한다. 기존 submit/callback/전역retry/API/AI/S3/Redis 불변. residual capability 경합 수용 범위는 UPLOAD_URL_READ_ONLY_GUARD_FIX.md에 기록했다.
+- 신규7개 회귀와 전체 테스트 실행 중. 최초 테스트 패키지 오기와 기존 소유권 조회 순서2개 실패를 수정하고 재실행한다. 아직 commit/push/배포 완료 아님. Secret/Token 기록 없음.

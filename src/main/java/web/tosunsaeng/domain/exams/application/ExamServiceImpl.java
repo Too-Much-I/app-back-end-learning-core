@@ -322,34 +322,36 @@ public class ExamServiceImpl implements ExamService {
     // 사용자가 가상으로 녹음 오디오 파일을 업로드할 수 있는 임시 S3 PutObject용 Presigned URL을 발급합니다.
     @Override
     public ExamResponseDTO.UploadUrlResult getPresignedUrl(String examId, Integer questionNumber, Integer retryCount) {
-        if (deletionAccess != null) deletionAccess.requirePublicWrite(currentUserProvider.getCurrentUserId());
-        var observed = requireOwnedNotAbandonedSession(examId);
+        var observed = requireUploadUrlAccess(examId);
         var approval = reanswerAdmission == null ? null : reanswerAdmission.prepare(observed,questionNumber,retryCount,false);
-        if (approval != null) {
-            if (userOwnedTransactionExecutor==null || !userOwnedTransactionExecutor.enabled())
-                throw new IllegalStateException("Reanswer requires owner transactions");
-            return executeUserOwned(currentUserProvider.getCurrentUserId(), () -> {
-                if (deletionAccess!=null) deletionAccess.requirePublicWrite(currentUserProvider.getCurrentUserId());
-                reanswerAdmission.authorize(requireOwnedNotAbandonedSession(examId),questionNumber,retryCount,approval,null);
-                return getPresignedUrlInTransaction(examId,questionNumber,retryCount);
-            });
-        }
-        if (userOwnedTransactionExecutor == null || !userOwnedTransactionExecutor.enabled()) {
-            return getPresignedUrlInTransaction(examId, questionNumber, retryCount);
-        }
-        String userId = currentUserProvider.getCurrentUserId();
-        return executeUserOwned(userId,
-                () -> getPresignedUrlInTransaction(examId, questionNumber, retryCount));
+        var result = createUploadUrl(examId, questionNumber, retryCount);
+        // No DB write/transaction for issuing this five-minute capability. Recheck after signing;
+        // a later merge/deletion can leave a residual PUT URL, but submit/callback keep their fences.
+        var current = requireUploadUrlAccess(examId);
+        if (reanswerAdmission != null)
+            reanswerAdmission.authorize(current,questionNumber,retryCount,approval,null);
+        return result;
     }
 
-    private ExamResponseDTO.UploadUrlResult getPresignedUrlInTransaction(
+    private ExamSession requireUploadUrlAccess(String examId) {
+        ExamSession session = requireOwnedNotAbandonedSession(examId);
+        String userId = session.getUserId();
+        if (deletionAccess != null) deletionAccess.requirePublicWrite(userId);
+        try {
+            if (userOwnedTransactionExecutor != null) userOwnedTransactionExecutor.requireUploadUrlAccess(userId);
+        } catch (UserOwnershipGuardException merged) {
+            throw new ExamsException(ErrorStatus._ACCOUNT_MERGED_TOKEN_REJECTED);
+        }
+        if (session.isAccessRevoked()) throw new ExamsException(ErrorStatus._ENTITLEMENT_REVOKED);
+        return session;
+    }
+
+    private ExamResponseDTO.UploadUrlResult createUploadUrl(
             String examId,
             Integer questionNumber,
             Integer retryCount
     ) {
         long startedAt = System.nanoTime();
-        requireOwnedNotAbandonedSession(examId);
-
         String fileKey = String.format("temp/%s/q_%d_r%d.wav", examId, questionNumber, retryCount);
 
         software.amazon.awssdk.services.s3.model.PutObjectRequest objectRequest =
@@ -1098,17 +1100,6 @@ public class ExamServiceImpl implements ExamService {
             return (String) ((Map<String, Object>) rawPayload.get("metadata")).get("user_id");
         } catch (RuntimeException invalidMetadata) {
             throw invalidMetadata;
-        }
-    }
-
-    private <T> T executeUserOwned(String userId, Supplier<T> command) {
-        if (userOwnedTransactionExecutor == null) {
-            return command.get();
-        }
-        try {
-            return userOwnedTransactionExecutor.execute(userId, command);
-        } catch (UserOwnershipGuardException merged) {
-            throw new ExamsException(ErrorStatus._ACCOUNT_MERGED_TOKEN_REJECTED);
         }
     }
 

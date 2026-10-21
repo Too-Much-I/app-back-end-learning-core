@@ -94,6 +94,18 @@ public class UserOwnedTransactionExecutor {
         if (deletionAccess != null) deletionAccess.requirePublicWrite(userId);
     }
 
+    /** Capability issuance only: never use this read-only check in place of a writer fence. */
+    public void requireUploadUrlAccess(String userId) {
+        if (!enabled()) return;
+        guardService.find(userId).ifPresent(guard -> {
+            if (guard.isMerged())
+                throw new UserOwnershipGuardException(UserOwnershipGuardException.Reason.ALREADY_MERGED);
+            if (guard.getState() != web.tosunsaeng.domain.usermerge.domain.OwnershipGuardState.ACTIVE)
+                throw new UserOwnershipGuardException(UserOwnershipGuardException.Reason.STATE_CONFLICT);
+        });
+        if (deletionAccess != null) deletionAccess.requireWriter(userId);
+    }
+
     /** Read-only recheck after an aborted post-submission transaction; never replaces a writer fence. */
     public void requireDeferredExamCoordinationAllowed(String userId, String examId) {
         if (!enabled()) throw new IllegalStateException("User-owned writer guard is disabled");
