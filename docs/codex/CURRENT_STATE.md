@@ -1,5 +1,7 @@
 # Learning Core Current State
 
+- 2026-10-22 upload-url 한정 read-only guard 수정 진행(codex/fix-upload-url-guard, TMI-125/TMI-193). 사용자 운영 직접 배포 승인. 사전·사후 권한 검사와 submit/callback fence 유지, 외부 계약 불변. 로컬/CI 검증 후 main 전달 예정, 현재 배포 완료 아님.
+
 - 2026-10-21 재답변 구현: draft-5 전용 workload 조회/QuestionGradingJob 승인 증거/완료시험 접수·후속채점 연결. BILLING_REANSWER_ENABLED 기본OFF. clean test1,482건(1,481통과/1skip), diff check 통과. Mongo 통합은 Docker provider 실패로 미실행. 공동fixture/Billing 연결/E2E/배포·활성화 미완료, 커밋·푸시 없음. 아래 준비기록은 과거 이력이다.
 
 - 사용자 추가 수락 반영: 미발급trial 제외·최대5초 관측 경합 수용(여러 Job 가능)을 재답변 인계서에 명시했다. wire/fixture 공동 동결 및 제품 구현은 미완료, 외부 발송/배포 없음.
