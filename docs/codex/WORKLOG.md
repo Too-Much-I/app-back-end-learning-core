@@ -16421,3 +16421,1313 @@
 - TMI-193/TMI-217. 사용자 승인으로 Azure exam_id를 cleanup/잔존 검사/persistence fence 및 index 준비 검사에 일관 적용한다. 실제 entity 직렬화·삭제 차단·새 기록 보존 및 기존 오설치 index fail-closed 회귀를 포함한다.
 - Azure 보완만 별도 develop 기반 브랜치로 분리했다. 기존 작업트리·운영 준비·DS_Store는 보존하고 전달에서 제외한다. 공개 API/BaseResponse/AI/S3/Redis 계약 불변. 운영 배포·봉인·데이터 정리 없음.
 - 삭제 index Node11개 통과. 전체 Java/Mongo 및 CI·test 배포 결과는 후속 확인한다. 실제 사용자 삭제 E2E 완료로 보고하지 않는다.
+## 2026-10-17 — 공존 R2 test 배포 확인 완료
+
+- 관련 TMI-116/TMI-128/TMI-125/TMI-217/TMI-220/TMI-193. 제품 `e817ae8` push, PR48 검증 전체 성공 후 develop `f2111e5` merge. 배포 run39032470211 성공.
+- LC test task42를 보존 기반으로 코드 task43 배포 후, 같은 이미지에 무료 생성 flag 하나만 추가한 task44를 적용했다. 등록 입력 전체 비교로 기타 설정 불변 확인. 최종 COMPLETED/running1/pending0 및 새8080/8444 healthy, 공개 health200, v1/v2 무토큰401, OpenAPI 두 route 확인.
+- 첫 task 등록의 빈 tags 오류는 등록 전 거절됐고 옵션 제거 후 성공했다. 새 task의 초기 unhealthy가 해소되는 것을 확인했고, 이전 target drain 완료까지 기다렸다. IAM/네트워크/키/DB·manifest 변경 및 prod/Billing/Identity 수정 없음.
+- clean test1374통과/기존 조건부skip1, Mongo333통과, Node64통과 및 원본 hash 유지. 실제 유저 권리 소비·시험/AI 공동 E2E는 미실행으로 분리한다. 앱 v2 고정 호출/동일key 재시도 검증이 다음 과제다.
+- 사후 실행 문서를 같은 작업 브랜치에 추가 commit/push한다. 문서 기록은 제품 이미지 변경이 아니므로 추가 배포하지 않는다. 사용자 DS_Store와 기존 운영 준비 변경은 그대로 보존했다. Secret/Token 기록 없음.
+
+### 최종 상태 표현 보완
+
+- 위의 「이전 target drain 완료」는 ECS rollout COMPLETED 확인과 구분한다. 최종 화면에서 새 task44 running1/pending0·두 포트 healthy 및 ECS COMPLETED를 확인했으며, ALB 목록에는 이전 target의 잔여 draining 표시가 있었다. ALB 잔여 항목 제거까지 완료됐다는 의미로 보고하지 않는다. 추가 설정/코드 변경 없음.
+
+## 2026-10-17 prod 기동 준비 코드 보완
+
+- 사용자 운영 호환 보완 요청, 브랜치 feat/lc-review-coexistence. 기존 DS_Store·test 연결 준비 문서·운영 준비 scripts의 미커밋 변경은 보존했다.
+- PaidExamTestActivation에 prod 단독 profile/production trust environment/전용 production-activation-approved 기본 OFF 경로 추가. 기존 test 승인은 prod에 효력이 없으며 공통 flag·sealed manifest·owner executor·필수 index 검사는 유지한다. 두 gate 주석·application.yml·단위/Mongo 테스트·AGENTS·운영 준비 문서·CURRENT_STATE를 갱신했다.
+- v1 무료/v2 이용권, 공개 DTO·Billing wire·AI user_id/S3/Redis 및 manifest 형식 불변. actual DB/index/manifest·AWS/키·서버 설정·배포·commit/push는 하지 않았다. 예기치 않은 제품 변경 없음.
+- clean test:1396개 중1395통과/기존skip1/실패0. 최초 Mongo 실행은 Docker API1.32가 서버 최소1.40보다 낮아 컨테이너 시작 전 실패했다. 테스트 프로세스에만 JAVA_TOOL_OPTIONS=-Dapi.version=1.44 지정 후 rollout Mongo 테스트 통과. 저장소 Docker 설정은 변경하지 않았다. 전체 Mongo 회귀 진행 중.
+- 다음은 운영 exact manifest/index/owner 준비·Billing prod/키/TLS 구성 확인 및 구앱/신앱 실제 인증 smoke다. 준비 코드 완료를 운영 활성화나 공동 E2E 통과로 기록하지 않는다.
+- 최종 전체 mongoIntegrationTest336개 통과/실패0/skip0(57초), clean test1395통과/기존skip1. git diff --check 통과. 운영 준비 문서의 실행 결과를 이 항목으로 확정한다.
+
+## 2026-10-17 — test EXAM_5001 읽기 진단
+
+<!-- codex-turn:01a149ee-da92-7be2-b99c-5e59bb6dba54 -->
+
+- 관련 TMI-116. 사용자 POST /exams 500 신고에 대해 ErrorStatus·MockExamCatalogService·Part4 검사를 읽고 전용 CloudShell 세션에서 LC test CloudWatch만 조회했다.
+- 최근 카탈로그 오류 4건 모두 「배정 가능한 활성 문항 포함 MockExam이 없습니다」이며 마지막 관측은 2026-10-17 12:50:36.264 UTC. 빈 카탈로그/전체 비활성/유효 문항 없는 자료를 아직 DB 직접 조회로 구분하지 않았다. 9263013a 검색 결과 0건으로 해당 요청과 직접 상관은 미확정이다.
+- health/배포 성공은 실제 인증된 시험 생성 검증과 구분한다. test 문제 카탈로그 점검·필요한 데이터 준비가 후속이며 제품 코드/DB/설정/권한/배포는 변경하지 않았다. 테스트 재실행 없음, Secret·Token·개별 학습 원문 출력 없음.
+
+## 2026-10-17 — 승인된 prod 문제 세트 1개 test 복사
+
+- 관련 TMI-116. 사용자 「하나만 복사해서 넣어줘」 및 원본 「prod db」 확인에 따라 문제 카탈로그만 복사했다.
+- 실제 LC prod task의 prod profile/database 및 Secret URI host만 읽기 대조했다. 로컬 기존 접속으로 prod `to-teacher-app.mock_exams`를 읽고 `mock_exam_001`의 11문항/번호1~11 중복없음/Part4 table_context 존재를 확인했다. URI·credential 출력 없음.
+- Atlas tosunsaeng-test의 `to-teacher-learning-core-test.mock_exams`에는 비활성 문항0 더미 한 건만 존재했다. 중복 없는 원본 문제 세트 한 건을 EJSON으로 삽입하고 전체2건 및 mock_exam_001·11문항·첫1/끝11 조건 재조회1건을 확인했다. 기존 더미는 보존했다.
+- prod는 읽기만 수행했고 사용자 시험·답안·결과 및 Billing/Identity/서버 설정/배포는 변경하지 않았다. 기존 미커밋 코드 변경도 보존했다. 앱 인증 POST/채점 E2E 성공은 아직 검증하지 않았다. 임시 문제 export와 확인 화면은 /private/tmp에 두었으며 Git에 추가하지 않았다.
+
+### prod→test 문제 복사 턴 기록 보완
+
+<!-- codex-turn:01a149f2-4983-7590-b640-c0a82bbb503f -->
+
+- 관련 TMI-116. 위 문제 세트 1건 복사·재조회 완료 기록에 현재 턴 식별자를 보완했다. 실제 앱 시험 생성 성공은 후속 확인이며 추가 DB/코드/설정 변경은 없다. Secret·Token은 기록하지 않았다.
+
+## 2026-10-17 운영 readiness 변경 전달
+
+- 사용자 commit/push 요청으로 이전 구현8파일을9fb8f71(feat/lc-review-coexistence) commit/push했다. main/develop 머지 및 배포 없음. 공유 WORKLOG/CURRENT_STATE의 다른 동시 작업 기록과 test DB 준비 문서/scripts/DS_Store는 제외·보존했다.
+- 단위1395통과/skip1·Mongo336통과 결과는 직전 구현 검증이며 이번 재실행 없음. Billing 측 운영 DB 읽기에서 exam_paid_rollout_state/exam_legacy_manifest_entries/exam_creation_operations 미존재, user_ownership_guards 존재 확인. LC DB/서버는 변경하지 않았다.
+- 다음은 운영 데이터 준비·인증 및 실제 구앱/신앱 smoke. 이 커밋은 운영 활성화 완료가 아니다. 자세한 Billing 기반 리소스 준비는 Billing 저장소에 기록한다.
+
+## 2026-10-17 — v2 성공 후 v1 409 동작 설명
+
+<!-- codex-turn:01a149fb-7988-70f0-a642-9f8eac74faab -->
+
+- 관련 TMI-116. 사용자 v2 성공/v1 EXAM_CREATION_PROCESSING 보고를 공존 계획 20/55/58~60행 및 TransitionFreeExamService.start와 대조했다.
+- v1은 activeGuard 미완료 operation뿐 아니라 진행 중/active/confirming Billing Session도 같은409로 차단한다. 따라서 같은 계정의 v2 생성 후 v1 요청이면 승인된 진행 중 Billing→무료 전환 제외 정책과 일치한다. 실제 계정 DB 상태는 조회하지 않았으므로 해당 분기 발생을 직접 확정하지 않는다.
+- 공통 오류의 「같은 요청으로 다시 시도」는 활성 Billing Session 차단에서는 단순 재시도로 해결되는 의미가 아니므로 안내 개선 여지가 있다. 구앱 v1 검증은 진행 중 Billing 시험이 없는 별도 테스트 계정으로 분리하도록 안내한다. 제품/DB/설정 변경·테스트 재실행 없음, Secret·Token 기록 없음.
+
+## 2026-10-17 — v2 테스트 시험 삭제 대상 확인 대기
+
+<!-- codex-turn:01a14a00-0f5d-7540-ae0b-85a16f18ace4 -->
+
+- 관련 TMI-116/TMI-217/TMI-193. 사용자가 v1 검증을 위해 방금 만든 v2 시험 삭제를 요청했다. 정확한 examId가 없어 임의 최신 문서나 사용자 전체 시험을 삭제하지 않고 식별자 확인을 요청한다.
+- Billing 연결 상태를 보존하도록 Session 단독 직접 삭제 대신 기존 삭제 절차를 확인할 예정이다. 아직 DB/코드/설정 변경·삭제 실행 없음. 인증 Token은 채팅으로 요청하지 않는다.
+
+### 테스트 세션 대상 조회 후속
+
+- 관련 TMI-116/TMI-217/TMI-193. Atlas LC test exam_sessions 조회 결과 전체1건이며 IN_PROGRESS/active 및 Billing CONFIRMED/INITIAL 연결을 확인했다. 사용자 식별자는 기록하지 않는다.
+- 기존 공개 삭제 API는 단일 examId가 아니라 현재 사용자 학습기록 전체를 대상으로 한다. 사용자 인증 없이 이 경로를 실행하거나 단일 Session만 직접 삭제해 Billing/생성 operation을 남기는 조작은 수행하지 않았다. 연결 자료를 포함한 테스트 정리 범위 확인이 필요하다.
+
+## 2026-10-17 — 특정 테스트 시험 연결 정리 승인·실행 경계 확인
+
+<!-- codex-turn:01a14a00-e255-7572-bba5-990dc6b6e4ab -->
+
+- 관련 TMI-116/TMI-217/TMI-193. 사용자 「어」로 해당 시험 연결 기록까지 포함하는 테스트 정리를 승인했다. 다른 학습자료·문제 세트·prod는 범위 밖이다.
+- DeletionController/DeletionCommandService 및 삭제 준비 스크립트를 대조했다. 기존 DELETE /api/v1/learning-records는 인증된 현재 사용자 전체 학습기록 요청이며 단일 시험 선택 API가 아니다. 기존 스크립트도 특정 시험의 안전한 연결 정리 도구가 아니다.
+- 특정 시험만 처리하는 실행 경로 없이 전체 사용자 삭제로 확대하거나 DB Session/원장 직접 삭제로 대체하지 않았다. 단일 대상 정리 도구 준비가 추가로 필요하며 이번 삭제 실행 없음. 무료권 재지급/소비 원장 삭제·코드/서버 설정 변경 없음. Secret·Token 기록 없음.
+
+## 2026-10-17 — 테스트 Session 단독 삭제의 한계 설명
+
+<!-- codex-turn:01a14a03-2a3c-7100-966d-8b373bb78787 -->
+
+- 관련 TMI-116/TMI-217/TMI-193. 사용자 「그냥 저거만 지우면 안되는 거야?」에 대해 테스트 Session 한 건만 지우는 것은 임시 v1 생성 확인 수단일 수 있으나 정합한 초기화와는 다르다고 설명했다.
+- Billing 연결·생성 요청 기록이 남아 이후 v2 replay/재응시에 영향을 줄 수 있고, 미완료 activeGuard가 있으면 v1도 계속409일 수 있다. 해당 계정의 operation 상태를 이번에 조회하지 않아 삭제 후 성공을 보장하지 않는다.
+- 앞선 특정 정리 도구 필요 안내는 연결 정합성을 유지하는 삭제에 대한 설명이며, 제한적인 테스트 임시 삭제가 기술적으로 불가능하다는 의미는 아니다. 이번은 설명만 수행했고 DB 삭제·코드·설정 변경 없음. Secret·Token 기록 없음.
+
+## 2026-10-17 — 소비 기록 포함 테스트 초기화 요청
+
+- 관련 TMI-116/TMI-217/TMI-193. 사용자가 해당 테스트 시험의 소비 기록 삭제까지 요청했다. 소비 문서 삭제와 잔량/최초 체험 사용 표시 복구는 별개의 변경이므로 원하는 최종 상태를 확인한다.
+- 범위는 기존에 식별한 test 시험 한 건이며 prod·다른 시험/이용권은 제외한다. 실제 소비 원장/잔량/TrialClaim 연결은 아직 조회·변경하지 않았다. DB 삭제 실행 없음, Secret·Token 기록 없음.
+
+## 2026-10-17 — 초기화 승인 후 실제 예약 출처 확인
+
+<!-- codex-turn:01a14a03-e070-7173-84fd-aaf04105472c -->
+
+- 관련 TMI-116/TMI-217/TMI-193. 사용자 무료권 사용 전 초기화 확인 후 Atlas에서 해당 test Session과 exact 연결된 reservation 한 건을 조회했다. 상태 CONFIRMED/INITIAL이며 sourceSnapshot.type은 SUBSCRIPTION이고 구독 purchase/entitlement 참조가 있다. 무료권 사용이라는 앞선 가정과 달라 이를 정정했다.
+- 구독 구매/권리 삭제나 무료권 잔량 변경으로 확대하지 않았다. 해당 시험의 이용 기록 정리와 구독 유지 여부를 구분하며 DB 삭제·갱신은 아직 수행하지 않았다. prod/다른 시험·구매 미변경. 사용자 식별자·Secret·Token은 기록하지 않았다.
+
+## 2026-10-17 — 승인된 테스트 시험 한 건 이용 기록 초기화 완료
+
+<!-- codex-turn:01a14a06-485a-7380-a3dd-6ccf7cf32642 -->
+
+- 관련 TMI-116/TMI-217/TMI-193. 사용자가 구독 구매·이용권 유지 및 해당 시험 이용 기록 초기화를 승인했다. 사전조회에서 LC Session1/성공 operation1, Billing reservation1/attempt session1/group1/operation receipt2/EXAM_OPERATION 사용원장2와 current owner guard1을 확인했다. 접수/채점/outbox 등 다른 연결 기록은 점검 query에서 발견되지 않았다.
+- 기존 LC test 실행 역할·Secret으로 Billing DB까지 조회한 첫 점검은 AtlasError8000으로 실패했다. AWS 재로그인 이후 각 서비스의 기존 test 실행 역할·Mongo Secret·네트워크로 분리했다. IAM/네트워크 권한을 추가하지 않았다. 중단 중 DB 쓰기 없음.
+- 일회성 공식 mongo:8.0 태스크에서 exact ID·version·상태·연결 건수·진행 작업 부재를 검증하고 DB별 snapshot/majority Transaction으로 백업+정리했다. Billing7건 삭제 및 현재 group/session 포인터 해제(version 증가), 이어 LC2건 삭제 및 owner revision fence touch 완료. 다른 사용자/구매/무료권 원장은 변경하지 않았다.
+- 양측 `manual_test_reset_backups`의 `approved-one-exam-reset-20261017-05d45c71`에 원본과 guard를 보존했다. 삭제는 백업을 이용한 검토 후 수동 복원이 가능하며, 이후 신규 작업이 생기면 과거 guard를 그대로 복원해서는 안 된다. 자동 TTL/purge는 설정하지 않았다.
+- Billing은 구독 purchase/entitlement의 전체 EJSON hash 불변 및 대상 잔여0 확인, LC도 대상 잔여0 및 종료코드0 확인. DB별 원자 처리이며 양쪽 DB 전체 단일 Transaction이라고 보고하지 않는다. Redis의 이전 exam별 TTL projection은 이번에 수정하지 않았다. 실제 인증 v1 생성 성공은 사용자 재시도로 확인해야 한다.
+- 임시 task definition4개를 INACTIVE 처리했다. 서비스 재배포/기능 flag/운영 DB/제품 코드 변경 없음. 사전조회·정리 스크립트 및 확인 화면은 /private/tmp에만 있으며 commit/push하지 않았다. Secret·Token·사용자 식별자를 작업 기록에 남기지 않았다.
+
+## 2026-10-17 — v1·v2 시험 생성 사용자 검증 확인
+
+<!-- codex-turn:01a14a12-9d18-7380-a3dd-6ccf7cf32642 -->
+
+- 관련 TMI-116/TMI-217/TMI-193. 테스트 초기화 후 사용자 「둘 다 잘된데」로 v1·v2 시험 생성 정상 동작을 확인했다. 사용자 실행 결과이며 이번 턴에서 서버 로그·DB를 다시 조회한 독립 검증은 아니다.
+- 제출·채점·Summary·환불·삭제 및 전체 공동 E2E 통과로 확대 해석하지 않는다. 이번 변경은 WORKLOG/CURRENT_STATE 기록뿐이며 코드·DB·설정·배포 변경 없음. Secret·Token 기록 없음.
+
+### 사용자 검증 확인 턴 식별자 보완
+
+<!-- codex-turn:01a14a12-3fd6-79a3-8927-425d6e0b4876 -->
+
+- 관련 TMI-116/TMI-217/TMI-193. 위 v1·v2 시험 생성 사용자 확인 기록의 턴 식별자가 잘못 기재되어, 과거 항목을 수정하지 않고 현재 hook이 제공한 정확한 식별자를 추가했다. 두 생성 경로 정상이라는 사용자 확인 및 후속 제출·채점·요약 검증 필요 상태는 동일하다. 추가 코드·DB·설정 변경 없음.
+
+## 2026-10-17 — prod 배포 가능 여부 검토
+
+- 관련 TMI-116/TMI-128/TMI-217/TMI-220/TMI-193. 사용자 운영 배포 가능 질문에 운영 기동 준비 문서·공존 전달 기록·현재 상태·로컬 Git 이력을 정적으로 대조했다. v1/v2 생성 성공은 사용자 확인됐지만 제출/채점/Summary 및 복구·삭제·환불 실제 연동 검증과는 별개다.
+- 운영 준비 commit9fb8f71은 로컬 최신 이력에 있으며 현재 기록상 main/develop 머지·LC 배포는 미완료다. prod manifest/index/owner 및 운영 전용 JWT/TLS/scope·Billing 연결도 현재 문서상 미검증이다. 이번에는 실운영 재조회하지 않았다.
+- v1 무료 경로도 필수 runtime/owner/manifest 준비가 필요해 단순 paid OFF 배포를 안전한 구앱 호환으로 보지 않는다. 최소 실앱 학습 흐름 확인과 운영 데이터·연결 준비 및 배포본 대조 후 prod 적용을 권장한다. 이번은 확인/문서 기록만이며 Git 전달·DB·설정·배포 변경 없음. Secret·Token 기록 없음.
+
+### prod 배포 검토 턴 식별자 보완
+
+<!-- codex-turn:01a14a12-f619-7ce0-be2e-842686d21570 -->
+
+- 관련 TMI-116/TMI-128/TMI-217/TMI-220/TMI-193. 위 운영 배포 검토의 현재 턴 식별자를 추가했다. test 생성 사용자 확인 완료와 운영 준비·학습 흐름 검증 미완료를 구분하며, 이번 추가 시스템 변경은 없다. Secret·Token 기록 없음.
+
+## 2026-10-17 — prod 실제 읽기 준비 점검
+
+- 관련 TMI-116/TMI-128/TMI-217/TMI-220/TMI-193. 사용자 「어 해줘」로 운영 준비 읽기 점검 수행. 전용 CloudShell에서 ECS task/환경변수명·안전한 flag/Secret 이름·ALB 라우팅을 확인하고 실제 prod host/database를 대조했다. DB는 기존 로컬 접속으로 건수·collection·index만 조회했다.
+- LC prod task7 running1/pending0/COMPLETED, 기존 Billing 업무 OFF,8080만 연결·전용JWT/TLS Secret 주입 없음. 동일 클러스터 Billing prod 서비스 MISSING/test만 존재. 다른 배포/DB까지 부재를 주장하지 않는다.
+- 운영 시험1,718건·문제20건·owner77건. 새 operation/legacy manifest/rollout/outbox/revoke/삭제 연동 collection 없음. 조회는 고정 snapshot/봉인과 구분한다. GitHub main과 운영 readiness9fb8f71 diverged(ahead73/behind2) 확인.
+- 보고서 `LC_PROD_READINESS_INSPECTION_2026-10-17.md` 작성. 신규 코드만 먼저 배포하면 v1 필수 runtime 미준비로 구앱 생성 차단 위험이 있어, 운영 데이터/연결·배포본·실제 학습 검증을 선행하도록 안내한다. 실제 운영 DB/설정/권한/네트워크/배포/머지 변경 없음. Secret·Token·개별 문서 내용 기록 없음.
+
+### prod 읽기 점검 턴 식별자 보완
+
+<!-- codex-turn:01a14a14-2eda-7a22-aada-8c17a2cc7223 -->
+
+- 관련 TMI-116/TMI-128/TMI-217/TMI-220/TMI-193. 위 prod 실제 읽기 점검의 현재 턴 식별자를 보완했다. 운영 전환 준비 미완료 판단과 보고서는 유지하며, 추가 시스템 변경 없음. Secret·Token 기록 없음.
+
+## 2026-10-17 — LC 운영 전용 인증/TLS 준비
+
+<!-- codex-turn:01a14a18-2975-7713-ba16-d96ab1b7d269 -->
+
+- 관련 TMI-116/TMI-128/TMI-217/TMI-220/TMI-193. 사용자 운영 데이터·인증/TLS 준비 요청 후 exact 키/Secret/IAM 변경을 별도 승인받았다. 운영 namespace Secret metadata·실행 역할/네트워크를 읽기 확인했다.
+- 독립 RSA3072 JWT·TLS 키 생성, 신규 Secret2개 저장 및 prod 실행 역할 exact2 ARN GetSecretValue 추가. 원본 policy/키·test/Billing·서비스·네트워크 유지. 저장값/PKCS12/IAM 재조회와 공개키 SPKI 지문 대조 성공. 비밀값 출력·저장소 기록 없음.
+- 공개 JWK `/private/tmp/lc-production-billing-public-jwks.json`, 상세 `LC_PROD_AUTH_TLS_PREPARATION_2026-10-17.md`, CURRENT_STATE 갱신. 기존 dirty·DS_Store 보존. 제품/API/AI/S3/Redis 코드 불변, Gradle 미실행.
+- prod task7/running1/pending0 확인. 실제 DB/index/TTL·최종 legacy 봉인·8444/ALB·Billing 공개키/scope·실TLS/E2E 준비는 남아 있다. 기존 writer 실행 중 최종 목록 봉인 금지. 배포/기능 ON/commit/push/merge 없음.
+
+## 2026-10-17 — 목록 봉인 제외 운영 index/TLS 준비
+
+- TMI-116/TMI-128/TMI-217/TMI-220/TMI-193. 사용자 「기존 시험 목록 최종 봉인빼고」 요청으로 운영 인덱스 준비 진행. 적용 직전 별도 TTL2 및 SG8444/TG 생성 승인을 받았다.
+- 생성/saga·복구·outbox·revoke index18개 설치, 최종 missing=[] 검증. publisher state 빈 collection 생성. 새 기능 자료0건/기존 Session Billing string 연결 없음 확인 뒤 DDL만 수행. drop/recreate·업무 데이터/owner/목록 봉인 수정 없음.
+- prod SG에 기존ALB SG→TCP8444만 허용, HTTPS8444 IP target group 생성. 사후 규칙/그룹 및 task7 running1/pending0/8080만 연결 확인. ALB 전달 rule·서비스배포·기능ON 없음.
+- 삭제/owner 읽기 검사에서 부모 미연결1,410건(결과4,question job15,Azure1391), invalidOwnerCount1, 기존MERGED1 관측. 원인과 역사적 형식 미확정이며 삭제24index/owner backfill을 임의 적용하지 않았다. 해당 자료 삭제/복구는 별도 범위다.
+- 상세 `LC_PROD_INDEX_NETWORK_PREPARATION_2026-10-17.md` 및 CURRENT_STATE 갱신. 도구 selftest·실환경 사후읽기·diff 검사 수행, 제품 코드 불변으로 Gradle 미실행. 기존 dirty 보존, commit/push/merge 없음. 인증자료/문서 식별자/시험 원문 출력 없음.
+
+## 2026-10-17 — Identity 운영 workload 키 인계 확인
+
+<!-- codex-turn:01a14a22-687e-7f61-ae4e-5a44f0eba435 -->
+
+- 사용자 제공 Identity-billing-production-key-readiness-2026-10-17.md를 읽었다. Identity의 Billing 전용 운영 서명키와 공개 JWK 준비 요청이며 기존 사용자JWT/LC 키와 구분, workload production 계약 유지·발신OFF·실환경 검증 별도 범위임을 확인했다. 신규 Jira 연결 없음.
+- 결론2의 별도 Billing 발신키 Secret 미발견과 위험절의 recovery-workload-jwt 준비 완료가 문서상 충돌한다. 같은 키라면 최신 상태로 통일하고 다른 용도/시점이면 명시할 필요가 있음을 안내한다. 이는 문서 내 일관성 확인이며 실제 AWS Secret 상태를 독립 검증한 결과가 아니다.
+- CURRENT_STATE와 WORKLOG EOF만 갱신했다. 인계서/Billing/Identity 코드·Secret·권한·네트워크·발신·배포·외부메시지·Git 변경 없음. 기존 dirty 보존, 테스트 미실행, diff check/marker 단일 출현 확인. Secret 값/Token 원문 미기록.
+
+## 2026-10-17 — Identity 운영키 인계서 정정 확인
+
+<!-- codex-turn:01a14a24-8d43-74d3-8be2-59c47ef1a2e4 -->
+
+- 수정된 결론에서 이전 문구 충돌 해소 확인. Identity→Billing 공개키 전달 필요와 Billing→Identity 복구 발신키의 기존 기록상 생성·검증 완료를 구분한다. Identity 공개키 등록 완료 여부는 별도 확인 대상이다.
+- 문서/기존 기록 기준 확인이며 AWS 재검증이 아니다. 발신 활성화·E2E 완료를 의미하지 않는다. 신규 Jira 없음.
+- LC 작업 기록만 갱신. 제품 코드·인계서·AWS·설정·배포·외부 전송·commit/push 변경 없음. 테스트 미실행.
+
+### 운영 index/TLS 준비 턴 기록 식별자 보완
+
+<!-- codex-turn:01a14a1f-056d-7761-958e-af9493367c76 -->
+
+- 관련 TMI-116/TMI-128/TMI-217/TMI-220/TMI-193. 이번 운영 준비는 인덱스18개 설치·검증 및 승인된 ALB→8444 SG/HTTPS 대상 그룹 생성까지 완료했다. 기존 시험 목록 봉인은 제외했고 서비스/ALB 전달 연결·배포·기능 활성화는 하지 않았다.
+- 삭제 사전검사 부모 미연결1,410건 및 owner 형식 검토가 남아 삭제 관련 적용을 보류한 상태를 유지한다. 이번 기록 보완은 추가 시스템 변경 없이 WORKLOG append와 CURRENT_STATE 갱신만 수행했다. 다른 작업의 기록은 보존했고 Secret·Token은 기록하지 않았다.
+
+## 2026-10-17 — 운영 삭제 준비 오탐·owner 원인 진단
+
+- TMI-193/TMI-217 및 운영 준비 TMI-116/TMI-128/TMI-220. 사용자 후속 요청을 남은 읽기 원인 확인으로 진행했다. AzureResult의 @Field(exam_id)와 검사기의 raw examId 불일치를 발견했다.
+- 실제 운영 올바른 필드 재집계: Azure1,391건 전부 부모 존재. 실제 미연결은 ExamResult4건/QuestionGradingJob15건이다. 앞선1,410을 실제 고아 자료 건수로 해석하지 않도록 보고서/CURRENT_STATE 정정했다. owner 형식 이상은 과거 개발 고정ID 사용 Session2건으로 확인했다. 개별 식별자·원문·Secret 출력 없음.
+- 삭제 worker cleanMongo/verify 및 persistence fence의 raw examId도 Azure 저장 필드와 불일치해 보완 필요함을 정적으로 확인했다. 제품/DB 수정·삭제·설정·배포 없이 보고서와 작업 기록만 갱신했다. Gradle은 제품 변경 없어 미실행, 읽기 집계 및 diff 검사 수행. 기존 dirty와 다른 작업 기록 보존. 다음 단계는 필드 매핑 코드/검사기 회귀 보완과 남은19건 원인 검토이며 임의 삭제는 하지 않는다.
+
+### 운영 삭제 원인 진단 턴 식별자 보완
+
+<!-- codex-turn:01a14a26-816d-7a81-8812-1ecddac4d6d9 -->
+
+- 관련 TMI-193/TMI-217/TMI-116/TMI-128/TMI-220. 위 읽기 진단의 현재 턴 식별자를 보완했다. Azure1,391건은 필드 불일치 오탐, 실제 미연결19건과 개발 고정ID 시험2건은 후속 검토 대상으로 유지한다.
+- 이번 보완은 WORKLOG append와 CURRENT_STATE 갱신뿐이다. 제품 코드·실DB·설정·배포 변경 없음. Secret·Token 미기록, 기존 기록 보존.
+
+## 2026-10-17 — Azure 삭제 필드 매핑 구현·회귀
+
+- TMI-193/TMI-217. 사용자 후속 「어 해줘」로 Azure 필드 매핑 보완 구현. DeletionChildFields 추가, worker cleanup/verify와 persistence fence가 Azure raw BSON exam_id를 사용하도록 변경했다. 검사기 lookup/cleanup index도 동일하게 정정했다. 공개 API/AI/저장 필드/owner·삭제 차단 계약은 불변이다.
+- 실제 Azure entity 직렬화 기반 Mongo 회귀: 과거 자료 삭제/새 시험 자료 보존, 최종 잔존 검증, 정상 fence 통과·잘못된 필드 거절·삭제 후 deny. Node 검사기는 올바른 lookup/부모 collection 및 기존 잘못된 same-name index 자동 교체 금지를 검증한다.
+- clean test XML1,396 실패/오류0·기존 LearningImportedContentTest skip1. 최초 Mongo 실행은 Docker API1.32/최소1.40 불일치로 기동 실패, 테스트 프로세스에 JAVA_TOOL_OPTIONS=-Dapi.version=1.44 적용 후 집중회귀와 전체 Mongo337 실패/오류/skip0. Node mongodb123개 통과, diff check 통과. Docker 저장소 설정 변경 없음.
+- LC_AZURE_DELETION_FIELD_FIX_2026-10-17.md 및 CURRENT_STATE 갱신. 실제 DB/index·19건 자료·legacy 봉인·키/설정·배포·commit/push 미변경. 기존 dirty/사용자 DS_Store와 다른 작업 기록 보존, 예상 밖 제품 변경 없음. 운영 적용 전 잘못된 기존 Azure index 전환 및 실제 미연결 자료 검토가 남는다. Secret·Token 기록 없음.
+
+### Azure 삭제 매핑 구현 턴 식별자 보완
+
+<!-- codex-turn:01a14a28-e791-7fa0-b9c0-9626419ca9be -->
+
+- 관련 TMI-193/TMI-217. 이번 구현의 턴 식별자를 보완했다. Azure exam_id 매핑 보완 및 단위1,396건(기존skip1), Mongo337건, Node123건 검증 결과는 위 기록과 같다.
+- WORKLOG append와 CURRENT_STATE 갱신만 수행했으며 추가 코드/실DB/설정/배포 변경은 없다. 기존 기록과 사용자 변경을 보존했고 Secret·Token은 기록하지 않았다.
+
+## 2026-10-17 — Azure 보완 이후 후속 작업 안내
+
+- 관련 TMI-193/TMI-217/TMI-116/TMI-128/TMI-220. 현재 상태와 Azure 보완 검증 기록을 확인했다. 다음은 실제 미연결19건·개발 고정ID 시험의 읽기 검토 및 환경별 삭제 index 점검, 승인된 index 준비, 보완 코드 전달/test 검증, Billing 운영 인증/TLS 연결 순서다.
+- 목록 최종 봉인은 사용자 보류를 유지하고 운영 전환 전 별도 진행한다. 이번은 안내·기록만이며 실환경 재조회/데이터 변경·코드 변경·Git 전달·배포·활성화 없음. 테스트는 재실행하지 않았고 기존 검증 결과만 참조했다.
+
+### 후속 작업 안내 턴 식별자 보완
+
+<!-- codex-turn:01a14a2e-3987-7ad1-916d-2b88dbad7c93 -->
+
+- 관련 TMI-193/TMI-217/TMI-116/TMI-128/TMI-220. 이번 후속 작업 안내의 턴 식별자를 보완했다. 다음 단계는 미연결19건 및 환경별 삭제 index 읽기 점검이며 목록 최종 봉인은 보류한다.
+- WORKLOG 끝에 항목을 추가하고 CURRENT_STATE를 갱신했다. 추가 시스템 변경·테스트 재실행 없음. 과거 기록을 보존하고 Secret·Token은 기록하지 않았다.
+
+## 2026-10-17 — 미연결19건 및 환경별 삭제 index 읽기 점검
+
+- TMI-193/TMI-217. 사용자 후속 요청으로 운영 snapshot read-only 집계 수행. 결과4건은 부모1개, Job15건은 부모2개 참조(합계 부모2). retry0 전부, Job PROCESSING11/COMPLETED4, firstUserSubmittedAt 없음. 관련 삭제target/생성operation/접수receipt/Azure·SpeechAce·Summary0. 부모 삭제 원인/시점·19건 삭제 가능성은 미확정이다.
+- prod Azure index는 기본_id만 존재, 삭제 operation/command/target index 없음. metadata는 snapshot 밖 별도 읽기다. test 로컬 조회 AWS_AUTH_UNAVAILABLE, 전용 LC CloudShell test exact host 조회도 TEST_INDEX_READ_FAILED/exit1로 실패해 test index 미확인. 조회 프로세스 종료 확인, 권한/네트워크 확대 없음.
+- LC_ORPHAN_EVIDENCE_REVIEW_2026-10-17.md·CURRENT_STATE 갱신. 이번 제품코드/실DB/index/봉인/배포/commit/push 변경 없음. 테스트 재실행 없이 읽기 검증과 diff 검사 수행. Secret·Token·개별 사용자/시험ID·원문 비출력, 기존 dirty 및 다른 작업 보존. test 네트워크 내 읽기 경로 확보와 역사적 증거/처리 기준 확인이 후속이다.
+
+### 미연결 기록·인덱스 읽기 점검 턴 식별자 보완
+
+<!-- codex-turn:01a14a2f-7ace-7b31-b84f-72be1a71bad1 -->
+
+- 관련 TMI-193/TMI-217. 이번 읽기 점검의 턴 식별자를 보완했다. 운영19건의 부모 부재 원인·처리 기준과 test 인덱스 확인은 후속이며 임의 삭제하지 않는다.
+- WORKLOG append 및 CURRENT_STATE 갱신만 수행했다. 추가 실환경/코드 변경·테스트 실행 없음. 기존 기록 보존, Secret·Token 미기록.
+
+## 2026-10-17 — test 내부 삭제 index 읽기 완료
+
+- TMI-193/TMI-217. 사용자 후속 요청으로 기존 LC test 네트워크/실행 역할·Mongo Secret1개와 공식 mongo:8.0을 사용하는 읽기 전용 Fargate 태스크1개 실행. 최대150초, 별도 task role/포트/앱 없음. 다섯 collection index metadata만 출력했고 DB 쓰기·식별자/원문/Secret 출력 없음.
+- test Azure idx_deletion_exam_cleanup 키가 examId/_id로 잘못 설치됨 확인. 수정 코드가 요구하는 exam_id/_id로 전환해야 하며 이번에 drop/create하지 않았다. 기타 조회한 삭제/continuation index 존재 확인과 전체 readiness/E2E는 구분한다.
+- 실행1b6d180de01a4dc1a1dd8385aad4fd17 STOPPED/exit0, lc-test-deletion-index-read-20261017:1 INACTIVE. 기존 서비스 task/network/target 불변·running1/pending0. IAM/네트워크·기능 flag/배포/봉인·운영19건 변경 없음. 감사 로그 보존.
+- 보고서/CURRENT_STATE 갱신, diff check 수행. 제품코드 변경 없어 Gradle 재실행 없음. 기존 dirty 보존·commit/push 없음. 후속은 test index1개 전환 승인과 보완 코드 test 전달·검증이며 운영 미연결 자료는 보존한다.
+
+### 2026-10-17 — test 내부 삭제 index 점검 턴 기록 보완
+
+<!-- codex-turn:01a14a33-8c1b-78e1-8155-26b11cec994c -->
+
+- 관련 TMI-193/TMI-217. 읽기 점검 완료와 test Azure index의 examId/_id 오류 확인 결과를 기록했다. exam_id/_id 교체는 별도 승인 대상이며 아직 수행하지 않았다.
+- WORKLOG 이력 보존 및 CURRENT_STATE 갱신만 수행했다. 운영 미연결19건 보존·legacy 최종 봉인 보류 유지. 추가 코드/DB/index/배포·commit/push 변경 및 테스트 재실행 없음. Secret·Token 미기록.
+
+## 2026-10-17 — Azure 삭제 보완 test 인덱스 교체·전달·배포 확인
+
+<!-- codex-turn:01a14a38-6b6a-7583-acb6-2b950d8336be -->
+
+- TMI-193/TMI-217. 사용자 후속 실행 및 Azure 보완만 commit/push/develop 머지·test 배포 명시 승인. 실제 삭제는 별도 응답으로 제외하고 서버 정상 상태까지만 검증했다.
+- test azure_results.idx_deletion_exam_cleanup의 기존 키/옵션 검사 후 examId/_id→exam_id/_id 전환. 비unique·비TTL, 다른 index 불변, 학습문서 delete/update 없음. 기존 역할/네트워크의 일회성 mongo:8.0 태스크860c1e693518454d8cd1073887522753 exit0/STOPPED, 임시정의 INACTIVE. IAM/접근 확대 없음.
+- 원 작업트리와 운영 준비 커밋3개·다른 dirty/DS_Store를 보존하려 별도 /private/tmp/lc-azure-deletion-delivery-20261017에서 develop 기반 codex/azure-deletion-field-fix 브랜치 사용. 코드/테스트6파일 및 해당 기록2파일만 commit1ed1c89, PR49 CI통과 후 merge509fee0. 자동 test 배포39040605235 성공. 예상 밖 코드/설정 변경 없음.
+- 전달본 clean test1375(실패/오류0·기존skip1), Mongo334(실패/오류/skip0, process-only Docker API1.44), Mongo Node123 통과 및 diff check. 앞선 전체 작업트리와 전달본의 기반이 달라 테스트 건수 차이 있음. 공개 API/BaseResponse/AI user_id=examId/S3/Redis 계약 불변.
+- ECS test45 PRIMARY COMPLETED/running1/pending0, merge ECR 이미지 일치. 새8080/8444 healthy 및 공개health UP. 환경/Secret참조/포트/log/network/target 연결 불변. 이전 ALB 대상은 draining 잔존으로 최종 제거 완료와 구분. 이번 배포 전후 운영 task8, 운영 변경 실행 없음.
+- LC_AZURE_TEST_DELIVERY_2026-10-17.md 및 CURRENT_STATE 갱신. 실제 삭제/E2E·운영19건 정리·legacy 최종 봉인 미실행. 원 작업트리의 기존 미커밋 보완 사본은 복원/삭제하지 않았다. Secret/Token·개별 학습자료 미기록. 후속 실제 삭제 검증은 테스트 대상 별도 지정 필요.
+
+## 2026-10-17 — 다음 작업: 운영 Billing 인증·TLS 인계 대조
+
+<!-- codex-turn:01a14a4c-bfe6-71b0-9b98-5d1a47f86990 -->
+
+- TMI-116/TMI-217/TMI-220. 사용자 다음 작업 요청에 따라 미완료 운영 인증/TLS 연결의 사전 대조를 수행했다. 앞선 실제 삭제 제외·legacy 최종 봉인 제외를 유지하며 임의 운영 연결/활성화는 하지 않았다.
+- LC/Billing 준비 문서를 읽기 대조하고 LC application.yml 환경변수 확인. LC 발신 공개 JWK는 RSA3072/RS256/verify 전용·비밀필드 없음·기존 SPKI 지문 일치를 Node crypto로 재검증했다. Billing 환불 공개키 파일·운영 scope·최종 origin·LC 공개키 등록 결과는 인계 확인이 필요하다.
+- LC_PROD_BILLING_CONNECTION_HANDOFF_2026-10-17.md 작성 및 CURRENT_STATE 갱신. 코드/API/AI/S3/Redis 계약 변경 없음. 실환경 재조회·DB/인덱스/설정/배포·외부 전송·commit/push 없음. 운영19건/개발owner/삭제DDL 및 readiness 전달·봉인 조건은 후속으로 명시했다.
+- 코드 변경 없어 Gradle 미실행, 대신 공개키 검사와 git diff --check 수행. 기존 dirty 보존·예상 밖 변경 없음. Secret/Token 미기록. 실제 연결 변경은 인계값/현재 상태 확인 후 exact 승인 범위를 정한다.
+
+## 2026-10-17 — Billing 운영 공개키·연결 회신 접수
+
+<!-- codex-turn:01a14a51-df4d-7261-9610-109c2ac623db -->
+
+- TMI-116/TMI-217/TMI-220. 전달된 Billing 운영 회신과 공개 JWK를 읽고 LC 연결 사전 대조 문서·CURRENT_STATE를 갱신했다. scope tosunsaeng-billing-prod와 예정 workload origin을 인계 기준으로 반영하되 실제 주입/연결 완료와 구분했다.
+- Node crypto 독립 검사: keys1개·공개7필드만·RSA3072/RS256/sig/verify 전용·kid 및 SPKI 지문 일치 통과. 비밀키/Token 원문을 출력·기록하지 않았고 공개키 원문도 Git에 추가하지 않았다.
+- Billing 회신의 LC 공개키 Secret 등록/지문 확인은 생산자 증거로 접수했으며 LC AWS 독립 검증으로 과장하지 않았다. Billing 환불 production gate 보완, DNS/ALB/8443 및 양측 주입·실제 인증/TLS 검증은 미완료로 기록했다.
+- 제품 코드/API/AI/S3/Redis 계약·실DB/설정/배포·외부 전송·commit/push 변경 없음. Gradle은 코드 미변경으로 재실행하지 않았고 공개키 검사·git diff --check 수행. 기존 dirty 보존·예상 밖 변경 없음. 실제 삭제/운영19건 정리/legacy 최종 봉인 제외 유지.
+
+## 2026-10-17 — LC 운영 연결 AWS 읽기 재검증
+
+<!-- codex-turn:01a14a54-4a41-73e1-af5e-178c5df9b2cc -->
+
+- TMI-116/TMI-217/TMI-220. 사용자 후속 요청으로 전용 CloudShell 세션의 ECS/ELB/EC2 describe 조회 수행. 다른 작업의 터미널·파일은 변경하지 않았다.
+- LC prod8 정상1/0/COMPLETED,8080만 서비스 연결, Billing Secret 주입 없음. 기존 prod8444 SG 제한 유지 및 준비 TG의 ALB 미연결 확인. 관련 ALB route는 test38/39만 관측했다.
+- 로컬 receiver OFF/TLS connector 조건 확인.8080 health 성공과8444 TLS 인증 성공을 구분하고 실제 연결·활성화 완료로 보고하지 않았다. Billing의 최신 runtime/DNS 및 Secret 내용은 조회하지 않았다.
+- 연결 인계서와 CURRENT_STATE 갱신, git diff --check 수행. 제품 코드 미변경으로 Gradle 미실행. AWS 쓰기/권한/배포·실DB·legacy 봉인·삭제/19건 정리·commit/push 없음. 기존 dirty 보존, Secret/Token 미기록.
+
+## 2026-10-17 — 운영 공개키·미배포 태스크 설정 준비
+
+- TMI-116/TMI-217/TMI-220. 사용자 후속 승인으로 prod8 기반 태스크9만 등록. 공개키 environment와 기존 승인 Secret 참조3개, origin/scope/environment/TLS 설정 및 신규 feature OFF 준비. IAM·서비스 update/run-task·네트워크·DB·manifest 변경 없음.
+- 공개키 RSA3072/SPKI 일치 재검증. 기존 execution role exact 두 Secret 읽기 정책 확인. 비밀값 출력/저장 없음. AWS environment 순서 차이로 최초 직접 비교 실패 후 name 정렬 비교 및 나머지 전 필드 일치 확인, 중복 등록 없음. 실제 서비스 prod8 running1/pending0 유지.
+- 현재 서비스 기반 workflow 확인, 준비 revision 자동 배포가 아님을 기록했다. 실제 이미지/readiness·구앱 무료 설정 대조 및8444/TLS/수신 활성화는 후속 승인 범위. 코드 미변경으로 Gradle 미실행, 문서 diff check. 기존 dirty 보존·commit/push 없음. 증빙 /private/tmp/lc-prod-task9-prepared.png.
+
+## 2026-10-17 — 운영 태스크 준비 턴 기록 보완
+
+<!-- codex-turn:01a14a57-c6fd-7510-81f2-211ec792165a -->
+
+- TMI-116/TMI-217/TMI-220. 이번 작업의 운영 공개키·Secret 참조 설정 준비 및 미배포 prod9 등록 결과를 턴 식별자와 연결했다. 실서비스 prod8 유지, 실제 배포·기능ON·네트워크/DB/봉인 변경 없음.
+- CURRENT_STATE 갱신 및 git diff --check 확인. 이번 기록 보완에 따른 추가 AWS 작업·코드 변경·commit/push 없음. Secret/Token 미기록.
+
+## 2026-10-17 — 운영 배포 전 공통 gate·구앱 생성 조건 점검
+
+<!-- codex-turn:01a14a5b-71c4-7731-a663-6e7c782c16dd -->
+
+- TMI-116/TMI-217/TMI-220. 후속 진행 요청으로 AccessEventRolloutGate/PaidExamTestActivation/LegacyExamRuntimeConfiguration/TransitionFreeExamService와 관련 단위 테스트 명세 정적 대조. receiver ON이 sealed manifest·전체 paid readiness를 요구하며, 새 공존 v1도 runtime 없으면409임을 확인했다.
+- 사용자 최종 봉인 제외와 실제 운영 전환 조건이 충돌하므로 배포·ON·봉인·gate 우회는 수행하지 않았다. 앞선 배포/TLS 후속 안내에 빠졌던 선행 조건을 인계서 §9와 CURRENT_STATE에 명시했다. 미배포 태스크9를 검증된 운영 배포본으로 간주하지 않는다.
+- 기존 dirty 보존, 제품 코드/실DB/AWS/commit/push 변경 없음. 이번은 정적 점검으로 Gradle·공동E2E·AWS 재조회 미실행. git diff --check 및 marker 1회 확인. Secret/Token 미기록.
+
+## 2026-10-17 — 봉인과 운영 활성화 조건 구분 안내
+
+- TMI-116/TMI-217/TMI-220. 봉인만 하면 활성화 가능한지 질문에 기존 연결 준비 기록을 대조했다. 봉인은 필요조건이며 Billing 운영 readiness/경로, LC 코드·태스크 배포와 TLS 연결, owner/index 검증 및 양측 인증·업무 검증이 별도로 남아 있음을 정리했다.
+- 봉인 시점 이후 기존 writer가 추가 시험을 만들면 목록에서 빠질 수 있어 전환 경계 통제가 필요하다. 지금 임의 봉인하지 않고 나머지 준비 후 실제 전환 직전에 확정하도록 안내했다.
+- 문서 기록만 갱신. AWS 재조회·코드/DB/봉인/설정/배포·commit/push 없음. Secret/Token 미기록.
+
+## 2026-10-17 — 활성화 조건 안내 턴 기록 보완
+
+<!-- codex-turn:01a14a5e-06ac-7870-933c-b129c9291cbb -->
+
+- TMI-116/TMI-217/TMI-220. 봉인은 운영 활성화의 필요조건 중 하나라는 이번 안내를 현재 턴과 연결했다. Billing 준비·LC 배포/TLS·owner/index·공동 검증 및 전환 경계 확인이 남아 있다.
+- CURRENT_STATE 갱신과 문서 검사만 수행했다. 추가 AWS/DB/봉인/설정/배포·코드·commit/push 변경 없음. Secret/Token 미기록.
+
+## 2026-10-18 — 운영 기존 배포 유지 상태 안내
+
+<!-- codex-turn:01a14a66-2e88-77c2-bf27-d2e34436fd4c -->
+
+- TMI-116/TMI-217/TMI-220. 마지막 AWS 확인은 실서비스 prod8 유지·prod9 미배포 준비이며, 이후 이 작업에서 운영 배포/활성화를 수행하지 않았음을 안내했다. 현재 AWS를 재조회한 결과와 구분한다.
+- CURRENT_STATE 갱신 및 git diff --check 수행. 코드/실환경/DB/설정/commit/push 변경 없음. Secret/Token 미기록.
+
+## 2026-10-18 — Billing 연결 준비 회신 대조
+
+- TMI-116/TMI-217/TMI-220. billing-lc-production-connection-preparation-2026-10-18.md를 읽고 Billing prod4는 미배포 설정 보관용이며 운영 지원 코드 이미지·TLS 시작 명령·8443/경로 및 LC 환불 origin 확정이 남았음을 확인했다. 실행 prod3은 Billing 보고이며 이번 AWS 독립 조회는 아니다.
+- LC 봉인은 Billing의 코드/시작 명령/경로 변경안 준비까지 막는 선행 조건이 아니다. 양측 배포 준비를 병행하고 실제 전환 시 기존 writer와 봉인 사이 신규 시험 누락 방지를 통제해야 한다고 설명했다. 무중단 전환이나 즉시ON 가능을 주장하지 않았다.
+- CURRENT_STATE 갱신 및 문서 diff 검사. 코드/DB/봉인/AWS/배포·외부 메시지·commit/push 없음. Secret/Token 미기록.
+
+## 2026-10-18 — Billing 준비 회신 대조 턴 기록 보완
+
+<!-- codex-turn:01a14a66-f588-7183-bc28-e12eafd6ca03 -->
+
+- TMI-116/TMI-217/TMI-220. Billing 미배포 설정 준비 회신 대조와 양측 병행 준비·전환 직전 봉인 순서 안내를 현재 턴과 연결했다. 구앱 보호 전환 절차는 확정 전이며 실제 활성화 완료가 아니다.
+- CURRENT_STATE 갱신 및 문서 검사만 수행했다. 추가 실환경/코드/DB/배포·외부 메시지·commit/push 변경 없음. Secret/Token 미기록.
+
+## 2026-10-18 — 구앱 보호 운영 전환 실행안 작성
+
+- TMI-116/TMI-217/TMI-220. 사용자 후속 요청으로 LC_PRODUCTION_CUTOVER_RUNBOOK_2026-10-18.md 작성. 실제 생성 route와 공통 readiness/manifest/무료 writer 조건을 코드에서 대조했다.
+- 양측 병행 준비·생성 제한 제안·기존 요청/구 writer 배출·봉인·배포·인증/업무 검증·개방 및 단계별 복구 경계를 명시했다. 신규 자료 생성 뒤 구 이미지 자동 rollback, source backfill, confirm 취소/재지급으로의 우회를 금지했다.
+- 생성 제한 exact 수단/응답·일정, 기존 submit/Callback 보존 리허설·지정 검증계정과 운영 실행 승인은 미확정으로 기록했다. 무중단/배포준비 완료로 주장하지 않았다.
+- CURRENT_STATE 갱신 및 git diff --check 수행. 문서 작업으로 Gradle 미실행. 코드/AWS/DB/봉인/배포·Jira·외부 전송·commit/push 없음. 기존 dirty 보존·Secret/Token 미기록.
+
+## 2026-10-18 — 운영 전환 실행안 턴 기록 보완
+
+<!-- codex-turn:01a14a67-cc2e-7933-b29f-701f3c346071 -->
+
+- TMI-116/TMI-217/TMI-220. 구앱 보호 운영 전환 실행안 작성 결과를 현재 턴과 연결했다. 생성 제한 방식/시간대·검증계정·실행 승인은 미확정이며 실제 전환은 수행하지 않았다.
+- CURRENT_STATE 갱신 및 문서 검사. 추가 코드/실환경/DB/봉인/배포·commit/push 변경 없음. Secret/Token 미기록.
+
+## 2026-10-18 — Billing 운영 후보 빌드 회신 접수
+
+<!-- codex-turn:01a14cef-1440-7972-a8be-5a6507ce8883 -->
+
+- TMI-116/TMI-217/TMI-220. Billing production-cutover-package 문서 읽기 대조. 실행본 prod5 보고를 기존 prod3 이력과 구분하고, dirty 포함 후보의 commit/원격 digest 미확정 및1838개 회귀/Java launch stub3개와 실제 ON/E2E의 차이를 기록했다.
+- LC 환불 origin/route 및 양방향 실제 출구대역 읽기 확인을 다음 범위로 정리했다. test NAT를 운영 확정값으로 복사하지 않는다. CURRENT_STATE와 실행안 후속 인계를 갱신했다.
+- git diff --check 수행. 코드 변경 없어 Gradle 미실행. AWS 독립 재조회/설정/DB/봉인/배포·외부 전송·commit/push 없음. Secret/Token 미기록.
+
+## 2026-10-18 — Billing 이미지 전달·운영 주소 및 출구대역 회신 접수
+
+<!-- codex-turn:01a14cfa-361b-7ee2-9048-55e22ecba4e3 -->
+
+- TMI-116/TMI-217/TMI-220. Billing 인계서 후속을 읽고 소스57d6639·원격 ECR digest, LC 환불 exact endpoint 및 양방향13.124.57.130/32의 subnet/NAT 확인 근거를 전환 실행안에 반영했다. 전달기록3ca7d52는 사용자 보고로 구분했다.
+- 앞선 dirty/원격 digest 미확정은 이력으로 남기고 최신 준비 결과와 구분했다. 공유 NAT에서 JWT 필요, 공개443 검증과8444 미검증, ALB exact 전달/차단 및 기존 앱/evaluation 보존 조건을 기록했다.
+- CURRENT_STATE 갱신·git diff --check 및 marker1회 확인. 코드 미변경으로 Gradle 미실행. AWS/ECR 독립 검증·실환경/DB/봉인/배포·외부 전송·commit/push 없음. Secret/Token 미기록.
+
+## 2026-10-18 — 최신 AWS 대조·운영8444 전달/차단안 준비
+
+- TMI-116/TMI-217/TMI-220. 전용 LC CloudShell 세션에서 ECS/ELB/EC2 describe만 실행.12:09 KST LC prod8 정상1/0·8080,8444 TG 미연결/대상0,ALB SG 한정8444 확인. Billing prod5와 양측 동일 subnet의 active route→available NAT13.124.57.130 독립 확인.
+- 전체 listener rule 대조 후 빈78 전달/79 exact 경로404 차단 요청 JSON 및 변경안 문서 작성.70/80 및 타 서비스 보존, 적용 직전 충돌 재확인·차단 우선 설치·no-store/정규화 한계와 실제 인증/TLS 별도 검증을 명시했다.
+- CURRENT_STATE 갱신, JSON 정적 검사·git diff --check. 실제 AWS 쓰기/네트워크/권한/배포/ON·DB/봉인·commit/push 없음. 제품 코드 미변경으로 Gradle 미실행. Secret/Token 미기록, 기존 dirty 보존.
+
+## 2026-10-18 — 운영8444 준비 턴 기록 보완
+
+<!-- codex-turn:01a14cfb-5bc3-7752-aa2d-71f3b9173a7f -->
+
+- TMI-116/TMI-217/TMI-220. 최신 AWS 읽기 대조와78/79 전달·차단 요청안 준비 결과를 현재 턴과 연결했다. 실제 규칙 적용·배포·활성화는 미실행이다.
+- CURRENT_STATE 갱신·문서 검사 및 식별자1회 확인. 추가 실환경/코드/DB/commit/push 변경 없음. Secret/Token 미기록.
+
+## 2026-10-18 — 운영8444 적용 범위 확인
+
+- TMI-116/TMI-217/TMI-220. 후속 실행 요청을 준비안과 대조했다. 마지막 관측상8444 TG 대상0·수신OFF이므로78 전달 선적용은 허용 요청에503 등 오류를 만들 수 있다. 준비안의 수신 기동/전환 조건을 우회하지 않는다.
+- 우선79 exact host/path404 차단만 적용하고78 전달은 수신 준비 뒤 적용하는 제한 범위를 사용자에게 확인한다. 해당 내부 경로만 대상으로 기존 앱/평가 경로는 보존한다. 이번은 문서 대조이며 최신 AWS 재조회·규칙 적용·배포·DB 변경 없음.
+- CURRENT_STATE 갱신·git diff --check. Secret/Token 미기록, commit/push 없음.
+
+## 2026-10-18 — 운영8444 적용 범위 확인 턴 기록 보완
+
+<!-- codex-turn:01a14cfe-c41c-7b92-a7f9-5e48ad931c9d -->
+
+- TMI-116/TMI-217/TMI-220. 빈8444 대상 그룹에78 전달 규칙을 선적용하지 않고79 차단 선적용 범위를 사용자에게 확인한 이번 작업을 기록했다. 승인 응답 대기이며 실제 규칙 적용은 하지 않았다.
+- CURRENT_STATE 갱신·문서 검사. 추가 AWS/코드/DB/배포·commit/push 변경 없음. Secret/Token 미기록.
+
+## 2026-10-18 — 운영79 차단 규칙 적용 완료
+
+- TMI-116/TMI-217/TMI-220. 사용자79 차단만 승인 후 전용 CloudShell에서78/79 미점유·기존70/80과 LC 상태를 재확인하고79 fixed404만 생성했다. rule ARN suffix6d56affd5853585c.78 전달은 미생성.
+- readback 및 기존 전체 rule 객체 불변 확인. 공개 HTTPS exact 경로 GET/빈POST 각각404/본문0bytes. 토큰/업무event 없이 차단만 검증했다. LC prod8 running1/pending0, taskDefinition/network/loadBalancers 불변. 배포/기능ON/DB/봉인/IAM/SG 변경 없음.
+- 적용 문서·CURRENT_STATE 갱신, git diff --check. 증빙 /private/tmp/lc-prod-rule79-block-20261018.png. 제품 코드 미변경으로 Gradle 미실행. 기존 dirty 보존·commit/push 없음. Secret/Token 미기록.
+
+## 2026-10-18 — 운영79 차단 적용 턴 기록 보완
+
+<!-- codex-turn:01a14cff-ada5-7e51-9a46-72896da3efb5 -->
+
+- TMI-116/TMI-217/TMI-220. 승인된79 차단 규칙 적용 및 GET/POST404·본문0bytes 확인 결과를 현재 턴과 연결했다.78 전달 미생성·LC prod8 유지 상태다.
+- CURRENT_STATE 갱신 및 문서 검사만 수행했다. 추가 AWS/코드/DB/배포·commit/push 변경 없음. Secret/Token 미기록.
+
+## 2026-10-18 — 서버 중단·봉인 시점 판단 안내
+
+<!-- codex-turn:01a14d02-6d17-7cc3-af63-60cfcfc4a7df -->
+
+- TMI-116/TMI-217/TMI-220. 사용자 실행 금지 요청에 따라 기록 대조와 설명만 수행했다. 지금 전체 서버부터 중단할 단계가 아니라 양측 배포/복구 준비·제한 방식/시간·검증계정 확정 뒤 신규 생성 writer를 통제하고 in-flight 배출 후 봉인하는 순서를 안내했다.
+- 기존 조회/접수/채점 유지가 목표지만 부분 제한·구 태스크 배출 방식 검증은 미완료다. 전체 중단의 필요성을 확정하지 않았으며 봉인만으로 나머지 활성화 조건이 해결되지 않는다.79 차단은 이미 적용,78 전달은 미적용이라는 기존 기록도 구분했다.
+- CURRENT_STATE 갱신·git diff --check. 서버 중단/신규 생성 제한/DB/봉인/배포/설정·AWS 재조회·commit/push 없음. Secret/Token 미기록.
+
+## 2026-10-18 — 생성 제한·봉인·구 서버 종료 안전성 점검
+
+- TMI-116/TMI-217/TMI-220. 사용자 확인 요청으로 공개 controller/Session 생성 writer, PaidExamCutoverInspector/LegacyExamWriterGuard, 봉인 scripts, GradingConfig/SummaryDispatchScheduler 및 Docker entrypoint를 정적 대조했다.
+- 경로별 제한은 설계상 가능하나 HTTP 차단과 snapshot만으로 writer 배출을 증명하지 못한다. writersDrained는 외부 확인 선언, guard는 분산lock이 아님을 기록했다. 빈 test 전용 봉인 스크립트를 운영에 전용하지 않고 nonempty 운영 도구 준비가 필요하다.
+- Summary executor 종료 대기false와 durable Job timeout/retry 존재를 구분했다. 중단 시 데이터 손실을 단정하지 않고 재개 리허설 및 실제 prod 이미지/종료 설정 대조를 잔여 확인으로 남겼다. 전체 서버부터 내리지 않고 준비 후 제한 범위를 결정하도록 안내한다.
+- 실행안/CURRENT_STATE 갱신·git diff --check. 진단 요청으로 코드 수정·Gradle/리허설·AWS 조회/변경·서버 중단·DB/봉인·commit/push 없음. 기존 dirty 보존·Secret/Token 미기록.
+
+## 2026-10-18 — 생성 제한·봉인 안전성 점검 턴 기록 보완
+
+<!-- codex-turn:01a14d03-c5bd-7912-b4ff-2c47531ff84c -->
+
+- TMI-116/TMI-217/TMI-220. 운영 봉인 도구·진행 중 생성 요청 배출·미완료 Job 복구 검증이 필요하다는 정적 점검 결과를 현재 턴과 연결했다. 실제 서버 중단이나 봉인은 수행하지 않았다.
+- CURRENT_STATE 갱신 및 문서 검사만 수행했다. 추가 코드/AWS/DB/배포·commit/push 변경 없음. Secret/Token 미기록.
+
+## 2026-10-18 — 운영 봉인 도구·Summary 교체 복구 검증 준비 구현
+
+- TMI-116/TMI-217/TMI-220. 사용자 후속 구현 요청으로 seal-production-legacy.js와 모의 경계 테스트를 추가했다. inspect 기본·exact prod SRV/DB·TLS 검증 유지·apply 별도 승인/hash/count·drain/reader attestation·evidence ref 요구. 실제 drain을 증명한다고 표현하지 않는다.
+- 기존 Session 수정/DDL 없이 entries+SEALED 한 Transaction, 부분/다른 봉인 거절, 최초sealedAt 보존 replay, readback 검사, unknown commit 자동재실행 금지. 출력은 집계/hash와 일반 오류만. 실제 운영 실행 없음.
+- SummaryDispatchSchedulerTest에 구 프로세스 queue 유실 후 새 scheduler timeout 재개/늦은 구 runnable 비중복 및 PROCESSING 정각 경계2개 추가. Node22/22, Java 대상60/60 실패/skip0. 실제 자동복구/ECS/AI E2E로 과장하지 않는다.
+- Docker socket 접근 거절로 실제 replica-set/mongosh 검증 미실행, 운영 DB 대체 검증 없음. 격리 DB·실제 writer drain/Callback 리허설 체크리스트 문서 작성·CURRENT_STATE 갱신. git diff --check 통과. 기존 dirty 보존, API/AI/S3/Redis 변경·commit/push·AWS/DB/봉인/배포 없음. Secret/Token 미기록.
+
+## 2026-10-18 — 운영 봉인 도구 구현 턴 기록 보완
+
+<!-- codex-turn:01a14d05-c671-7171-b0a7-c711cc73c225 -->
+
+- TMI-116/TMI-217/TMI-220. 운영 봉인 도구·모의 Transaction 경계 및 Summary 교체 복구 테스트 준비 결과를 현재 턴과 연결했다. 신규 Node22개에 기존 관련 테스트를 합한49개와 Java 대상60개 모두 통과했다.
+- 실제 Mongo/mongosh·ECS 전환 리허설은 미완료다. CURRENT_STATE 갱신·문서 검사만 수행했으며 추가 코드/실환경/DB/봉인/배포·commit/push 변경 없음. Secret/Token 미기록.
+
+## 2026-10-18 — 실제 로컬 replica set 봉인 검증·mongosh 호환 보완
+
+- TMI-116/TMI-217/TMI-220. 사용자 후속 실행 요청으로 Docker 기본권한 거절 후 승인된 권한으로 기존 mongo7.0.14 이미지의 loopback 임시 replica set을 실행했다. 운영 DB/Secret 미접속. test harness는 localhost URI·lcseal primary·빈DB 확인 후 가짜자료만 사용한다.
+- 실제 실행에서 mongosh find Promise 체인 오류 발견, 도구 커서 각 단계 await 및 async cursor 회귀 추가. harness top-level await 오류도 보완했다. 모의 검증만으로 놓친 문제를 기록한다.
+- 실제 Mongo9개(snapshot/미완료 거절/hash 불일치/원자rollback/commit후응답유실모의/Int32·원문불변/replay/latewriter/변조) 통과. fake-ID hash Java 독립 대조 추가. Node50·Java61 실패/skip0. 실제 네트워크 commit 유실/다중노드 failover/ECS drain/Callback 리허설 통과로 과장하지 않는다.
+- 임시 컨테이너 --rm stop·부재 확인, 폐기 가능한 가짜DB 제거. 기존 컨테이너·이미지 및 dirty 파일 보존. 문서/CURRENT_STATE 갱신·git diff --check. 운영 서버/DB/봉인/배포·commit/push 없음. Secret/Token 미기록.
+
+## 2026-10-18 — 실제 격리 Mongo 검증 턴 기록 보완
+
+<!-- codex-turn:01a14d09-afe5-74d2-a709-c2f0320a6ef5 -->
+
+- TMI-116/TMI-217/TMI-220. 실제 로컬 Mongo9개·Node50개·Java61개 통과와 mongosh 비동기 커서 보완 결과를 현재 턴과 연결했다. 임시 컨테이너·가짜DB 정리 완료, 운영 전환 리허설은 미완료다.
+- CURRENT_STATE 갱신 및 문서 검사만 수행했다. 추가 코드/AWS/DB/봉인/배포·commit/push 변경 없음. Secret/Token 미기록.
+
+## 2026-10-18 — 격리 검증 후 운영 중단 가능 여부 재확인
+
+- TMI-116/TMI-217/TMI-220. 봉인 도구 로컬 검증 완료와 실제 운영 전환 가능 상태를 구분해 최신 실행안·작업트리를 대조했다. LC 배포 후보 commit/image 확정, 최신 운영 owner/index·feature 검사, 요청 배출/Callback 복구 리허설과 제한 시간·검증계정 확정이 아직 완료 증거 없는 항목이다.
+- 전체 서버 중단은 신규 writer 정지를 단순하게 할 수 있지만 진행 요청/Callback 보호 및 새 서버 기동 준비를 대체하지 않는다. 지금 먼저 중단하지 않고 남은 준비 후 승인된 전환 창에서 봉인하도록 안내했다.
+- CURRENT_STATE 갱신·git diff --check. AWS 재조회·서버 중단·DB/봉인·설정/배포·commit/push 없음. Secret/Token 미기록.
+
+## 2026-10-18 — 운영 중단 가능 여부 재확인 턴 기록 보완
+
+<!-- codex-turn:01a14d0e-7ae1-77f0-acad-0f32076166f7 -->
+
+- TMI-116/TMI-217/TMI-220. 봉인 도구 검증 완료와 운영 배포 준비·기동 조건·전환 리허설의 미완료를 구분한 이번 안내를 현재 턴과 연결했다. 실제 서버 중단이나 봉인은 수행하지 않았다.
+- CURRENT_STATE 갱신·문서 검사만 수행했다. 추가 코드/AWS/DB/배포·commit/push 변경 없음. Secret/Token 미기록.
+
+## 2026-10-18 — 운영 후보·종료 설정 실조회
+
+- TMI-116/TMI-217/TMI-220. 사용자 후속 준비 요청으로 로컬 workflow/readiness/git 상태와 AWS ECS/ECR/ELB 메타데이터를 읽기 대조했다. 로컬 AWS 자격증명 없음·GitHub API 연결 실패 후 기존 LC 전용 CloudShell 세션만 사용했으며 다른 작업의 터미널/파일은 변경하지 않았다.
+- 03:32:56 UTC prod8 running1/pending0/PRIMARY COMPLETED,8080·구 digest 및 ECR b2b37ff tag 확인. prod9도 같은 이미지/OFF. stopTimeout30초·TG drain300초를 확인하고 앱 완료 보장과 구분했다. 민감 JSON 원문은 출력하지 않고 종료 override만 선택 검사했다.
+- workflow의 현재 서비스 태스크 참조로 준비9 자동승계 불가, source/image 통합과 command/entryPoint 대조 필요를 실행안에 기록했다. 운영 DB 최신검사·실제 종료/Callback 리허설·최종 후보 이미지는 미완료다.
+- 실행안/CURRENT_STATE/WORKLOG만 갱신. 제품 코드·공개 API/AI/S3/Redis 계약 유지. 서버/설정/DB/봉인/배포·commit/push·Jira 변경 없음. 테스트 재실행 없이 문서 diff 검사, 기존 dirty 보존·Secret/Token 미기록.
+
+## 2026-10-18 — 운영 후보·종료 설정 확인 턴 기록 보완
+
+<!-- codex-turn:01a14d10-b5a5-74f2-877b-7dc3ea5f4ecf -->
+
+- TMI-116/TMI-217/TMI-220. 이번 AWS 읽기 대조 결과(prod8 유지, prod9 구이미지/OFF, stopTimeout30초·TG drain300초)와 LC 최종 이미지/명시 전환 설정·종료/Callback 리허설 미완료를 현재 턴에 연결했다.
+- CURRENT_STATE 갱신 및 문서 검사만 수행했다. 추가 서버/설정/DB/봉인/배포·commit/push 변경 없음. Secret/Token 미기록.
+
+## 2026-10-18 — LC 로컬 후보 이미지·시작 명령 준비
+
+- TMI-116/TMI-217/TMI-220. 후속 준비 요청으로 기존 dirty를 보존하며 readiness/공존/Azure 보완을 포함한 현재 소스 JAR 및 linux/amd64 후보 이미지를 빌드했다. 소스517파일 지문·JAR hash·로컬 image ID를 LC_PRODUCTION_CANDIDATE_PACKAGE_2026-10-18.md에 기록했다. 커밋된 배포본/원격 digest로 오인하지 않는다.
+- AWS는 LC 전용 세션에서 prod9 시작 명령 구조만 읽기 대조. 기존 /bin/sh -c + 단일 command가 TLS entrypoint 없이 직접Java를 실행함을 확인했다. 원문/비밀값을 출력하지 않고 마지막 exact tail1회와 prefix 존재를 확인했다. prefix/기타 설정을 보존하는 prepare-production-startup.cjs 순수 함수와8개 검사 추가. AWS 호출/자동등록/입력로그 없음.
+- unit1399 실패/오류0·기존skip1, Node88 통과. Mongo 캐시 결과 후 강제 실행에서 Docker API 호환 초기화 실패19개를 관측했고, 소켓만 지정한 재시도도 실패. 기존 process-only API1.44로 강제 재실행해337 실패/오류/skip0 확인. 프로젝트/영구Docker 설정 변경 없음.
+- 최초 platform 미지정 Docker 빌드는 중단하고 workflow와 같은 amd64로 완료. 로컬 image c84d9216a2f9aeb9eb6f626fb37cfb4460f0b907056baa7284177c8106154cac. 네트워크 차단 일회성 컨테이너로 Java버전/TLS가짜bytes/전처리연결3개 통과, --rm 정리. 앱 ON 기동·실제PKCS12/TLS·종료/Callback 공동리허설은 미완료다.
+- 후보 문서/실행안/CURRENT_STATE 갱신·git diff --check. 공개API/AI/S3/Redis·제품코드 불변, 기존 사용자파일 보존. 운영/DB/봉인/설정/태스크등록/배포·commit/push·Jira 변경 없음. Secret/Token 미기록.
+
+## 2026-10-18 — 로컬 후보 준비 턴 기록 보완
+
+<!-- codex-turn:01a14d13-3786-7c72-a03c-a96fdc262643 -->
+
+- TMI-116/TMI-217/TMI-220. 이번 로컬 amd64 후보 이미지·시작 명령 변환 도구 준비 및 unit1399(기존skip1)/Mongo337/Node88/이미지검사3 통과 결과를 현재 턴에 연결했다.
+- 실제 앱 ON 기동·종료/Callback 리허설과 최종 원격 이미지 전달은 미완료다. CURRENT_STATE 갱신·문서 검사만 추가 수행했으며 운영/DB/봉인/배포·commit/push 변경 없음. Secret/Token 미기록.
+
+## 2026-10-18 — 실제 후보 앱 재시작·늦은 Callback 리허설
+
+<!-- codex-turn:01a14d1e-1e36-7af1-8b2a-24cce1738da9 -->
+
+- TMI-116/TMI-217/TMI-220. 사용자 후속 요청으로 opt-in CandidateProcessRestartTest를 추가했다. 후보 image c84d9216… exact 검사, Docker internal network·포트 미공개·가짜 Mongo replica set/Redis·local 프로필을 사용한다. 실키/실DB/외부 AI/Billing 접속 없음.
+- 최초 harness의 internal network+published port 기대가 맞지 않아 Mongo 준비 단계에서 실패했다. 격리 완화 없이 published port 제거·내부 mongosh/curl exec로 수정했다. 실제 앱 health200→SIGTERM/exit0또는143/OOM아님→새 컨테이너 재시작 후 PROCESSING Summary BSON 보존 확인.
+- 늦은 Azure Callback2회 결과1개·원시험 연결, 늦은 Summary Callback2회 결과1개·Job/Session COMPLETED 확인. 직접 만든 가짜 접수/결과 fixture이며 실제 submit/AI 송신·production paidON/JWT/TLS/진행중 요청배출·자동재전송까지 통과한 것으로 표현하지 않는다.
+- 최종 XML 시나리오1개 실패/오류/skip0, Gradle 성공. 테스트 프로세스에만 Docker API1.44 적용. try-with-resources로 임시자료 정리, 후보 앱 컨테이너 부재 확인, 기존 이미지 보존. 문서/CURRENT_STATE 갱신·git diff --check 통과.
+- 제품코드·공개API/DTO/AI user_id/S3/Redis 계약 불변. 운영 서버/설정/DB/봉인/배포·commit/push·Jira 변경 없음. Secret/Token 미기록.
+
+## 2026-10-18 — 후보 production 프로필·JWT/TLS 격리 검증
+
+<!-- codex-turn:01a14d2d-8536-7773-ae08-da18caa47545 -->
+
+- TMI-116/TMI-217/TMI-220. CandidateProductionTlsTest opt-in 시나리오 추가. exact 로컬 후보 이미지·외부접속 없는 internal network·신규 Mongo/Redis·가짜 빈 SEALED manifest·필수 index·임시 RSA/PKCS12만 사용한다. 운영 gate를 완화하지 않았다.
+- prod 프로필/paid gate 실제 기동과 health200, 공개환불404, 전용TLS 인증없음401/잘못된aud403/정상204 두번·차단문서1개/Session0개 확인. CA 검증 사용, 토큰/키 원문 미기록. 04:05:33 UTC JUnit1/실패0/오류0/skip0, Gradle 성공. 후보 앱 컨테이너 정리 확인.
+- 보고서/후보 패키지/이전 리허설/CURRENT_STATE 동기화. 실제 요청 배출·운영 ALB/ECS·양측 업무 E2E·자동복구 전체 검증으로 확대하지 않는다. 전체 회귀는 앞선 기록이며 이번은 추가 대상검사다.
+- 제품코드/API/AI/S3/Redis 계약과 기존 dirty 보존. 실DB/봉인/AWS 설정/배포·commit/push·Jira 변경 없음. 다음은 전환 조합·배출/복구 절차 및 명시 배포 준비 확인이며 서버부터 중단하지 않는다.
+
+## 2026-10-18 — 진행 작업 배출·복구 및 공동 연결 준비
+
+- TMI-116/TMI-217/TMI-220. 사용자 후속 요청으로 종료 코드와 Summary 재채점 진입점을 대조하고 LC_CUTOVER_DRAIN_AND_CONNECTION_CHECKLIST_2026-10-18.md 작성, 실행안/CURRENT_STATE 동기화.
+- 마지막 관측 ECS stopTimeout30초와 reconciliation 기본 순차 대기20+30초·일부 scheduler35초 차이 확인. 실활성 설정별 검증 필요하며 단순 timeout 증가나 작업 자동완료로 결론내리지 않았다. Summary shutdown 대기false, durable Job/늦은 Callback/기존 사용자 retry 경로와 자동재전송을 구분했다.
+- ./gradlew test --tests '*SummaryDispatchSchedulerTest' --tests '*BillingReservationReconciliation*Test' --no-daemon 성공. 실제 in-flight SIGTERM·AWS 재조회·공동 업무검증은 미실행. 테스트 보고서에서 실제 실행된 클래스/건수를 확인하며 wildcard 명칭을 통과 증거로 대신하지 않는다.
+- 이번 변경은 문서3개뿐이며 기존 사용자/제품 dirty 보존. 제품/API/AI/S3/Redis 계약·운영 서버/DB/봉인/설정/배포·commit/push·Jira/외부전송 변경 없음. 실제 실행에는 양측 기능 조합·배출 수단/시간·검증 계정/영향 범위 확인과 승인 필요.
+- XML 최종 확인: 실행된 것은 SummaryDispatchSchedulerTest13개/실패0/오류0/skip0이며 BillingReservationReconciliation 패턴 실행 결과 없음. Billing 복구 회귀 통과로 주장하지 않는다. git diff --check 통과.
+
+## 2026-10-18 — 배출·공동 연결 준비 턴 기록 보완
+
+<!-- codex-turn:01a14d32-38f9-7f32-b26d-e427de6a3ffc -->
+
+- TMI-116/TMI-217/TMI-220. 이번 턴의 배출·복구/공동 연결 확인표 작성과 Summary 단위검사13개 통과 결과를 연결했다. 실제 in-flight 종료·양측 운영 연결 검증은 미완료다.
+- WORKLOG append 및 CURRENT_STATE 갱신만 추가 수행. 운영/DB/봉인/배포·commit/push 변경 없음. 기존 기록 보존, Secret/Token 미기록.
+
+## 2026-10-18 — 후속 운영 전환 준비의 사용자 결정 확인
+
+- TMI-116/TMI-217/TMI-220. 후속 요청의 범위를 기존 확인표와 CURRENT_STATE로 대조했다. 시간대/최대 제한 시간·검증 계정이 미지정이므로 임의 실사용자 테스트나 운영 중단을 수행하지 않고 해당 정보를 요청한다.
+- 실제 in-flight 종료/공동 연결·최종 후보 확정 미완료는 유지한다. 이번은 기록 확인·문서 갱신뿐이며 테스트 재실행, 제품코드/실DB/AWS/봉인/배포·commit/push 변경 없음. Secret/Token 미기록.
+
+## 2026-10-18 — 전환 준비 확인 턴 식별자 기록
+
+<!-- codex-turn:01a14d34-5a14-7d20-92eb-46694ff80c39 -->
+
+- TMI-116/TMI-217/TMI-220. 이번 턴은 전환 시간대/최대 중단 시간과 운영 검증 계정 표시명을 요청한 상태다. 실제 전환 승인이나 완료로 간주하지 않는다.
+- WORKLOG 끝에 기록 추가 및 CURRENT_STATE 갱신. 운영 중단/봉인/배포·DB·코드 변경 없음. Secret/Token 미기록.
+
+## 2026-10-18 — 즉시 전환 희망·30분 목표 확인
+
+- TMI-116/TMI-217/TMI-220. 사용자가 지금 진행하고30분 안에 끝내고 싶다고 밝혔다. 시간대/목표를 기록했으며 검증 계정은 여전히 미지정이다. 잔여 후보 확정·배출/공동 연결 검증 때문에30분 완료를 보장하지 않는다.
+- 중단 전 준비 미완료 시 기존 운영을 유지하며, 봉인/새 데이터 쓰기 이후 시간 초과를 이유로 구 writer를 자동 재개하지 않는 기준을 안내한다. 목표 시간 제시를 미지정 계정의 소비/환불/삭제나 모든 실환경 변경 승인으로 확대하지 않는다.
+- 기록 조회·WORKLOG append/CURRENT_STATE 갱신만 수행. 실제 중단·봉인·배포·DB/설정 변경, 테스트 재실행·commit/push 없음. Secret/Token 미기록.
+
+## 2026-10-18 — 30분 전환 목표 턴 기록 보완
+
+<!-- codex-turn:01a14d35-8836-7910-b167-c2c856ff0239 -->
+
+- TMI-116/TMI-217/TMI-220. 지금 시작·30분 내 완료 희망을 확인했으며 완료 보장은 하지 않았다. 운영 테스트 계정 표시명 응답 및 잔여 준비 확인을 기다린다.
+- WORKLOG append와 CURRENT_STATE 갱신만 수행. 서버 중단·봉인·배포·실DB/설정 변경 없음. 기존 기록 보존, Secret/Token 미기록.
+
+## 2026-10-18 — 운영 검증 계정 지정 접수
+
+- TMI-116/TMI-217/TMI-220. 사용자가 Firebase UID로 운영 검증 계정을 지정했다. 원문 UID는 문서에 복제하지 않았다. JwtCurrentUserProvider의 UUID sub 검증과 FRONTEND_API_HANDOFF의 Firebase→Identity 교환 계약을 확인했다.
+- Firebase UID를 LC userId로 직접 사용하거나 UUID로 임의 변환하지 않는다. 실제 운영 Identity 연결 UUID 조회/인증은 미실행이다. UID만으로 로그인하거나 사용자 토큰을 생성할 수 없으며 앱의 정상 로그인 검증이 필요하다.
+- 기록 갱신만 수행. 공개 계약/제품코드·운영 DB/설정/중단/봉인/배포·commit/push 변경 없음. 테스트 재실행 없음. 지정 계정에 대한 임의 환불·삭제도 하지 않았다.
+
+## 2026-10-18 — 검증 계정 지정 턴 기록 보완
+
+<!-- codex-turn:01a14d36-a5f3-7f13-a686-b2a4441d560f -->
+
+- TMI-116/TMI-217/TMI-220. 운영 검증 계정 지정을 접수하고 정상 앱 로그인을 요청했다. 원본 Firebase UID·Secret·Token은 기록하지 않았다. Identity UUID 연결과 실제 인증은 미확인이다.
+- WORKLOG append 및 CURRENT_STATE 갱신만 추가 수행. 운영 중단·봉인·배포·실DB/설정 변경 없음. 기존 기록을 보존했다.
+
+## 2026-10-18 — 운영 검증 계정 로그인 불가 확인 요청
+
+<!-- codex-turn:01a14d37-81fd-7f40-adea-70f8ad6f6569 -->
+
+- TMI-116/TMI-217/TMI-220. 사용자가 로그인할 수 없다고 알려 로그인 오류인지 앱 사용 불가 상황인지 확인을 요청했다. 오류인 경우 test/prod 환경과 오류 문구 또는 캡처를 요청했으며 Token/비밀번호는 요청하지 않았다.
+- 원인은 미확인이다. 로그인 문제 확인 전 운영 중단·봉인·배포를 진행하지 않겠다고 안내했다. 실제 진단/테스트·코드/DB/설정 변경은 수행하지 않았다.
+- WORKLOG append 및 CURRENT_STATE 갱신. 기존 기록 보존, Secret/Token·원본 사용자 식별자 미기록.
+
+## 2026-10-18 — 테스트 앱 사용 불가로 검증 범위 구분
+
+<!-- codex-turn:01a14d37-e9a9-7c81-89b1-2645c8aa8400 -->
+
+- TMI-116/TMI-217/TMI-220. 사용자가 테스트 앱을 사용할 수 없다고 명확히 했다. 앞선 로그인 장애 추정은 확정 사실이 아니며 로그인 오류 진단 대상으로 취급하지 않는다.
+- 앱 없이 서버 준비·상태·네트워크/TLS 확인은 가능하지만 사용자 인증 시험 생성/소비·앱 E2E를 통과로 보고할 수 없다. Firebase UID만으로 인증을 우회하거나 Token을 임의 생성하지 않는다.
+- 사용자 검증 경로가 없는 상태에서 일반 개방을 자동 승인하지 않는다. 기존 전환 gate 유지. 이번은 설명 및 문서 갱신만이며 실환경 조회/중단/봉인/배포·코드/DB/설정 변경 없음. Secret/Token·원본 UID 미기록.
+
+## 2026-10-18 — 구앱 검증 경로 확인
+
+- TMI-116/TMI-217/TMI-220. 사용자가 구앱 사용 가능을 확인했다. 지정 계정의 정상 구앱을 통한 v1 무료 생성·기존 제출/결과 검증 경로를 확보할 수 있음을 안내한다. 실제 검증 통과나 유료 v2 검증 완료로 간주하지 않는다.
+- 신앱 경로/공동 업무 검증과 배출·최종 후보 준비는 여전히 별도다. 구앱 사용 가능만으로 운영 배포/기능 전체 활성화를 실행하지 않았다.
+- CURRENT_STATE/WORKLOG 기록만 갱신. 제품코드/실DB/AWS/중단/봉인/배포·commit/push 변경 없음. 테스트 재실행 없음. Secret/Token·사용자 식별자 미기록.
+
+## 2026-10-18 — 구앱 사용 가능 확인 턴 기록 보완
+
+<!-- codex-turn:01a14d38-923a-7183-878e-bc6131b03e64 -->
+
+- TMI-116/TMI-217/TMI-220. 구앱으로 지정 계정의 무료 시험 생성·제출·결과 확인이 가능하다는 사용자 답변을 기록했다. 실제 검증은 아직 수행하지 않았으며 신앱 유료 경로 검증도 남아 있다.
+- WORKLOG append 및 CURRENT_STATE 갱신만 추가 수행. 서버 중단·봉인·배포·실DB 변경 없음. 기존 기록 보존, Secret/Token 미기록.
+
+## 2026-10-18 — 운영 재조회 및 실제 전달 선행조건 확인
+
+- TMI-116/TMI-217/TMI-220. 후속 요청으로 로컬 dirty/후보 패키지를 대조했다. AWS CLI sts는 NoCredentials로 실패했으며 기존 로그인 브라우저의 전용 ECS 조회 탭으로 대체했다. 다른 작업의 CloudShell·탭을 조작하지 않았다.
+- 13:16 KST 화면: tosunsaeng-learning-core-prod-service는 prod:8, 실행1/대기0, 배포성공, 컨테이너8080 대상 정상1/비정상0. DB/Secret/전체 task 환경은 조회하지 않았다.
+- 검증한 LC 후보는 로컬 이미지이며 최종 소스/원격 이미지 확정이 선행이다. 계정/시간 지정만으로 즉시 전환 가능하다는 인상을 정정하고, 운영 중단 없이 후보 commit/push·ECR 전달 범위를 확인한다. 30분 전환 완료 보장 없음.
+- WORKLOG/CURRENT_STATE 갱신 및 diff 검사. 제품코드/실DB/설정/중단/봉인/배포·commit/push/이미지전달 미실행. 사용자 dirty 보존, Secret/Token 미기록.
+
+## 2026-10-18 — 운영 재조회 턴 기록 보완
+
+<!-- codex-turn:01a14d39-906f-7643-9a0a-4f3aefa3a35d -->
+
+- TMI-116/TMI-217/TMI-220. 이번 턴의 AWS ECS 읽기 확인 및 LC 후보 전달 선행조건 안내를 기록했다. 후보 변경분 commit/push·ECR 전달 범위에 대한 사용자 응답 대기다.
+- WORKLOG append 및 CURRENT_STATE 갱신만 추가 수행. 운영 중단·봉인·배포·실DB/설정 변경 없음. 기존 기록 보존, Secret/Token 미기록.
+
+## 2026-10-18 — 승인된 LC 후보 커밋·푸시 및 ECR 전달 시도
+
+- TMI-116/TMI-217/TMI-220. 사용자 「어 해줘」로 후보commit/push·ECR 전달 승인. 별도 codex/lc-production-candidate-20261018에서22파일 선택 커밋3d02300 및 원격 push 성공. main/develop 머지·배포 workflow 실행 없음. 사용자 DS_Store와 기존 준비/공유 기록은 스테이징하지 않고 보존했다.
+- 단위1399/실패0/오류0/기존skip1, 관련 Node42/실패0. Docker image inspect 태그 조회는 실패했으나 image list 및 ID inspect로 기존 c84d9216… amd64 존재 확인. 신규테스트2개 제외517파일 source hash가 빌드 당시28e77ce2…와 일치한다. 재빌드 없이 기존 검증 이미지를 전달 대상으로 사용했다.
+- ECR 새 후보태그prod-candidate-3d02300을 로컬에 추가하고 push했으나 blob HEAD403으로 실패. 정상AWS CLI 인증 없음, Docker 인증 만료/권한 원인은 미확정. IAM 확대/Secret 출력으로 우회하지 않았다. ECR전달/최종digest 검증은 미완료다.
+- 전달 보고서·CURRENT_STATE 갱신. 공개API/AI/S3/Redis 계약 불변, 예상 밖 제품 변경 없음. 실제 서버/DB/봉인/기능/배포 변경 없음. 다음은 정상 ECR 인증 연결 후 전달 재개이며30분 전환 완료로 보고하지 않는다.
+
+## 2026-10-18 — 후보 전달 기록 보완 및 CloudShell 대안 안내
+
+<!-- codex-turn:01a14d3a-c4a0-7540-97a0-b862b2625ef8 -->
+
+- TMI-116/TMI-217/TMI-220. 후보3d02300 및 전달 기록fc416a7의 별도 브랜치 push 완료. ECR push403은 미해결이며 운영 배포/봉인은 하지 않았다.
+- 사용자가 CloudShell 대안을 질문했다. 기존 로그인 권한으로 ECR 전달 가능하나 로컬 후보 이미지를 먼저 옮기고 환경의 도구/디스크/저장소 권한을 확인해야 한다고 안내했다. 로컬 이미지를 CloudShell에서 바로 참조할 수 있다고 가정하지 않는다. 기존 타 작업 세션 보존·전용 세션 원칙 유지.
+- 이번 추가 작업은 설명과 WORKLOG append/CURRENT_STATE 갱신뿐이다. 이미지 전송/CloudShell 명령 실행·IAM 변경·운영 변경 없음. Secret/Token 미기록.
+
+## 2026-10-18 — CloudShell 후보 이미지 전달 재개
+
+<!-- codex-turn:01a14d3e-301b-7842-bb65-91149ad4935d -->
+
+- TMI-116/TMI-217/TMI-220. 사용자 승인으로 기존 LC 전용 CloudShell 세션에서 이미지 전달 재개. 기존 계정/ECR 저장소 조회와 Docker25 확인. 홈 여유98MiB·/tmp1858MiB로 이미지152MiB를50,000,000bytes 조각으로 나눠 순차 업로드하고 전용 임시 디렉터리로 이동한다.
+- 사용자 추가 요청 「CloudShell의 미사용 LC 이미지」 삭제 대상을 읽기 확인했다. 현재 Docker 목록에는mongo:8.0만 있어 삭제할 LC 이미지가 없으며 다른 작업용 이미지는 보존한다. ECR/로컬Mac 이미지 삭제는 범위가 아니다.
+- 로컬 Docker save 파일 SHA256 f7ffa931c8482fb3a089fe5bd8ced5a4ad27529a2c24c928ce1703eee3cc6bca. 최종 전송 hash·ECR 검증 전 전달 완료로 간주하지 않는다. 다른 세션/파일·운영 서비스/DB/봉인/권한은 변경하지 않는다. Secret/Token 미기록.
+
+### CloudShell 전달 최종 결과
+
+- 4조각 결합158,905,856bytes 및 원본SHA256 일치 확인. Docker load exit0·amd64/config d9e24104…·TLS entrypoint 확인 후 전용 임시 Docker config에서 기존 권한으로 ECR 로그인했다. 자격증명은 stdin/메모리로만 전달하고 출력하지 않았다.
+- prod-candidate-3d02300 push exit0, 원격digest sha256:d4e51241021b1982167682ea8f4e5257872e53f12d1a186bb75e3f945300b499 및 config 일치/9layers 확인. 로컬index digest와 registry manifest digest를 구분한다. 최종 LC ECS prod8 running1/pending0 유지. 전용 Docker logout exit0.
+- 오래된 LC 이미지 삭제 대상 없음으로0건 삭제. mongo/다른 작업 자료 보존. 전용/tmp 전송 조각·archive/로그와 새 후보 이미지는 보존했다. 기존 서비스/DB/봉인/ALB/IAM/기능 변경 없음. 새 제품테스트 재실행 대신 전송무결성/remote readback 검사 수행, API/AI/S3/Redis 계약 불변.
+- 전달 보고서와 CURRENT_STATE 갱신. 이후 전환 task 조립·배출/봉인·양측 검증은 별도이며 이미지 전달을 운영 배포로 보고하지 않는다.
+- 전달 보고서만3cea48a 커밋으로 동일 후보 브랜치에 push 성공. 공유 WORKLOG/CURRENT_STATE 및 기존 사용자 dirty는 커밋에서 제외·보존했다. git diff --check 및 현재 marker1회 확인 완료.
+
+## 2026-10-18 — 이미지 전달 후 봉인 가능 여부 확인
+
+- TMI-116/TMI-217/TMI-220. 후보 전달/봉인 도구 문서를 대조했다. ECR 전달은 완료됐지만 최종 운영 task 설정 조립·양측 준비 확인·실제 생성 writer 배출 근거는 완료되지 않았다. 따라서 즉시 봉인 가능으로 안내하지 않는다.
+- 다음은 봉인값 주입만 남도록 배포 설정을 준비하고 양측 전환 가능 여부를 확인한 뒤, 승인된 생성 제한/배출→최종 inventory/봉인→배포/연결 검증 순서다. 구writer가 계속 생성 가능한 상태에서 봉인하면 대상 누락이 발생할 수 있다.
+- 이번은 판단/기록 갱신만 수행. 최신AWS/DB 조회·실제 봉인/중단/배포·테스트 재실행 없음. Secret/Token 미기록.
+
+## 2026-10-18 — 봉인 가능 여부 검토 턴 기록 보완
+
+<!-- codex-turn:01a14d47-9b98-75d3-a7be-1d45d7a7db12 -->
+
+- TMI-116/TMI-217/TMI-220. ECR 전달 후에도 최종 운영 배포 설정·양측 준비와 실제 생성 writer 배출 확인이 선행되어야 함을 안내한 턴이다. 즉시 봉인/중단/배포 승인 또는 완료로 간주하지 않는다.
+- WORKLOG 끝에 추가하고 CURRENT_STATE를 갱신했다. 과거 기록 보존, 추가 실환경 변경 없음. Secret/Token 미기록.
+
+## 2026-10-18 — 운영 배포 설정 초안 준비·최신 설정 대조
+
+<!-- codex-turn:01a14d48-5e66-7272-b417-5d52e34894d8 -->
+
+- TMI-116/TMI-217/TMI-220. 전용 CloudShell에서 LC prod8 실행1/대기0·8080 연결 및 준비 prod9, Billing prod5 실행1/대기0를 읽기 재조회했다. 다른 작업 터미널은 변경하지 않았다.
+- prod8/9 기동 override 동일, TLS 스크립트 연결 변환 모양·prefix 보존 메모리 검사. SPRING_APPLICATION_JSON은 알림 속성만 있어 Billing 관련 override 충돌 없음. Secret 값·원본 command·개별 식별자 미출력/미저장.
+- 등록 불가 JSON 변경 명세와 준비 보고서 작성. immutable image/8444/환경/기본 gate 후보를 명시하고 봉인값은 미기입. 복구/outbox/phone/삭제 조합 및 Billing readiness는 미완료로 남겼다.
+- Node 시작 변환8개 및 JSON/봉인 미기입 검사 통과. 제품 코드 변경 없어 Gradle 미실행. 실제 task 등록/배포/기능ON/봉인/중단/DB/ALB/IAM·commit/push 없음. 기존 dirty 보존.
+
+## 2026-10-18 — 복구·outbox·phone·삭제 목표 조합 및 Billing 상태 대조
+
+- TMI-116/TMI-128/TMI-217/TMI-220. 코드 validator/기존 RUNBOOK을 대조해 등록불가 task 초안에 복구·상태 writer/publisher·phone 목표ON을 명시했다. 실제 flags는 변경하지 않았다.
+- 경보 재전송 한도는 작업복구24h/200과 별개이며 기존 승인 근거가 없어 PT24H/200을 제안으로만 기록했다. 삭제 fence 동시성/rollout/index/storage/Billing delivery 조건을 정리하고 미확인 DB gate를 임의 승인하지 않았다.
+- 전용 CloudShell ECS 읽기 조회: LC prod8/Billing prod5 각 실행1/대기0. Billing은 전달 후보와 다른 image,8443 없음, LC workload 수신/삭제/환불publisher 명시false. 정상 공동HTTP·전체 effective 설정 검증으로 확대하지 않는다.
+- LC_PRODUCTION_FEATURE_REVIEW_2026-10-18.md 및 CURRENT_STATE 갱신. JSON 파싱/미승인값 미기입·diff 검사 통과. 제품 코드 변경 없어 Gradle 미실행. 실DB/봉인/중단/배포/기능ON/IAM/ALB/타저장소/메시지/commit/push 변경 없음. Secret/Token 미기록, 기존 dirty 보존.
+
+## 2026-10-18 — 운영 기능 조합 검토 턴 식별 기록
+
+<!-- codex-turn:01a14d4d-26b7-7572-8aa1-1ea433f44463 -->
+
+- TMI-116/TMI-128/TMI-217/TMI-220. 이번 턴의 복구/outbox/phone/삭제 설정안 및 Billing 운영 읽기 대조 결과를 위 항목과 상세 보고서에 기록했다. 경보 재전송24시간/200회는 승인 대기이며 실제 설정에 적용하지 않았다.
+- CURRENT_STATE 최신 상태 확인·갱신. 서버/DB/봉인/배포 변경 없음. Secret/Token 미기록.
+
+## 2026-10-18 — 경보 재전송24시간/200회 사용자 승인 반영
+
+- TMI-128/TMI-116. 사용자 「어」를 직전 경보 전송 실패 재시도 한도 질문에 대한 승인으로 반영했다. 로컬 task 초안에 BILLING_RECONCILIATION_ALERT_MAX_AGE=PT24H 및 BILLING_RECONCILIATION_ALERT_MAX_ATTEMPTS=200을 명시했다.
+- 기능 검토 문서와 CURRENT_STATE를 동기화했다. 작업 복구 한도·미완료 증거 보존은 불변이며 경보 한도 소진을 시험 기록 삭제 허가로 해석하지 않는다.
+- 제품 코드 변경 없어 Gradle 미실행. JSON 값·봉인값 미기입 및 diff 검사 수행. 서버 설정/DB/봉인/배포/기능ON/commit/push 없음. Secret/Token 미기록.
+
+## 2026-10-18 — 경보 한도 승인 턴 기록 보완
+
+<!-- codex-turn:01a14d4f-ce25-7dd3-9af8-d8299205d399 -->
+
+- TMI-128/TMI-116. 경보 재전송24시간/200회 승인과 로컬 배포 초안 반영을 완료했다. JSON 값·등록불가 상태·봉인값 미기입 검사 및 diff 검사 통과. 제품 코드 변경 없어 Gradle 미실행.
+- CURRENT_STATE 갱신. Sentry 실수신·삭제 DB·Billing 수신 준비 확인은 미완료이며 실제 서버/DB/배포/기능 설정은 변경하지 않았다. Secret/Token 미기록.
+
+## 2026-10-18 — Sentry·삭제 DB·Billing 수신 잔여 조건 읽기 점검
+
+- TMI-116/TMI-128/TMI-193/TMI-217/TMI-220. 기존 LC prod host/DB exact 검사 후 mongosh 집계·index/rollout 읽기만 실행했다. 최초 제한 환경 실패 후 네트워크 허용 실행 성공. 삭제 index24개·전달index 미설치, rollout 없음, 부모미연결19/owner불일치0/활성삭제중복0/전달TTL위반0 확인. 고정snapshot 아님.
+- Sentry 기존 탭은 로그인 화면으로 실제 경보 수신 확인 불가. 경보 발송하지 않음. 전용 CloudShell ECS 재조회에서 LC prod8/Billing prod5 각 실행1/대기0, Billing8443 없음·LC수신/삭제/환불발신 명시OFF 재확인.
+- LC_PRODUCTION_REMAINING_GATES_2026-10-18.md 및 CURRENT_STATE 갱신. Node 삭제 준비 검사11개 통과·diff 검사. 제품 코드 변경 없어 Gradle 미실행. 임시 읽기 도구 외 DB DDL/삭제/봉인/서버중단/배포/기능ON/commit/push·타작업 변경 없음. Secret/Token/식별자/학습원문 미기록.
+
+## 2026-10-18 — 잔여 조건 점검 턴 기록 보완
+
+<!-- codex-turn:01a14d50-b339-7ac3-b953-67914a0eafb7 -->
+
+- TMI-116/TMI-128/TMI-193/TMI-217/TMI-220. 이번 턴의 운영 삭제 DB 읽기 점검·Billing 수신 상태 재조회·Sentry 로그인 차단 결과를 위 항목과 잔여 조건 보고서에 기록했다. 삭제 준비 검사11개 통과, 실제 DB/서버 변경 없음.
+- CURRENT_STATE를 갱신했다. Sentry 로그인 대기 및 삭제 준비·Billing 연결 미완료 상태 유지. Secret/Token 미기록.
+
+## 2026-10-18 — Sentry 로그인 후 LC 경보 규칙·이력 확인
+
+- TMI-128/TMI-116. 사용자 로그인 완료 후 LC 프로젝트의 Alert3828472 활성·전체환경·high-priority 조건 및 자동 Email 대상(Suggested Assignees/Recently Active Members)을 읽기 확인했다. 최근14일 trigger6회, 최종10/13 09:03UTC. trigger와 실제 메일 도착은 구분한다.
+- LC 전체환경 최근14일 capture.source:billing_reservation_reconcile 검색0건. 과거 전체이력/전송장애로 확대 해석하지 않으며 전용 경보 실수신은 미검증이다. reporter의 SDK_ACCEPTED 비ACK 의미를 대조했다.
+- 잔여 조건 보고서/CURRENT_STATE 갱신, diff 검사. 문서/조회 작업으로 Gradle 미실행. 규칙 편집·경보 발송·서버/DB/봉인/배포/commit/push 없음. Secret/Token 미기록.
+
+## 2026-10-18 — Sentry 확인 턴 기록 보완
+
+<!-- codex-turn:01a14d53-10c6-7653-b7cc-2ac9960e2ec7 -->
+
+- TMI-128/TMI-116. Sentry 로그인 완료와 LC 기존 high-priority 이메일 경보·실행 이력을 읽기 확인했다. 복구 source 최근14일 검색0건이며 실제 수신은 미검증이다.
+- 전용 경보 추가·시험 알림1건의 승인과 수신자 지정 대기 상태를 CURRENT_STATE에 반영했다. 규칙/서버/DB 변경 없음, Secret/Token 미기록.
+
+## 2026-10-18 — 지정 이메일 경보 생성 전 수신자 확인
+
+- TMI-128/TMI-116. 사용자가 지정 이메일로 복구 전용 경보와 비식별 시험 알림1건을 승인했다. Sentry 생성 양식에서 LC/prod 및 Member 동작을 확인했으나 지정 주소 검색0건, 다른 회원1명만 선택 가능했다.
+- 임의 이메일 직접 입력 동작이 없어 다른 수신자 대체·계정 초대·권한 변경을 하지 않았다. 미저장 양식 Cancel 후 기존 Alerts4개 유지 확인. 새 규칙/시험발송 미완료이며 수신자 준비 또는 변경 필요.
+- 잔여 조건 문서/CURRENT_STATE 갱신·diff 검사. UI 확인/문서 작업으로 Gradle 미실행. 서버/DB/봉인/배포/commit/push 없음. Secret/Token 및 불필요한 이메일 원문은 작업 기록에 남기지 않았다.
+
+## 2026-10-18 — 지정 수신자 확인 턴 기록 보완
+
+<!-- codex-turn:01a14d55-1f66-7d91-ab3d-1b9212cf4ac1 -->
+
+- TMI-128/TMI-116. 지정 이메일이 Sentry Member 선택 목록에 없어 새 경보 생성과 시험 발송을 수행하지 않았다. 미저장 양식 취소 후 기존4개 경보 유지 확인. 계정 등록 또는 기존 수신자 선택에 대한 사용자 응답 대기.
+- CURRENT_STATE 갱신. 서버/DB/권한/배포 변경 없음. Secret/Token 미기록.
+
+## 2026-10-18 — 등록 계정 복구 경보 생성·시험메일 수신 확인
+
+- TMI-128/TMI-116. 사용자 현재 등록계정 지정 승인으로 Sentry Alert6187357 생성. LC 프로젝트/prod/capture.source exact billing_reservation_reconcile/event captured/매trigger/Member1명 조건을 저장 후 readback했다. 기존경보 보존·계정초대/권한확대 없음.
+- 내장 Send Test Notification1회 실행해 Notification fired! 확인, 사용자 「어 왔어」로 메일함 도착 확인. 증빙 /private/tmp/lc-prod-recovery-alert-test-20261018.jpg. 실제 LC SDK→Sentry 이벤트 필터/복구 E2E를 검증한 것으로 확대하지 않는다.
+- 잔여조건 문서·배포초안·CURRENT_STATE 갱신. JSON/diff 검사, 설정/UI 작업으로 Gradle 미실행. 앱서버/DB/봉인/배포/feature flag/commit/push 불변. Secret/Token 미기록.
+
+## 2026-10-18 — 복구 경보 생성·수신 완료 턴 기록 보완
+
+<!-- codex-turn:01a14d57-b8cb-7832-b42a-bf04fcba6716 -->
+
+- TMI-128/TMI-116. 등록 계정 대상으로 Sentry Alert6187357 생성 및 내장 시험 알림1회 발송을 완료했고, 사용자가 메일 도착을 확인했다. LC 실제 복구 이벤트 E2E 검증과는 구분한다.
+- CURRENT_STATE 최신 상태 갱신. 삭제 DB/Billing 준비는 잔여이며 앱서버/DB/봉인/배포는 변경하지 않았다. Secret/Token 미기록.
+
+## 2026-10-18 — 삭제 준비의 미연결 자료 안전 경계 대조
+
+<!-- codex-turn:01a14d5c-3b3c-7c12-bc4e-7240053517d8 -->
+
+- TMI-193/TMI-217 및 운영 전환 TMI-116/128/220. 기존19건 조사 기록과 삭제 준비 도구/worker/startup 검증을 대조했다. 부모 없는 결과는 런타임에서도 UnsafeEvidence 처리되므로 DDL 검사만 우회할 수 없다. 원인 불명 자료를 삭제/재생성/강제 완료하지 않았다.
+- Billing 운영 후보 인계 문서는 전달 완료·prod:5 유지·기능OFF 상태를 기록하며 이번 AWS 실측은 아니다. 별도 보존·격리는 설계 승인 필요, 원인/소유권 조사는 읽기 범위로 구분한다.
+- 잔여 조건/CURRENT_STATE 갱신. 제품 코드·DB/index/TTL·서버·봉인·배포·commit/push 변경 없음. 사용자 dirty 보존, 문서 공백 검사 수행. Gradle 미실행.
+
+## 2026-10-18 — 미연결19건 소유권 읽기 조사
+
+- TMI-193/TMI-217. 사용자 추가조사 승인으로 운영 exact host/DB snapshot 읽기 후 abort. 최초 제한환경 실행 실패 후 허용 실행 성공. 식별자/원문/URI 미출력, 임시 검사기는 집계만 반환한다.
+- 결과4건은 canonical UUID1개에 귀속되며 개발고정계정 아님. 해당 소유자의 다른 활성 Session/guard 존재, MERGED guard/삭제operation 없음. Job15건 직접owner 없음,4건만 결과와 examId 연결. 나머지11건 소유불명. 관련target/operation/receipt0, createdAt 모두 없어 경과기간 판정불가.
+- 부모 삭제 원인/시각은 미확정. 기존 자료만으로 삭제/부모복원/격리 예외 승인 불가. 백업/감사 자료 대조 필요성을 기록했다. DB/인덱스/서버/봉인/배포 변경 없음. 문서 diff 검사, 제품코드 불변으로 Gradle 미실행.
+
+## 2026-10-18 — 미연결 자료 소유권 조사 턴 기록 보완
+
+<!-- codex-turn:01a14d5e-c919-7bd3-bf90-0dde8945ff02 -->
+
+- TMI-193/TMI-217. 운영 미연결19건 읽기 조사 완료. 결과4건은 동일 소유정보가 있고 해당 사용자의 다른 활성 시험이 존재한다. Job4건은 결과와 연결되지만11건은 소유불명이며, 생성시각과 부모 삭제 원인은 확인되지 않았다.
+- CURRENT_STATE 갱신. 자료 보존과 안전 차단 유지, 후속은 백업/감사 근거 대조다. DB/서버/배포 변경 없음. Secret/Token/개별 식별자 미기록.
+
+## 2026-10-18 — 미연결 자료의 8월23일 이전 여부 질문
+
+- TMI-193/TMI-217. 기존 조사 증거를 확인했다.19건 모두 createdAt 부재로 현재 증거만으로8월23일 이전 생성인지 확정할 수 없다. 다른 시각 필드/백업의 해당 날짜 대조는 수행하지 않았으며 오래된 자료라고 추정하지 않는다. DB/서버 변경 없음.
+
+## 2026-10-18 — 생성 날짜 확인 턴 기록 보완
+
+<!-- codex-turn:01a14d60-5221-73c3-a3d8-79bac3cd45bd -->
+
+- TMI-193/TMI-217. 기존 조사 기록을 대조해 미연결19건의8월23일 이전 여부는 미확정이라고 안내했다. createdAt 부재를 오래된 자료라는 증거로 해석하지 않는다.
+- CURRENT_STATE 최신 상태 갱신. 추가 DB 조회·수정·서버 변경 없음. Secret/Token 미기록.
+
+## 2026-10-18 — 미연결19건 삭제 가능성 검토
+
+- TMI-193/TMI-217. 사용자 삭제 가능성 질문은 실행 승인과 구분했다.19건은 Session19개가 아니라 결과4건/Job15건이며 정상 사용자 소유정보와 PROCESSING 작업이 포함돼 무해함을 보장할 수 없다.
+- 위험 수용 시 복구 가능한 제한 보관, exact 대상/부모 부재/진행 작업 재확인, 별도 명시 승인 후 대상 한정 삭제와 재검증을 권고한다. 개인정보 포함 백업의 위치·접근·보존도 정해야 하며 이번에 백업/삭제/DB변경은 수행하지 않았다. 삭제만으로 운영 전환 준비가 완료되지는 않는다.
+
+## 2026-10-18 — 미연결 자료 삭제 검토 턴 기록 보완
+
+<!-- codex-turn:01a14d61-24fc-75a2-9ee9-3bc3ea1797c3 -->
+
+- TMI-193/TMI-217. 미연결 결과4건·채점Job15건의 삭제 가능성에 대해 위험과 복구용 제한 보관·정확 대상 재확인·명시 승인 필요성을 안내했다. 삭제 가능성 질문을 실제 삭제 승인으로 해석하지 않았다.
+- CURRENT_STATE 갱신. 자료 백업/삭제·DB/서버 변경 없음. Secret/Token/개별 식별자 미기록.
+
+## 2026-10-18 — 삭제 사전 대상·처리 시각 재확인
+
+- TMI-193/TMI-217. 사용자 후속 요청으로 exact 운영 대상 읽기 snapshot 재확인. 결과4/Job15, PROCESSING11/COMPLETED4 유지. 추가 집계에서9월2일 발신·완료 기록 확인; 생성 시각이나 최초 접수로 해석하지 않는다.
+- 실제 작업 실행 부재와 복구용 사본 위치/접근/보존기간 미확정. 새 시각 근거를 사용자에게 안내하고 실제 백업/삭제를 보류했다. DB/서버/인덱스 변경 없음. 식별자/학습원문/Secret/Token 미출력. 관련 문서/CURRENT_STATE 갱신.
+
+## 2026-10-18 — 삭제 사전 확인 턴 기록 보완
+
+<!-- codex-turn:01a14d61-bdd2-7e93-be08-c71de559bc06 -->
+
+- TMI-193/TMI-217. 미연결19건의 사전 읽기 재확인에서9월2일 발신·완료 기록을 확인했다. 생성일이나 최초 접수 증거로 해석하지 않는다.
+- 로컬 접근 제한 폴더의 복구용 사본7일 보관안을 사용자에게 제안했으며 승인 대기다. 실제 작업 실행 부재 확인도 미완료다. 백업/삭제/DB/서버 변경 없음. CURRENT_STATE 갱신, Secret/Token 미기록.
+
+## 2026-10-18 — 승인된 미연결19건 복구 사본 생성
+
+- TMI-193/TMI-217. 사용자7일 제한 보관 승인 후 snapshot 읽기로 결과4건/Job15건·부모2개 부재 재확인, DB Transaction abort 후 로컬 사본 저장. DB 쓰기 없음.
+- 경로 `/private/tmp/lc-orphan-recovery-20261018.aEX15O/recovery.ejson`, 폴더0700/파일0600, EJSON 재읽기 건수19 및 SHA256 `069ae26945e62e65a23b99926acfc0d41babdcaa5505ec29b915a6615fbe8893` 검증. 같은 폴더 manifest.json에 기록했다. 원문/식별자/Secret/Token 미출력. 사본은 개인정보를 포함할 수 있어 저장소에 편입하지 않는다.
+- 생성2026-10-18T05:02:28.224Z,7일 보관 검토시각2026-10-25T05:02:28.224Z. 자동 폐기 작업은 설치하지 않았다. 임시 경로는 OS 정리 대상이므로 영속 백업으로 보장하지 않는다.
+- 로컬 Callback은 부모 부재를 거절하나 운영 실행 revision/AI 실행 작업 부재는 미확인. 삭제는 보류, DB/서버 불변. 운영 작업 상태 접근 확인 필요. CURRENT_STATE 갱신.
+
+## 2026-10-18 — 복구 사본 생성 턴 기록 보완
+
+<!-- codex-turn:01a14d63-1749-7972-8545-c9449f5aed72 -->
+
+- TMI-193/TMI-217. 승인된 미연결19건의 로컬 복구 사본 생성 및 건수·해시·제한 접근 권한 검증을 완료했다.7일 보관 검토 시각을 기록했으며 자동폐기는 설치하지 않았다.
+- 운영 AI 작업의 실제 실행 부재는 미확인으로 삭제 보류 상태다. CURRENT_STATE 갱신. DB/서버 변경 없음, Secret/Token/개별 식별자 미기록.
+
+## 2026-10-18 — 명시 승인된 운영 미연결19건 삭제
+
+<!-- codex-turn:01a14d65-825a-7582-ab3f-3801861c69cb -->
+
+- TMI-193/TMI-217. 사용자 「아냐 그냥 지워줘」로 AI 실행 조회 중단 및 기존 대상 삭제를 명시 승인했다. AI 실행 부재를 검증했다고 주장하지 않는다.
+- 기존0700/0600 사본 SHA256 검증, exact 운영 host/DB, 사본 전체 문서와 현행 BSON 일치, 부모2개 부재를 snapshot Transaction에서 확인했다. 최초 비교는 commit 전 중단; EJSON 원래 숫자타입 보존 읽기로 수정 후 전체 비교 통과. 중단 시 DB 변경 없음.
+- 단일 majority commit으로 exam_results4건·question_grading_jobs15건 삭제. 완료2026-10-18T05:05:43.044Z. 후속 읽기에서 대상 잔여 각각0, 두 컬렉션 orphan 각각0. 다른 Session/결제/컬렉션을 삭제하지 않았다. 사본 폴더의 deletion-result.json에 비식별 결과 저장.
+- 복구 사본 `/private/tmp/lc-orphan-recovery-20261018.aEX15O/recovery.ejson` 보존.7일 보관 검토/자동폐기 미설치·임시경로 한계는 기존 기록대로다. 복원은 별도 승인·충돌 검사 필요. 인덱스/TTL/rollout/봉인/서버/배포 변경 없음. 문서 diff 검사, Secret/Token/원문/개별ID 미기록.
+
+## 2026-10-18 — 삭제 후 전체 준비 재검사·인덱스 범위 정리
+
+- TMI-193/TMI-217. 운영 exact 대상 읽기 검사에서 전체 orphan0/owner불일치0/활성삭제중복0/index충돌0/전달TTL위반0 확인. 다중 조회는 고정 snapshot 아님.
+- 표준명세24개(non-TTL21 중 선택집계1 포함/TTL3)+별도전달index1 미설치, rollout/v1 부재. writer drain/승인근거 없이 적용하지 않았다. 신규 TTL3개를 앞선 생성/outbox TTL 승인으로 확대하지 않는다.
+- Node 준비도구11개 통과. 잔여조건/CURRENT_STATE 갱신 및 diff 검사. 이번 DDL/DB쓰기/서버중단/봉인/배포/commit/push 없음, Secret/Token 미출력.
+
+## 2026-10-18 — 삭제 후 준비 재검사 턴 기록 보완
+
+<!-- codex-turn:01a14d67-a9ab-70c3-87a7-5042e8f2174f -->
+
+- TMI-193/TMI-217. 삭제 후 전체 준비 검사에서 미연결 자료·소유자 불일치·활성 삭제 중복·인덱스 충돌·전달 TTL 위반 모두0건을 확인했다. 준비 도구 테스트11개 통과.
+- 표준 인덱스24개와 별도 전달 인덱스1개 미설치, rollout/v1 부재 상태를 기록했다. writer 배출 및 TTL 포함 설치 승인 전 적용하지 않았다. CURRENT_STATE 갱신. 이번 DB쓰기/서버 변경 없음, Secret/Token 미기록.
+
+## 2026-10-18 — 인덱스 적용 전 운영 writer 상태 조회
+
+- TMI-193/TMI-217. 사용자 후속 요청 후 로컬 AWS 인증 부재 확인, 기존 LC 전용 CloudShell 터미널에서 describe_services 읽기 수행. LC prod:8 desired1/running1/pending0·PRIMARY COMPLETED·서비스8080 확인. 다른 작업 터미널에는 명령을 보내지 않았다.
+- 기존 준비 도구의 drained writers 조건과 전환 체크리스트를 대조했다. 설치 승인 요청을 시험 제출/조회/Callback까지 포함한 전체 서비스 중단 승인으로 확대하지 않는다. 실제 제한·배출 방식 승인 전 DDL/rollout 변경 없음.
+- CURRENT_STATE 갱신, 문서 diff 검사. 서버 중단/배포/봉인/DB 변경 없음. Secret/Token 미출력.
+
+## 2026-10-18 — 인덱스 적용 전 운영 조회 턴 기록 보완
+
+<!-- codex-turn:01a14d68-9d81-7251-b4bd-d3291205aa44 -->
+
+- TMI-193/TMI-217. LC 운영 prod:8 desired1/running1/pending0·8080 상태를 읽기 확인했다. writer 배출 근거가 없어 인덱스 적용은 미실행이다.
+- 제출/조회/Callback에 영향을 주는 LC 일시 중단·배출 확인·TTL 포함 인덱스 설치·기존 버전 재개 범위의 승인을 요청했다. 승인 대기이며 실제 서버 중단/DB 변경/봉인/배포는 하지 않았다. CURRENT_STATE 갱신, Secret/Token 미기록.
+
+## 2026-10-18 — 인덱스 설치와 최종 봉인 동시 진행 검토
+
+<!-- codex-turn:01a14d6b-d204-7412-a515-54fdb5711669 -->
+
+- TMI-116/TMI-193/TMI-217/TMI-220. 사용자 동시 봉인 가능 여부 질문에 기존 전환 절차를 대조했다. 동일 writer 배출 구간에서 설치·재검사·봉인을 묶을 수 있으나, 봉인 후 구 writer 생성 재개는 금지다. 기존 prod:8 재개를 전제로 한 인덱스 단독 작업과 구분한다.
+- 신규 공존 코드/봉인 설정·Billing 연결·검증·실패 시 생성 제한 유지 계획을 사전 확정한 전환으로 묶는 방향을 권고했다. 이번 질문은 중단/봉인/배포 실행 승인으로 간주하지 않았다. 문서만 갱신, DB/서버 변경 없음. Secret/Token 미기록.
+
+## 2026-10-18 — 동시 봉인 검토 턴 기록 보완
+
+<!-- codex-turn:01a14d6b-9880-7b63-a03f-d5925393d1b3 -->
+
+- TMI-116/TMI-193/TMI-217/TMI-220. 인덱스 설치와 최종 봉인은 같은 쓰기 배출 구간으로 묶을 수 있으나, 봉인 후 기존 prod:8의 구 writer 생성 재개는 허용하지 않는다고 안내했다. 신규 공존 코드·설정·Billing 연결 준비 후 통합 전환이 필요하다.
+- CURRENT_STATE 갱신. 실제 서버 중단/인덱스 설치/봉인/배포는 수행하지 않았다. Secret/Token 미기록.
+
+## 2026-10-18 — 인덱스·봉인 통합 전환 사전 조건 대조
+
+<!-- codex-turn:01a14d6c-5bec-70f0-839d-29d65b2f0e68 -->
+
+- TMI-116/TMI-193/TMI-217/TMI-220. LC task 초안과 Billing 최신 prod-lc-receiver8443 인계서를 읽었다. Billing prod6/8443 연결·거절검증 진전을 반영하되 ALL_BLOCKED·업무/삭제 미활성·정상서명 미검증과 구분했다. 이번 Billing AWS 독립 재조회 없음.
+- LC 삭제 기동검증의 rollout/storage/writer/delivery 근거와 최종task 미완료 조건을 대조하고 통합 준비 문서를 작성했다. 기존 prod8 재개형 인덱스 단독 작업과 봉인 후 신코드 전환을 구분했다.
+- 준비 완료 전에 서버를 내리지 않았다. DB/인덱스/봉인/서버/배포/Billing 수정/외부전송/commit/push 없음. CURRENT_STATE 갱신, 문서 diff 검사. Secret/Token 미기록.
+
+## 2026-10-18 — 통합 전환 준비 검토 턴 기록 보완
+
+<!-- codex-turn:01a14d6c-505e-7973-b3cb-a32302d09faf -->
+
+- TMI-116/TMI-193/TMI-217/TMI-220. 최신 Billing 인계서의 prod:6/8443/TLS 준비와 아직 남은 업무 활성화·삭제 수신·정상서명 검증을 구분했다. LC 삭제 준비 근거와 최종 배포 설정을 포함한 통합 전환 사전 조건을 문서화했다.
+- CURRENT_STATE 갱신. 실제 서버 중단/인덱스 설치/봉인/배포/DB 변경 없음. Secret/Token 미기록.
+
+## 2026-10-18 — LC 삭제 설정 overlay와 전환 근거 구체화
+
+<!-- codex-turn:01a14d6f-fb24-7c81-9ad5-eb08d561e1b9 -->
+
+- TMI-116/TMI-193/TMI-217/TMI-220. application.yml/DeletionActivationBarrier/DeletionStartupValidator/BillingDeletionConfiguration과 저장소 모의 테스트를 대조했다. 삭제6개ON/aggregateOFF 조건부 환경표를 로컬 task 초안에 추가하고 등록불가 상태·봉인 미기입을 유지했다.
+- rollout5개 근거를 분리하고 storage 검증에 S3/Redis·답안학습 원격 purge가 포함됨을 명시했다. 로컬 코드/모의 테스트를 운영 권한 검증으로 확대하지 않는다. Billing 업무/삭제 readiness 회신 요청문을 작성하되 전송하지 않았다.
+- startup 변환 Node8개 통과, JSON·실제 설정명·봉인 gate 및 diff 검사 통과. 제품 코드 변경 없어 Gradle 미실행. CURRENT_STATE 갱신. 서버/DB/DDL/봉인/배포/Billing수정/외부전송/commit/push 없음. Secret/Token 미기록.
+
+## 2026-10-18 — LC 배포안 보완 턴 기록 보완
+
+<!-- codex-turn:01a14d6d-c1b0-7a10-9692-1e0772bb605d -->
+
+- TMI-116/TMI-193/TMI-217/TMI-220. 삭제6개ON/집계OFF 조건부 설정과 운영 검증 근거를 정리했다. 시작 명령 테스트8개 및 설정명/JSON 검사를 통과했다. 등록불가 상태와 봉인값 미기입을 유지한다.
+- Billing 회신 요청문은 미전송이며 운영 저장소·업무/삭제 수신 검증은 잔여다. CURRENT_STATE 갱신. 실제 서버/DB/봉인/배포 변경 없음. Secret/Token 미기록.
+
+## 2026-10-18 — Billing 통합 전환 회신 접수
+
+<!-- codex-turn:01a14d72-cfe4-7ef1-881a-e4f6e9b93e3b -->
+
+- TMI-116/TMI-193/TMI-217/TMI-220. 사용자 전달 Billing-LC-combined-cutover-readiness-response-2026-10-18.md 전체를 읽었다. OPEN과 Identity/attribution·독립 유입 제한 조건, 삭제 exact route/JWT/204저장·환불 발신OFF 경계를 통합 계획에 반영했다.
+- LC billingDeliveryVerified 선행기동과 정상 전달 검증의 순환을 확인했다. 별도 사전검증 절차·승인 fixture/Session·증거 저장 방식이 필요하며 값을 임의true로 만들지 않는다. 검증 절차 정의·선행 근거 확보를 다음 작업으로 기록했다.
+- CURRENT_STATE 갱신 및 문서 diff 검사. 제품코드/DB/AWS/중단/봉인/배포/Billing·Identity수정/외부답신 없음. Secret/Token 미기록.
+
+## 2026-10-18 — 전체 중단 전환의 단순화 범위 설명
+
+- TMI-116/TMI-193/TMI-217/TMI-220. 전체 LC 중단은 경로별 유입 통제보다 운영 절차를 단순화할 수 있으나 기존 작업 배출 확인은 필요하다. LC 중단만으로 Billing 공개 purchase-account 유입이나 Identity 준비·삭제204 증거가 해결되지는 않는다.
+- 사용자 발언은 방식 검토로 해석했으며 실제 중단하지 않았다. 전체 중단 방식을 선택하되 새 서버 기동/삭제 사전검증 실행안 확정 후 시작하도록 권고한다.30분 완료를 보장하지 않으며 봉인 후 구 writer 재개 금지를 유지한다. CURRENT_STATE 갱신, 서버/DB 불변.
+
+## 2026-10-18 — 전체 중단 방식 검토 턴 기록 보완
+
+<!-- codex-turn:01a14d74-a03e-7d72-b27a-6e0c0399e7b6 -->
+
+- TMI-116/TMI-193/TMI-217/TMI-220. 전체 LC 중단은 유입 통제를 단순화하지만 Billing 공개 유입·Identity 준비·새 서버 기동·삭제 전달 검증 조건을 대체하지 않는다고 안내했다. 실행 준비 확정 후 중단하는 순서를 권고했으며30분 완료는 보장하지 않았다.
+- CURRENT_STATE 갱신. 실제 중단/배포/봉인/DB 변경 없음. Secret/Token 미기록.
+
+## 2026-10-18 — 기존 앱 구매 유입 전제 확인
+
+- TMI-116/TMI-217. 사용자가 기존 앱에서는 구매 요청이 오지 않는다고 확인했다. 기존 앱 정상 흐름의 구매 유입을 전환 지연의 확정 사유로 다루지 않는다. 직접호출/신앱/검증요청 가능성과 서버 차단 보장은 별개이며, 이 발언을 공개 경로 차단 요구 폐기나 Billing OPEN 승인으로 확대하지 않는다.
+- 구매계정 보강과 실제 결제는 구분한다. 새 서버 기동·Identity/MEMBER·삭제 전달 검증은 여전히 필요하다. CURRENT_STATE 갱신, 서버/DB/설정 변경 없음. Secret/Token 미기록.
+
+## 2026-10-18 — 기존 앱 구매 유입 확인 턴 기록 보완
+
+<!-- codex-turn:01a14d75-ae2a-7870-ad28-edc3225cd316 -->
+
+- TMI-116/TMI-217. 기존 앱 정상 흐름에서 구매 요청이 없다는 사용자 확인을 반영했다. 직접 API 호출 가능성과 서버 차단 보장은 별개이며 Billing OPEN이나 차단 정책 변경 승인으로 확대하지 않았다.
+- 새 서버 기동·시험 생성·삭제 연동 준비는 잔여다. CURRENT_STATE 갱신. 서버/DB/설정 변경 없음. Secret/Token 미기록.
+
+## 2026-10-18 — LC 삭제 설정·전달 복구 로컬 재검증
+
+<!-- codex-turn:01a14d76-5adb-7e6e-94f9-d003410433b5 -->
+
+- TMI-193/TMI-217. 삭제 패키지 단위7개 클래스58개 실행, XML상 실패/오류/skip0. DeletionFlowMongoTest·DeletionWiringMongoTest는 테스트 코드의 MongoDBContainer만 사용하는 것을 확인하고 실행했다.
+- 초기 Gradle 권한 및 Docker29 API 호환 실패 후 기존 기록의 실행 전용 JAVA_TOOL_OPTIONS=-Dapi.version=1.44로 재실행, BUILD SUCCESSFUL. 전역 설정은 변경하지 않았다. 운영 Billing204가 아닌 모의응답/격리Mongo 저장 검증으로 구분한다.
+- CURRENT_STATE/통합 준비 문서 갱신. 제품코드/운영DB/서버/봉인/배포/commit/push 변경 없음. Secret/Token 미기록.
+
+## 2026-10-18 — LC 삭제 재검증 턴 기록 보완
+
+<!-- codex-turn:01a14d76-5c44-7390-ba35-91a0833735cd -->
+
+- TMI-193/TMI-217. 삭제 단위 테스트58개 및 격리 Mongo 테스트25개(Flow18/Wiring7) 통과, 실패/오류/skip0을 확인했다. 모의 Billing 응답 기반 검증이며 운영 인증·실제204 전달·저장소 권한 검증과 구분한다.
+- CURRENT_STATE 갱신. 제품코드/운영DB/서버/봉인/배포 변경 없음. Secret/Token 미기록.
+
+## 2026-10-18 — 운영 전환 잔여 작업 요약
+
+- TMI-116/TMI-193/TMI-217/TMI-220. 최신 기록을 대조해 완료(19건 정리/정합성/로컬 테스트)와 잔여(운영 저장소 권한·삭제 사전검증 순환 해소·Identity/Billing OPEN 조건·최종task·실제 중단/설치/봉인/배포/공동검증)를 구분해 안내했다.
+- 추가 로컬 테스트 반복이 아닌 운영 사전검증 절차 및 배포본 완성이 다음 작업이다. 이번은 상태 설명이며 AWS/DB 재조회·변경 없음. CURRENT_STATE 갱신, Secret/Token 미기록.
+
+## 2026-10-18 — 운영 전환 잔여 요약 턴 기록 보완
+
+<!-- codex-turn:01a14d78-d4fa-7b80-ba39-9524f839af5d -->
+
+- TMI-116/TMI-193/TMI-217/TMI-220. 완료된 자료 정리·정합성 검사·로컬 검증과 남은 운영 저장소 권한/최종 배포 설정·Billing 업무 준비·삭제 사전검증 절차·통합 전환을 구분해 안내했다.
+- CURRENT_STATE 갱신. 이번은 기존 기록 기반 상태 설명으로 AWS/DB 재조회·변경, 중단/봉인/배포 없음. Secret/Token 미기록.
+
+## 2026-10-18 — 운영 저장소 역할·설정 읽기 점검
+
+- TMI-193/TMI-217. LC 전용 CloudShell에서 prod8 task/role·설정 존재 여부, S3 versioning·IAM inline/attached 및 정책 시뮬레이션을 읽었다. 실제 role은 GetObject/PutObject만 Allow, 삭제 경로의 bucket 조회/삭제 액션은 시뮬레이션 implicitDeny. 버킷은 unversioned다. 시뮬레이션을 실효권한/삭제 실검증으로 확대하지 않는다.
+- 시험bucket/Redis 설정은 있으나 답안학습 bucket/Lambda 환경·Secret 참조/JSON 관련 설정 없음. 제품 코드의 원격purge 의존성을 대조해 최소 권한/설정 보완안을 기록했다. 운영 sender 분리검증은 기동gate 우회 없이 별도 공동 절차가 필요하다.
+- 새 저장소 점검 문서 및 CURRENT_STATE 갱신. 파일원문/목록/Secret/Token 미출력. IAM/DB/서버/삭제/봉인/배포 변경 없음. 문서 diff 검사.
+
+## 2026-10-18 — 운영 저장소 점검 턴 기록 및 후속 승인
+
+<!-- codex-turn:01a14d79-ffd3-72c1-a4d5-daf90b20dd70 -->
+
+- TMI-193/TMI-217. 운영 저장소 읽기 점검 결과와 미완료 조건을 기록했다. 사용자 후속 「어」를 LC 운영 task 역할의 시험 버킷 GetBucketVersioning, temp/ 제한 ListBucket 및 temp/* DeleteObject 추가 승인으로 접수했다. 실제 파일 삭제·배포·버전삭제 권한은 승인 범위가 아니다.
+- CURRENT_STATE 갱신. 이 기록 시점은 적용 전이며 exact 역할/버킷 재대조 후 결과를 별도 기록한다. Secret/Token 미기록.
+
+## 2026-10-18 — 승인된 운영 S3 삭제 준비 권한 적용
+
+- TMI-193/TMI-217. 사용자 후속 승인으로 LC prod:8 task role/시험bucket 동일성을 재확인하고 ProductionDeletionS3 inline정책을 추가했다. bucket GetBucketVersioning/temp prefix ListBucket/temp object DeleteObject만 허용. 기존 ProductionRuntimeS3 전체 문서 readback 동일, 신규정책 exact 일치 확인.
+- 역할 시뮬레이션에서 versioning/list_temp/delete_temp allowed, list_outside/delete_outside/delete_version implicitDeny 확인. 실제 object는 생성/삭제하지 않았다. 증빙 /private/tmp/lc-prod-s3-deletion-permission-20261018.png.
+- IAM 변경은 실행 중 역할에도 효력이 있으며 배포가 필요한 것으로 오해하지 않는다. DB/서비스/봉인/배포 불변. storageVerified 전체 통과는 아님. 저장소 준비 문서/CURRENT_STATE 갱신, diff 검사. Secret/Token 미기록.
+
+## 2026-10-18 — 운영 전환 필수 확인과 후속 검증 구분
+
+<!-- codex-turn:01a14d80-3a81-7250-8c89-da70ae8fe8b4 -->
+
+- TMI-116/TMI-193/TMI-217/TMI-220. 사용자 검증 범위 과다 지적에 대해 이미 통과한 코드 테스트 반복과 전환 필수 확인·전체 시나리오 검증을 혼합한 안내를 정정했다. 테스트는 당시 시험 목록 0건 및 삭제 기반 설정이 준비된 상태였고, 운영은 기존 시험 보존과 미비 인덱스·권한 준비가 필요함을 기존 기록 기준으로 설명했다.
+- 후속은 미충족 기동 조건 해결 후 생성 중단·인덱스/목록 봉인, 배포/TLS 연결, 서버·구앱·Billing 연결 확인으로 구분한다. 전체 삭제/환불 시나리오 검증을 매번 반복하지 않으며 필수 gate를 증거 없이 통과 처리하지 않는다.
+- 이번은 설명 및 작업 기록 갱신만 수행했다. 코드/실DB/AWS/서비스/봉인/배포 변경 및 추가 테스트 실행 없음. Secret/Token 미기록.
+
+## 2026-10-18 — 바로 다음 운영 준비 작업 안내
+
+- TMI-193/TMI-217. 저장소 준비 및 잔여 gate 문서를 읽어 S3 권한 추가 완료와 storageVerified/삭제 전달 준비 미완료를 구분했다. 바로 다음 작업은 중단이 아니라 삭제 연동 준비의 실제 적용 범위·남은 설정 및 제한된 204 저장 확인 절차를 마무리하는 것이다.
+- 이후 최종 task 확정 및 중단/인덱스/봉인/배포 순서를 안내한다. 기존 통과 테스트 재실행, AWS/DB 조회·변경, 실제 삭제·중단·배포는 수행하지 않았다. Secret/Token 미기록.
+
+## 2026-10-18 — 다음 작업 안내 턴 기록 확인
+
+<!-- codex-turn:01a14d82-7c23-7212-b7c9-1d0956bbad25 -->
+
+- TMI-193/TMI-217. 중단 전 삭제 저장소 준비·Billing 204 저장 확인 절차·최종 배포 설정을 마무리하고 이후 통합 전환하도록 안내했다. 위 안내는 기존 문서 근거이며 실제 운영 준비 완료나 실환경 재검증을 뜻하지 않는다.
+- CURRENT_STATE 최신 안내 기록 갱신. 코드/DB/AWS/중단/봉인/배포 변경 및 테스트 재실행 없음. Secret/Token 미기록.
+
+## 2026-10-18 — 중단 전 삭제 준비 범위 실측 및 배포 초안 보완
+
+- TMI-193/TMI-217. 사용자 「해줘」로 저장소/삭제 사전검증/최종 설정 준비를 진행했다. 운영 exact host/DB를 검사하는 읽기 전용 임시 스크립트로 learning_submissions/learning_completions/learning_record_deletion_targets 각0건을 확인했다(05:37:59 UTC). sandbox 연결 실패 후 승인된 확장 실행에서 성공, 식별자·원문·URI 출력 없음.
+- Lambda client/삭제 storage 코드상 실제 submission 삭제 때만 원격purge가 필요하다. 적용 시 빈 inventory와 effective writer OFF를 확인·유지하는 조건으로 답안학습 신규 인프라를 전환 필수에서 제외할 수 있음을 문서화했다. storageVerified는 여전히 미확정이다.
+- Billing 최신 회신 §7 및 sender를 대조했다. 일반 tick은 전체 대기 target에서 선택하므로 사전검증에 사용할 수 없다. 승인된 실제 Session과 exact-target 전용 도구가 없어 real204/ACK 검증은 미실행이다. Billing 업무/OPEN/route 준비도 별도이며 임의 gate 승인은 하지 않았다.
+- 저장소 문서·task 초안·CURRENT_STATE 갱신. JSON/문서 공백 검사 수행. 제품 코드/외부 API·AWS/DB 쓰기/서버중단/봉인/배포/commit/push 변경 없음. 기존 dirty 및 사용자 DS_Store 보존. 기존 통과 테스트는 코드 변경 없어 재실행하지 않았다.
+
+## 2026-10-18 — 삭제 준비 실측 턴 기록 완료
+
+<!-- codex-turn:01a14d83-6e77-7fc1-8541-9e7a7b11d282 -->
+
+- TMI-193/TMI-217. 운영 답안학습 제출·완료와 삭제 target 각각0건 확인 및 조건부 준비 범위 축소를 기록했다. effective writer OFF 재확인, 지정 대상 한정 도구·승인 검증자료·실제204/ACK 증거는 미완료다.
+- task 초안 JSON 파싱과 기록 diff 검사 통과. CURRENT_STATE 갱신. 실제 운영 쓰기/삭제/중단/배포 없음. Secret/Token 미기록.
+
+## 2026-10-18 — 지정 대상 삭제 사전검증 도구 구현
+
+<!-- codex-turn:01a14d85-d211-7a82-a6be-dd998fd9def8 -->
+
+- TMI-193/TMI-217. 사용자 후속 「어 해줘」로 exact target 한정 도구를 구현했다. BillingDeletionSender에 target/user/event/digest·EXAM/sealed/prepared/무TTL exact 검증을 추가하고 기존 발신·Transaction·lease·retry·ACK를 재사용한다. 기존 전체tick 동작은 보존한다. 전용 경로는 기존 ACTIVE owner 증거를 요구하며 없으면 새로 만들지 않는다.
+- 별도 DeletionDeliveryPreflight main은 기본 inspect·명시 승인/drain 확인 시 send-once, exact prod host/DB/HTTPS origin, primary/majority readback 및 고정 결과코드만 사용한다. Spring 앱/scheduler/target 생성/원문 정리를 실행하지 않으며 기존 storage/index/drain 검사와 전달 무TTL 검사를 재사용한다. billingDeliveryVerified를 쓰거나 앱기동 gate를 완화하지 않는다.
+- 일반 단위 `clean test` 및 최종 `test` 성공:1402통과/기존 imported-content1skip/실패·오류0. 격리 Mongo Flow/Wiring33개 통과(skip0), 새 한정 선택/응답유실/owner부재/lease·격리/unknown commit/환경·version 충돌 사례 포함. 모의 Billing이며 실환경204 증거 아님. Gradle sandbox 캐시 거절 후 승인된 로컬 실행, Docker API 옵션은 해당 프로세스만 적용.
+- 사용자 확인으로 전용 계정은 후속 지정, 이번은 도구 준비까지만 수행한다. 기존 후보이미지에는 새 도구 미포함이며 정상 생성·삭제target 준비 경로/실행 승인은 미완료다. 운영 조회/쓰기/요청/삭제/봉인/배포/키변경/commit/push/Jira 수정 없음.
+- 변경: sender/config·별도main·단위 및 Mongo테스트·새 도구문서·task 초안 상태·CURRENT_STATE. 공개 API/DTO·AI/S3/Redis/Billing wire 불변. 기존 dirty/사용자 DS_Store 보존, 예상 밖 변경 없음. JSON 및 diff 검사 통과. Secret/Token 미기록.
+
+## 2026-10-18 — 프론트 검증과 배포 순서 안내 정정
+
+- TMI-193/TMI-217. 사용자 지적에 따라 실제 생성·삭제 E2E는 서버 배포 및 프론트 실행 이후 가능함을 인정하고, 모든 E2E를 배포 전 완료 조건으로 제시한 안내를 정정했다. 이미 통과한 테스트 반복이나 운영 도구 검증을 추가 필수 절차로 강제하지 않는다.
+- 배포 전 설정/키/인덱스/기존 데이터 준비와 배포 후 제한된 프론트 검증을 분리하는 방향을 설명한다. 현재 billingDeliveryVerified 기동 의존성·정상 target 준비 순환은 실제 코드/계약 조정 대상이며 이번 설명은 gate 우회/임의 true/배포 승인이 아니다.
+- CURRENT_STATE 갱신. 제품 코드·운영 환경·DB·기능설정·배포 변경 및 테스트 재실행 없음. Secret/Token 미기록.
+
+## 2026-10-18 — 배포 후 프론트 검증 순서 정정 기록 완료
+
+<!-- codex-turn:01a14d8c-4e9c-7731-a2cd-8fa2d0085ee3 -->
+
+- TMI-193/TMI-217. 실제 프론트 생성·제출·삭제 확인은 배포 후 수행하며 배포 전 설정/인덱스/데이터 준비와 구분한다고 안내했다. 한정 검증 도구는 보조 수단이다. 현재 삭제 전달 검증의 기동 의존성은 후속 조정 필요이며 미검증 값을 승인 처리하지 않는다.
+- CURRENT_STATE 갱신. 이번은 설명/문서 기록만 수행했으며 코드·실DB·서버·배포 변경 없음. Secret/Token 미기록.
+
+## 2026-10-18 — 테스트 검증 재사용 및 운영 배포 후 확인 방향
+
+<!-- codex-turn:01a14d8d-100e-7531-8e4e-08bf649077d7 -->
+
+- TMI-116/TMI-193/TMI-217. 사용자는 테스트 서버에서 확인한 업무 동작을 재검증하는 대신 빠른 운영 배포 후 프론트 확인을 요청했다. 배포 전 업무 E2E를 반복 요구한 안내를 정정하고 운영 연결 설정·필수 인덱스·기존 시험 봉인·기동 조건에 사전 준비를 한정한다.
+- 한정 사전검증 도구를 필수 경로로 강제하지 않는다. 테스트 검증과 운영 E2E 증거는 구분하며 현재 삭제 전달 기동 의존성은 후속 수정 대상이다. 미검증 운영 결과를 verified=true로 기록하거나 모든 준비가 완료됐다고 주장하지 않았다.
+- CURRENT_STATE 갱신. 이번은 설명과 작업 기록만 수행했으며 코드/운영DB/AWS/기능설정/배포/테스트 재실행 없음. Secret/Token 미기록.
+
+## 2026-10-18 — 배포 후 프론트 확인을 위한 기동 조건 조정·전달 착수
+
+<!-- codex-turn:01a14d8d-e399-7630-99c6-414dc0214706 -->
+
+- TMI-193/TMI-217. 사용자 「어 해서 빨리 좀 해줘」로 billingDeliveryVerified를 배포 전 기동 필수에서 제거했다. 기존 서명/HTTPS·worker/fence·인덱스/무TTL 및 DeletionStartupValidator 의존은 유지한다. 증거 값을 자동 true로 쓰지 않는다. 한정 도구는 선택적이며 배포 후 프론트 검증을 진행한다.
+- clean test1402통과/기존1skip/실패0, 기동 Mongo13통과(skip0), bootJar 성공. 신규 테스트는 verified 누락/false/true 모두 비변경, 전달 인덱스·무TTL·서명/worker/fence 미충족 거절을 확인했다. 모의 HTTPS origin/격리 Mongo 사용, 실운영 업무 검증 아님.
+- JAR SHA256 3cde8dd70f2656df001d4aede6e04038a8da9a24036efb85f50490ad48ae0968. 기존 LC 후보에 새 JAR만 교체한 로컬 amd64 이미지 lc-prod-frontcheck:20261018 빌드 성공. 다른 이미지/파일 보존.
+- LC 전용 CloudShell 네 번째 세션에서 LC prod8 running1/pending0 및 전달공간 읽기 확인. 새 JAR 업로드 착수, 이 기록 시점은 원격 build/push/봉인/배포 전이다. 다른 Codex 세션 미조작. Secret/Token 미기록. 후속 결과는 추가 기록한다.
+
+- 후속 운영 적용: ECR prod-frontcheck-3cde8dd 전달 및 원격 digest `sha256:02e658f3ad7b878b9889f47941c3a6faba341216de8cd6b2a2877078a5fa0c4b` 확인. LC prod8 desired/running/pending0 및 RUNNING 태스크0으로 drain 확인 후 삭제 인덱스 설치(missing/conflicts0, 승인 TTL3개·delivery index)와 readiness 저장. billingDeliveryVerified=false 유지, storageVerified는 테스트 검증·운영 설정/IAM 준비 근거이며 실운영 삭제 검증은 POST_DEPLOY다.
+- 봉인 컬렉션 부재로 inspect가 중단됐다. 자동 승인 검토의 생성 거절 후 사용자에게 명시 승인받아 두 컬렉션만 생성했다. revision `lc-prod-legacy-20261018`, count1748, SHA256 `1f9db0dd6496ee4b028e413ef70a9a52db254beca715d4e89b4fcaedd440cc1a`로 SEALED_VERIFIED. 기존 시험 원문 변경 없음. 봉인 후 prod8 재기동 금지.
+- prod10 등록: 새 이미지·봉인값·전용 Secret 참조·기존8080 보존. 사용자 요청대로 BILLING_LEGACY_EXAM_CREATE_ENABLED=true, v2 paid saga=true. 최초8444 연결은 TG의 ALB 미연결로 거절되어 기존8080으로 먼저 기동했다. 별도 사용자 승인 후 ALB78번 exact host/path/POST/NAT /32 전달 추가, 기존79번404 보존, 서비스8080+8444 연결 성공. 앱/ALB 기동 상태 확인 중이며 실제 프론트 업무 검증 미실행. commit/push 없음.
+- 최종 실측: prod10 running1/pending0, 등록 이미지digest 일치·v1무료true/v2paidtrue·봉인count1748 readback. 앱 Tomcat8080/8444 Started, 공개헬스200 UP, ALB8080/8444 healthy, 외부 환불POST404 확인. 이전 타깃 draining 및 ECS 이전deployment 정리는 진행 중이며 rollout COMPLETED 관측은 아님. 실제 사용자 시험생성/삭제/환불E2E는 프론트 후속 확인. 새 LC_PRODUCTION_DEPLOYMENT_2026-10-18.md와 task자료/CURRENT_STATE 갱신. JSON/diff 검사 통과. 비밀값/원문 사용자ID 미기록.
+
+## 2026-10-18 — 운영 전환 이후 LC 잔여 범위 확인
+
+- TMI-116/TMI-193/TMI-217/TMI-220. 배포 기록·현재 Git 상태를 확인했다. 승인된 LC 기능 구현/운영 설정은 적용됐으며 검증 외에는 배포 변경의 commit/push·소스 이력 정리와 심사/강제업데이트 후 구앱 무료 생성 OFF가 남는다. 후자는 지금 수행할 작업이 아니며 별도 승인 대상이다.
+- 실제 프론트 업무·서명 환불/삭제 ACK·이전 deployment drain 완료는 검증 범위로 구분한다. 이번 AWS 재조회/변경·코드 수정·commit/push·테스트 재실행 없음. CURRENT_STATE 갱신, 기존 dirty/DS_Store 보존.
+
+## 2026-10-18 — LC 잔여 범위 확인 기록 완료
+
+<!-- codex-turn:01a14da3-fdf6-7a60-9877-fabc5371e225 -->
+
+- TMI-116/TMI-193/TMI-217/TMI-220. 이번 턴은 운영 배포 기록과 Git 상태를 근거로 LC 잔여 범위를 안내했다. 실제 연동 검증 외에는 배포 변경의 소스 이력 정리, 향후 심사/강제업데이트 후 구앱 생성 OFF가 남는다.
+- CURRENT_STATE 최신 잔여 범위 기록 갱신 완료. 제품 코드·AWS·DB 변경이나 commit/push 없음. Secret/Token 미기록.
+
+## 2026-10-18 — 운영 OFF 설정 범위 안내
+
+<!-- codex-turn:01a14dab-ca4e-7f20-ac40-459d4ac1ce5c -->
+
+- TMI-116/TMI-193/TMI-217/TMI-220. prod10 배포 기록과 설정 원문을 대조했다. 시험/Billing 관련 승인 필수 기능과 구앱 생성은 ON이며 답안학습 writer/grading 및 삭제 aggregate는 의도적 OFF로 유지했다. test activation 승인=false는 운영에서 정상이다. billingDeliveryVerified=false는 기능 스위치가 아닌 미실행 검증 증거다.
+- 이번은 배포 당시 근거 기반 안내이며 AWS 현재값 재조회/설정 변경·테스트 실행 없음. Billing 측 발신 활성화 상태는 LC ON만으로 단정하지 않는다. CURRENT_STATE 갱신, Secret/Token 미기록.
+
+## 2026-10-18 — 답안학습·집계 OFF 의미 설명
+
+- TMI-193/TMI-217. LearningController/Service 및 LearningActivityRecorder/DeletionConfiguration을 확인했다. 답안학습은 /api/v1/learning의 단원·레슨·녹음 제출/채점/완료 기능이며 일반 시험 경로와 별개다. aggregate는 삭제 건수만이 아니라 시험/문항/요약/챌린지 활동의 익명 일별 카운터다. 앞선 “삭제 관련 통계” 표현을 구체화했다.
+- 해당 학습 화면을 이번 출시에서 사용한다면 OFF는 기능 미제공이므로 별도 준비가 필요함을 안내한다. 설정/코드/실DB 변경 없음. CURRENT_STATE 갱신, Secret/Token 미기록.
+
+## 2026-10-18 — OFF 기능 설명 턴 기록 완료
+
+<!-- codex-turn:01a14dad-7594-7b41-a6d9-8df791f1cbab -->
+
+- TMI-193/TMI-217. 답안학습은 단원/레슨의 별도 녹음 제출·채점 기능, aggregate는 익명 일별 학습 활동 통계임을 코드로 확인해 안내했다. 일반 시험 채점 및 삭제 기능과 구분했다.
+- CURRENT_STATE 반영 완료. 이번 설명으로 기능을 활성화하지 않았으며 코드/운영DB/AWS 변경 없음. Secret/Token 미기록.
+
+## 2026-10-18 — 두 선택 기능 OFF 유지 영향 확인
+
+<!-- codex-turn:01a14dae-6aa3-7fa2-a8fc-2603f2a4327b -->
+
+- TMI-193/TMI-217. 별도 단원/레슨 답안학습 화면을 지금 제공하지 않는 전제에서 두 기능 OFF는 현재 모의고사·채점·Billing·삭제 흐름을 막지 않는다고 안내했다. OFF 기간의 별도 일별 집계는 쌓이지 않는 비용을 구분했다.
+- 설명/기록만 수행. 코드·운영 설정·DB 변경 없음. Secret/Token 미기록.
+
+## 2026-10-18 — 운영 AI Callback 500 알림 조사
+
+<!-- codex-turn:01a14dbd-07e0-7330-be6e-efa2eac576c1 -->
+
+- TMI-193/TMI-217 관련 경로. 사용자 지정 메일과 Sentry TO-TEACHER-LEARNING-CORE-8(issue7798380883)를 읽었다. 15:25:20 KST prod 발생1건, global_exception_advice HTTP500, DataIntegrityViolationException의 원인은 MongoCommandException. receiveAiResult→updateFeedbackResultWithGuard→AttemptGroupStateCoordinator.reconcile→UserOwnershipGuardService.touchActive:47 경로다.
+- 코드상 결과저장/문항완료 처리 후 별도 상태 동기화 Transaction에서 owner guard revision 증가 중 실패했다. 결과 자체 유실로 단정하지 않는다. 동시에 갱신되는 guard의 쓰기 충돌 가능성이 있지만 Sentry 원인 메시지/DB 오류코드가 없어 확정하지 못했다. 해당 경로는 DuplicateKey/OptimisticLock 예외만 별도 처리한다.
+- 별도 답안학습/집계 OFF와 다른 일반 시험 Callback 오류다. 로그/DB로 원인코드·결과 및 상태 수렴 확인 필요. 이번 제품코드·설정·DB 수정/배포 없음. Secret/Token 미기록.
+
+## 2026-10-18 — 오류 발생과 서버 중단 시각 구분
+
+- TMI-193/TMI-217 관련. 사용자는 중단 당시 오류로 이해했으나 배포 기록의 공개헬스 회복은15:09 KST, Sentry 발생은15:25:20 KST다. 기록상 재기동 후 약16분 뒤이며 중단 자체로 설명된다고 단정하지 않았다. 지연 Callback 연관성도 미확정이다. 추가 실환경 조회/변경 없음.
+
+## 2026-10-18 — 오류 시각 안내 기록 완료
+
+<!-- codex-turn:01a14dbe-be00-78c2-873c-7217c3b6b5fb -->
+
+- TMI-193/TMI-217. 서버 정상 응답 회복과 Callback500 발생 시각을 구분해 안내했다. 서버 중단 또는 지연 Callback이 원인이라는 결론은 미확정으로 유지한다.
+- CURRENT_STATE 갱신 완료. 이번 추가 코드·운영 설정·DB 변경 없음. Secret/Token 미기록.
+
+## 2026-10-18 — Callback 오류 후 완료 상태 실측
+
+- TMI-193/TMI-217 관련. LC 전용 CloudShell에서 해당 요청의 CloudWatch 로그와 운영 DB의 해당 시험 상태를 읽기 전용 확인했다. 시험 생성15:13:50, 마지막 문항 접수15:24:38, 문항완료15:25:20.596, Callback50015:25:20.910, 요약완료15:25:31.421, 시험COMPLETED15:25:31.469(KST). 문항 결과1개 존재, owner guard ACTIVE, Billing group 연결 없는 시험이다. 사용자/시험 식별자·답안 원문은 기록하지 않는다.
+- 문항·요약 dispatchAttempt=1이며 조회 범위에서 재시도 성공 증거는 없다. 결과 저장 후 후속 상태 조정에서500이 났으나 별도 요약 흐름은 정상 완료한 것으로 확인했다. 재기동 뒤 생성·제출한 시험이므로 중단 중 밀린 기존 시험이라는 설명은 근거와 맞지 않는다. Mongo 상세 오류코드는 로그에도 없어 쓰기충돌은 가설로 유지한다.
+- 현재 prod10 running1/pending0, ECS rollout COMPLETED 확인. 코드/DB/AWS 설정 수정 없음. Secret/Token 미기록.
+
+## 2026-10-18 — Callback 완료 확인 턴 기록 완료
+
+<!-- codex-turn:01a14dbf-5ca0-7a53-a6ff-3372919cbf66 -->
+
+- TMI-193/TMI-217 관련. 운영 로그·해당 시험 DB 읽기 결과 문항 저장과 요약/시험 완료를 확인했다. 재시도 성공의 증거는 없으며 상세 Mongo 오류 원인은 미확정으로 유지한다.
+- CURRENT_STATE에 조사 결과 반영 완료. 이번 조사에서 제품 코드·운영 설정·DB 변경 없음. Secret/Token 미기록.
+
+## 2026-10-18 — 21시 알림 미수신 조사
+
+<!-- codex-turn:01a14ee9-8a71-7f10-9170-2d014ec997f5 -->
+
+- TMI-198. 코드와 운영 DB를 읽기 전용 확인했다. 발송 시간은 KST21:00 이상21:15 미만이며 MEMBER/권한AUTHORIZED/유효기기·당일전체제출 제외 등의 조건이 있다. 21:08경 오늘 delivery는 FAILED1건, notification_control의 fcm-circuit.authBlocked=true, 활성 MEMBER/AUTHORIZED 기기는11건이다. 성공 발송 기록은 조회 결과에 없다.
+- FCM 인증 실패 분류가 영속 발송 차단을 설정하는 코드와 일치한다. 실제 provider 상세 오류코드/원문을 저장하지 않으므로 키·권한·프로젝트 불일치 등 세부 원인은 미확정이다. authBlocked 해제나 재발송은 수행하지 않았다. 앞서 조사한 시험 계정은 당일제출 및 기기등록0건이지만 현재 문의 계정과 같다고 단정하지 않는다.
+- CURRENT_STATE 갱신. 토큰/사용자 식별자·답안 미출력, 코드/운영 설정/DB 수정 없음.
+
+## 2026-10-18 — 21시 알림 인증 실패 후속 확인
+
+<!-- codex-turn:01a14eeb-3a45-73f3-8462-3c1b828de907 -->
+
+- TMI-198. 운영 DB 읽기에서 오늘 실패는21:00:00.730 KST 시도 후21:00:01.230 종료된 iOS/AUTHORIZED/MEMBER 활성 기기1건임을 확인했다. provider 상세 오류는 보존되지 않는다. 과거10/13~15 ACCEPTED,10/16 FAILED 이력이 있어 오늘 중단만의 문제로 단정하지 않는다.
+- ECS prod:10의 알림 sending-enabled=true/dry-run=false/project-id=to-teacher-firebase 확인. Firebase API V1 활성이나 운영 iOS 앱 com.toteacher.app의 개발/프로덕션 APNs 인증키와 인증서 모두 미등록 확인. APNs 준비 누락은 확인 사실이며 오늘 실패와의 직접 연결은 provider 상세 부재로 유력 가설로 구분한다.
+- 코드401/403 전역 authBlocked 분류와 영속 차단을 확인했다. 설정 OFF/스케줄 미실행이 아니라 발송 실패 뒤 차단 상태다. 실제 키 등록·차단 해제·재발송·코드/DB/배포 변경 없이 진단과 CURRENT_STATE만 갱신했다. 비밀값·토큰은 기록하지 않았다.
+
+## 2026-10-18 — APNs 등록 사용자 인계 준비
+
+- TMI-198. 사용자 후속 진행 요청으로 Firebase 운영 iOS com.toteacher.app의 프로덕션 APNs 키 업로드 대화상자를 열었다. .p8/Key ID/Team ID 입력·등록은 인증 자격증명 변경이므로 사용자 직접 수행으로 인계한다. 비밀값을 채팅에 요청하거나 읽지 않았다.
+- 인증 정상 확인 전 전역 발송 차단은 해제하지 않았다. 실제 등록/재발송/DB/코드/배포 변경 없음. CURRENT_STATE 갱신, 기존 dirty 변경 보존.
+
+### APNs 등록 인계 종료 기록
+
+<!-- codex-turn:01a14eee-fcc5-7643-af4d-ad781f016af8 -->
+
+- TMI-198. Firebase 운영 iOS APNs 등록 화면 준비 및 사용자 직접 업로드 인계 완료. 키 등록 완료 회신 대기이며 인증 검증과 발송 차단 해제는 미실행이다. Secret/Token 미기록, 운영 DB·배포 변경 없음.
+
+## 2026-10-18 — Apple APNs 키 다운로드 경로 안내
+
+<!-- codex-turn:01a14ef0-22b0-79e3-a47a-cb89a450fa32 -->
+
+- TMI-198. Apple Developer의 Certificates, Identifiers & Profiles > Keys에서 APNs 사용 키 생성 및 일회성 .p8 다운로드 경로를 안내했다. 기존 파일 우선 확인, 기존 키 임의 폐기 금지, Key ID/Team ID 구분과 사용자 직접 등록을 설명했다.
+- 실제 Apple 키 생성/다운로드/폐기, Firebase 등록, 발송 차단 해제는 수행하지 않았다. Secret/Token 미기록.
+
+## 2026-10-18 — APNs 다운로드 요청 및 Apple 키 목록 확인
+
+- TMI-198. 사용자 다운로드 요청으로 Apple Developer 현재 팀 Keys 목록을 확인했다. Apple 로그인용 키1개만 있으며 APNs 키가 없어 다운로드를 수행할 수 없다. 기존 로그인 키는 그대로 보존했다.
+- 신규 APNs 키 생성 화면까지만 열어 사용자 직접 발급으로 인계했다. 자격증명 생성/입력/등록·다운로드·Firebase 변경·차단 해제는 미실행. CURRENT_STATE 갱신, Secret/Token 미기록.
+
+## 2026-10-18 — APNs 신규 발급 요청 인계
+
+<!-- codex-turn:01a14ef1-d061-7e73-84f9-5bbd0f1d128e -->
+
+- TMI-198. 사용자 신규 생성 요청을 확인했다. 인증 자격증명 발급은 사용자 직접 수행이 필요한 경계이므로 Apple의 열린 신규 키 화면에서 APNs 선택 및 운영용 설정 후 등록하도록 안내한다.
+- 키 생성·다운로드·폐기, Firebase 업로드, 운영 발송 차단 해제는 수행하지 않았다. 현재 사용자 발급 완료 대기이며 기존 Apple 로그인 키 및 운영 상태를 보존했다. Secret/Token 미기록.
+
+## 2026-10-18 — APNs Team ID 위치 안내
+
+<!-- codex-turn:01a14ef4-966a-7ed0-9f23-74d44e6db2bc -->
+
+- TMI-198. 앞서 직접 확인한 Apple Developer 현재 팀 화면 상단의 Team ID 위치와 값을 사용자에게 안내했다. Key ID와 Team ID를 구분하고 키를 발급한 동일 팀의 값을 사용하도록 설명했다.
+- 인증키/Token을 읽거나 기록하지 않았으며 Firebase 등록·차단 해제·DB/배포 변경 없음. 등록 완료 여부는 아직 미확인이다.
+
+## 2026-10-18 — APNs 등록 후 환경 확인
+
+- TMI-198. 사용자 등록 완료 회신 후 Firebase 확인 결과 개발 APNs 칸에만 키가 등록됐고 프로덕션 칸은 비어 있다. Apple 키 상세의 Sandbox & Production 지원을 확인해 동일 파일의 프로덕션 추가 등록을 안내했다.
+- 프로덕션 업로드 대화상자를 열었으며 실제 자격증명 입력/업로드는 사용자 직접 수행 대기다. 인증 검증·발송 차단 해제·재발송은 수행하지 않았다. Secret/Token 미기록.
+
+### APNs 환경 확인 종료 기록
+
+<!-- codex-turn:01a14ef5-61c8-7d81-8ba8-8cb50438bccd -->
+
+- TMI-198. Firebase 개발용 등록 및 프로덕션 미등록 확인 후, 양 환경 지원 기존 키의 프로덕션 등록을 사용자에게 인계했다. 현재 등록 완료 회신 대기이며 인증 검증·발송 차단 해제·재발송은 미실행이다. Secret/Token 미기록.
+
+## 2026-10-18 — APNs 양 환경 등록 확인 및 발송 차단 해제
+
+<!-- codex-turn:01a14ef6-9d10-7650-90f6-84b5980d510d -->
+
+- TMI-198. 사용자 완료 회신 후 Firebase 운영 iOS 앱의 개발/프로덕션 APNs 키 등록을 모두 화면에서 확인했다. APNs 미등록은 해소됐으나 이전 실패 상세코드 미보존으로 직접 원인은 여전히 추정이며 실제 provider/단말 수신 성공은 미검증이다.
+- 기존 복구 진행 승인에 따라 발송 시간대 밖임을 검사하고 운영 DB notification_control의 fcm-circuit 한 건을 authBlocked=true 조건으로 false로 변경했다. majority write 결과 matched1/modified1, 재조회 authBlocked=false/pausedUntil=null 확인. 실패 delivery·기기·다른 문서 및 설정은 변경하지 않았으며 강제 재발송 없음.
+- 제품 코드·배포 변경 없음. Secret/Token 미기록. 다음 정규 발송 또는 별도로 지정한 검증 기기의 실제 수신 확인이 남는다.
+
+### 알림 복구 결과 인계 종료 기록
+
+<!-- codex-turn:01a14ef8-ec34-78e0-8e1c-761beb3a9a94 -->
+
+- TMI-198. APNs 양 환경 등록 확인과 운영 발송 차단 해제 결과를 인계했다. authBlocked=false/pausedUntil=null 재조회 결과는 직전 실행 근거이며 이번 종료 기록에서 추가 운영 변경은 없다.
+- 실패 기록 보존 및 강제 재발송 미실행을 안내했다. 실제 단말 수신 성공은 미검증이며 다음 정규 발송은 2026-10-19 21:00 KST다. Secret/Token 미기록.
+
+## 2026-10-18 — 강제 재발송 대상 확인
+
+- TMI-198. 사용자 강제 재발송 요청을 받았으나 본인 기기 검증/오늘 실패 기기/오늘 미수신 적격 대상 전체 중 발송 범위가 명시되지 않아 대상을 확인한다. 실제 푸시 전송·실패 기록 삭제·시간 제한 변경은 수행하지 않았다. Secret/Token 미기록.
+
+## 2026-10-18 — 본인 수신 확인 및 승인된 적격 기기 전체 일회성 발송
+
+<!-- codex-turn:01a14efa-3a0f-7ff1-8cf8-a94e323d367f -->
+
+- TMI-198. 사용자 지정 계정의 Firebase→Identity→LC 연결을 읽기 확인해 활성/AUTHORIZED Android 기기1대를 식별했다. Firebase 콘솔 단일 기기 테스트를1회 전송했고 사용자가 실제 수신을 확인했다. 콘솔 테스트는 LC 정규 sender 검증과 구분하며 전체 캠페인은 게시하지 않았다.
+- 이어 사용자 승인으로 오늘 정규 알림을 받지 못한 현재 적격 기기를 계산했다. 기존 eligible 기준(active/MEMBER/AUTHORIZED/30일 permission/owner/withdrawal/suppression/삭제 activeGuard/당일 전체 제출)을 적용하고 기존 ACCEPTED·SENDING·UNKNOWN 등 FAILED 외 기록은 제외했다. 대상11대(iOS8/Android3), 기존 실패1건이다.
+- 운영 서비스가 참조하는 FCM 인증으로 OAuth200 확인 후, 별도 일회성 sender에서 기존 알림 문구/type/route 및 최대900초 TTL·22시 이전 만료를 사용했다. 전송 전 동일 owner/device Transaction fence 및 현재 적격성 재확인, notification_control의 날짜/설치별 MANUAL_DAILY_REMINDER 중복 방지 기록을 저장했다. claim120초 초과 건은 미발송, 자동 재시도·redirect 금지 및 인증/불명 오류 시 나머지 발신 중지 규칙을 적용했다. 기존 정규 시간 제한 코드는 수정하지 않았다.
+- 결과11건 모두 FCM HTTP200 ACCEPTED. 일회성 기록11건을 majority로 ACCEPTED 저장하고 재조회11건 확인. 기존 daily_exam_reminder_deliveries FAILED1건은 그대로 보존했다. 이는 provider 수락 증거이며 전체 단말 화면 표시 증거는 아니다. 이번 발신은 서버와 동일 인증을 사용한 일회성 도구이며 배포된 scheduler 자체 E2E와 구분한다.
+- 단일/묶음 임시 토큰 파일 제거 및 CloudShell 비밀값 변수 정리 완료. 제품 코드·배포/IAM/키 변경 없음. scripts 구문 검사 통과, Secret/Token/전화번호/사용자 식별자 원문은 기록하지 않았다. 다른 사용자/다른 Codex 터미널은 변경하지 않았다.
+
+## 2026-10-19 — AI LangSmith 키 재배포 미반영 문의 및 확인 대기
+
+<!-- codex-turn:01a151cd-640b-73d0-95a9-04a71dbb64e0 -->
+<!-- codex-turn:01a151cd-7873-7c83-ab70-9c65f3a62fb4 -->
+
+- 사용자 문의: AI의 LangSmith 키를 Secret에서 변경하고 재배포했으나 반영되지 않는 상황이다. 중단된 요청과 후속 종료 기록 식별자를 함께 연결한다.
+- 안내/확인 대기: test/prod 대상 환경과 기존 키 사용 지속 또는 추적 중단 중 어떤 증상인지 질문했다. LANGSMITH_API_KEY/LANGCHAIN_API_KEY 참조 차이, Secret ARN/필드/버전 차이, 새 태스크 시작 여부, 별도 worker의 갱신 여부를 가능한 원인으로 안내했다. 후보일 뿐 실제 배포 구조나 장애 원인을 확인한 것은 아니다.
+- 수행 경계: AWS/AI 코드·배포 설정·로그·Secret 값을 조회하지 않았고 키 변경·서비스 재배포·운영 변경·테스트 실행은 하지 않았다. 관련 Jira는 미확인이다. 키 원문을 보내지 않도록 안내했으며 Secret/Token은 기록하지 않았다.
+- 변경/검증: WORKLOG 끝에 이번 항목을 append하고 CURRENT_STATE에 확인 대기 상태를 반영했다. 과거 기록과 제품 코드는 보존하며 문서 diff whitespace 및 두 식별자의 단일 존재를 확인한다. 다음 단계는 사용자 환경/증상 확인 후 필요한 읽기 전용 진단이다.
+
+## 2026-10-19 — 지정 ECS 서비스3개 정리 사전 점검
+
+<!-- codex-turn:01a151d3-e9d0-7090-bd6b-55cec62f180c -->
+
+- 요청: 사용자는 테스트10초 챌린지 AI가 불필요하며 지정한 구 AI/Identity 서비스도 더 이상 제공하지 않으면 내릴 수 있는지 검토한다. 이번에는 확정된 삭제/중지 명령으로 확대하지 않고 읽기 전용 점검과 권장 순서를 안내한다.
+- 실제 콘솔 확인: 서울 tosunsaeng-staging-cluster에서 tosunsaeng-ai-learning-test-service는 tosunsaeng-ai-learning-test:3·desired/running1/1, tosunsaeng-ai-service는 tosunsaeng-ai:17·1/1, tosunsaeng-identity-service는 tosunsaeng-identity:23·0/0이었다. 구 Identity는 이미 태스크가 내려간 상태다. 서비스가 활성 표시여도 태스크가 실행 중이라는 뜻은 아니다.
+- 클러스터 확인: 동일 클러스터에 ai-learning-prod, ai-prod, identity-prod/test, learning-core-prod/test 등 별도 서비스가 실행 중이다. staging이라는 클러스터 이름만으로 운영 미사용을 판단하거나 클러스터 전체를 정리하면 안 된다. 목록에 구 learning-core-service도0/0이지만 사용자 지정 정리 대상에 추가하지 않았다.
+- 로컬 근거: docs/codex/deployment/AI_LEARNING_TEST_BOOTSTRAP_STATUS.md는 TMI-126 테스트 챌린지 AI의 API/worker 동일 태스크·ai-test 도메인·전용 target group과 공유 Redis의 별도 namespace를 기록한다. 과거 bootstrap 상태를 현재 의존성/queue/LC 기능 상태의 증거로 간주하지 않는다. 로컬 AWS CLI profile 목록은 비어 있어 실제 상태는 로그인된 AWS 콘솔로 확인했다.
+- 권장/미확인: 테스트 챌린지 사용 중지에 맞춰 LC test의 신규 호출·기능 노출과 진행 작업을 정리한 뒤 AI Learning test를 desired0으로 내리는 것을 우선 권장한다. 구 AI는 LC test/prod의 현재 AI endpoint·Service Connect/Cloud Map·대기 작업·배포/자동 확장 참조 확인 후 desired0으로 내려 관찰하는 편이 삭제보다 복구하기 쉽다. 구 Identity는 ALB/DNS/JWKS/자동 배포 참조 정리 확인 후 서비스 삭제를 검토할 수 있으나 이미0이라 현재 태스크 실행 비용 추가 절감은 없다. 공유 ALB/Redis/DB/Secret/IAM/클러스터 삭제는 범위 밖이다.
+- 변경/검증: CURRENT_STATE 갱신 및 WORKLOG EOF append만 수행했다. 콘솔 서비스 수·task revision·목록을 읽었으며 update/delete/scale·DB/Secret 조회·배포·제품 코드·Jira 변경은 없다. 관련 TMI-126은 배포 이력 배경이고 신규 정리 Jira는 없다. Secret/Token은 기록하지 않았다. 기존 사용자 dirty 변경을 보존하며 문서 whitespace와 지정 marker1회를 확인한다. runtime 미변경으로 테스트는 실행하지 않았고 문서 배포는 필요 없다.
+
+## 2026-10-19 — ECS 서비스 정리 권고 인계
+
+<!-- codex-turn:01a151d9-90d9-7193-8955-635a1e1fc76b -->
+
+- 앞선 읽기 전용 콘솔 조사 결과를 사용자에게 인계했다. AI Learning test와 구 AI는 각각 실행1개, 구 Identity는 이미0개라는 확인 사실과 의존성 미확인을 구분했다. 이번 턴에는 AWS를 다시 조회하지 않았다.
+- 권장 계획: 테스트 챌린지 신규 호출/진행 작업 정리 및 구 AI의 현재 소비자 확인 후 실행 수0으로 전환하고 관찰한 뒤 삭제 검토. 자동 확장/배포 재기동과 Identity 잔여 라우팅 참조 확인이 남는다. 공유 클러스터/ALB/Redis/DB/Secret은 정리 범위에서 제외한다.
+- TMI-126은 과거 AI Learning 배포 참고 이력이며 신규 Jira 변경 없음. 중지/삭제/배포/제품 코드 변경 및 테스트 실행 없음. WORKLOG append와 CURRENT_STATE 인계 상태 갱신만 수행했으며 Secret/Token을 기록하지 않았다.
+
+## 2026-10-19 — Apple 3.0.0 심사 거절 사유 확인
+
+<!-- codex-turn:01a151e1-322f-7933-9a96-f6020145df3d -->
+
+- 신규 Jira 없음. 사용자 지정 App Store Connect 심사 페이지와 Apple 첨부 Screenshot-1019-094820.png를 읽기 확인했다. 3.0.0(13)은 Guideline 2.3.10 Accurate Metadata로 거절되었으며 Apple은 앱 binary의 Google Play 언급 제거를 요청했다.
+- 첨부 이용권 화면 하단에 ‘결제와 환불은 App Store · Google Play 정책을 따라요.’가 실제 노출된다. iOS에서는 App Store만, Android에서는 Google Play만 표시하도록 플랫폼 분기 후 새 빌드 제출을 권고한다. 이번 사유는 서버/결제 실패 증거가 아니며 이용권5개는 심사 준비됨 상태다.
+- Apple은 버그 수정 제출이면 회신으로 이번 승인 요청·다음 업데이트 수정이 가능하다고 안내했다. 승인 보장은 아니며 메시지 전송/재제출/코드·설정·배포 변경은 수행하지 않았다. 문서만 갱신, 제품 테스트 생략, diff check 수행. Secret/Token 기록 없음.
+
+## 2026-10-19 — 지정 ECS 서비스 의존성·정리 조건 확인
+
+<!-- codex-turn:01a151de-0da5-7483-8114-5ece37090e7c -->
+
+- TMI-126 과거 배포 이력 참고, 신규 Jira 없음. 사용자 확인 요청에 따라 AWS ECS 태스크 설정/Service Connect·ALB rule·Application Auto Scaling 및 GitHub AI/Identity workflow를 읽기 조사했다. 구 AI1/1, AI Learning test1/1, 구 Identity0/0 재확인.
+- LC prod:10 AI_SERVER_URL은 tosunsaeng-ai-prod:8000, test:45는127.0.0.1:9. test 챌린지는 ON이며 ai-test endpoint를 참조한다. 구 AI와 prod AI는 Redis DB1을 공유하나 eval_agent/eval_agent-prod 큐와 job prefix가 분리된다. 지정 AI2개 scalable target 없음, 구 Identity scaling 모두 suspended, scheduled actions 없음.
+- staging Identity ALB rule은 구 target group에 남고 test/prod는 별도 target group이다. 운영 JWT issuer 문자열 staging과 JWKS prod를 구분하며 issuer를 임의 변경하지 않는다. AI main 수동 workflow는 구 AI 대상, Identity main retired이나 원격 develop에는 과거 main 분기가 남아 있다.
+- 실제 큐 대기/진행 건수·모든 외부 소비자·EventBridge 등 별도 자동화는 미검증이다. 신규 챌린지 차단 및 drain 후 실행0→관찰→삭제를 권장하되 변경은 실행하지 않았다. Secret/Token 조회·기록, 서비스 scale/delete/update, DB 쓰기, 배포/commit/push 없음.
+- ECS_SERVICE_CLEANUP_CHECK_2026-10-19.md에 계층형 근거·사실/계획/추론/미확인 분리 기록, CURRENT_STATE 갱신, WORKLOG EOF append. 제품 테스트 생략, 문서 diff check 및 marker1회 확인. 기존 사용자와 다른 작업의 변경 보존.
+
+## 2026-10-19 — 사용자 지정 AI 서비스 중지
+
+<!-- codex-turn:01a151e6-3642-7972-a965-0a476a524af1 -->
+
+- TMI-126은 테스트 챌린지 배포 참고 이력, 신규 Jira 없음. 사용자 테스트 챌린지 요청 미전송 방침 및 후속 「그냥 내려줘」에 따라 서울 tosunsaeng-staging-cluster의 tosunsaeng-ai-learning-test-service와 tosunsaeng-ai-service만 update_service(desiredCount=0) 실행했다. 두 요청 모두 desired0 응답 확인.
+- 재조회 결과 지정 AI2개와 기존 tosunsaeng-identity-service 모두 desired/running/pending0/0/0. 운영 ai-prod/ai-learning-prod/learning-core-prod/identity-prod는 각각1/1/0이었다. 기능 E2E 검증이나 큐 drain 완료 증거로 해석하지 않는다.
+- 비용 설명: Fargate 태스크 종료 후 해당 실행 CPU/메모리 과금 중단, 실행0 ECS 서비스 객체 자체 비용 없음. 공유 ALB/Redis/NAT 및 보관 로그/이미지 등 비용은 별도다. 서비스 객체 영구삭제·공유 리소스/DB/Secret 삭제·workflow 변경·LC test 챌린지 OFF는 수행하지 않았다. 큐 대기/진행 건수는 미검증이며 과거 작업 완료 보장 없음.
+- 변경: AWS 지정2개 desiredCount만 변경, CURRENT_STATE 최신화 및 WORKLOG EOF append. 제품 코드/commit/push 없음, Secret/Token 조회·기록 없음. 문서 diff check 및 marker 단일 존재 확인, 제품 테스트 생략.
+- 최종 검증: 테스트 AI의 DEACTIVATING→DEPROVISIONING 종료 절차를 기다리고 두 AI 태스크 모두 lastStatus/desiredStatus=STOPPED/STOPPED 확인. 강제 종료·ALB 대기 설정 변경 없음. 증빙 화면 /private/tmp/ecs-services-stopped-20261019.png 저장.
+
+## 2026-10-19 — AI 중지 결과 인계 종료 기록
+
+<!-- codex-turn:01a151e7-9cb1-7fa3-9358-d4805ea0978e -->
+
+- TMI-126 과거 배포 참고 이력, 신규 Jira 없음. 직전 AWS 검증의 테스트 챌린지 AI와 구 AI 태스크 STOPPED/STOPPED 및 구 Identity 실행0 결과를 사용자에게 안내했다. 이번 기록에서 AWS를 추가 조회하거나 변경하지 않았다.
+- 서비스 정의는 보존했으며 공유 ALB/Redis/NAT·로그/이미지 등의 비용은 태스크 실행 비용과 별도임을 안내했다. 큐 drain 완료 및 기능 E2E 검증을 주장하지 않는다.
+- WORKLOG EOF append 및 CURRENT_STATE 인계 상태 갱신만 수행. Secret/Token 미기록, 제품 코드·배포·commit/push 없음. 문서 diff check와 현재 marker1회 확인.
+
+## 2026-10-19 — 배포 코드 커밋·푸시 및 Jira 현황 정리
+
+<!-- codex-turn:01a15254-d313-7f30-8c2f-4f86bfdad290 -->
+
+- 사용자 최근 코드 commit/push·Jira 정리 요청으로 후보 브랜치의 코드/스크립트 11개를 `4a7341a`로 커밋하고 원격 `codex/lc-production-candidate-20261018`에 푸시했다. 사용자 DS_Store 변경은 제외·보존했다.
+- 저장된 prod10 배포 JAR와 현재 소스 강제 재빌드 JAR SHA256 `3cde8dd70f2656df001d4aede6e04038a8da9a24036efb85f50490ad48ae0968` 일치. AWS 현재 상태 신규 조회는 하지 않았다. unit 1,403개 중1,402 통과/기존1skip, 삭제 Mongo3클래스39 통과, Node88 통과. 전체 Mongo suite/운영 삭제·환불 E2E 미실행.
+- TMI-193/198 설명 최신화 후 검토 중 전환. TMI-116 완료 유지·후속 계약 댓글, TMI-217/220 LC 결과 및 공동 검증 미완료 댓글. Billing 이슈 상태는 이번 작업에서 변경하지 않았다. FCM 수락과 실제 단말 수신/정규 scheduler 검증을 구분했다.
+- 운영 동기화 보고서 생성, preflight 현재 배포 포함 여부 정정, CURRENT_STATE 갱신. 과거 WORKLOG는 보존하며 기존 미커밋 운영 준비/배포 문서도 이력으로 함께 전달한다. 코드/문서 비밀값 패턴 검사 및 diff check 수행. 문서 커밋·동일 후보 브랜치 푸시 대상으로 준비했다.
+- main은 fetch 시89defb7, develop509fee0; Azure 동등 수정은 후보에 이미 포함. main/develop 머지·새 배포·DB/설정 변경은 하지 않았다. main 정리 시 자동 운영 배포 승인은 별도다. 상세는 LC_PRODUCTION_CODE_SYNC_2026-10-19.md.
+
+## 2026-10-19 — main 자동 배포 대상 정정 및 IAM 승인 대기
+
+- 관련 TMI-126. 사용자 main 반영 요청 후 main 자동 배포 유지/현재 prod 대상 수정을 명시 선택했다. 기존 select-target은 옛 learning-core-service/family와 api-staging 주소여서 prod-service/prod family/api-prod로 수정했다. 실제 prod 컨테이너 이름은 learning-core-test이므로 family와 분리해 유지했다. main push/수동 실행 gate 및 develop PR 자동배포 정책은 유지한다.
+- workflow gate 표시명만 실제 동작에 맞게 정정. Node 배포 테스트88 통과, diff check 통과. Java 제품 코드/공개 API/AI 계약 변경 없음으로 Gradle 재실행하지 않았다. 기존 DS_Store는 제외·보존한다.
+- GitHub 변수 AWS_ROLE_ARN은 tosunsaeng-github-learning-core-deploy-role. AWS IAM 콘솔에서 이 역할의 유일 inline Policy를 읽어 ecs Describe/Update 대상이 옛 LC service, PassRole이 옛 execution/task role임을 확인했다. ECR 대상은 현재 LC 저장소이며 task definition Describe/Register는 기존 Resource=*다. 로컬 AWS 인증은 없어 콘솔 읽기로 확인했고 Secret/Token은 조회하지 않았다.
+- IAM 변경은 미실행. prod service 및 prod execution/task role로 권한 대상을 교체할 별도 사용자 승인 전 main 머지·자동배포를 보류한다. PR 준비와 후보 브랜치 전달까지만 진행하며 현재 서버/DB/설정은 변경하지 않는다.
+
+<!-- codex-turn:01a1525d-c52c-7862-a23f-08490d27884a -->
+
+- 전달 결과: 코드/기록 `0d5aede` 후보 브랜치 push 완료, main 대상 PR #50 생성·현재 작업에 연결. PR 본문에 IAM 승인 전 머지 금지 명시. 운영 배포 미실행이며 다음 권한 교체 승인 필요. https://github.com/Too-Much-I/app-back-end-learning-core/pull/50
+
+## 2026-10-21 main 동기화 및 Mongo 진단 전달 후보
+
+- main574c9b9→develop9c46d81 병합, 기록 충돌 양쪽 보존. 기존 PR54 단어 검증 유지. MongoFailureDiagnostics와 HTTP/owner/notification retry 경계에 비민감 code/boolean/attempt/outcome 추가. API·재시도 정책·Sentry 정제 불변.
+- 사용자 develop PR 병합·테스트 후 main PR 병합 및 운영 배포 순서 승인. TMI-118/TMI-125/TMI-193 관련. 실제 진행 결과는 root 작업 기록에서 후속 확인하며 이번 후보만으로 배포 완료를 주장하지 않는다. Secret/Token 미기록.

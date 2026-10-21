@@ -5,9 +5,11 @@ set -euo pipefail
 case "${GITHUB_REF:-}" in
   refs/heads/main)
     target=prod
-    service=tosunsaeng-learning-core-service
-    family=tosunsaeng-learning-core
-    health=https://api-staging.to-teacher.com/actuator/health
+    service=tosunsaeng-learning-core-prod-service
+    family=tosunsaeng-learning-core-prod
+    # Existing prod task retains this historical container name; do not rename it.
+    container=tosunsaeng-learning-core-test
+    health=https://api-prod.to-teacher.com/actuator/health
     alias=prod
     tag="${GITHUB_SHA:-}"
     role="${MAIN_ROLE_ARN:-}"
@@ -20,6 +22,7 @@ case "${GITHUB_REF:-}" in
     target=test
     service=tosunsaeng-learning-core-test-service
     family=tosunsaeng-learning-core-test
+    container=tosunsaeng-learning-core-test
     health=https://api-test.to-teacher.com/actuator/health
     alias=test
     tag="test-${GITHUB_SHA:-}"
@@ -38,5 +41,5 @@ if [[ ! "$role" =~ ^arn:aws:iam::[0-9]{12}:role/[A-Za-z0-9_+=,.@/-]+$ ]]; then
 fi
 printf '%s\n' "DEPLOY_TARGET=$target" "ECS_SERVICE=$service" \
   "SPRING_DEPLOY_PROFILE=$target" \
-  "TASK_FAMILY=$family" "CONTAINER_NAME=$family" "HEALTH_URL=$health" \
+  "TASK_FAMILY=$family" "CONTAINER_NAME=$container" "HEALTH_URL=$health" \
   "IMAGE_ALIAS=$alias" "IMAGE_TAG=$tag" "AWS_DEPLOY_ROLE_ARN=$role"

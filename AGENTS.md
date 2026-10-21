@@ -1,5 +1,14 @@
 # 프로젝트 목적
 
+## 2026-10-21 main/develop 동기화·Mongo 진단 전달 승인 예외
+
+- 사용자는 이번 작업 한정 AGENTS 예외 추가 요청에 「어 해줘」로 승인했다. main→develop 동기화, 기존 PR54 단어·문장 정합성 검증 유지, 비민감 Mongo 오류·재시도 로그 보강의 커밋·푸시·PR 생성·develop/main PR 병합 및 기존 workflow의 테스트·운영 배포를 허용한다. 일반 Git 금지와 이전 과제의 배포 금지는 이번 전달 범위에서만 대체한다.
+- CI 및 테스트 서버 확인 후 운영으로 전달한다. 기존 API·재시도 정책·Sentry 개인정보 정제를 유지하며 Secret/Token/발화 원문을 기록하지 않는다. 별도 기능 활성화, 실DB 수정·삭제, IAM 권한 확대, Billing/Identity/웹 저장소 변경은 허용하지 않는다.
+
+## 2026-10-17 운영 기동 준비 코드 보완 승인
+
+- Billing 측 운영 호환 점검 후 사용자 「어 해줘」로 LC 운영 readiness 코드·격리 테스트 보완을 승인했다. test 승인과 분리된 production 승인 기본 OFF, prod→production 환경 매핑과 기존 sealed manifest/owner/index·JWT/TLS 검증을 유지한다. 아래 test-only 금지는 이 준비 코드 범위에서 대체하며 실제 prod 활성화·DB 설치·배포·commit/push는 수행하지 않는다.
+
 ## 2026-10-17 공존 R2 구현·test 전달 승인
 
 - 사용자 「브랜치 파서 하고 끝나면 커밋 푸시 하고 테스트 서버에 배포」로 공존 R2 코드·격리 테스트와 feat 브랜치 commit/push/PR/develop 머지·LC test 배포를 승인했다. main/prod·Billing/Identity·실DB/index/manifest 변경은 제외한다. 사용자 DS_Store는 전달하지 않는다.

@@ -136,6 +136,9 @@ public class GlobalExceptionAdvice extends ResponseEntityExceptionHandler {
         }
 
         reportUnexpectedException(e);
+        // HTTP does not own the retry loop; attempt=0 means unknown at this boundary.
+        MongoFailureDiagnostics.record(e, MongoFailureDiagnostics.Boundary.HTTP, 0,
+                MongoFailureDiagnostics.Outcome.PROPAGATED);
         log.error(
                 "HTTP 요청 처리 실패 event=http.request outcome=failed status={} errorCode={} "
                         + "method={} path={} errorType={}",

@@ -21,12 +21,13 @@ function values(result) {
     return [line.slice(0, i), line.slice(i + 1)];
   }));
 }
-test('main selects prod but preserves existing service, role and verified URL', () => {
+test('main selects current prod service and preserves its historical container name', () => {
   const env = values(select('refs/heads/main'));
-  assert.equal(env.ECS_SERVICE, 'tosunsaeng-learning-core-service');
-  assert.equal(env.TASK_FAMILY, 'tosunsaeng-learning-core');
-  assert.equal(env.CONTAINER_NAME, env.TASK_FAMILY);
-  assert.equal(env.HEALTH_URL, 'https://api-staging.to-teacher.com/actuator/health');
+  assert.equal(env.ECS_SERVICE, 'tosunsaeng-learning-core-prod-service');
+  assert.equal(env.TASK_FAMILY, 'tosunsaeng-learning-core-prod');
+  assert.equal(env.CONTAINER_NAME, 'tosunsaeng-learning-core-test');
+  assert.notEqual(env.CONTAINER_NAME, env.TASK_FAMILY);
+  assert.equal(env.HEALTH_URL, 'https://api-prod.to-teacher.com/actuator/health');
   assert.equal(env.AWS_DEPLOY_ROLE_ARN, mainRole);
   assert.equal(env.IMAGE_ALIAS, 'prod');
   assert.equal(env.DEPLOY_TARGET, 'prod');

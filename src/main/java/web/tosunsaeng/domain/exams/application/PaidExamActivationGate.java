@@ -4,7 +4,7 @@ import org.springframework.beans.factory.InitializingBean;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
-/** Default closed; only explicitly approved test-only readiness may pass. */
+/** Default closed; only explicitly approved environment-specific readiness may pass. */
 @Component
 public class PaidExamActivationGate implements InitializingBean {
     private final boolean enabled;
