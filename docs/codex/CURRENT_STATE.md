@@ -1,5 +1,13 @@
 # Learning Core Current State
 
+- 2026-10-21 재답변 구현: draft-5 전용 workload 조회/QuestionGradingJob 승인 증거/완료시험 접수·후속채점 연결. BILLING_REANSWER_ENABLED 기본OFF. clean test1,482건(1,481통과/1skip), diff check 통과. Mongo 통합은 Docker provider 실패로 미실행. 공동fixture/Billing 연결/E2E/배포·활성화 미완료, 커밋·푸시 없음. 아래 준비기록은 과거 이력이다.
+
+- 사용자 추가 수락 반영: 미발급trial 제외·최대5초 관측 경합 수용(여러 Job 가능)을 재답변 인계서에 명시했다. wire/fixture 공동 동결 및 제품 구현은 미완료, 외부 발송/배포 없음.
+
+- Billing 공유 기준을 재답변 인계서에 반영: 유효 유료권 OR 사용 가능 무료권1장 이상, 무발급/무예약/무차감, 소비한 retake 제외 및 기접수 Job 보호. 기술 wire/인증/경합 규격은 공동 확인 대기. 제품 구현·배포 없음.
+
+- 2026-10-21 codex/fix-feedback-reanswer-entitlement: 완료 재답변 잔여권 조건·402 ENTITLEMENT_INSUFFICIENT를 FEEDBACK_REANSWER_ENTITLEMENT_HANDOFF.md에 정리했다. LC 무차감 Billing 조회 계약 부재로 제품 구현 전 공동 계약 확인 필요. 코드/DB/Billing 저장소/배포 변경 없음.
+
 - 2026-10-21 동기화 후보: main574c9b9를 develop9c46d81에 병합하고 안전한 Mongo failure/retry 진단을 추가했다. PR54 단어 정합성 검증 보존. 아래 과거 운영 준비 기록은 당시 상태이며 현재 운영 배포 기준은 prod13이다. 사용자 승인한 develop 검증 후 main 전달 진행 중(TMI-118/TMI-125/TMI-193).
 
 - 2026-10-17 TMI-193/TMI-217: Azure BSON exam_id 삭제 필드 보완을 별도 브랜치로 전달 준비. cleanup/verify/fence/index 검사 일관화, 기존 API 및 권한 차단 유지. Node11 통과, Java/Mongo·CI 및 test 배포 후 검증은 진행 중. 운영 배포·봉인·미연결 자료 삭제는 제외.

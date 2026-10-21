@@ -45,6 +45,7 @@ class BillingWorkloadTokenIssuerTest {
                     case RESERVATIONS -> "reservations";
                     case ATTEMPT_GROUP_EVENTS -> "attempt-group-events";
                     case EXAM_DELETION_EVENTS -> "exam-deletion-events";
+                    case REANSWER_ELIGIBILITY -> "reanswer-eligibility";
                 };
                 assertEquals(java.util.List.of("tosunsaeng-billing:"+target+":test"),c.getAudience());
                 // Aud must be a JSON string on the wire, not merely a single-item parser list.

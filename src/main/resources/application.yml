@@ -51,6 +51,8 @@ app:
     poll-ms: ${CHALLENGE_POLL_MS:1000}
     expiry-poll-ms: ${CHALLENGE_EXPIRY_POLL_MS:10000}
   billing:
+    reanswer:
+      enabled: ${BILLING_REANSWER_ENABLED:false}
     paid-exam:
       coexistence:
         legacy-create-enabled: ${BILLING_LEGACY_EXAM_CREATE_ENABLED:false}

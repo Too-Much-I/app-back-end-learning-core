@@ -23,10 +23,13 @@ public class ExamAcceptedWorkPolicy {
 
     public boolean questionAllowed(ExamSession session,Integer question,Integer retry) {
         if (!processable(session) || question==null) return false;
+        var admitted=jobs.findById(GradingKeys.questionJobId(session.getExamId(),question,retry)).orElse(null);
+        if (admitted!=null && admitted.getReanswerApproval()!=null)
+            return web.tosunsaeng.domain.exams.reanswer.ReanswerAdmission.accepted(session,admitted);
         if (!requiresEvidence(session)) return true; // Preserve the existing legacy callback/recovery contract.
         if (session.getSubmissionEvidenceVersion()!=null && !Integer.valueOf(1).equals(session.getSubmissionEvidenceVersion())) return false;
         int canonical=GradingKeys.canonicalRetryCount(retry);
-        var job=jobs.findById(GradingKeys.questionJobId(session.getExamId(),question,canonical)).orElse(null);
+        var job=admitted;
         if (session.hasLegacyClosure() && !session.isAccessRevoked()) {
             if (job!=null && java.util.Objects.equals(job.getJobId(),GradingKeys.questionJobId(session.getExamId(),question,canonical))
                     && java.util.Objects.equals(GradingKeys.effectiveMockExamId(job.getMockExamId()),GradingKeys.effectiveMockExamId(session.getMockExamId()))
