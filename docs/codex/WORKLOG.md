@@ -16416,6 +16416,11 @@
 - clean test 성공: 1375개 중1374통과, 기존 외부 import 자료 조건부1 skip. 전체 Mongo 격리 테스트 성공, Node64개 통과, 원본 SHA256SUMS 전체 통과, git diff --check 통과. 초기 테스트 mock 연결/전환 응답 fixture 불일치를 수정 후 재실행했다.
 - 사용자 DS_Store·기존 실DB 준비 스크립트/별도 운영 준비 문서는 이번 제품 commit에서 제외한다. main/prod/Billing/Identity·실DB/index는 변경하지 않았다. PR/develop/test 배포 결과 및 실제 공동 E2E는 별도 기록한다.
 
+## 2026-10-17 — Azure 삭제 BSON 필드 보완 전달
+
+- TMI-193/TMI-217. 사용자 승인으로 Azure exam_id를 cleanup/잔존 검사/persistence fence 및 index 준비 검사에 일관 적용한다. 실제 entity 직렬화·삭제 차단·새 기록 보존 및 기존 오설치 index fail-closed 회귀를 포함한다.
+- Azure 보완만 별도 develop 기반 브랜치로 분리했다. 기존 작업트리·운영 준비·DS_Store는 보존하고 전달에서 제외한다. 공개 API/BaseResponse/AI/S3/Redis 계약 불변. 운영 배포·봉인·데이터 정리 없음.
+- 삭제 index Node11개 통과. 전체 Java/Mongo 및 CI·test 배포 결과는 후속 확인한다. 실제 사용자 삭제 E2E 완료로 보고하지 않는다.
 ## 2026-10-17 — 공존 R2 test 배포 확인 완료
 
 - 관련 TMI-116/TMI-128/TMI-125/TMI-217/TMI-220/TMI-193. 제품 `e817ae8` push, PR48 검증 전체 성공 후 develop `f2111e5` merge. 배포 run39032470211 성공.
@@ -17721,3 +17726,8 @@
 <!-- codex-turn:01a1525d-c52c-7862-a23f-08490d27884a -->
 
 - 전달 결과: 코드/기록 `0d5aede` 후보 브랜치 push 완료, main 대상 PR #50 생성·현재 작업에 연결. PR 본문에 IAM 승인 전 머지 금지 명시. 운영 배포 미실행이며 다음 권한 교체 승인 필요. https://github.com/Too-Much-I/app-back-end-learning-core/pull/50
+
+## 2026-10-21 main 동기화 및 Mongo 진단 전달 후보
+
+- main574c9b9→develop9c46d81 병합, 기록 충돌 양쪽 보존. 기존 PR54 단어 검증 유지. MongoFailureDiagnostics와 HTTP/owner/notification retry 경계에 비민감 code/boolean/attempt/outcome 추가. API·재시도 정책·Sentry 정제 불변.
+- 사용자 develop PR 병합·테스트 후 main PR 병합 및 운영 배포 순서 승인. TMI-118/TMI-125/TMI-193 관련. 실제 진행 결과는 root 작업 기록에서 후속 확인하며 이번 후보만으로 배포 완료를 주장하지 않는다. Secret/Token 미기록.

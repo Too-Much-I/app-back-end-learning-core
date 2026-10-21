@@ -1,5 +1,8 @@
 # Learning Core Current State
 
+- 2026-10-21 동기화 후보: main574c9b9를 develop9c46d81에 병합하고 안전한 Mongo failure/retry 진단을 추가했다. PR54 단어 정합성 검증 보존. 아래 과거 운영 준비 기록은 당시 상태이며 현재 운영 배포 기준은 prod13이다. 사용자 승인한 develop 검증 후 main 전달 진행 중(TMI-118/TMI-125/TMI-193).
+
+- 2026-10-17 TMI-193/TMI-217: Azure BSON exam_id 삭제 필드 보완을 별도 브랜치로 전달 준비. cleanup/verify/fence/index 검사 일관화, 기존 API 및 권한 차단 유지. Node11 통과, Java/Mongo·CI 및 test 배포 후 검증은 진행 중. 운영 배포·봉인·미연결 자료 삭제는 제외.
 - TMI-126 전달: `0d5aede` push 및 [main PR #50](https://github.com/Too-Much-I/app-back-end-learning-core/pull/50) 준비 완료. IAM prod 대상 교체 승인 대기, 미머지·미배포.
 
 - 2026-10-19 main 자동배포 정리(TMI-126): 사용자 main→prod 자동배포 유지 선택에 따라 service/family/health를 현재 prod로 수정하고 실제 컨테이너의 역사적 이름 learning-core-test는 유지했다. Node88 통과. AWS 배포 역할 Policy는 여전히 옛 LC service 및 옛 execution/task role만 허용하므로 IAM 대상 교체 승인 전 main 머지·배포 보류. develop 대상/공개 API/운영 설정은 불변.

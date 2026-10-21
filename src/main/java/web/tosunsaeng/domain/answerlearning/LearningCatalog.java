@@ -83,6 +83,7 @@ public class LearningCatalog {
         Set<String> mediaIds = new HashSet<>(); mediaIds.add(u.getString("thumbnailMediaId"));
         for (Document l : lessons.values()) mediaIds.add(l.getString("photoMediaId"));
         for (Document a : answers.values()) {
+            validateWords(a);
             mediaIds.add(a.getString("fullAudioMediaId"));
             a.getList("sentences", Document.class).forEach(s -> mediaIds.add(s.getString("audioMediaId")));
         }
@@ -106,6 +107,25 @@ public class LearningCatalog {
             wire.put("answer", answer); result.add(wire);
         }
         return new Document("unit", summary(u, lessons, completed(owner, level, ids), media)).append("lessons", result);
+    }
+    /** Validate without normalizing or re-tokenizing: clients reference the original word positions. */
+    static void validateWords(Document answer) {
+        if (!(answer.get("sentences") instanceof List<?> sentences) || sentences.isEmpty())
+            throw LearningFailure.unavailable();
+        for (Object value : sentences) {
+            if (!(value instanceof Document sentence)
+                    || !(sentence.get("text") instanceof String text) || text.isBlank()
+                    || !(sentence.get("words") instanceof List<?> words) || words.isEmpty())
+                throw LearningFailure.unavailable();
+            List<String> texts = new ArrayList<>();
+            for (Object entry : words) {
+                if (!(entry instanceof Document word)
+                        || !(word.get("text") instanceof String token) || token.isBlank())
+                    throw LearningFailure.unavailable();
+                texts.add(token);
+            }
+            if (!String.join(" ", texts).equals(text)) throw LearningFailure.unavailable();
+        }
     }
     private Map<String, Document> mediaMap(Collection<String> ids) {
         return mongo.find(Query.query(current().and("_id").in(ids).and("accessScope").is("authenticated-learning")), Document.class, "learning_media")

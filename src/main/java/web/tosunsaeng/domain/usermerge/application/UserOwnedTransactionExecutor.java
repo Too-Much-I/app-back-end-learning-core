@@ -1,6 +1,7 @@
 package web.tosunsaeng.domain.usermerge.application;
 
 import com.mongodb.MongoException;
+import web.tosunsaeng.global.exception.MongoFailureDiagnostics;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.dao.DuplicateKeyException;
 import org.springframework.dao.OptimisticLockingFailureException;
@@ -131,6 +132,13 @@ public class UserOwnedTransactionExecutor {
             } catch (RuntimeException failure) {
                 lastFailure = failure;
                 TransactionFailureKind failureKind = classify(failure);
+                MongoFailureDiagnostics.record(failure, MongoFailureDiagnostics.Boundary.USER_OWNED, attempt,
+                        failureKind == TransactionFailureKind.UNKNOWN_COMMIT
+                                ? MongoFailureDiagnostics.Outcome.UNKNOWN_COMMIT
+                                : failureKind != TransactionFailureKind.TRANSIENT_RETRYABLE
+                                        ? MongoFailureDiagnostics.Outcome.NON_RETRYABLE
+                                        : attempt == MAX_ATTEMPTS ? MongoFailureDiagnostics.Outcome.EXHAUSTED
+                                        : MongoFailureDiagnostics.Outcome.RETRYING);
                 if (failureKind == TransactionFailureKind.UNKNOWN_COMMIT) {
                     throw new UserOwnedCommitOutcomeUnknownException(failure);
                 }

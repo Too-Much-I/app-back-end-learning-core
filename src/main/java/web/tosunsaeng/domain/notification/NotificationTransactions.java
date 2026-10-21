@@ -1,6 +1,7 @@
 package web.tosunsaeng.domain.notification;
 
 import com.mongodb.*;
+import web.tosunsaeng.global.exception.MongoFailureDiagnostics;
 import org.springframework.dao.DuplicateKeyException;
 import org.springframework.dao.OptimisticLockingFailureException;
 import org.springframework.data.mongodb.MongoDatabaseFactory;
@@ -22,6 +23,11 @@ public class NotificationTransactions {
         for (int attempt = 0; ; attempt++) {
             try { return tx.execute(status -> command.get()); }
             catch (RuntimeException e) {
+                MongoFailureDiagnostics.record(e, MongoFailureDiagnostics.Boundary.NOTIFICATION, attempt + 1,
+                        unknown(e) ? MongoFailureDiagnostics.Outcome.UNKNOWN_COMMIT
+                                : !retryable(e) ? MongoFailureDiagnostics.Outcome.NON_RETRYABLE
+                                : attempt == 2 ? MongoFailureDiagnostics.Outcome.EXHAUSTED
+                                : MongoFailureDiagnostics.Outcome.RETRYING);
                 if (unknown(e) || attempt == 2 || !retryable(e)) throw e;
                 // Avoid immediately colliding with the same committing transaction again.
                 java.util.concurrent.locks.LockSupport.parkNanos(java.util.concurrent.TimeUnit.MILLISECONDS.toNanos(20L * (attempt + 1)));
