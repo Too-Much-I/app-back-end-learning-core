@@ -96,6 +96,14 @@ public interface ExamSessionRepository extends MongoRepository<ExamSession, Stri
             + "'$or': [ { 'terminalEventId': null }, { 'terminalEventId': { '$exists': false } } ] }")
     List<ExamSession> findAttemptGroupReconciliationCandidates();
 
+    @Query(value = "{ '_id': { '$gt': ?0 }, 'entitlementState': 'CONFIRMED', "
+            + "'attemptGroupId': { '$exists': true, '$ne': null }, "
+            + "'attemptGroupProjectionStatus': { '$exists': true, '$ne': null }, "
+            + "'$or': [ { 'terminalEventId': null }, { 'terminalEventId': { '$exists': false } } ] }",
+            sort = "{ '_id': 1 }")
+    List<ExamSession> findAttemptGroupReconciliationCandidatesAfter(String afterId,
+            org.springframework.data.domain.Pageable pageable);
+
     @Query("{ 'entitlementState': 'CONFIRMED', 'attemptGroupId': { '$exists': true, '$ne': null }, "
             + "'$or': [ { 'attemptGroupProjectionStatus': null }, "
             + "{ 'attemptGroupProjectionStatus': { '$exists': false } } ] }")
