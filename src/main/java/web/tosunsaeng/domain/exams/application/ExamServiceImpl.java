@@ -43,6 +43,8 @@ import java.util.function.Supplier;
 @Service
 @RequiredArgsConstructor
 public class ExamServiceImpl implements ExamService {
+    @Autowired(required=false)
+    private web.tosunsaeng.domain.exams.reanswer.ReanswerAdmission reanswerAdmission;
     @Autowired(required = false)
     private web.tosunsaeng.domain.exams.rollout.LegacyExamRuntime legacyExamRuntime;
     @Autowired(required = false) private PaidExamCreationSaga paidExamCreationSaga;
@@ -321,6 +323,17 @@ public class ExamServiceImpl implements ExamService {
     @Override
     public ExamResponseDTO.UploadUrlResult getPresignedUrl(String examId, Integer questionNumber, Integer retryCount) {
         if (deletionAccess != null) deletionAccess.requirePublicWrite(currentUserProvider.getCurrentUserId());
+        var observed = requireOwnedNotAbandonedSession(examId);
+        var approval = reanswerAdmission == null ? null : reanswerAdmission.prepare(observed,questionNumber,retryCount,false);
+        if (approval != null) {
+            if (userOwnedTransactionExecutor==null || !userOwnedTransactionExecutor.enabled())
+                throw new IllegalStateException("Reanswer requires owner transactions");
+            return executeUserOwned(currentUserProvider.getCurrentUserId(), () -> {
+                if (deletionAccess!=null) deletionAccess.requirePublicWrite(currentUserProvider.getCurrentUserId());
+                reanswerAdmission.authorize(requireOwnedNotAbandonedSession(examId),questionNumber,retryCount,approval,null);
+                return getPresignedUrlInTransaction(examId,questionNumber,retryCount);
+            });
+        }
         if (userOwnedTransactionExecutor == null || !userOwnedTransactionExecutor.enabled()) {
             return getPresignedUrlInTransaction(examId, questionNumber, retryCount);
         }
@@ -373,8 +386,10 @@ public class ExamServiceImpl implements ExamService {
     @Override
     public ExamResponseDTO.SubmitResult submitAudio(String examId, Integer questionNumber, Integer retryCount) {
         if (deletionAccess != null) deletionAccess.requirePublicWrite(currentUserProvider.getCurrentUserId());
-        requireOwnedNotAbandonedSession(examId);
-        ExamStatus status = gradingService.submitQuestion(examId, questionNumber, retryCount);
+        var session = requireOwnedNotAbandonedSession(examId);
+        var approval = reanswerAdmission == null ? null : reanswerAdmission.prepare(session,questionNumber,retryCount,true);
+        ExamStatus status = approval == null ? gradingService.submitQuestion(examId, questionNumber, retryCount)
+                : gradingService.submitQuestion(examId, questionNumber, retryCount, approval);
         if (GradingKeys.canonicalRetryCount(retryCount) == 0 && attemptGroupStateCoordinator != null) {
             attemptGroupStateCoordinator.reconcileAfterSubmission(examId, questionNumber, 0, () -> {
                 if (deletionAccess != null) deletionAccess.requirePublicWrite(currentUserProvider.getCurrentUserId());

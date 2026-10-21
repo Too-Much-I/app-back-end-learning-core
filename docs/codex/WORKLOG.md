@@ -17731,3 +17731,22 @@
 
 - main574c9b9→develop9c46d81 병합, 기록 충돌 양쪽 보존. 기존 PR54 단어 검증 유지. MongoFailureDiagnostics와 HTTP/owner/notification retry 경계에 비민감 code/boolean/attempt/outcome 추가. API·재시도 정책·Sentry 정제 불변.
 - 사용자 develop PR 병합·테스트 후 main PR 병합 및 운영 배포 순서 승인. TMI-118/TMI-125/TMI-193 관련. 실제 진행 결과는 root 작업 기록에서 후속 확인하며 이번 후보만으로 배포 완료를 주장하지 않는다. Secret/Token 미기록.
+
+## 2026-10-21 재답변 브랜치 준비
+
+- origin/develop5d9733a에서 codex/fix-feedback-reanswer-entitlement를 생성했다. 완료 재답변의 현재 잔여 응시권 요구/추가 차감 없음/부족402 ENTITLEMENT_INSUFFICIENT 계약을 인계 문서에 정리했다.
+- LC 무차감 Billing 조회 연동은 없고 public 조회는 사용자 JWT 방식임을 확인했다. 외부 계약을 추측해 구현하거나 원래 closure를 해제하지 않았다. 제품 구현 전 서버 간 조회 계약 확인 필요. Billing/Identity/DB/배포 변경 없음. 문서만 변경해 코드 테스트 미실행, diff check 수행. Secret/Token 미기록.
+
+## 2026-10-21 공유된 Billing 판정 기준 반영
+
+- 사용자 공유 기준에 따라 인계서의 유효 유료권/잔여 무료권 OR 판정과 무차감/기접수 보호를 구체화했다. wire/인증/경합 규격은 미확정이며 제품 구현/외부 발송/배포 없음. 문서 diff check 수행, Secret/Token 미기록.
+
+## 2026-10-21 추가 제안 수락
+
+- 사용자 확인으로 미발급 최초 무료권 제외 및5초 관측 기반 경합 수용을 인계서에 반영했다. 동시 신규 Job 여러 건 가능하며1건 상한/commit·deny전파 상한은 없다는 한계를 명시했다. Billing 초안 수정 및 wire/fixture 확정은 후속이다. 제품 코드/외부 발송/배포 변경 없음, 문서 diff check 수행. Secret/Token 미기록.
+
+## 2026-10-21 재답변 구현·검증
+
+- 사용자 승인에 따라 draft-5 무차감 조회, 전용 workload 목적, completed retry>0 접수, Job+승인 증거 원자 저장 경로와 dispatch/Callback 허용을 구현했다. 기존 closure/권한·삭제·환불/AI·공개API 계약 유지, 기본OFF. 부족402/탈퇴401/일시503/연동결함500 구분.
+- `./gradlew clean test`1,482건 중1,481통과/1skip/실패0. 신규 service fixture 수정 후 전체 성공. `mongoIntegrationTest --tests '*ReanswerApprovalMongoTest'` Docker provider 연결 실패로 실제Mongo 검증 불가. diff check 통과. 승인 시각 BSON string 왕복/rollback용 테스트를 추가했지만 실행 성공으로 표시하지 않는다.
+- 변경 범위는 reanswer 패키지, 시험 서비스/접수정책/Job, workload signer, 설정, 관련 테스트와 인계서·기록. 기존 사용자 dirty 보존, 예상 밖 제품 변경 없음. 신규 Jira·Billing/Identity 변경·외부발송·실DB/index·커밋/푸시/배포 없음. 공동fixture와 실제Billing/시각동기화/권한경합 E2E·격리Mongo 검증 후 활성화. 기존 Reservation/AttemptGroup circuit은 변경하지 않았고 신규조회 운영 차단 연결은 점검대상. Secret/Token 미기록.

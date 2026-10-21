@@ -37,6 +37,14 @@ public class QuestionGradingJob {
     // Distinguishes a new public submission from reconstruction of a missing legacy Job.
     private boolean activityUserSubmission;
     private Instant firstUserSubmittedAt;
+    private web.tosunsaeng.domain.exams.reanswer.ReanswerApproval reanswerApproval;
+
+    public void approveReanswer(web.tosunsaeng.domain.exams.reanswer.ReanswerApproval proof) {
+        if (proof==null || !proof.valid() || reanswerApproval!=null || !activityUserSubmission
+                || firstUserSubmittedAt==null || retryCount==null || retryCount<=0)
+            throw new IllegalStateException("Invalid reanswer admission evidence");
+        reanswerApproval=proof;
+    }
 
     public QuestionGradingJob markUserSubmission(Instant acceptedAt) {
         if (!activityUserSubmission && firstUserSubmittedAt==null)

@@ -290,6 +290,41 @@ class ExamGradingServiceTest {
         verify(questionJobRepository,never()).insert(any(QuestionGradingJob.class));
     }
 
+    @Test void completedReanswerStoresApprovalAndReplaysAfterExpiryWithoutAnotherBillingRead() {
+        String user="11111111-1111-4111-8111-111111111111";
+        var owners=org.mockito.Mockito.mock(web.tosunsaeng.domain.usermerge.application.UserOwnedTransactionExecutor.class);
+        var client=org.mockito.Mockito.mock(web.tosunsaeng.domain.exams.reanswer.ReanswerEligibilityClient.class);
+        var beans=new org.springframework.beans.factory.support.DefaultListableBeanFactory();
+        beans.registerSingleton("client",client);
+        var gate=new web.tosunsaeng.domain.exams.reanswer.ReanswerAdmission(true,
+                beans.getBeanProvider(web.tosunsaeng.domain.exams.reanswer.ReanswerEligibilityClient.class),
+                questionJobRepository,mockExamCatalogService,clock);
+        ReflectionTestUtils.setField(service,"reanswerAdmission",gate);
+        ReflectionTestUtils.setField(service,"userOwnedTransactionExecutor",owners);
+        when(owners.enabled()).thenReturn(true);
+        when(owners.executeExamCoordination(eq(user),eq(EXAM_ID),any())).thenAnswer(invocation ->
+                ((java.util.function.Supplier<?>)invocation.getArgument(2)).get());
+        var session=ExamSession.builder().examId(EXAM_ID).userId(user).mockExamId(GradingKeys.LEGACY_MOCK_EXAM_ID)
+                .status(ExamSessionStatus.COMPLETED).submissionsClosedAt(NOW.minusSeconds(10)).build();
+        when(examSessionRepository.findById(EXAM_ID)).thenReturn(Optional.of(session));
+        var proof=new web.tosunsaeng.domain.exams.reanswer.ReanswerApproval(
+                web.tosunsaeng.domain.exams.reanswer.ReanswerApproval.TYPE,
+                web.tosunsaeng.domain.exams.reanswer.ReanswerApproval.REVISION,user,NOW.toString(),NOW.plusSeconds(5).toString());
+        when(client.check(user)).thenReturn(proof);
+        assertEquals(ExamStatus.PROCESSING,service.submitQuestion(EXAM_ID,1,1,gate.prepare(session,1,1,true)));
+        var stored=storedQuestion(1,1);
+        assertEquals(proof,stored.getReanswerApproval());
+        assertEquals(NOW,stored.getFirstUserSubmittedAt());
+        assertEquals(NOW.minusSeconds(10),session.getSubmissionsClosedAt());
+        clock.set(NOW.plusSeconds(10));
+        assertEquals(ExamStatus.PROCESSING,service.submitQuestion(EXAM_ID,1,1,gate.prepare(session,1,1,true)));
+        verify(client,times(1)).check(user);
+        verify(questionJobRepository,times(1)).insert(any(QuestionGradingJob.class));
+        service.completeQuestion(EXAM_ID,1,1);
+        assertEquals(GradingJobStatus.COMPLETED,storedQuestion(1,1).getStatus());
+        assertTrue(summaryJobs.isEmpty());
+    }
+
     @Test void closedAdmissionPreservesAlreadyAdmittedJobReplay() {
         var owners=org.mockito.Mockito.mock(web.tosunsaeng.domain.usermerge.application.UserOwnedTransactionExecutor.class);
         ReflectionTestUtils.setField(service,"userOwnedTransactionExecutor",owners);
@@ -1654,6 +1689,7 @@ class ExamGradingServiceTest {
 
     private static QuestionGradingJob copy(QuestionGradingJob source, Long version) {
         return QuestionGradingJob.builder()
+                .reanswerApproval(source.getReanswerApproval())
                 .activityUserSubmission(source.isActivityUserSubmission())
                 .firstUserSubmittedAt(source.getFirstUserSubmittedAt())
                 .jobId(source.getJobId())
