@@ -6,6 +6,12 @@ import web.tosunsaeng.domain.exams.domain.entity.ExamSession;
 import static org.assertj.core.api.Assertions.*;
 
 class LegacyExamManifestTest {
+    @Test void productionToolReplicaSetFixtureMatchesJavaDigest() {
+        var manifest = LegacyExamManifest.build("production", "to-teacher-app", "lc-local-rehearsal-r1",
+                List.of("fake-exam-한글", "fake-exam-a"));
+        assertThat(manifest.summary().sha256())
+                .isEqualTo("ce6c343a0d26f685a9f84054dcc498a69b80dbb6bcfeeede857e39b81c16da8a");
+    }
     @Test void canonicalDigestIsOrderIndependentAndContextBound() {
         var a = LegacyExamManifest.build("test", "fixture", "r1", List.of("ex_b", "ex_a"));
         // Independently computed with Node crypto using the documented length-prefixed UTF-8 format.

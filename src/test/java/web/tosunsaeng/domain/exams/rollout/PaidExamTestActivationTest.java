@@ -84,4 +84,57 @@ class PaidExamTestActivationTest {
         doThrow(new IllegalStateException("required indexes unavailable")).when(indexes).verify();
         approved(true, true).run(c -> assertThat(c).hasFailed());
     }
+
+    private ApplicationContextRunner production(boolean manifest, boolean owner) {
+        return approved(manifest, owner)
+                .withInitializer(c -> c.getEnvironment().setActiveProfiles("prod"))
+                .withPropertyValues("app.billing.paid-exam.test-activation-approved=false",
+                        "app.billing.paid-exam.production-activation-approved=true",
+                        "app.billing.workload-jwt.environment=production",
+                        "app.billing.paid-exam.legacy.environment=production",
+                        "app.billing.access-events.environment=production");
+    }
+
+    @Test void explicitProductionApprovalPassesBothGates() {
+        production(true, true).run(c -> assertThat(c).hasNotFailed());
+        verify(indexes, times(2)).verify();
+    }
+
+    @ParameterizedTest @ValueSource(strings = {"false", "invalid", "TRUE", ""})
+    void productionRequiresExactApproval(String value) {
+        production(true, true).withPropertyValues("app.billing.paid-exam.production-activation-approved=" + value)
+                .run(c -> assertThat(c).hasFailed());
+        verifyNoInteractions(indexes);
+    }
+
+    @ParameterizedTest @ValueSource(strings = {"", "local", "production", "staging", "test", "prod,test", "prod,local"})
+    void productionApprovalDoesNotEnableOtherProfiles(String profile) {
+        production(true, true).withInitializer(c -> c.getEnvironment().setActiveProfiles(
+                profile.isEmpty() ? new String[0] : profile.split(",")))
+                .run(c -> assertThat(c).hasFailed());
+        verifyNoInteractions(indexes);
+    }
+
+    @ParameterizedTest @ValueSource(strings = {"app.billing.workload-jwt.environment",
+            "app.billing.paid-exam.legacy.environment", "app.billing.access-events.environment"})
+    void productionRejectsCopiedTestEnvironment(String property) {
+        production(true, true).withPropertyValues(property + "=test").run(c -> assertThat(c).hasFailed());
+        verifyNoInteractions(indexes);
+    }
+
+    @ParameterizedTest @ValueSource(strings = {"app.billing.paid-exam.enabled", "app.billing.creation-saga-enabled",
+            "app.billing.workload-jwt.sender-enabled", "app.billing.access-events.receiver-enabled",
+            "app.user-merged.writer-enabled"})
+    void productionRequiresAllExistingFlags(String flag) {
+        production(true, true).withPropertyValues(flag + "=false").run(c -> assertThat(c).hasFailed());
+        verifyNoInteractions(indexes);
+    }
+
+    @Test void productionStillRequiresManifestOwnerAndIndexes() {
+        production(false, true).run(c -> assertThat(c).hasFailed());
+        production(true, false).run(c -> assertThat(c).hasFailed());
+        verifyNoInteractions(indexes);
+        doThrow(new IllegalStateException("missing indexes")).when(indexes).verify();
+        production(true, true).run(c -> assertThat(c).hasFailed());
+    }
 }

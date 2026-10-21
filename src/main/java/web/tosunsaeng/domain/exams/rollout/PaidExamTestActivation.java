@@ -7,7 +7,7 @@ import web.tosunsaeng.domain.usermerge.application.UserOwnedTransactionExecutor;
 import java.util.Arrays;
 import java.util.List;
 
-/** Explicit test-only rollout permission. Never grants staging/production permission or installs data. */
+/** Explicit environment-specific rollout permission. Never installs data or reuses test approval in prod. */
 @Component
 public final class PaidExamTestActivation {
     private final Environment environment;
@@ -24,26 +24,36 @@ public final class PaidExamTestActivation {
     }
 
     public void requireReady() {
-        // Reject defaults, mixed profiles and all non-test names, even when approval was accidentally copied.
-        if (!Arrays.equals(environment.getActiveProfiles(), new String[]{"test"})) throw denied();
-        for (String flag : List.of("app.billing.paid-exam.test-activation-approved",
-                "app.billing.paid-exam.enabled", "app.billing.creation-saga-enabled",
+        // Deployment profile prod maps to the existing wire/manifest environment production.
+        // Mixed profiles and copied test approval never grant production permission.
+        String trustEnvironment;
+        String approval;
+        if (Arrays.equals(environment.getActiveProfiles(), new String[]{"test"})) {
+            trustEnvironment = "test";
+            approval = "app.billing.paid-exam.test-activation-approved";
+        } else if (Arrays.equals(environment.getActiveProfiles(), new String[]{"prod"})) {
+            trustEnvironment = "production";
+            approval = "app.billing.paid-exam.production-activation-approved";
+        } else throw denied();
+        if (!"true".equals(environment.getProperty(approval))) throw denied();
+        for (String flag : List.of("app.billing.paid-exam.enabled", "app.billing.creation-saga-enabled",
                 "app.billing.workload-jwt.sender-enabled", "app.billing.access-events.receiver-enabled",
                 "app.user-merged.writer-enabled")) {
             if (!"true".equals(environment.getProperty(flag))) throw denied();
         }
         for (String property : List.of("app.billing.workload-jwt.environment",
                 "app.billing.paid-exam.legacy.environment", "app.billing.access-events.environment")) {
-            if (!"test".equals(environment.getProperty(property))) throw denied();
+            if (!trustEnvironment.equals(environment.getProperty(property))) throw denied();
         }
         // The runtime bean is created only after verifySealed(expected); approval alone cannot substitute for it.
-        if (legacy.getIfAvailable() == null) throw denied();
+        var runtime = legacy.getIfAvailable();
+        if (runtime == null) throw denied();
         var owner = owners.getIfAvailable();
         if (owner == null || !owner.enabled()) throw denied();
         indexes.verify();
     }
 
     private static IllegalStateException denied() {
-        return new IllegalStateException("Paid exam test activation prerequisites are not satisfied");
+        return new IllegalStateException("Paid exam activation prerequisites are not satisfied");
     }
 }

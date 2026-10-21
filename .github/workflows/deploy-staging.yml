@@ -23,7 +23,7 @@ env:
 
 jobs:
   deployment-gate:
-    name: Allow test deployment only after PR merge
+    name: Allow main deployment and merged-PR test deployment
     runs-on: ubuntu-latest
     timeout-minutes: 5
     permissions:

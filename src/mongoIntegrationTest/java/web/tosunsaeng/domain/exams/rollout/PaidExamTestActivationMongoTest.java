@@ -75,13 +75,47 @@ class PaidExamTestActivationMongoTest {
     }
 
     private LegacyExamManifest.Summary seal() {
-        var summary = new PaidExamCutoverInspector(mongo).inspectCandidate("test", "gate-1", true);
+        return seal("test");
+    }
+
+    private LegacyExamManifest.Summary seal(String environment) {
+        var summary = new PaidExamCutoverInspector(mongo).inspectCandidate(environment, "gate-1", true);
         mongo.insert(new Document("_id", "legacy").append("revision", summary.revision()), PaidExamCutoverInspector.ENTRIES);
         mongo.insert(new Document("_id", PaidExamCutoverInspector.STATE_ID).append("status", "SEALED")
-                .append("environment", "test").append("database", summary.database()).append("revision", summary.revision())
+                .append("environment", environment).append("database", summary.database()).append("revision", summary.revision())
                 .append("sha256", summary.sha256()).append("count", summary.count()).append("sealedAt", new Date())
                 .append("writersDrained", true).append("readerCoverageVerified", true), PaidExamCutoverInspector.STATE);
         return summary;
+    }
+
+    private ApplicationContextRunner production(LegacyExamManifest.Summary summary) {
+        return context(summary).withInitializer(c -> c.getEnvironment().setActiveProfiles("prod"))
+                .withPropertyValues("app.billing.paid-exam.test-activation-approved=false",
+                        "app.billing.paid-exam.production-activation-approved=true",
+                        "app.billing.workload-jwt.environment=production",
+                        "app.billing.access-events.environment=production",
+                        "app.billing.paid-exam.legacy.environment=production");
+    }
+
+    @Test void productionUsesRealSealedManifestAndIndexesWithoutMutatingSessions() {
+        requiredIndexes(); var summary = seal("production");
+        var before = mongo.findById("legacy", Document.class, "exam_sessions");
+        production(summary).run(c -> assertThat(c).hasNotFailed());
+        assertThat(mongo.findById("legacy", Document.class, "exam_sessions")).isEqualTo(before);
+        assertThat(mongo.getCollection("exam_creation_operations").countDocuments()).isZero();
+    }
+
+    @Test void productionApprovalCannotBypassWrongManifestOrMissingIndex() {
+        requiredIndexes(); var summary = seal("production");
+        production(summary).withPropertyValues("app.billing.paid-exam.legacy.sha256=" + "0".repeat(64))
+                .run(c -> assertThat(c).hasFailed());
+        mongo.getCollection("exam_results").dropIndex("idx_exam_results_user");
+        production(summary).run(c -> assertThat(c).hasFailed());
+    }
+
+    @Test void productionRejectsActuallySealedTestManifest() {
+        requiredIndexes(); var summary = seal("test");
+        production(summary).run(c -> assertThat(c).hasFailed());
     }
 
     private void index(String collection, String name, Document keys, boolean unique, Document partial, boolean ttl) {

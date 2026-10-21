@@ -269,6 +269,101 @@ class DeletionFlowMongoTest {
         assertThat(commands.latest(OWNER).isWriteBlocked()).isTrue();
         assertThat(commands.latest(OWNER).getSafeToStartLearningAt()).isNull();
     }
+    @Test void exactPreflightDoesNotSelectOtherPendingTargetsAndReplaysStoredAck() {
+        var target = linkedPrepared();
+        var other = DeletionTarget.draining(UUID.randomUUID().toString(), OWNER, DeletionTarget.Type.EXAM, "other");
+        other.sealCallbacks(true, true, clock.instant()); other.markPrepared();
+        other.prepareBilling("test", UUID.randomUUID().toString(), clock.instant(), clock.instant().minusSeconds(10));
+        mongo.insert(other);
+        var remote = mock(BillingDeletionClient.class);
+        when(remote.send(any())).thenReturn(new BillingDeletionClient.Result(true, null, null));
+        var expected = exact(target);
+        assertThat(sender(remote).sendExact(expected)).isTrue();
+        assertThat(sender(remote).sendExact(expected)).isFalse();
+        assertThat(mongo.findById(target.getId(), DeletionTarget.class).getBillingDelivery().getState()).isEqualTo(BillingDeletionDelivery.State.ACKED);
+        assertThat(mongo.findById(other.getId(), DeletionTarget.class).getBillingDelivery().getAttempts()).isZero();
+        verify(remote, times(1)).send(target.getBillingDelivery().getPayload());
+        verifyNoMoreInteractions(remote);
+    }
+    @Test void exactPreflightRejectsMismatchWithoutWritesOrSend() {
+        var target = linkedPrepared();
+        var remote = mock(BillingDeletionClient.class);
+        for (var wrong : List.of(
+                new BillingDeletionSender.ExactTarget(target.getId(), OWNER, UUID.randomUUID().toString(), target.getBillingDelivery().getPayloadDigest()),
+                new BillingDeletionSender.ExactTarget(target.getId(), OWNER, target.getBillingDelivery().getEventId(), "0".repeat(64)),
+                new BillingDeletionSender.ExactTarget(target.getId(), UUID.randomUUID().toString(), target.getBillingDelivery().getEventId(), target.getBillingDelivery().getPayloadDigest())))
+            assertThatThrownBy(() -> sender(remote).sendExact(wrong)).isInstanceOf(IllegalStateException.class);
+        assertThat(mongo.findById(target.getId(), DeletionTarget.class).getVersion()).isEqualTo(target.getVersion());
+        verifyNoInteractions(remote);
+    }
+    @Test void exactPreflightHonorsDelayAndPreservesPayloadAfterLostResponse() {
+        var target = linkedPrepared();
+        var remote = mock(BillingDeletionClient.class);
+        when(remote.send(any())).thenReturn(BillingDeletionClient.Result.retry(), new BillingDeletionClient.Result(true, null, null));
+        var expected = exact(target);
+        sender(remote).sendExact(expected);
+        assertThat(sender(remote).sendExact(expected)).isFalse();
+        clock.now = clock.now.plusSeconds(5);
+        sender(remote).sendExact(expected);
+        verify(remote, times(2)).send(target.getBillingDelivery().getPayload());
+        assertThat(mongo.findById(target.getId(), DeletionTarget.class).getBillingDelivery().getState()).isEqualTo(BillingDeletionDelivery.State.ACKED);
+    }
+    @Test void exactPreflightCannotAcknowledgeChangedVersion() {
+        var target = linkedPrepared();
+        var remote = mock(BillingDeletionClient.class);
+        when(remote.send(any())).thenAnswer(call -> {
+            mongo.updateFirst(Query.query(Criteria.where("_id").is(target.getId())), new Update().inc("version", 1), DeletionTarget.class);
+            return new BillingDeletionClient.Result(true, null, null);
+        });
+        sender(remote).sendExact(exact(target));
+        assertThat(mongo.findById(target.getId(), DeletionTarget.class).getBillingDelivery().getState()).isEqualTo(BillingDeletionDelivery.State.PENDING);
+    }
+    @Test void exactPreflightDoesNotCreateMissingOwnerOrSend() {
+        var target = linkedPrepared();
+        mongo.remove(Query.query(Criteria.where("_id").is(OWNER)), UserOwnershipGuard.class);
+        var remote = mock(BillingDeletionClient.class);
+        assertThatThrownBy(() -> sender(remote).sendExact(exact(target))).isInstanceOf(IllegalStateException.class);
+        assertThat(mongo.findById(OWNER, UserOwnershipGuard.class)).isNull();
+        assertThat(mongo.findById(target.getId(), DeletionTarget.class).getBillingDelivery().getAttempts()).isZero();
+        verifyNoInteractions(remote);
+    }
+    @Test void exactPreflightPreservesQuarantineAndLiveLease() {
+        var target = linkedPrepared();
+        target.getBillingDelivery().claim(clock.instant(), "other-worker"); mongo.save(target);
+        var remote = mock(BillingDeletionClient.class);
+        assertThat(sender(remote).sendExact(exact(target))).isFalse();
+        target.getBillingDelivery().review(BillingDeletionDelivery.Failure.RETRY_EXHAUSTED); mongo.save(target);
+        assertThat(sender(remote).sendExact(exact(target))).isFalse();
+        assertThat(mongo.findById(target.getId(), DeletionTarget.class).getBillingDelivery().getState()).isEqualTo(BillingDeletionDelivery.State.NEEDS_REVIEW);
+        verifyNoInteractions(remote);
+    }
+    @Test void exactPreflightUnknownClaimCommitDoesNotSendOrResetEvidence() {
+        var target = linkedPrepared();
+        var realTx = tx;
+        tx = mock(DeletionTransactions.class);
+        when(tx.run(any())).thenAnswer(call -> {
+            realTx.run(call.getArgument(0));
+            var failure = new com.mongodb.MongoException(91, "fixture unknown commit");
+            failure.addLabel(com.mongodb.MongoException.UNKNOWN_TRANSACTION_COMMIT_RESULT_LABEL);
+            throw failure;
+        });
+        var remote = mock(BillingDeletionClient.class);
+        assertThatThrownBy(() -> sender(remote).sendExact(exact(target))).isInstanceOf(com.mongodb.MongoException.class);
+        assertThat(mongo.findById(target.getId(), DeletionTarget.class).getBillingDelivery().getAttempts()).isEqualTo(1);
+        verifyNoInteractions(remote);
+    }
+    @Test void exactPreflightRejectsForeignEnvironmentWithoutMutatingTarget() {
+        var target = linkedPrepared();
+        var remote = mock(BillingDeletionClient.class);
+        var guards = new UserOwnershipGuardService(mongo, new MongoRepositoryFactory(mongo).getRepository(UserOwnershipGuardRepository.class));
+        var prod = new BillingDeletionSender(mongo, tx, guards, remote, clock, "production");
+        assertThatThrownBy(() -> prod.sendExact(exact(target))).isInstanceOf(IllegalStateException.class);
+        assertThat(mongo.findById(target.getId(), DeletionTarget.class).getVersion()).isEqualTo(target.getVersion());
+        verifyNoInteractions(remote);
+    }
+    private BillingDeletionSender.ExactTarget exact(DeletionTarget target) {
+        return new BillingDeletionSender.ExactTarget(target.getId(), OWNER, target.getBillingDelivery().getEventId(), target.getBillingDelivery().getPayloadDigest());
+    }
     private void acknowledgeDeleted() {
         var remote=mock(BillingDeletionClient.class);
         when(remote.send(any())).thenReturn(new BillingDeletionClient.Result(true,null,null));

@@ -421,6 +421,38 @@ class SummaryDispatchSchedulerTest {
         return scheduler(taskExecutor, Clock.fixed(NOW, ZoneOffset.UTC));
     }
 
+    @Test
+    void lostOldProcessQueueCanBeClaimedByNewSchedulerAfterPendingTimeout() {
+        var oldQueue = new CapturingTaskExecutor();
+        var store = installRepositoryStore(SummaryGradingJob.pending(JOB_ID, EXAM_ID, "mock_exam_002", NOW));
+        assertTrue(scheduler(oldQueue).schedulePending(JOB_ID, 1));
+        // Simulate process exit before queued work runs; only repository state survives.
+        var newQueue = new CapturingTaskExecutor();
+        var later = NOW.plus(PROPERTIES.pendingTimeout());
+        assertTrue(scheduler(newQueue, Clock.fixed(later, ZoneOffset.UTC)).scheduleRetry(JOB_ID, 1));
+        newQueue.runAll();
+        assertEquals(GradingJobStatus.PROCESSING, store.get().getStatus());
+        assertEquals(1, store.get().getDispatchAttempt());
+        oldQueue.runAll(); // delayed old runnable must not claim again
+        verify(dispatchService, times(1)).dispatchSummary(any());
+    }
+
+    @Test
+    void newSchedulerDoesNotReclaimProcessingUntilTimeoutBoundary() {
+        var store = installRepositoryStore(summaryJob(GradingJobStatus.PROCESSING, 1, NOW, 0L));
+        var earlyQueue = new CapturingTaskExecutor();
+        scheduler(earlyQueue, Clock.fixed(NOW.plus(PROPERTIES.processingTimeout()).minusNanos(1), ZoneOffset.UTC))
+                .scheduleRetry(JOB_ID, 1);
+        earlyQueue.runAll();
+        verify(dispatchService, never()).dispatchSummary(any());
+        var retryQueue = new CapturingTaskExecutor();
+        scheduler(retryQueue, Clock.fixed(NOW.plus(PROPERTIES.processingTimeout()), ZoneOffset.UTC))
+                .scheduleRetry(JOB_ID, 1);
+        retryQueue.runAll();
+        assertEquals(2, store.get().getDispatchAttempt());
+        verify(dispatchService, times(1)).dispatchSummary(any());
+    }
+
     private static ExamSession inProgressSession() {
         return ExamSession.builder()
                 .examId(EXAM_ID)
