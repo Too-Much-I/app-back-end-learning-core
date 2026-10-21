@@ -50,6 +50,8 @@ import java.util.stream.Collectors;
 @Service
 @RequiredArgsConstructor
 public class ExamGradingService {
+    @Autowired(required=false)
+    private web.tosunsaeng.domain.exams.reanswer.ReanswerAdmission reanswerAdmission;
     @Autowired(required = false)
     private web.tosunsaeng.domain.exams.rollout.LegacyExamRuntime legacyExamRuntime;
 
@@ -93,7 +95,15 @@ public class ExamGradingService {
     private String bucketName;
 
     public ExamStatus submitQuestion(String examId, Integer questionNumber, Integer retryCount) {
+        return submitQuestion(examId,questionNumber,retryCount,null);
+    }
+
+    public ExamStatus submitQuestion(String examId, Integer questionNumber, Integer retryCount,
+            web.tosunsaeng.domain.exams.reanswer.ReanswerAdmission.Observation approval) {
         requirePublicWrite(examId);
+        if (reanswerAdmission!=null && reanswerAdmission.applies(requireNotAbandonedSession(examId),retryCount)
+                && (approval==null || userOwnedTransactionExecutor==null || !userOwnedTransactionExecutor.enabled()))
+            throw new IllegalStateException("Reanswer requires verified admission and owner transactions");
         boolean trackSubmission = notificationSubmissionTracker != null && notificationSubmissionTracker.enabled();
         boolean coveredSubmission = submissionEvidence != null && submissionEvidence.covered(examId);
         if (coveredSubmission && (userOwnedTransactionExecutor == null || !userOwnedTransactionExecutor.enabled())) {
@@ -105,7 +115,7 @@ public class ExamGradingService {
         int canonicalRetryCount = GradingKeys.canonicalRetryCount(retryCount);
         Supplier<SubmitPreparation> prepare = () -> inCurrentOwnerTransaction(
                 examId,
-                () -> { requirePublicWrite(examId); return prepareQuestionDispatch(examId, questionNumber, canonicalRetryCount); }
+                () -> { requirePublicWrite(examId); return prepareQuestionDispatch(examId, questionNumber, canonicalRetryCount, approval); }
         );
         SubmitPreparation preparation = trackSubmission ? notificationSubmissionTracker.transaction(prepare) : prepare.get();
         if (preparation.claim() == null) {
@@ -128,22 +138,26 @@ public class ExamGradingService {
     private SubmitPreparation prepareQuestionDispatch(
             String examId,
             Integer questionNumber,
-            int retryCount
+            int retryCount,
+            web.tosunsaeng.domain.exams.reanswer.ReanswerAdmission.Observation approval
     ) {
         requireNotAbandonedSession(examId);
         String jobId = GradingKeys.questionJobId(examId, questionNumber, retryCount);
         ExamSession admission=examSessionRepository.findById(examId).orElseThrow();
-        if (admission.getSubmissionsClosedAt()!=null && !acceptedQuestionWork(examId,questionNumber,retryCount))
+        QuestionGradingJob current = questionJobRepository.findById(jobId).orElse(null);
+        var proof = reanswerAdmission==null ? null : reanswerAdmission.authorize(admission,questionNumber,retryCount,approval,current);
+        if (admission.getSubmissionsClosedAt()!=null && proof==null && !acceptedQuestionWork(examId,questionNumber,retryCount))
             throw new ExamsException(ErrorStatus._EXAM_ABANDONED);
         if (hasQuestionResult(examId, questionNumber, retryCount)) {
             completeQuestionWithoutGuard(examId, questionNumber, retryCount);
             return new SubmitPreparation(ExamStatus.COMPLETED, null);
         }
-        QuestionGradingJob current = questionJobRepository.findById(jobId).orElse(null);
         if (current != null) {
             return new SubmitPreparation(toExamStatus(current.getStatus()), null);
         }
-        requireNewAdmission(examId);
+        if (proof==null) requireNewAdmission(examId);
+        // Recheck after result lookup, immediately before creating durable admission evidence.
+        if (proof!=null) reanswerAdmission.authorize(admission,questionNumber,retryCount,approval,null);
         Instant now = clock.instant();
         QuestionGradingJob pending = QuestionGradingJob.pending(
                 jobId,
@@ -155,6 +169,7 @@ public class ExamGradingService {
                 now
         );
         pending.markUserSubmission(now);
+        if (proof!=null) pending.approveReanswer(proof);
         QuestionGradingJob inserted = questionJobRepository.insert(pending);
         if (submissionEvidence != null && submissionEvidence.covered(examId) && retryCount == 0) {
             submissionEvidence.accepted(examId, questionNumber, retryCount, null, now);
