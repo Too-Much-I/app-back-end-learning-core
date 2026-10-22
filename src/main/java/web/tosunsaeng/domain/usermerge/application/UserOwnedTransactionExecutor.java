@@ -125,6 +125,11 @@ public class UserOwnedTransactionExecutor {
                 : deletionAccess.examCoordination(examId, () -> execute(userId, command));
     }
 
+    public <T> T executeCallback(String userId, String examId, CallbackWriteFence.Lane lane, Supplier<T> command) {
+        return guardService.callbackScope(userId, examId, lane,
+                () -> executeExamCoordination(userId, examId, command));
+    }
+
     public void touchExamWithinExistingTransaction(String userId, String examId) {
         if (deletionAccess == null) touchWithinExistingTransaction(userId);
         else deletionAccess.examCoordination(examId, () -> { touchWithinExistingTransaction(userId); return null; });

@@ -10,6 +10,9 @@ import web.tosunsaeng.domain.withdrawal.repository.WithdrawnUserAccessDenyReposi
 public class UserWithdrawnEventTransactionService {
 
     @org.springframework.beans.factory.annotation.Autowired(required = false)
+    private web.tosunsaeng.domain.usermerge.application.CallbackWriteFence callbackWriteFence;
+
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
     private web.tosunsaeng.domain.notification.NotificationStore notificationStore;
 
     private final UserWithdrawnEventInboxRepository inboxRepository;
@@ -36,6 +39,7 @@ public class UserWithdrawnEventTransactionService {
             throw conflict();
         }
 
+        if (callbackWriteFence != null) callbackWriteFence.touchOwner(event.userId(), event.receivedAt());
         if (notificationStore != null) notificationStore.withdrawn(event.userId(), event.receivedAt());
         if (event.blockedUntil().isAfter(event.receivedAt())) {
             denyRepository.save(new WithdrawnUserAccessDeny(

@@ -43,6 +43,9 @@ class DeletionFlowMongoTest {
                 .partial(PartialIndexFilter.of(Criteria.where("activeGuard").is(true))));
         mongo.insert(UserOwnershipGuard.active(OWNER, clock.instant()));
         var guards = new UserOwnershipGuardService(mongo, new MongoRepositoryFactory(mongo).getRepository(UserOwnershipGuardRepository.class));
+        mongo.createCollection(web.tosunsaeng.domain.usermerge.application.CallbackWriteFence.COLLECTION);
+        org.springframework.test.util.ReflectionTestUtils.setField(guards, "callbackWriteFence",
+                new web.tosunsaeng.domain.usermerge.application.CallbackWriteFence(mongo, true));
         tx = new DeletionTransactions(mongo.getMongoDatabaseFactory());
         commands = new DeletionCommandService(mongo, tx, guards, clock);
         access = new DeletionAccess(mongo);
