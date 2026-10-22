@@ -1005,6 +1005,7 @@ public class ExamServiceImpl implements ExamService {
         }
         executeCallbackForCurrentOwner(
                 examId,
+                web.tosunsaeng.domain.usermerge.application.CallbackWriteFence.Lane.AZURE,
                 () -> processAzureCallbackWithoutGuard(rawPayload)
         );
     }
@@ -1111,6 +1112,17 @@ public class ExamServiceImpl implements ExamService {
     }
 
     private <T> T executeCallbackForCurrentOwner(String examId, Supplier<T> callbackCommand) {
+        return executeCallbackForCurrentOwner(examId,
+                web.tosunsaeng.domain.usermerge.application.CallbackWriteFence.Lane.CORE, callbackCommand);
+    }
+
+    private void executeCallbackForCurrentOwner(String examId,
+            web.tosunsaeng.domain.usermerge.application.CallbackWriteFence.Lane lane, Runnable command) {
+        executeCallbackForCurrentOwner(examId, lane, () -> { command.run(); return Boolean.TRUE; });
+    }
+
+    private <T> T executeCallbackForCurrentOwner(String examId,
+            web.tosunsaeng.domain.usermerge.application.CallbackWriteFence.Lane lane, Supplier<T> callbackCommand) {
         if (userOwnedTransactionExecutor == null || !userOwnedTransactionExecutor.enabled()) return callbackCommand.get();
         RuntimeException lastFailure = null;
         for (int attempt = 0; attempt < 3; attempt++) {
@@ -1118,7 +1130,7 @@ public class ExamServiceImpl implements ExamService {
                     web.tosunsaeng.domain.learningrecorddeletion.domain.DeletionTarget.Type.EXAM, examId)) return null;
             try {
                 ExamSession observed = resolveSession(examId);
-                return userOwnedTransactionExecutor.executeExamCoordination(observed.getUserId(), examId, () -> {
+                return userOwnedTransactionExecutor.executeCallback(observed.getUserId(), examId, lane, () -> {
                     ExamSession current = resolveSession(examId);
                     if (!Objects.equals(current.getUserId(), observed.getUserId())) {
                         throw new CallbackOwnerChangedException();

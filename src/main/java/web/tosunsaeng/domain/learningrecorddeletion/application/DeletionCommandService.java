@@ -70,6 +70,7 @@ public class DeletionCommandService {
     }
     private void requireOwner(String owner) {
         guards.touchActive(owner, clock.instant());
+        guards.fenceCallbacksForOwner(owner, clock.instant());
         if (mongo.exists(Query.query(Criteria.where("_id").is(owner).and("blockedUntil").gt(clock.instant())), "withdrawn_user_access_denies"))
             throw new DeletionFailure(403, "COMMON403");
     }

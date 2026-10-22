@@ -1,5 +1,10 @@
 # 프로젝트 목적
 
+## 2026-10-22 Callback write isolation 전달 승인
+
+- 사용자 구현·운영 배포 요청 및 테스트 선검증 순서의 후속 승인으로 이번 callback CORE/AZURE fence와 lifecycle bridge, 관련 테스트/문서의 커밋·푸시·PR·develop/main 병합과 테스트 후 운영 배포를 허용한다. main의 기존 upload URL guard·이벤트 시각 수정도 develop 전달에 포함한다.
+- lifecycle ON/isolation OFF 배포 및 구 task drain 확인 후 isolation ON을 적용한다. 기존 인증·삭제·탈퇴·통합·환불 제한과 외부 계약은 유지한다. 일반 Git/배포 금지는 이번 범위에서만 대체하며 Billing/Identity 코드·IAM·Secret·기존 업무 데이터 수동 수정은 제외한다.
+
 ## 2026-10-22 AttemptGroup 이벤트 시각 핫픽스 전달 승인
 
 - 사용자 「그거 빨리 수정해서 올려줘」에 따라 신규 AttemptGroup 이벤트의 밀리초 시각 규격 수정, 회귀 테스트, 전용 브랜치 커밋·푸시·PR 및 main 병합과 기존 운영 배포 workflow 실행을 허용한다. 일반 Git/배포 금지의 이번 수정 한정 예외다.
