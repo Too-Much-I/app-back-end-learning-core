@@ -17750,3 +17750,10 @@
 - 사용자 승인에 따라 draft-5 무차감 조회, 전용 workload 목적, completed retry>0 접수, Job+승인 증거 원자 저장 경로와 dispatch/Callback 허용을 구현했다. 기존 closure/권한·삭제·환불/AI·공개API 계약 유지, 기본OFF. 부족402/탈퇴401/일시503/연동결함500 구분.
 - `./gradlew clean test`1,482건 중1,481통과/1skip/실패0. 신규 service fixture 수정 후 전체 성공. `mongoIntegrationTest --tests '*ReanswerApprovalMongoTest'` Docker provider 연결 실패로 실제Mongo 검증 불가. diff check 통과. 승인 시각 BSON string 왕복/rollback용 테스트를 추가했지만 실행 성공으로 표시하지 않는다.
 - 변경 범위는 reanswer 패키지, 시험 서비스/접수정책/Job, workload signer, 설정, 관련 테스트와 인계서·기록. 기존 사용자 dirty 보존, 예상 밖 제품 변경 없음. 신규 Jira·Billing/Identity 변경·외부발송·실DB/index·커밋/푸시/배포 없음. 공동fixture와 실제Billing/시각동기화/권한경합 E2E·격리Mongo 검증 후 활성화. 기존 Reservation/AttemptGroup circuit은 변경하지 않았고 신규조회 운영 차단 연결은 점검대상. Secret/Token 미기록.
+
+
+## 2026-10-22 — 답변 학습 Swagger 보완·테스트 전달
+
+- 사용자 수정·전달 요청에 따라 최신 develop0436b8e 기반 codex/docs-answer-learning-swagger worktree를 만들었다. 운영은 제외하고 develop PR/기존 테스트 배포 대상으로 진행한다. root 사용자 dirty 및 기존 worktree 보존, 신규 Jira 없음.
+- LearningOpenApiConfiguration과 문서 전용 JSON으로 기존10개 경로에만 설명/typed schema/예시/오류를 보강했다. controller/service/DTO/직렬화/API·AI·S3·Redis/기능flag 불변. words 정합성/시간, 상태, 멱등·업로드·완료 조건 포함. 기능OFF 경로 노출 방지/전체 경로·ref·상태 회귀3건 추가. 문서 예시와 실제 COMMON_200/오류 result 생략 차이도 안내했다.
+- 최초 테스트 컴파일의 raw Schema 참조를 수정한 후 clean test1485건(1484pass/1skip) 성공, diff check 통과. CI/Mongo와 실제 테스트 Swagger 배포 확인은 진행 예정. 실제 앱 채점 E2E 미실행. 실DB/IAM/secret/타서비스 변경 없음. Secret/Token 미기록.

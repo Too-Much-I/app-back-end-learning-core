@@ -1,5 +1,13 @@
 # 답변 익히기 API 계약 v1
 
+## 실행 중인 Swagger 문서
+
+- `/swagger-ui/index.html`의 **답변 학습** 태그에서 전체 10개 API를 확인한다.
+- 기능이 활성화된 서버의 `/v3/api-docs`에 요청/응답 스키마, 예시, 오류와 사용 순서가 노출된다. 기능 OFF이면 해당 API를 문서에 새로 만들지 않는다.
+- 문서 보강 원본은 `src/main/resources/openapi/answer-learning.json`이며 실제 컨트롤러 응답 직렬화는 변경하지 않는다.
+- 아래 초기 계약의 envelope 예시와 달리 현재 구현 성공 코드는 `COMMON_200`, 메시지는 `성공입니다.`이다. HTTP 오류는 null `result`가 생략되며 재시도 여부는 제출 조회의 `result.error.retryable`과 구분한다.
+- 실제 앱/S3/채점 연결 검증과 Swagger 문서 검증은 별개다.
+
 **상태: 이 브랜치에서 구현·자동 검증 완료. 백엔드 배포 및 실제 앱 통합은 아직 수행하지 않았다.**
 프론트 구현은 이 계약으로 요청한다. 백엔드가 경로/형식을 바꾸면 `src/features/learning/api/`와 `learning-submission-api.ts`에서 맞춘다.
 [백엔드 실행·운영 안내](README.md) · [프론트 계약 원본](https://github.com/Too-Much-I/app-front-end/blob/feat/answer-learning/docs/api/answer-learning.md)

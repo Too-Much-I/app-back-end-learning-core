@@ -1,0 +1,2354 @@
+{
+  "openapi": "3.0.1",
+  "info": {
+    "title": "답변 학습 문서 보강",
+    "version": "1"
+  },
+  "tags": [
+    {
+      "name": "답변 학습",
+      "description": "목록 → 상세/미디어 → 채점 준비 확인 → 제출 생성 → 업로드 URL → S3 binary PUT → submit → 상태 조회 → 완료. Part 1은 서버 채점 없이 완료 저장. JWT 환경에서는 Swagger Authorize에 Access Token 입력. 사용자 ID는 보내지 않는다."
+    }
+  ],
+  "paths": {
+    "/api/v1/learning/units": {
+      "get": {
+        "tags": [
+          "답변 학습"
+        ],
+        "summary": "학습 카드 목록",
+        "description": "파트/등급별 카드와 현재 사용자 완료 상태. 최대100개, 페이지네이션 없음. Part 1은 유효한 level을 받으면 common으로 정규화.",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "part",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "description": "파트",
+              "minimum": 1,
+              "maximum": 5
+            },
+            "description": "1~5"
+          },
+          {
+            "in": "query",
+            "name": "level",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "description": "Part 1은 common, Part 2~5는 IM3/IH/AL. 화면의 IM은 IM3.",
+              "enum": [
+                "common",
+                "IM3",
+                "IH",
+                "AL"
+              ]
+            },
+            "description": "Part 2~5는 common 불가"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "성공 (COMMON_200). 비동기 작업은 result.status 확인.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "description": "공통 성공 응답",
+                  "properties": {
+                    "isSuccess": {
+                      "type": "boolean",
+                      "example": true
+                    },
+                    "code": {
+                      "type": "string",
+                      "description": "성공 코드",
+                      "example": "COMMON_200"
+                    },
+                    "message": {
+                      "type": "string",
+                      "description": "메시지",
+                      "example": "성공입니다."
+                    },
+                    "result": {
+                      "$ref": "#/components/schemas/LearningUnits"
+                    }
+                  },
+                  "required": [
+                    "isSuccess",
+                    "code",
+                    "message",
+                    "result"
+                  ]
+                },
+                "example": {
+                  "isSuccess": true,
+                  "code": "COMMON_200",
+                  "message": "성공입니다.",
+                  "result": {
+                    "part": 2,
+                    "level": "IH",
+                    "units": [
+                      {
+                        "id": "unit-p2-example",
+                        "part": 2,
+                        "title": "학습 예시",
+                        "thumbnail": null,
+                        "lessons": [
+                          {
+                            "id": "lesson-p2-example",
+                            "questionNumber": 3,
+                            "completed": false
+                          }
+                        ]
+                      }
+                    ]
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "INVALID_REQUEST: 파라미터/본문 형식 오류",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LearningErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "COMMON401 등: 인증 필요/유효하지 않은 토큰",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LearningErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "COMMON403 / LEARNING_FORBIDDEN 등: 접근 제한. 기존 계정·삭제 보호 유지",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LearningErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "LEARNING_NOT_FOUND: 자료 없음 또는 다른 사용자 제출",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LearningErrorResponse"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "LEARNING_UNAVAILABLE: 일시 장애/콘텐츠 정합성 오류. 기존 삭제 보호 오류도 유지",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LearningErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/learning/units/{id}": {
+      "get": {
+        "tags": [
+          "답변 학습"
+        ],
+        "summary": "학습 세트 상세",
+        "description": "문항·모범답안·문장/단어 타이밍·사진·음성·Part 4 표. words[].text.join(' ') === sentence.text를 정확히 보장; 불일치는503. 단어 위치는 반환 배열 기준이며 chunks는 제공하지 않는다.",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "description": "세트 ID",
+            "schema": {
+              "type": "string",
+              "description": "세트 ID"
+            }
+          },
+          {
+            "in": "query",
+            "name": "level",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "description": "Part 1은 common, Part 2~5는 IM3/IH/AL. 화면의 IM은 IM3.",
+              "enum": [
+                "common",
+                "IM3",
+                "IH",
+                "AL"
+              ]
+            },
+            "description": "조회할 등급"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "성공 (COMMON_200). 비동기 작업은 result.status 확인.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "description": "공통 성공 응답",
+                  "properties": {
+                    "isSuccess": {
+                      "type": "boolean",
+                      "example": true
+                    },
+                    "code": {
+                      "type": "string",
+                      "description": "성공 코드",
+                      "example": "COMMON_200"
+                    },
+                    "message": {
+                      "type": "string",
+                      "description": "메시지",
+                      "example": "성공입니다."
+                    },
+                    "result": {
+                      "$ref": "#/components/schemas/LearningDetail"
+                    }
+                  },
+                  "required": [
+                    "isSuccess",
+                    "code",
+                    "message",
+                    "result"
+                  ]
+                },
+                "example": {
+                  "isSuccess": true,
+                  "code": "COMMON_200",
+                  "message": "성공입니다.",
+                  "result": {
+                    "unit": {
+                      "id": "unit-p2-example",
+                      "part": 2,
+                      "title": "학습 예시",
+                      "thumbnail": null,
+                      "lessons": [
+                        {
+                          "id": "lesson-p2-example",
+                          "questionNumber": 3,
+                          "completed": false
+                        }
+                      ]
+                    },
+                    "lessons": [
+                      {
+                        "id": "lesson-p2-example",
+                        "contentVersion": "example-v1",
+                        "part": 2,
+                        "questionNumber": 3,
+                        "question": "Describe the picture.",
+                        "answerSeconds": 45,
+                        "photo": {
+                          "id": "photo-example",
+                          "url": "https://media.example.com/example.jpg",
+                          "expiresAt": "2099-01-01T00:00:00Z",
+                          "width": 1200,
+                          "height": 800
+                        },
+                        "level": "IH",
+                        "answer": {
+                          "id": "answer-example",
+                          "example": "A person reads.",
+                          "fullAudio": {
+                            "id": "audio-example",
+                            "url": "https://media.example.com/example.m4a",
+                            "expiresAt": "2099-01-01T00:00:00Z"
+                          },
+                          "sentences": [
+                            {
+                              "text": "A person reads.",
+                              "translation": "한 사람이 읽습니다.",
+                              "label": "주요 행동",
+                              "audio": {
+                                "id": "audio-example",
+                                "url": "https://media.example.com/example.m4a",
+                                "expiresAt": "2099-01-01T00:00:00Z"
+                              },
+                              "words": [
+                                {
+                                  "text": "A",
+                                  "start": 0,
+                                  "end": 0.2
+                                },
+                                {
+                                  "text": "person",
+                                  "start": 0.2,
+                                  "end": 0.7
+                                },
+                                {
+                                  "text": "reads.",
+                                  "start": 0.7,
+                                  "end": 1.2
+                                }
+                              ]
+                            }
+                          ]
+                        }
+                      }
+                    ]
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "INVALID_REQUEST: 파라미터/본문 형식 오류",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LearningErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "COMMON401 등: 인증 필요/유효하지 않은 토큰",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LearningErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "COMMON403 / LEARNING_FORBIDDEN 등: 접근 제한. 기존 계정·삭제 보호 유지",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LearningErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "LEARNING_NOT_FOUND: 자료 없음 또는 다른 사용자 제출",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LearningErrorResponse"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "LEARNING_UNAVAILABLE: 일시 장애/콘텐츠 정합성 오류. 기존 삭제 보호 오류도 유지",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LearningErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/learning/media/{id}/url": {
+      "get": {
+        "tags": [
+          "답변 학습"
+        ],
+        "summary": "학습 미디어 URL 갱신",
+        "description": "현재 콘텐츠 버전의 미디어 GET URL(1시간)을 발급. 만료/재생 실패 시 갱신. S3에는 앱 Bearer를 보내지 않는다.",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "description": "미디어 ID",
+            "schema": {
+              "type": "string",
+              "description": "미디어 ID"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "성공 (COMMON_200). 비동기 작업은 result.status 확인.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "description": "공통 성공 응답",
+                  "properties": {
+                    "isSuccess": {
+                      "type": "boolean",
+                      "example": true
+                    },
+                    "code": {
+                      "type": "string",
+                      "description": "성공 코드",
+                      "example": "COMMON_200"
+                    },
+                    "message": {
+                      "type": "string",
+                      "description": "메시지",
+                      "example": "성공입니다."
+                    },
+                    "result": {
+                      "$ref": "#/components/schemas/LearningMedia"
+                    }
+                  },
+                  "required": [
+                    "isSuccess",
+                    "code",
+                    "message",
+                    "result"
+                  ]
+                },
+                "example": {
+                  "isSuccess": true,
+                  "code": "COMMON_200",
+                  "message": "성공입니다.",
+                  "result": {
+                    "id": "audio-example",
+                    "url": "https://media.example.com/example.m4a",
+                    "expiresAt": "2099-01-01T00:00:00Z"
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "INVALID_REQUEST: 파라미터/본문 형식 오류",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LearningErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "COMMON401 등: 인증 필요/유효하지 않은 토큰",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LearningErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "COMMON403 / LEARNING_FORBIDDEN 등: 접근 제한. 기존 계정·삭제 보호 유지",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LearningErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "LEARNING_NOT_FOUND: 자료 없음 또는 다른 사용자 제출",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LearningErrorResponse"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "LEARNING_UNAVAILABLE: 일시 장애/콘텐츠 정합성 오류. 기존 삭제 보호 오류도 유지",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LearningErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/learning/capabilities": {
+      "get": {
+        "tags": [
+          "답변 학습"
+        ],
+        "summary": "문항 채점 준비 조회",
+        "description": "ready=true 및 lessonIds에 요청 문항이 포함돼야 채점 준비 상태. 모델은 호출하지 않는다.",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "lessonId",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "description": "문항 ID"
+            },
+            "description": "세트 ID가 아닌 문항 ID"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "성공 (COMMON_200). 비동기 작업은 result.status 확인.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "description": "공통 성공 응답",
+                  "properties": {
+                    "isSuccess": {
+                      "type": "boolean",
+                      "example": true
+                    },
+                    "code": {
+                      "type": "string",
+                      "description": "성공 코드",
+                      "example": "COMMON_200"
+                    },
+                    "message": {
+                      "type": "string",
+                      "description": "메시지",
+                      "example": "성공입니다."
+                    },
+                    "result": {
+                      "$ref": "#/components/schemas/LearningCapabilities"
+                    }
+                  },
+                  "required": [
+                    "isSuccess",
+                    "code",
+                    "message",
+                    "result"
+                  ]
+                },
+                "example": {
+                  "isSuccess": true,
+                  "code": "COMMON_200",
+                  "message": "성공입니다.",
+                  "result": {
+                    "ready": true,
+                    "lessonIds": [
+                      "lesson-p2-example"
+                    ]
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "INVALID_REQUEST: 파라미터/본문 형식 오류",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LearningErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "COMMON401 등: 인증 필요/유효하지 않은 토큰",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LearningErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "COMMON403 / LEARNING_FORBIDDEN 등: 접근 제한. 기존 계정·삭제 보호 유지",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LearningErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "LEARNING_NOT_FOUND: 자료 없음 또는 다른 사용자 제출",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LearningErrorResponse"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "LEARNING_UNAVAILABLE: 일시 장애/콘텐츠 정합성 오류. 기존 삭제 보호 오류도 유지",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LearningErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/learning/submissions": {
+      "post": {
+        "tags": [
+          "답변 학습"
+        ],
+        "summary": "녹음 제출 생성",
+        "description": "Part 2~5 전용. 같은 녹음의 재전송은 같은 submissionId 사용. 기존 ID·같은 문항/등급/버전이면 기존 작업 반환. 새 녹음은 새 ID. 다음: upload-url → S3 PUT → submit → 상태 조회.",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "성공 (COMMON_200). 비동기 작업은 result.status 확인.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "description": "공통 성공 응답",
+                  "properties": {
+                    "isSuccess": {
+                      "type": "boolean",
+                      "example": true
+                    },
+                    "code": {
+                      "type": "string",
+                      "description": "성공 코드",
+                      "example": "COMMON_200"
+                    },
+                    "message": {
+                      "type": "string",
+                      "description": "메시지",
+                      "example": "성공입니다."
+                    },
+                    "result": {
+                      "$ref": "#/components/schemas/LearningJob"
+                    }
+                  },
+                  "required": [
+                    "isSuccess",
+                    "code",
+                    "message",
+                    "result"
+                  ]
+                },
+                "example": {
+                  "isSuccess": true,
+                  "code": "COMMON_200",
+                  "message": "성공입니다.",
+                  "result": {
+                    "id": "d11aa316-35be-4e49-b681-19a35d2c7bce",
+                    "lessonId": "lesson-p2-example",
+                    "contentVersion": "example-v1",
+                    "level": "IH",
+                    "status": "awaiting_audio",
+                    "result": null,
+                    "error": null
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "INVALID_REQUEST: 파라미터/본문 형식 오류",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LearningErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "COMMON401 등: 인증 필요/유효하지 않은 토큰",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LearningErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "COMMON403 / LEARNING_FORBIDDEN 등: 접근 제한. 기존 계정·삭제 보호 유지",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LearningErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "LEARNING_NOT_FOUND: 자료 없음 또는 다른 사용자 제출",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LearningErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "IDEMPOTENCY_CONFLICT / CONTENT_VERSION_CHANGED / CHECKLIST_NOT_READY",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LearningErrorResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "LEARNING_RATE_LIMITED: 일별 생성·재시도 한도",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LearningErrorResponse"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "GRADING_NOT_READY / LEARNING_UNAVAILABLE",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LearningErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LearningCreateRequest"
+              },
+              "example": {
+                "submissionId": "d11aa316-35be-4e49-b681-19a35d2c7bce",
+                "lessonId": "lesson-p2-example",
+                "level": "IH",
+                "contentVersion": "example-v1"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/learning/submissions/{id}/upload-url": {
+      "post": {
+        "tags": [
+          "답변 학습"
+        ],
+        "summary": "녹음 업로드 URL 발급",
+        "description": "awaiting_audio 상태만 허용. 생성 후1일이 지난 제출은 만료. URL 발급 후 동일 크기 binary를 Content-Type audio/mp4로 직접 PUT. PUT만으로 채점되지 않는다.",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "description": "제출 ID",
+            "schema": {
+              "type": "string",
+              "description": "클라이언트가 녹음마다 생성하는 소문자 표준 UUID. 같은 녹음 재전송에는 같은 ID.",
+              "format": "uuid",
+              "example": "d11aa316-35be-4e49-b681-19a35d2c7bce"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "성공 (COMMON_200). 비동기 작업은 result.status 확인.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "description": "공통 성공 응답",
+                  "properties": {
+                    "isSuccess": {
+                      "type": "boolean",
+                      "example": true
+                    },
+                    "code": {
+                      "type": "string",
+                      "description": "성공 코드",
+                      "example": "COMMON_200"
+                    },
+                    "message": {
+                      "type": "string",
+                      "description": "메시지",
+                      "example": "성공입니다."
+                    },
+                    "result": {
+                      "$ref": "#/components/schemas/LearningUploadUrl"
+                    }
+                  },
+                  "required": [
+                    "isSuccess",
+                    "code",
+                    "message",
+                    "result"
+                  ]
+                },
+                "example": {
+                  "isSuccess": true,
+                  "code": "COMMON_200",
+                  "message": "성공입니다.",
+                  "result": {
+                    "submissionId": "d11aa316-35be-4e49-b681-19a35d2c7bce",
+                    "url": "https://upload.example.com/example.m4a",
+                    "expiresAt": "2099-01-01T00:00:00Z",
+                    "maxBytes": 8388608
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "INVALID_REQUEST: 파라미터/본문 형식 오류",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LearningErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "COMMON401 등: 인증 필요/유효하지 않은 토큰",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LearningErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "COMMON403 / LEARNING_FORBIDDEN 등: 접근 제한. 기존 계정·삭제 보호 유지",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LearningErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "LEARNING_NOT_FOUND: 자료 없음 또는 다른 사용자 제출",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LearningErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "UPLOAD_CLOSED",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LearningErrorResponse"
+                }
+              }
+            }
+          },
+          "410": {
+            "description": "SUBMISSION_EXPIRED",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LearningErrorResponse"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "LEARNING_UNAVAILABLE: 일시 장애/콘텐츠 정합성 오류. 기존 삭제 보호 오류도 유지",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LearningErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LearningUploadRequest"
+              },
+              "example": {
+                "contentType": "audio/mp4",
+                "sizeBytes": 250000
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/learning/submissions/{id}/submit": {
+      "post": {
+        "tags": [
+          "답변 학습"
+        ],
+        "summary": "업로드 완료 후 채점 접수",
+        "description": "S3 PUT 성공 후 호출. 파일 확인·입력 고정 후 queued. 반복 요청은 현재 작업 반환. 본문은 생략 또는 {}. API 응답 유실만으로 새 제출 ID를 만들지 않는다.",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "description": "제출 ID",
+            "schema": {
+              "type": "string",
+              "description": "클라이언트가 녹음마다 생성하는 소문자 표준 UUID. 같은 녹음 재전송에는 같은 ID.",
+              "format": "uuid",
+              "example": "d11aa316-35be-4e49-b681-19a35d2c7bce"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "성공 (COMMON_200). 비동기 작업은 result.status 확인.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "description": "공통 성공 응답",
+                  "properties": {
+                    "isSuccess": {
+                      "type": "boolean",
+                      "example": true
+                    },
+                    "code": {
+                      "type": "string",
+                      "description": "성공 코드",
+                      "example": "COMMON_200"
+                    },
+                    "message": {
+                      "type": "string",
+                      "description": "메시지",
+                      "example": "성공입니다."
+                    },
+                    "result": {
+                      "$ref": "#/components/schemas/LearningJob"
+                    }
+                  },
+                  "required": [
+                    "isSuccess",
+                    "code",
+                    "message",
+                    "result"
+                  ]
+                },
+                "example": {
+                  "isSuccess": true,
+                  "code": "COMMON_200",
+                  "message": "성공입니다.",
+                  "result": {
+                    "id": "d11aa316-35be-4e49-b681-19a35d2c7bce",
+                    "lessonId": "lesson-p2-example",
+                    "contentVersion": "example-v1",
+                    "level": "IH",
+                    "status": "queued",
+                    "result": null,
+                    "error": null
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "INVALID_REQUEST: 파라미터/본문 형식 오류",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LearningErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "COMMON401 등: 인증 필요/유효하지 않은 토큰",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LearningErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "COMMON403 / LEARNING_FORBIDDEN 등: 접근 제한. 기존 계정·삭제 보호 유지",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LearningErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "LEARNING_NOT_FOUND: 자료 없음 또는 다른 사용자 제출",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LearningErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "AUDIO_NOT_UPLOADED / AUDIO_CHANGED / UPLOAD_CHANGED / UPLOAD_CLOSED",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LearningErrorResponse"
+                }
+              }
+            }
+          },
+          "410": {
+            "description": "SUBMISSION_EXPIRED",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LearningErrorResponse"
+                }
+              }
+            }
+          },
+          "415": {
+            "description": "INVALID_AUDIO: Content-Type 불일치",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LearningErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "INVALID_AUDIO: 크기 검증 실패",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LearningErrorResponse"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "GRADING_NOT_READY / LEARNING_UNAVAILABLE",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LearningErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": false,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LearningEmpty"
+              },
+              "example": {}
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/learning/submissions/{id}": {
+      "get": {
+        "tags": [
+          "답변 학습"
+        ],
+        "summary": "채점 상태·결과 조회",
+        "description": "약1.2초 간격으로 조회하는 앱 흐름. 대기를 중단해도 작업은 취소되지 않으며 같은 ID로 조회를 재개한다. completed/result, failed/error, no_speech를 구분.",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "description": "제출 ID",
+            "schema": {
+              "type": "string",
+              "description": "클라이언트가 녹음마다 생성하는 소문자 표준 UUID. 같은 녹음 재전송에는 같은 ID.",
+              "format": "uuid",
+              "example": "d11aa316-35be-4e49-b681-19a35d2c7bce"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "성공 (COMMON_200). 비동기 작업은 result.status 확인.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "description": "공통 성공 응답",
+                  "properties": {
+                    "isSuccess": {
+                      "type": "boolean",
+                      "example": true
+                    },
+                    "code": {
+                      "type": "string",
+                      "description": "성공 코드",
+                      "example": "COMMON_200"
+                    },
+                    "message": {
+                      "type": "string",
+                      "description": "메시지",
+                      "example": "성공입니다."
+                    },
+                    "result": {
+                      "$ref": "#/components/schemas/LearningJob"
+                    }
+                  },
+                  "required": [
+                    "isSuccess",
+                    "code",
+                    "message",
+                    "result"
+                  ]
+                },
+                "example": {
+                  "isSuccess": true,
+                  "code": "COMMON_200",
+                  "message": "성공입니다.",
+                  "result": {
+                    "id": "d11aa316-35be-4e49-b681-19a35d2c7bce",
+                    "lessonId": "lesson-p2-example",
+                    "contentVersion": "example-v1",
+                    "level": "IH",
+                    "status": "completed",
+                    "result": {
+                      "checklistVersion": "checklist-example-v1",
+                      "transcript": "A person reads.",
+                      "metCount": 1,
+                      "totalCount": 1,
+                      "items": [
+                        {
+                          "id": "action",
+                          "label": "행동 묘사",
+                          "verdict": "met",
+                          "probability": 0.94,
+                          "feedback": "행동을 설명했어요."
+                        }
+                      ]
+                    },
+                    "error": null
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "INVALID_REQUEST: 파라미터/본문 형식 오류",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LearningErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "COMMON401 등: 인증 필요/유효하지 않은 토큰",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LearningErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "COMMON403 / LEARNING_FORBIDDEN 등: 접근 제한. 기존 계정·삭제 보호 유지",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LearningErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "LEARNING_NOT_FOUND: 자료 없음 또는 다른 사용자 제출",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LearningErrorResponse"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "LEARNING_UNAVAILABLE: 일시 장애/콘텐츠 정합성 오류. 기존 삭제 보호 오류도 유지",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LearningErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/learning/submissions/{id}/retry": {
+      "post": {
+        "tags": [
+          "답변 학습"
+        ],
+        "summary": "실패한 채점 재시도",
+        "description": "failed + error.retryable=true이며 총3회 미만일 때 같은 음성 재시도. 최초 queued 후1일 초과는 만료. failed가 아니면 현재 작업 반환. 새 녹음은 새로운 submissionId로 생성.",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "description": "제출 ID",
+            "schema": {
+              "type": "string",
+              "description": "클라이언트가 녹음마다 생성하는 소문자 표준 UUID. 같은 녹음 재전송에는 같은 ID.",
+              "format": "uuid",
+              "example": "d11aa316-35be-4e49-b681-19a35d2c7bce"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "성공 (COMMON_200). 비동기 작업은 result.status 확인.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "description": "공통 성공 응답",
+                  "properties": {
+                    "isSuccess": {
+                      "type": "boolean",
+                      "example": true
+                    },
+                    "code": {
+                      "type": "string",
+                      "description": "성공 코드",
+                      "example": "COMMON_200"
+                    },
+                    "message": {
+                      "type": "string",
+                      "description": "메시지",
+                      "example": "성공입니다."
+                    },
+                    "result": {
+                      "$ref": "#/components/schemas/LearningJob"
+                    }
+                  },
+                  "required": [
+                    "isSuccess",
+                    "code",
+                    "message",
+                    "result"
+                  ]
+                },
+                "example": {
+                  "isSuccess": true,
+                  "code": "COMMON_200",
+                  "message": "성공입니다.",
+                  "result": {
+                    "id": "d11aa316-35be-4e49-b681-19a35d2c7bce",
+                    "lessonId": "lesson-p2-example",
+                    "contentVersion": "example-v1",
+                    "level": "IH",
+                    "status": "queued",
+                    "result": null,
+                    "error": null
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "INVALID_REQUEST: 파라미터/본문 형식 오류",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LearningErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "COMMON401 등: 인증 필요/유효하지 않은 토큰",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LearningErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "COMMON403 / LEARNING_FORBIDDEN 등: 접근 제한. 기존 계정·삭제 보호 유지",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LearningErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "LEARNING_NOT_FOUND: 자료 없음 또는 다른 사용자 제출",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LearningErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "RETRY_NOT_ALLOWED",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LearningErrorResponse"
+                }
+              }
+            }
+          },
+          "410": {
+            "description": "SUBMISSION_EXPIRED",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LearningErrorResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "LEARNING_RATE_LIMITED",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LearningErrorResponse"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "GRADING_NOT_READY / LEARNING_UNAVAILABLE",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LearningErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": false,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LearningEmpty"
+              },
+              "example": {}
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/learning/lessons/{id}/completion": {
+      "put": {
+        "tags": [
+          "답변 학습"
+        ],
+        "summary": "문항 학습 완료 저장",
+        "description": "사용자·문항·등급·버전별 멱등 저장. Part 1은 common과 submissionId 생략/null. Part 2~5는 같은 문항/등급/버전의 completed 제출 필요. 채점 완료 worker도 완료 기록을 저장한다.",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "description": "문항 ID",
+            "schema": {
+              "type": "string",
+              "description": "문항 ID"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "성공 (COMMON_200). 비동기 작업은 result.status 확인.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "description": "공통 성공 응답",
+                  "properties": {
+                    "isSuccess": {
+                      "type": "boolean",
+                      "example": true
+                    },
+                    "code": {
+                      "type": "string",
+                      "description": "성공 코드",
+                      "example": "COMMON_200"
+                    },
+                    "message": {
+                      "type": "string",
+                      "description": "메시지",
+                      "example": "성공입니다."
+                    },
+                    "result": {
+                      "$ref": "#/components/schemas/LearningCompletion"
+                    }
+                  },
+                  "required": [
+                    "isSuccess",
+                    "code",
+                    "message",
+                    "result"
+                  ]
+                },
+                "example": {
+                  "isSuccess": true,
+                  "code": "COMMON_200",
+                  "message": "성공입니다.",
+                  "result": {
+                    "lessonId": "lesson-p2-example",
+                    "level": "IH",
+                    "contentVersion": "example-v1",
+                    "completed": true
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "INVALID_REQUEST: 파라미터/본문 형식 오류",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LearningErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "COMMON401 등: 인증 필요/유효하지 않은 토큰",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LearningErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "COMMON403 / LEARNING_FORBIDDEN 등: 접근 제한. 기존 계정·삭제 보호 유지",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LearningErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "LEARNING_NOT_FOUND: 자료 없음 또는 다른 사용자 제출",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LearningErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "CONTENT_VERSION_CHANGED / COMPLETION_NOT_READY",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LearningErrorResponse"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "LEARNING_UNAVAILABLE: 일시 장애/콘텐츠 정합성 오류. 기존 삭제 보호 오류도 유지",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LearningErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LearningCompletionRequest"
+              },
+              "example": {
+                "level": "IH",
+                "contentVersion": "example-v1",
+                "submissionId": "d11aa316-35be-4e49-b681-19a35d2c7bce"
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "LearningMedia": {
+        "type": "object",
+        "description": "사진/음성 공통 미디어",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "미디어 ID"
+          },
+          "url": {
+            "type": "string",
+            "description": "유효기간 1시간의 서명된 GET URL. 앱 Bearer를 S3에 보내지 않는다.",
+            "format": "uri"
+          },
+          "expiresAt": {
+            "type": "string",
+            "description": "URL 만료 시각",
+            "format": "date-time"
+          },
+          "width": {
+            "type": "integer",
+            "description": "사진 너비 (사진인 경우)"
+          },
+          "height": {
+            "type": "integer",
+            "description": "사진 높이 (사진인 경우)"
+          }
+        },
+        "required": [
+          "id",
+          "url",
+          "expiresAt"
+        ]
+      },
+      "LearningLessonRef": {
+        "type": "object",
+        "description": "카드 문항 요약",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "문항 ID"
+          },
+          "questionNumber": {
+            "type": "integer",
+            "description": "문항 번호"
+          },
+          "completed": {
+            "type": "boolean",
+            "description": "현재 사용자·등급·콘텐츠 버전의 완료 여부"
+          }
+        },
+        "required": [
+          "id",
+          "questionNumber",
+          "completed"
+        ]
+      },
+      "LearningUnit": {
+        "type": "object",
+        "description": "학습 카드. thumbnail은 없으면 null.",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "학습 세트 ID"
+          },
+          "part": {
+            "type": "integer",
+            "description": "파트",
+            "minimum": 1,
+            "maximum": 5
+          },
+          "title": {
+            "type": "string",
+            "description": "카드 제목"
+          },
+          "thumbnail": {
+            "nullable": true,
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/LearningMedia"
+              }
+            ]
+          },
+          "lessons": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/LearningLessonRef"
+            }
+          }
+        },
+        "required": [
+          "id",
+          "part",
+          "title",
+          "lessons"
+        ]
+      },
+      "LearningUnits": {
+        "type": "object",
+        "description": "파트별 전체 카드, 페이지네이션 없음. 최대100개.",
+        "properties": {
+          "part": {
+            "type": "integer",
+            "description": "파트"
+          },
+          "level": {
+            "type": "string",
+            "description": "Part 1은 common, Part 2~5는 IM3/IH/AL. 화면의 IM은 IM3.",
+            "enum": [
+              "common",
+              "IM3",
+              "IH",
+              "AL"
+            ]
+          },
+          "units": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/LearningUnit"
+            }
+          }
+        },
+        "required": [
+          "part",
+          "level",
+          "units"
+        ]
+      },
+      "LearningWord": {
+        "type": "object",
+        "description": "배열 순서/위치가 단어 조각 참조 기준.",
+        "properties": {
+          "text": {
+            "type": "string",
+            "description": "공백 연결에 사용되는 원본 단어. 구두점 포함.",
+            "example": "book."
+          },
+          "start": {
+            "type": "number",
+            "description": "문장 음성 시작 기준 초",
+            "minimum": 0
+          },
+          "end": {
+            "type": "number",
+            "description": "문장 음성 시작 기준 초 (end >= start)",
+            "minimum": 0
+          }
+        },
+        "required": [
+          "text",
+          "start",
+          "end"
+        ]
+      },
+      "LearningSentence": {
+        "type": "object",
+        "description": "서버는 words/text 불일치 시 503 LEARNING_UNAVAILABLE. 순서·공백·구두점을 보정하지 않는다.",
+        "properties": {
+          "text": {
+            "type": "string",
+            "description": "words[].text를 공백 하나로 연결한 문자열과 정확히 일치"
+          },
+          "translation": {
+            "type": "string",
+            "description": "문장 번역 (없으면 표시하지 않음)",
+            "nullable": true
+          },
+          "label": {
+            "type": "string",
+            "description": "문장 역할",
+            "nullable": true
+          },
+          "audio": {
+            "nullable": true,
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/LearningMedia"
+              }
+            ]
+          },
+          "words": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/LearningWord"
+            },
+            "minItems": 1
+          }
+        },
+        "required": [
+          "text",
+          "words"
+        ]
+      },
+      "LearningAnswer": {
+        "type": "object",
+        "description": "선택된 등급의 모범답안. chunks 필드는 제공하지 않는다.",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "모범답안 ID"
+          },
+          "example": {
+            "type": "string",
+            "description": "전체 모범답안"
+          },
+          "durationSeconds": {
+            "type": "number",
+            "description": "전체 음성 길이 (선택)"
+          },
+          "fullAudio": {
+            "$ref": "#/components/schemas/LearningMedia"
+          },
+          "sentences": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/LearningSentence"
+            },
+            "minItems": 1
+          }
+        },
+        "required": [
+          "id",
+          "example",
+          "sentences"
+        ]
+      },
+      "LearningTable": {
+        "type": "object",
+        "description": "Part 4 표. tableFocus는 원본 값의 발췌이며 행/열이 빈 배열일 수 있다.",
+        "properties": {
+          "tableType": {
+            "type": "string",
+            "description": "표 종류"
+          },
+          "title": {
+            "type": "string",
+            "description": "표 제목"
+          },
+          "subtitles": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "description": "부제"
+            }
+          },
+          "metadata": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "description": "메타데이터",
+              "properties": {
+                "key": {
+                  "type": "string",
+                  "description": "키"
+                },
+                "label": {
+                  "type": "string",
+                  "description": "표시명"
+                },
+                "value": {
+                  "type": "string",
+                  "description": "값"
+                }
+              }
+            }
+          },
+          "columns": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "description": "열",
+              "properties": {
+                "key": {
+                  "type": "string",
+                  "description": "열 키"
+                },
+                "label": {
+                  "type": "string",
+                  "description": "열 표시명"
+                },
+                "valueType": {
+                  "type": "string",
+                  "description": "값 형식"
+                }
+              }
+            }
+          },
+          "items": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "description": "행",
+              "properties": {
+                "cells": {
+                  "type": "object",
+                  "additionalProperties": {
+                    "type": "string"
+                  },
+                  "description": "열 key별 값"
+                },
+                "status": {
+                  "type": "string",
+                  "description": "상태"
+                },
+                "statusNote": {
+                  "type": "string",
+                  "description": "상태 설명",
+                  "nullable": true
+                },
+                "strikeThrough": {
+                  "type": "boolean",
+                  "description": "취소선 여부"
+                }
+              }
+            }
+          },
+          "notes": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "description": "각주"
+            }
+          }
+        }
+      },
+      "LearningLesson": {
+        "type": "object",
+        "description": "파트별 선택 필드는 없거나 null일 수 있다.",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "문항 ID"
+          },
+          "contentVersion": {
+            "type": "string",
+            "description": "완료·제출 요청에 그대로 전달할 버전"
+          },
+          "part": {
+            "type": "integer",
+            "description": "파트",
+            "minimum": 1,
+            "maximum": 5
+          },
+          "questionNumber": {
+            "type": "integer",
+            "description": "문항 번호"
+          },
+          "question": {
+            "type": "string",
+            "description": "영어 질문"
+          },
+          "questionTranslation": {
+            "type": "string",
+            "description": "질문 번역",
+            "nullable": true
+          },
+          "passage": {
+            "type": "string",
+            "description": "Part 1 지문",
+            "nullable": true
+          },
+          "passageTranslation": {
+            "type": "string",
+            "description": "지문 번역",
+            "nullable": true
+          },
+          "answerSeconds": {
+            "type": "integer",
+            "description": "실전 녹음 제한 초"
+          },
+          "photo": {
+            "nullable": true,
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/LearningMedia"
+              }
+            ]
+          },
+          "contextIntro": {
+            "type": "string",
+            "description": "세트 상황 설명",
+            "nullable": true
+          },
+          "table": {
+            "nullable": true,
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/LearningTable"
+              }
+            ]
+          },
+          "tableFocus": {
+            "nullable": true,
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/LearningTable"
+              }
+            ]
+          },
+          "level": {
+            "type": "string",
+            "description": "Part 1은 common, Part 2~5는 IM3/IH/AL. 화면의 IM은 IM3.",
+            "enum": [
+              "common",
+              "IM3",
+              "IH",
+              "AL"
+            ]
+          },
+          "answer": {
+            "$ref": "#/components/schemas/LearningAnswer"
+          }
+        },
+        "required": [
+          "id",
+          "contentVersion",
+          "part",
+          "questionNumber",
+          "level",
+          "answer"
+        ]
+      },
+      "LearningDetail": {
+        "type": "object",
+        "description": "unit.lessons와 동일 순서의 문항 상세",
+        "properties": {
+          "unit": {
+            "$ref": "#/components/schemas/LearningUnit"
+          },
+          "lessons": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/LearningLesson"
+            }
+          }
+        },
+        "required": [
+          "unit",
+          "lessons"
+        ]
+      },
+      "LearningCapabilities": {
+        "type": "object",
+        "description": "ready와 lessonIds 포함 여부를 모두 확인. Part 1/체크리스트 미준비이면 lessonIds는 빈 배열.",
+        "properties": {
+          "ready": {
+            "type": "boolean",
+            "description": "서버 채점 기능 활성 여부"
+          },
+          "lessonIds": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "description": "체크리스트가 준비된 요청 문항 ID"
+            }
+          }
+        },
+        "required": [
+          "ready",
+          "lessonIds"
+        ]
+      },
+      "LearningCriterion": {
+        "type": "object",
+        "description": "체크리스트 판정. 공식 토익스피킹 점수가 아니다.",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "체크리스트 항목 ID"
+          },
+          "label": {
+            "type": "string",
+            "description": "항목명"
+          },
+          "verdict": {
+            "type": "string",
+            "description": "판정",
+            "enum": [
+              "met",
+              "not_met",
+              "uncertain"
+            ]
+          },
+          "probability": {
+            "type": "number",
+            "description": "확률",
+            "minimum": 0,
+            "maximum": 1
+          },
+          "feedback": {
+            "type": "string",
+            "description": "피드백"
+          }
+        },
+        "required": [
+          "id",
+          "label",
+          "verdict",
+          "probability",
+          "feedback"
+        ]
+      },
+      "LearningResult": {
+        "type": "object",
+        "description": "completed일 때 결과. 모델 내부 메타데이터는 포함하지 않는다.",
+        "properties": {
+          "checklistVersion": {
+            "type": "string",
+            "description": "체크리스트 버전"
+          },
+          "transcript": {
+            "type": "string",
+            "description": "인식 텍스트; 로그/분석 이벤트에 기록하지 않는다."
+          },
+          "metCount": {
+            "type": "integer",
+            "description": "met 항목 수"
+          },
+          "totalCount": {
+            "type": "integer",
+            "description": "전체 항목 수"
+          },
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/LearningCriterion"
+            }
+          }
+        },
+        "required": [
+          "checklistVersion",
+          "transcript",
+          "metCount",
+          "totalCount",
+          "items"
+        ]
+      },
+      "LearningJobError": {
+        "type": "object",
+        "description": "failed일 때 오류",
+        "properties": {
+          "code": {
+            "type": "string",
+            "description": "고정 오류 코드"
+          },
+          "message": {
+            "type": "string",
+            "description": "사용자 안내"
+          },
+          "retryable": {
+            "type": "boolean",
+            "description": "서버 재시도 허용 여부"
+          }
+        },
+        "required": [
+          "code",
+          "message",
+          "retryable"
+        ]
+      },
+      "LearningJob": {
+        "type": "object",
+        "description": "HTTP 성공은 채점 완료를 뜻하지 않는다. completed는 result, failed는 error 확인. 무음 no_speech는 새로 녹음.",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "클라이언트가 녹음마다 생성하는 소문자 표준 UUID. 같은 녹음 재전송에는 같은 ID.",
+            "format": "uuid",
+            "example": "d11aa316-35be-4e49-b681-19a35d2c7bce"
+          },
+          "lessonId": {
+            "type": "string",
+            "description": "문항 ID"
+          },
+          "contentVersion": {
+            "type": "string",
+            "description": "콘텐츠 버전"
+          },
+          "level": {
+            "type": "string",
+            "description": "등급",
+            "enum": [
+              "IM3",
+              "IH",
+              "AL"
+            ]
+          },
+          "status": {
+            "type": "string",
+            "description": "처리 상태",
+            "enum": [
+              "awaiting_audio",
+              "queued",
+              "transcribing",
+              "grading",
+              "completed",
+              "failed",
+              "no_speech"
+            ]
+          },
+          "result": {
+            "nullable": true,
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/LearningResult"
+              }
+            ]
+          },
+          "error": {
+            "nullable": true,
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/LearningJobError"
+              }
+            ]
+          }
+        },
+        "required": [
+          "id",
+          "lessonId",
+          "contentVersion",
+          "level",
+          "status"
+        ]
+      },
+      "LearningUploadUrl": {
+        "type": "object",
+        "description": "Content-Type audio/mp4 및 발급 요청 sizeBytes와 동일한 파일을 PUT.",
+        "properties": {
+          "submissionId": {
+            "type": "string",
+            "description": "클라이언트가 녹음마다 생성하는 소문자 표준 UUID. 같은 녹음 재전송에는 같은 ID.",
+            "format": "uuid",
+            "example": "d11aa316-35be-4e49-b681-19a35d2c7bce"
+          },
+          "url": {
+            "type": "string",
+            "description": "서명된 S3 PUT URL; binary 업로드, Bearer 전달 금지",
+            "format": "uri"
+          },
+          "expiresAt": {
+            "type": "string",
+            "description": "발급 기록 시점 기준 최대5분",
+            "format": "date-time"
+          },
+          "maxBytes": {
+            "type": "integer",
+            "description": "최대8 MiB",
+            "example": 8388608
+          }
+        },
+        "required": [
+          "submissionId",
+          "url",
+          "expiresAt",
+          "maxBytes"
+        ]
+      },
+      "LearningCompletion": {
+        "type": "object",
+        "description": "완료 응답",
+        "properties": {
+          "lessonId": {
+            "type": "string",
+            "description": "문항 ID"
+          },
+          "level": {
+            "type": "string",
+            "description": "Part 1은 common, Part 2~5는 IM3/IH/AL. 화면의 IM은 IM3.",
+            "enum": [
+              "common",
+              "IM3",
+              "IH",
+              "AL"
+            ]
+          },
+          "contentVersion": {
+            "type": "string",
+            "description": "콘텐츠 버전"
+          },
+          "completed": {
+            "type": "boolean",
+            "description": "완료 저장됨"
+          }
+        },
+        "required": [
+          "lessonId",
+          "level",
+          "contentVersion",
+          "completed"
+        ]
+      },
+      "LearningCreateRequest": {
+        "type": "object",
+        "description": "Part 2~5 제출 생성",
+        "properties": {
+          "submissionId": {
+            "type": "string",
+            "description": "클라이언트가 녹음마다 생성하는 소문자 표준 UUID. 같은 녹음 재전송에는 같은 ID.",
+            "format": "uuid",
+            "example": "d11aa316-35be-4e49-b681-19a35d2c7bce"
+          },
+          "lessonId": {
+            "type": "string",
+            "description": "상세 응답의 문항 ID",
+            "maxLength": 160
+          },
+          "level": {
+            "type": "string",
+            "description": "등급",
+            "enum": [
+              "IM3",
+              "IH",
+              "AL"
+            ]
+          },
+          "contentVersion": {
+            "type": "string",
+            "description": "상세 응답의 버전",
+            "maxLength": 160
+          }
+        },
+        "required": [
+          "submissionId",
+          "lessonId",
+          "level",
+          "contentVersion"
+        ]
+      },
+      "LearningUploadRequest": {
+        "type": "object",
+        "description": "M4A/AAC 파일",
+        "properties": {
+          "contentType": {
+            "type": "string",
+            "description": "정확히 audio/mp4",
+            "enum": [
+              "audio/mp4"
+            ]
+          },
+          "sizeBytes": {
+            "type": "integer",
+            "description": "실제 업로드 파일 바이트",
+            "minimum": 1,
+            "maximum": 8388608
+          }
+        },
+        "required": [
+          "contentType",
+          "sizeBytes"
+        ]
+      },
+      "LearningCompletionRequest": {
+        "type": "object",
+        "description": "Part 1은 common, Part 2~5는 채점 완료 후 저장.",
+        "properties": {
+          "level": {
+            "type": "string",
+            "description": "Part 1은 common, Part 2~5는 IM3/IH/AL. 화면의 IM은 IM3.",
+            "enum": [
+              "common",
+              "IM3",
+              "IH",
+              "AL"
+            ]
+          },
+          "contentVersion": {
+            "type": "string",
+            "description": "상세 응답의 버전",
+            "maxLength": 160
+          },
+          "submissionId": {
+            "type": "string",
+            "description": "Part 2~5는 같은 문항/등급/버전의 completed 제출 ID 필수. Part 1은 생략/null.",
+            "format": "uuid",
+            "example": "d11aa316-35be-4e49-b681-19a35d2c7bce",
+            "nullable": true
+          }
+        },
+        "required": [
+          "level",
+          "contentVersion"
+        ]
+      },
+      "LearningEmpty": {
+        "type": "object",
+        "description": "본문 생략 또는 빈 JSON 객체 {}만 허용.",
+        "properties": {},
+        "additionalProperties": false
+      },
+      "LearningErrorResponse": {
+        "type": "object",
+        "description": "오류에서는 null result가 JSON에서 생략된다. Job.error와 다른 형식.",
+        "properties": {
+          "isSuccess": {
+            "type": "boolean",
+            "example": false
+          },
+          "code": {
+            "type": "string",
+            "description": "고정 오류 코드",
+            "example": "LEARNING_NOT_FOUND"
+          },
+          "message": {
+            "type": "string",
+            "description": "사용자 안내",
+            "example": "학습 정보를 찾을 수 없어요."
+          }
+        },
+        "required": [
+          "isSuccess",
+          "code",
+          "message"
+        ]
+      }
+    }
+  }
+}
