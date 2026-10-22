@@ -30,6 +30,9 @@ class AccessRevocationMongoTest {
         mongo=new MongoTemplate(new SimpleMongoClientDatabaseFactory(client,"isolated-revoke-"+UUID.randomUUID()));
         for(String c:List.of(AccessRevocationStore.COLLECTION,"exam_sessions","user_ownership_guards")) mongo.createCollection(c);
         indexes(); store=new AccessRevocationStore(mongo,"test","fixture-test",Clock.fixed(NOW,ZoneOffset.UTC)); store.validateIndexes();
+        mongo.createCollection(web.tosunsaeng.domain.usermerge.application.CallbackWriteFence.COLLECTION);
+        org.springframework.test.util.ReflectionTestUtils.setField(store, "callbackWriteFence",
+                new web.tosunsaeng.domain.usermerge.application.CallbackWriteFence(mongo, true));
         mongo.insert(new Document("_id",USER).append("state","ACTIVE").append("revision",0L),"user_ownership_guards");
     }
     @AfterEach void drop(){mongo.getDb().drop();}
@@ -59,6 +62,11 @@ class AccessRevocationMongoTest {
         assertThat(store.denied(GROUP,"protected",USER)).isFalse();
         assertThat(store.denied(GROUP,"later",USER)).isTrue();
         assertThat(store.denied(GROUP,"protected","different-owner")).isTrue();
+        for (String id : List.of("protected", "other")) {
+            for (String lane : List.of("CORE", "AZURE"))
+                assertThat(mongo.findById(lane + ":" + id, Document.class,
+                        web.tosunsaeng.domain.usermerge.application.CallbackWriteFence.COLLECTION)).isNotNull();
+        }
     }
     @Test void eventConflictPrecedesGroupConflictAndCannotChangeProtectedNull(){
         String id=UUID.randomUUID().toString(); store.accept(event(id,GROUP,null));

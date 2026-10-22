@@ -17762,3 +17762,10 @@
 - 사용자 긴급 수정·운영 전달 요청. main c89087b 기준 codex/fix-attempt-event-millis에서 신규 payload 생성 시 occurredAt 밀리초 절삭 및 UTC 소수3자리 직렬화 적용. canonical bytes/digest 생성 이전에만 적용하고 기존 저장 payload의 publish/retry는 변경하지 않는다. 관련 TMI-128, 신규 Jira 없음.
 - GRADING/COMPLETED/RETAKE_AVAILABLE3종·정수초/밀리초2종·기존 저장 payload 불변 전송 및 coordinator 나노초 Clock 회귀 추가/보강. 최종 clean test 성공. 운영 PR/CI/배포 확인은 후속 진행하며 현재 완료 아님.
 - 공개 API/AI/S3/Redis/기능설정 불변. root 기존 사용자 dirty 보존, Billing/Identity/실DB/IAM 변경 없음. 기존 DEAD_LETTER 복구는 불변 이벤트 계약을 지키는 별도 승인 절차 필요. Secret/Token 미기록.
+
+## 2026-10-22 — Callback write isolation (TMI-128)
+
+- 사용자 승인으로 main39678c8 기반 별도 브랜치에서 callback CORE/AZURE fence 및 lifecycle bridge 구현. 진입/저장 hook의 owner guard write를 같은 scoped lane으로 대체하고 일반 writer·삭제·통합·탈퇴·환불 보호를 유지한다.
+- clean test/mongoIntegrationTest 중간 전체 성공, 추가 최초 삽입/역방향 Mongo112 경합 집중 테스트 성공, Node 배포/DB 준비211개 성공. 최종 환불 bridge 회귀 포함 재실행 중. API/AI/S3/Redis/완료 조건 불변.
+- 신규 collection은 최소 revision fence만 보존하며 TTL/purge 미추가. main의 upload URL·timestamp 수정도 test 전달에 포함한다. 테스트 후 운영에 bridge 배포/drain→isolation ON, 복구는 isolation OFF/drain 선행. 실앱 E2E는 미검증.
+- ECS test53/prod18, desired1/minHealthy100/max200/rolling/grace300 확인. 현재 외부 변경 없음. 코드 커밋·CI/배포 상태는 후속 기록한다. 사용자 root dirty·타서비스 작업 보존, Secret/Token 미기록.
