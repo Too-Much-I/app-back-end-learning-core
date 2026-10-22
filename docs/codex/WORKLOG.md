@@ -17769,3 +17769,9 @@
 - clean test/mongoIntegrationTest 중간 전체 성공, 추가 최초 삽입/역방향 Mongo112 경합 집중 테스트 성공, Node 배포/DB 준비211개 성공. 최종 환불 bridge 회귀 포함 재실행 중. API/AI/S3/Redis/완료 조건 불변.
 - 신규 collection은 최소 revision fence만 보존하며 TTL/purge 미추가. main의 upload URL·timestamp 수정도 test 전달에 포함한다. 테스트 후 운영에 bridge 배포/drain→isolation ON, 복구는 isolation OFF/drain 선행. 실앱 E2E는 미검증.
 - ECS test53/prod18, desired1/minHealthy100/max200/rolling/grace300 확인. 현재 외부 변경 없음. 코드 커밋·CI/배포 상태는 후속 기록한다. 사용자 root dirty·타서비스 작업 보존, Secret/Token 미기록.
+
+## 2026-10-22 — 답변 학습 Swagger 보완·테스트 전달
+
+- 사용자 수정·전달 요청에 따라 최신 develop0436b8e 기반 codex/docs-answer-learning-swagger worktree를 만들었다. 운영은 제외하고 develop PR/기존 테스트 배포 대상으로 진행한다. root 사용자 dirty 및 기존 worktree 보존, 신규 Jira 없음.
+- LearningOpenApiConfiguration과 문서 전용 JSON으로 기존10개 경로에만 설명/typed schema/예시/오류를 보강했다. controller/service/DTO/직렬화/API·AI·S3·Redis/기능flag 불변. words 정합성/시간, 상태, 멱등·업로드·완료 조건 포함. 기능OFF 경로 노출 방지/전체 경로·ref·상태 회귀3건 추가. 문서 예시와 실제 COMMON_200/오류 result 생략 차이도 안내했다.
+- 최초 테스트 컴파일의 raw Schema 참조를 수정한 후 clean test1485건(1484pass/1skip) 성공, diff check 통과. CI/Mongo와 실제 테스트 Swagger 배포 확인은 진행 예정. 실제 앱 채점 E2E 미실행. 실DB/IAM/secret/타서비스 변경 없음. Secret/Token 미기록.
