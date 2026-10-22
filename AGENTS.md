@@ -1,5 +1,10 @@
 # 프로젝트 목적
 
+## 2026-10-22 AttemptGroup 이벤트 시각 핫픽스 전달 승인
+
+- 사용자 「그거 빨리 수정해서 올려줘」에 따라 신규 AttemptGroup 이벤트의 밀리초 시각 규격 수정, 회귀 테스트, 전용 브랜치 커밋·푸시·PR 및 main 병합과 기존 운영 배포 workflow 실행을 허용한다. 일반 Git/배포 금지의 이번 수정 한정 예외다.
+- 기존 공개 API/AI/S3/Redis/feature flag와 이미 저장된 outbox의 eventId·canonical payload·digest는 유지한다. 실패 이벤트 재작성·재전송, 실DB 변경, Billing/Identity 코드 수정 및 IAM 확대는 이 승인에 포함하지 않는다.
+
 ## 2026-10-21 main/develop 동기화·Mongo 진단 전달 승인 예외
 
 - 사용자는 이번 작업 한정 AGENTS 예외 추가 요청에 「어 해줘」로 승인했다. main→develop 동기화, 기존 PR54 단어·문장 정합성 검증 유지, 비민감 Mongo 오류·재시도 로그 보강의 커밋·푸시·PR 생성·develop/main PR 병합 및 기존 workflow의 테스트·운영 배포를 허용한다. 일반 Git 금지와 이전 과제의 배포 금지는 이번 전달 범위에서만 대체한다.

@@ -48,7 +48,7 @@ class AttemptGroupStateCoordinatorTest {
 
     @Test
     void gradingTransitionAndOutboxInsertShareTransactionBoundary() {
-        Instant now = Instant.parse("2026-09-01T03:00:00Z");
+        Instant now = Instant.parse("2026-09-01T03:00:00.123456789Z");
         ExamSession session = ExamSession.builder()
                 .examId("ex_group").userId("00000000-0000-4000-8000-000000000001")
                 .mockExamId("mock_exam_001").status(ExamSessionStatus.IN_PROGRESS).active(true)
@@ -85,5 +85,6 @@ class AttemptGroupStateCoordinatorTest {
                 session.getAttemptGroupProjectionStatus());
         assertNotNull(session.getGradingEventId());
         assertEquals(session.getGradingEventId(), event.getValue().getEventId());
+        assertEquals(Instant.parse("2026-09-01T03:00:00.123Z"), event.getValue().getOccurredAt());
     }
 }

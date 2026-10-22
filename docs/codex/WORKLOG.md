@@ -17756,3 +17756,9 @@
 - 사용자 브랜치 생성·수정·운영 직접 배포 승인으로 origin/main c32df4a에서 codex/fix-upload-url-guard 생성. root/이전 worktree dirty를 보존했다. 관련 TMI-125/TMI-193.
 - URL 발급만 read-only guard 검사로 분리하고 서명 전후 현재 소유권·삭제·merged/refund 차단 및 재답변 승인 만료 검사를 수행한다. 기존 submit/callback/전역retry/API/AI/S3/Redis 불변. residual capability 경합 수용 범위는 UPLOAD_URL_READ_ONLY_GUARD_FIX.md에 기록했다.
 - 신규7개 회귀와 전체 테스트 실행 중. 최초 테스트 패키지 오기와 기존 소유권 조회 순서2개 실패를 수정하고 재실행한다. 아직 commit/push/배포 완료 아님. Secret/Token 기록 없음.
+
+## 2026-10-22 — AttemptGroup 신규 이벤트 밀리초 정밀도 수정
+
+- 사용자 긴급 수정·운영 전달 요청. main c89087b 기준 codex/fix-attempt-event-millis에서 신규 payload 생성 시 occurredAt 밀리초 절삭 및 UTC 소수3자리 직렬화 적용. canonical bytes/digest 생성 이전에만 적용하고 기존 저장 payload의 publish/retry는 변경하지 않는다. 관련 TMI-128, 신규 Jira 없음.
+- GRADING/COMPLETED/RETAKE_AVAILABLE3종·정수초/밀리초2종·기존 저장 payload 불변 전송 및 coordinator 나노초 Clock 회귀 추가/보강. 최종 clean test 성공. 운영 PR/CI/배포 확인은 후속 진행하며 현재 완료 아님.
+- 공개 API/AI/S3/Redis/기능설정 불변. root 기존 사용자 dirty 보존, Billing/Identity/실DB/IAM 변경 없음. 기존 DEAD_LETTER 복구는 불변 이벤트 계약을 지키는 별도 승인 절차 필요. Secret/Token 미기록.

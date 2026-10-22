@@ -74,6 +74,19 @@ class AttemptGroupOutboxPublisherTest {
     }
 
     @Test
+    void persistedLegacyPayloadIsSentUnchangedRatherThanRecanonicalized() {
+        String persisted = "{\"occurredAt\":\"2026-10-20T09:52:37.552146195Z\"}";
+        when(event.getCanonicalPayload()).thenReturn(persisted);
+        when(client.send(anyString(), anyString()))
+                .thenReturn(new AttemptGroupEventClient.Response(204, null));
+        when(outboxStore.markDelivered(anyString(), anyString(), any(), any())).thenReturn(true);
+
+        publisher.publishAvailable();
+
+        verify(client).send(org.mockito.ArgumentMatchers.eq(persisted), anyString());
+    }
+
+    @Test
     void authFailureBlocksEventAndGlobalCircuit() {
         when(client.send(anyString(), anyString()))
                 .thenReturn(new AttemptGroupEventClient.Response(403, null));
