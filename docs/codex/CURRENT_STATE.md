@@ -1,5 +1,10 @@
 # Learning Core Current State
 
+- 2026-10-22 Callback write isolation(TMI-128): CORE/AZURE lane 및 lifecycle bridge 구현, default OFF. 기존 main upload URL·timestamp 수정 포함 test 전달 후 prod 순차 전달 준비. 최종 회귀/CI·배포는 진행 중이며 실앱 E2E 미검증. 상세 `CALLBACK_WRITE_ISOLATION_ROLLOUT.md`; isolation ON 후 lifecycle 없는 코드로 직접 rollback 금지.
+
+- 2026-10-22 AttemptGroup 시간 정밀도 핫픽스(TMI-128 관련): main c89087b 기반 codex/fix-attempt-event-millis에서 신규 event occurredAt을 밀리초로 절삭하고 UTC 소수3자리로 직렬화. 기존 persisted payload 재전송 불변 회귀 포함. clean test 성공, 운영 전달 준비 중이며 아직 배포 미완료. 기존 DEAD_LETTER는 변경/재전송하지 않음.
+
+- 2026-10-22 upload-url 한정 read-only guard 수정 진행(codex/fix-upload-url-guard, TMI-125/TMI-193). 사용자 운영 직접 배포 승인. 사전·사후 권한 검사와 submit/callback fence 유지, 외부 계약 불변. 로컬/CI 검증 후 main 전달 예정, 현재 배포 완료 아님.
 - 2026-10-22 답변 학습 Swagger 보완: codex/docs-answer-learning-swagger(develop0436b8e 기반)에서10개 API 설명·스키마·예시·오류/사용순서 추가. 실제 API 계약 불변. clean test1485건 중1484pass/1skip. PR/테스트 배포 예정이며 운영 변경 없음, 신규 Jira 없음.
 
 - 2026-10-21 재답변 구현: draft-5 전용 workload 조회/QuestionGradingJob 승인 증거/완료시험 접수·후속채점 연결. BILLING_REANSWER_ENABLED 기본OFF. clean test1,482건(1,481통과/1skip), diff check 통과. Mongo 통합은 Docker provider 실패로 미실행. 공동fixture/Billing 연결/E2E/배포·활성화 미완료, 커밋·푸시 없음. 아래 준비기록은 과거 이력이다.

@@ -147,6 +147,79 @@ class ExamOwnershipServiceTest {
     }
 
     @Test
+    void uploadUrlUsesOnlyReadChecksEvenWhenWriterGuardIsEnabled() throws Exception {
+        stubOwnedSession();
+        var executor = org.mockito.Mockito.mock(web.tosunsaeng.domain.usermerge.application.UserOwnedTransactionExecutor.class);
+        ReflectionTestUtils.setField(examService, "userOwnedTransactionExecutor", executor);
+        when(s3Presigner.presignPutObject(any(PutObjectPresignRequest.class))).thenReturn(presignedPutObjectRequest);
+        when(presignedPutObjectRequest.url()).thenReturn(URI.create("https://example.com/upload").toURL());
+
+        assertNotNull(examService.getPresignedUrl(EXAM_ID, 1, 0));
+
+        verify(executor, times(2)).requireUploadUrlAccess(OWNER_USER_ID);
+        verify(executor, never()).execute(any(), any());
+        verify(examSessionRepository, never()).save(any());
+    }
+
+    @Test
+    void uploadUrlIsNotReturnedWhenOwnerChangesDuringSigning() throws Exception {
+        when(currentUserProvider.getCurrentUserId()).thenReturn(OWNER_USER_ID);
+        when(examSessionRepository.findById(EXAM_ID)).thenReturn(
+                Optional.of(sessionFor(OWNER_USER_ID)), Optional.of(sessionFor(OTHER_USER_ID)));
+        when(s3Presigner.presignPutObject(any(PutObjectPresignRequest.class))).thenReturn(presignedPutObjectRequest);
+        when(presignedPutObjectRequest.url()).thenReturn(URI.create("https://example.com/upload").toURL());
+
+        assertThrows(ExamsException.class, () -> examService.getPresignedUrl(EXAM_ID, 1, 0));
+    }
+
+    @Test
+    void uploadUrlIsNotReturnedWhenDeletionStartsDuringSigning() throws Exception {
+        stubOwnedSession();
+        var deletion = org.mockito.Mockito.mock(web.tosunsaeng.domain.learningrecorddeletion.application.DeletionAccess.class);
+        ReflectionTestUtils.setField(examService, "deletionAccess", deletion);
+        org.mockito.Mockito.doNothing().doThrow(web.tosunsaeng.domain.learningrecorddeletion.application.DeletionFailure.blocked())
+                .when(deletion).requirePublicWrite(OWNER_USER_ID);
+        when(s3Presigner.presignPutObject(any(PutObjectPresignRequest.class))).thenReturn(presignedPutObjectRequest);
+        when(presignedPutObjectRequest.url()).thenReturn(URI.create("https://example.com/upload").toURL());
+
+        assertThrows(web.tosunsaeng.domain.learningrecorddeletion.application.DeletionFailure.class,
+                () -> examService.getPresignedUrl(EXAM_ID, 1, 0));
+    }
+
+    @Test
+    void revokedSessionCannotIssueUploadUrl() {
+        var session = sessionFor(OWNER_USER_ID);
+        ReflectionTestUtils.setField(session, "accessRevoked", true);
+        when(currentUserProvider.getCurrentUserId()).thenReturn(OWNER_USER_ID);
+        when(examSessionRepository.findById(EXAM_ID)).thenReturn(Optional.of(session));
+        assertThrows(ExamsException.class, () -> examService.getPresignedUrl(EXAM_ID, 1, 0));
+        verifyNoInteractions(s3Presigner);
+    }
+
+    @Test
+    void uploadUrlRechecksReanswerEligibilityAfterSigning() throws Exception {
+        stubOwnedSession();
+        var gate = org.mockito.Mockito.mock(web.tosunsaeng.domain.exams.reanswer.ReanswerAdmission.class);
+        var approval = new web.tosunsaeng.domain.exams.reanswer.ReanswerAdmission.Observation(
+                OWNER_USER_ID, "job", null, 0, null);
+        ReflectionTestUtils.setField(examService, "reanswerAdmission", gate);
+        when(gate.prepare(any(), org.mockito.ArgumentMatchers.eq(1), org.mockito.ArgumentMatchers.eq(1),
+                org.mockito.ArgumentMatchers.eq(false))).thenReturn(approval);
+        when(s3Presigner.presignPutObject(any(PutObjectPresignRequest.class))).thenReturn(presignedPutObjectRequest);
+        when(presignedPutObjectRequest.url()).thenReturn(URI.create("https://example.com/upload").toURL());
+        when(gate.authorize(any(), org.mockito.ArgumentMatchers.eq(1), org.mockito.ArgumentMatchers.eq(1),
+                org.mockito.ArgumentMatchers.same(approval), org.mockito.ArgumentMatchers.isNull()))
+                .thenThrow(new ExamsException(ErrorStatus._BILLING_TEMPORARILY_UNAVAILABLE));
+        assertThrows(ExamsException.class, () -> examService.getPresignedUrl(EXAM_ID, 1, 1));
+        InOrder order = inOrder(s3Presigner, gate);
+        order.verify(gate).prepare(any(), org.mockito.ArgumentMatchers.eq(1), org.mockito.ArgumentMatchers.eq(1),
+                org.mockito.ArgumentMatchers.eq(false));
+        order.verify(s3Presigner).presignPutObject(any(PutObjectPresignRequest.class));
+        order.verify(gate).authorize(any(), org.mockito.ArgumentMatchers.eq(1), org.mockito.ArgumentMatchers.eq(1),
+                org.mockito.ArgumentMatchers.same(approval), org.mockito.ArgumentMatchers.isNull());
+    }
+
+    @Test
     void ownerCanIssueUploadUrlAfterOwnershipCheck() throws Exception {
         stubOwnedSession();
         when(s3Presigner.presignPutObject(any(PutObjectPresignRequest.class)))

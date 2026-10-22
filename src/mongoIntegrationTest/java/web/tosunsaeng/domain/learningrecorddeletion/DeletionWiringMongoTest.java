@@ -32,7 +32,8 @@ class DeletionWiringMongoTest {
         runner = new ApplicationContextRunner().withUserConfiguration(DeletionActivationBarrier.class, DeletionConfiguration.class, UserMergedConfiguration.class)
                 .withBean(MongoDatabaseFactory.class, mongo::getMongoDatabaseFactory).withBean(MongoTemplate.class, () -> mongo)
                 .withBean(UserOwnershipGuardRepository.class, () -> new MongoRepositoryFactory(mongo).getRepository(UserOwnershipGuardRepository.class))
-                .withPropertyValues("app.user-merged.writer-enabled=false", "app.user-merged.consumer-enabled=false",
+                .withPropertyValues("app.callback-write-fences.lifecycle-enabled=true", "app.callback-write-fences.isolation-enabled=true",
+                        "app.user-merged.writer-enabled=false", "app.user-merged.consumer-enabled=false",
                         "app.learning-record-deletion.writer-fence-enabled=true", "app.learning-record-deletion.read-fence-enabled=true",
                         "app.learning-record-deletion.billing-continuation-enabled=true", "app.learning-record-deletion.aggregate-enabled=true");
     }

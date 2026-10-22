@@ -13,6 +13,22 @@ import java.util.Optional;
 
 public class UserOwnershipGuardService {
 
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    private CallbackWriteFence callbackWriteFence;
+
+    public <T> T callbackScope(String owner, String examId, CallbackWriteFence.Lane lane,
+                               java.util.function.Supplier<T> command) {
+        return callbackWriteFence == null ? command.get() : callbackWriteFence.within(owner, examId, lane, command);
+    }
+
+    public void fenceCallbacksForOwner(String owner, Instant now) {
+        if (callbackWriteFence != null) callbackWriteFence.touchOwner(owner, now);
+    }
+
+    public void fenceCallbacksForExam(String examId, Instant now) {
+        if (callbackWriteFence != null) callbackWriteFence.touchExam(examId, now);
+    }
+
     private final MongoTemplate mongoTemplate;
     private final UserOwnershipGuardRepository repository;
 
@@ -39,6 +55,20 @@ public class UserOwnershipGuardService {
     }
 
     public void touchActive(String userId, Instant now) {
+        if (callbackWriteFence != null && callbackWriteFence.scoped()) {
+            UserOwnershipGuard existing = repository.findById(userId).orElse(null);
+            if (existing != null && existing.getState() != OwnershipGuardState.ACTIVE) {
+                throw new UserOwnershipGuardException(existing.isMerged()
+                        ? UserOwnershipGuardException.Reason.ALREADY_MERGED
+                        : UserOwnershipGuardException.Reason.STATE_CONFLICT);
+            }
+            if (mongoTemplate.exists(Query.query(Criteria.where("_id").is(userId)
+                    .and("blockedUntil").gt(now)), "withdrawn_user_access_denies")) {
+                throw new UserOwnershipGuardException(UserOwnershipGuardException.Reason.STATE_CONFLICT);
+            }
+            callbackWriteFence.touchScoped(userId, now);
+            return;
+        }
         Query active = Query.query(Criteria.where("_id").is(userId)
                 .and("state").is(OwnershipGuardState.ACTIVE));
         Update touch = new Update()

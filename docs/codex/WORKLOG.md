@@ -17751,6 +17751,24 @@
 - `./gradlew clean test`1,482건 중1,481통과/1skip/실패0. 신규 service fixture 수정 후 전체 성공. `mongoIntegrationTest --tests '*ReanswerApprovalMongoTest'` Docker provider 연결 실패로 실제Mongo 검증 불가. diff check 통과. 승인 시각 BSON string 왕복/rollback용 테스트를 추가했지만 실행 성공으로 표시하지 않는다.
 - 변경 범위는 reanswer 패키지, 시험 서비스/접수정책/Job, workload signer, 설정, 관련 테스트와 인계서·기록. 기존 사용자 dirty 보존, 예상 밖 제품 변경 없음. 신규 Jira·Billing/Identity 변경·외부발송·실DB/index·커밋/푸시/배포 없음. 공동fixture와 실제Billing/시각동기화/권한경합 E2E·격리Mongo 검증 후 활성화. 기존 Reservation/AttemptGroup circuit은 변경하지 않았고 신규조회 운영 차단 연결은 점검대상. Secret/Token 미기록.
 
+## 2026-10-22 — upload-url 공통 guard 쓰기 제거
+
+- 사용자 브랜치 생성·수정·운영 직접 배포 승인으로 origin/main c32df4a에서 codex/fix-upload-url-guard 생성. root/이전 worktree dirty를 보존했다. 관련 TMI-125/TMI-193.
+- URL 발급만 read-only guard 검사로 분리하고 서명 전후 현재 소유권·삭제·merged/refund 차단 및 재답변 승인 만료 검사를 수행한다. 기존 submit/callback/전역retry/API/AI/S3/Redis 불변. residual capability 경합 수용 범위는 UPLOAD_URL_READ_ONLY_GUARD_FIX.md에 기록했다.
+- 신규7개 회귀와 전체 테스트 실행 중. 최초 테스트 패키지 오기와 기존 소유권 조회 순서2개 실패를 수정하고 재실행한다. 아직 commit/push/배포 완료 아님. Secret/Token 기록 없음.
+
+## 2026-10-22 — AttemptGroup 신규 이벤트 밀리초 정밀도 수정
+
+- 사용자 긴급 수정·운영 전달 요청. main c89087b 기준 codex/fix-attempt-event-millis에서 신규 payload 생성 시 occurredAt 밀리초 절삭 및 UTC 소수3자리 직렬화 적용. canonical bytes/digest 생성 이전에만 적용하고 기존 저장 payload의 publish/retry는 변경하지 않는다. 관련 TMI-128, 신규 Jira 없음.
+- GRADING/COMPLETED/RETAKE_AVAILABLE3종·정수초/밀리초2종·기존 저장 payload 불변 전송 및 coordinator 나노초 Clock 회귀 추가/보강. 최종 clean test 성공. 운영 PR/CI/배포 확인은 후속 진행하며 현재 완료 아님.
+- 공개 API/AI/S3/Redis/기능설정 불변. root 기존 사용자 dirty 보존, Billing/Identity/실DB/IAM 변경 없음. 기존 DEAD_LETTER 복구는 불변 이벤트 계약을 지키는 별도 승인 절차 필요. Secret/Token 미기록.
+
+## 2026-10-22 — Callback write isolation (TMI-128)
+
+- 사용자 승인으로 main39678c8 기반 별도 브랜치에서 callback CORE/AZURE fence 및 lifecycle bridge 구현. 진입/저장 hook의 owner guard write를 같은 scoped lane으로 대체하고 일반 writer·삭제·통합·탈퇴·환불 보호를 유지한다.
+- clean test/mongoIntegrationTest 중간 전체 성공, 추가 최초 삽입/역방향 Mongo112 경합 집중 테스트 성공, Node 배포/DB 준비211개 성공. 최종 환불 bridge 회귀 포함 재실행 중. API/AI/S3/Redis/완료 조건 불변.
+- 신규 collection은 최소 revision fence만 보존하며 TTL/purge 미추가. main의 upload URL·timestamp 수정도 test 전달에 포함한다. 테스트 후 운영에 bridge 배포/drain→isolation ON, 복구는 isolation OFF/drain 선행. 실앱 E2E는 미검증.
+- ECS test53/prod18, desired1/minHealthy100/max200/rolling/grace300 확인. 현재 외부 변경 없음. 코드 커밋·CI/배포 상태는 후속 기록한다. 사용자 root dirty·타서비스 작업 보존, Secret/Token 미기록.
 
 ## 2026-10-22 — 답변 학습 Swagger 보완·테스트 전달
 

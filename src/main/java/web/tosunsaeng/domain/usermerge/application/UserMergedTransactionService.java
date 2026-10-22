@@ -91,6 +91,7 @@ public class UserMergedTransactionService {
                 .toList();
         for (String userId : guardOrder) {
             guardService.touchActive(userId, event.receivedAt());
+            guardService.fenceCallbacksForOwner(userId, event.receivedAt());
             if (deletionAccess != null) {
                 try { deletionAccess.requireNoActiveDeletion(userId); }
                 catch (web.tosunsaeng.domain.learningrecorddeletion.application.DeletionFailure activeDeletion) {

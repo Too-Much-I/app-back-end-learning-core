@@ -43,7 +43,7 @@ import web.tosunsaeng.global.config.ClockConfiguration;
 @ConditionalOnExpression("${app.user-merged.writer-enabled:false} || "
         + "${app.user-merged.consumer-enabled:false} || "
         + "${app.user-merged.source-deny-enabled:false} || ${app.learning-record-deletion.writer-fence-enabled:false}")
-@Import(ClockConfiguration.class)
+@Import({ClockConfiguration.class, CallbackWriteFenceConfiguration.class})
 public class UserMergedConfiguration {
 
 

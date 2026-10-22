@@ -11,6 +11,8 @@ import java.util.*;
 
 /** One immutable document per group; event uniqueness is independent. No TTL, upsert or owner transfer. */
 public final class AccessRevocationStore {
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    private web.tosunsaeng.domain.usermerge.application.CallbackWriteFence callbackWriteFence;
     public static final String COLLECTION="billing_access_revocations";
     public static final Document GROUP_INDEX=new Document("environment",1).append("producer",1).append("consumerScopeId",1).append("attemptGroupId",1);
     public static final Document EVENT_INDEX=new Document("environment",1).append("producer",1).append("consumerScopeId",1).append("eventId",1);
@@ -51,6 +53,12 @@ public final class AccessRevocationStore {
                     if(classify(event,false)) return null;
                     // Existing owner only: serialize with writers without recreating a deleted/withdrawn account.
                     mongo.updateFirst(Query.query(Criteria.where("_id").is(event.userId())),new Update().inc("revision",1L),"user_ownership_guards");
+                    if (callbackWriteFence != null) {
+                        Query affected = Query.query(Criteria.where("attemptGroupId").is(event.attemptGroupId()));
+                        affected.fields().include("_id");
+                        for (Document session : mongo.find(affected, Document.class, "exam_sessions"))
+                            callbackWriteFence.touchExam(session.getString("_id"), clock.instant());
+                    }
                     Document fact=base().append("eventId",event.eventId()).append("attemptGroupId",event.attemptGroupId())
                             .append("digest",event.digest()).append("userId",event.userId()).append("reason",event.reason())
                             .append("occurredAt",event.occurredAt()).append("confirmedSessionId",event.confirmedSessionId())

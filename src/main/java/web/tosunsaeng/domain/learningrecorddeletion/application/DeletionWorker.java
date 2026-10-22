@@ -164,6 +164,7 @@ public class DeletionWorker {
             target.prepareBilling(billingEnvironment, session.getAttemptGroupId(), op.getRequestedAt(), clock.instant());
             op.requireBillingDelivery();
         }
+        if (session != null) guards.fenceCallbacksForExam(session.getExamId(), clock.instant());
         target.sealCallbacks(true, true, clock.instant()); mongo.save(target);
         if (session != null && session.getAttemptGroupId() != null) continuations.retainAndDeleteSession(op.getDeletionId(), session.getExamId());
         else {
