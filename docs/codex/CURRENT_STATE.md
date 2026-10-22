@@ -1,5 +1,7 @@
 # Learning Core Current State
 
+- 2026-10-22 답변 학습 Swagger 보완: codex/docs-answer-learning-swagger(develop0436b8e 기반)에서10개 API 설명·스키마·예시·오류/사용순서 추가. 실제 API 계약 불변. clean test1485건 중1484pass/1skip. PR/테스트 배포 예정이며 운영 변경 없음, 신규 Jira 없음.
+
 - 2026-10-21 재답변 구현: draft-5 전용 workload 조회/QuestionGradingJob 승인 증거/완료시험 접수·후속채점 연결. BILLING_REANSWER_ENABLED 기본OFF. clean test1,482건(1,481통과/1skip), diff check 통과. Mongo 통합은 Docker provider 실패로 미실행. 공동fixture/Billing 연결/E2E/배포·활성화 미완료, 커밋·푸시 없음. 아래 준비기록은 과거 이력이다.
 
 - 사용자 추가 수락 반영: 미발급trial 제외·최대5초 관측 경합 수용(여러 Job 가능)을 재답변 인계서에 명시했다. wire/fixture 공동 동결 및 제품 구현은 미완료, 외부 발송/배포 없음.
