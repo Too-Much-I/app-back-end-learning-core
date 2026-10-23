@@ -13,6 +13,19 @@ import java.util.Optional;
 
 public class UserOwnershipGuardService {
 
+    private final ThreadLocal<Boolean> gradingReadChecks = new ThreadLocal<>();
+
+    /** Grading deliberately accepts lifecycle changes between its checks and commit. */
+    public <T> T gradingReadChecks(java.util.function.Supplier<T> command) {
+        Boolean previous = gradingReadChecks.get();
+        gradingReadChecks.set(true);
+        try { return command.get(); }
+        finally {
+            if (previous == null) gradingReadChecks.remove();
+            else gradingReadChecks.set(previous);
+        }
+    }
+
     @org.springframework.beans.factory.annotation.Autowired(required = false)
     private CallbackWriteFence callbackWriteFence;
 
@@ -55,6 +68,10 @@ public class UserOwnershipGuardService {
     }
 
     public void touchActive(String userId, Instant now) {
+        if (Boolean.TRUE.equals(gradingReadChecks.get())) {
+            requireActive(userId, now);
+            return;
+        }
         if (callbackWriteFence != null && callbackWriteFence.scoped()) {
             UserOwnershipGuard existing = repository.findById(userId).orElse(null);
             if (existing != null && existing.getState() != OwnershipGuardState.ACTIVE) {
@@ -86,6 +103,19 @@ public class UserOwnershipGuardService {
         }
 
         repository.insert(UserOwnershipGuard.active(userId, now));
+    }
+
+    private void requireActive(String userId, Instant now) {
+        UserOwnershipGuard existing = repository.findById(userId).orElse(null);
+        if (existing != null && existing.getState() != OwnershipGuardState.ACTIVE) {
+            throw new UserOwnershipGuardException(existing.isMerged()
+                    ? UserOwnershipGuardException.Reason.ALREADY_MERGED
+                    : UserOwnershipGuardException.Reason.STATE_CONFLICT);
+        }
+        if (mongoTemplate.exists(Query.query(Criteria.where("_id").is(userId)
+                .and("blockedUntil").gt(now)), "withdrawn_user_access_denies")) {
+            throw new UserOwnershipGuardException(UserOwnershipGuardException.Reason.STATE_CONFLICT);
+        }
     }
 
     public void markMerged(
