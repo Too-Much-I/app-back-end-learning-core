@@ -1,5 +1,7 @@
 # Learning Core Current State
 
+- 2026-10-23 모의고사 채점/retry 보호 쓰기 제거(TMI-25/TMI-128/TMI-125/TMI-193) 구현. Job·콜백·저장 hook은 상태 조회로 전환하며 완료 Job retry 쓰기 생략. 사용자 승인된 lifecycle late-write 위험은 GRADING_READ_CHECKS_2026_10_23.md 참고. 실제 Job Transaction/멱등성·공개/AI 계약 유지, 설정/DB 변경 없음. 로컬/CI·테스트→운영 배포 확인 진행 중, 아직 배포 완료 아님.
+
 - 2026-10-22 Callback write isolation(TMI-128): CORE/AZURE lane 및 lifecycle bridge 구현, default OFF. 기존 main upload URL·timestamp 수정 포함 test 전달 후 prod 순차 전달 준비. 최종 회귀/CI·배포는 진행 중이며 실앱 E2E 미검증. 상세 `CALLBACK_WRITE_ISOLATION_ROLLOUT.md`; isolation ON 후 lifecycle 없는 코드로 직접 rollback 금지.
 
 - 2026-10-22 AttemptGroup 시간 정밀도 핫픽스(TMI-128 관련): main c89087b 기반 codex/fix-attempt-event-millis에서 신규 event occurredAt을 밀리초로 절삭하고 UTC 소수3자리로 직렬화. 기존 persisted payload 재전송 불변 회귀 포함. clean test 성공, 운영 전달 준비 중이며 아직 배포 미완료. 기존 DEAD_LETTER는 변경/재전송하지 않음.

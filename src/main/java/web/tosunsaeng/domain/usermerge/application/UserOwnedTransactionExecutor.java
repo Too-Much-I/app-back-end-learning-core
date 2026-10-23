@@ -125,6 +125,11 @@ public class UserOwnedTransactionExecutor {
                 : deletionAccess.examCoordination(examId, () -> execute(userId, command));
     }
 
+    /** Retains transactions, access checks and bounded retries, without synthetic guard writes. */
+    public <T> T executeGrading(String userId, String examId, Supplier<T> command) {
+        return guardService.gradingReadChecks(() -> executeExamCoordination(userId, examId, command));
+    }
+
     public <T> T executeCallback(String userId, String examId, CallbackWriteFence.Lane lane, Supplier<T> command) {
         return guardService.callbackScope(userId, examId, lane,
                 () -> executeExamCoordination(userId, examId, command));

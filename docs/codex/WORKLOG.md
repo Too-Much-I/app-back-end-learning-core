@@ -17769,3 +17769,9 @@
 - clean test/mongoIntegrationTest 중간 전체 성공, 추가 최초 삽입/역방향 Mongo112 경합 집중 테스트 성공, Node 배포/DB 준비211개 성공. 최종 환불 bridge 회귀 포함 재실행 중. API/AI/S3/Redis/완료 조건 불변.
 - 신규 collection은 최소 revision fence만 보존하며 TTL/purge 미추가. main의 upload URL·timestamp 수정도 test 전달에 포함한다. 테스트 후 운영에 bridge 배포/drain→isolation ON, 복구는 isolation OFF/drain 선행. 실앱 E2E는 미검증.
 - ECS test53/prod18, desired1/minHealthy100/max200/rolling/grace300 확인. 현재 외부 변경 없음. 코드 커밋·CI/배포 상태는 후속 기록한다. 사용자 root dirty·타서비스 작업 보존, Secret/Token 미기록.
+
+## 2026-10-23 — 모의고사 채점/retry 보호 쓰기 제거
+
+- TMI-25/TMI-128/TMI-125/TMI-193 관련. 사용자 운영 전달 요청과 lifecycle 경합 위험 수용에 따라 gradingReadChecks scope 및 executeGrading 도입. 일반 Job Transaction·콜백 및 저장 hook에서 owner/lane 쓰기 없이 ACTIVE/withdrawn/삭제/소유권 검사 유지. 이미 완료된 문항 Job은 retry 쓰기 생략. 일반 writer·실제 Job 멱등성·공개/AI/S3/Redis 계약 유지.
+- 단위·격리 Mongo 회귀 추가. 충돌 대상 owner를 다른 Transaction이 갱신 중인 상황에서 저장 성공, 상태가 이미 차단된 경우 거절, scope 복원과 승인된 삭제 이후 late insert 재현 검증. 첫 Mongo 실행은 Docker API1.32 호환 오류로 실패, 테스트 프로세스 한정 api.version1.44로 집중 테스트 통과. 전체 회귀·CI·배포는 진행 중.
+- 설정/실DB/타서비스/IAM 변경 없음. 기존 callback fence collection과 lifecycle 경로 유지, 신규 flag 없음. 테스트 서버 확인 후 운영 배포 예정이며 실제 앱 E2E는 별도다. root dirty 보존, Secret/Token 미기록.
