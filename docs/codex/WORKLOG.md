@@ -17791,3 +17791,5 @@
 - unit1516건(1515통과/1skip), Node211통과. Mongo 전체 성공 후 최종 코드 재확인 중. 초기 enum switch/mock 및 구 retry 기대 실패를 수정했고 Docker 테스트 프로세스만 API1.44를 사용했다. 동결 review-2 hash 보존, diff check 통과.
 - test DB 읽기 전용 ECS 점검 exit0으로 ready manifest·무료 unit5개 확인. Billing test26 전용 조회ON/배포COMPLETED 확인. 새 DB/index·IAM·네트워크 변경 없음. LC test 코드/설정 배포는 진행 중이며 실제 앱 E2E는 미실행이다. 후속 결과는 아래 추가한다.
 - 최종 Mongo375건(373통과/기존2skip) 성공. 구현22b7dba를 푸시하고 develop PR67 생성·채팅 첨부 완료. Swagger 청크/300회/실패retry 설명도 보완해 추가 검증 후 같은 PR로 전달한다.
+- Swagger118d8bc 포함 CI39901685090 SUCCESS, PR67 merge9b4614a, test 배포39902118001 SUCCESS/task59. healthUP·새Swagger chunks·무인증 학습401 확인. 콘텐츠3011문장/청크7208/미디어3459 모두 읽기 검증 정상. 일회성2개 task exit0·전용 inventory정의INACTIVE, 로그/데이터 보존.
+- 기능ON 명령은 ECS deployment stable assertion에서 변경 없이 중단했다. 이후 브라우저 제어 도구가 제공되지 않아 결과 후속 조회/설정 재개 불가, 로컬 AWS STS는 NoCredentials. plugin-management 조회에도 기존 로그인된 Chrome 복구용 연결을 찾지 못했다. 추가 권한/새 cloud browser 로그인은 진행하지 않았다. ON/v3/300회/freeID는 아직 적용하지 못했고 이전 설정이 유지된다. 실제 앱/서명조회 E2E 미실행, 다음은 브라우저 재연결 후 live task/image 대조·학습 설정만 적용·안정화 검증이다.

@@ -1,6 +1,6 @@
 # Learning Core Current State
 
-- 2026-10-23 파트별 학습·청크: feat/part-learning-access-chunks에서 콘텐츠 전용 paid 조회/전용 audience·무료 세트5개·청크 경계·v3→v2 미디어 재사용·신규300회/실패retry 무차감 구현. 제출 조회·캐시·새 receipt/worker 없음. unit1516건(1515통과/1skip), Node211통과, Mongo 전체 성공 후 최종 재확인 중. test Billing26의 전용 조회ON/COMPLETED 및 test manifest/무료ID 확인. test 전달 진행 중이며 prod 변경 없음. 신규 Jira 없음. 상세 PART_LEARNING_TEST_DELIVERY_2026-10-23.md.
+- 2026-10-23 파트별 학습·청크 코드/test 배포 완료, 설정ON 미완료: feat/part-learning-access-chunks, PR67 develop merge9b4614a, CI39901685090 및 test 배포39902118001 SUCCESS, task59. healthUP/Swagger chunks/무인증401 확인. unit1516(1skip)·Mongo375(2skip)·Node211 실패0. 콘텐츠3011문장/7208청크·미디어3459 연결 읽기 검증 통과. 첫 ON 설정 시도는 ECS 안정화 assertion에서 변경 없이 중단; 이후 브라우저 도구 접근 소실·로컬 AWS NoCredentials로 재개 못함. 따라서 v3/유료조회ON/300회/무료ID 적용은 미완료이며 기존v2·60회 설정 유지. prod/Billing/Identity/DB/index/IAM 변경 없음. 앱 E2E 미실행. 상세 PART_LEARNING_TEST_DELIVERY_2026-10-23.md, 신규 Jira 없음.
 
 - 2026-10-23 모의고사 채점/retry 보호 쓰기 제거(TMI-25/TMI-128/TMI-125/TMI-193) 구현. Job·콜백·저장 hook은 상태 조회로 전환하며 완료 Job retry 쓰기 생략. 사용자 승인된 lifecycle late-write 위험은 GRADING_READ_CHECKS_2026_10_23.md 참고. 실제 Job Transaction/멱등성·공개/AI 계약 유지, 설정/DB 변경 없음. 로컬/CI·테스트→운영 배포 확인 진행 중, 아직 배포 완료 아님.
 
