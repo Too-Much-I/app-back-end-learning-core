@@ -17790,3 +17790,4 @@
 - 콘텐츠 전용 POST part-learning-eligibility와 전용 audience, 무료 세트5개, 청크 경계 전달, exact manifest v3→v2 미디어 재사용을 구현했다. 제출/재시도/목록/polling 조회 없음. 무차감·무캐시이며 기존 재답변과 모의고사/AI 계약 유지. 일일 신규300회, 실패 retry는 일일 차감 제외.
 - unit1516건(1515통과/1skip), Node211통과. Mongo 전체 성공 후 최종 코드 재확인 중. 초기 enum switch/mock 및 구 retry 기대 실패를 수정했고 Docker 테스트 프로세스만 API1.44를 사용했다. 동결 review-2 hash 보존, diff check 통과.
 - test DB 읽기 전용 ECS 점검 exit0으로 ready manifest·무료 unit5개 확인. Billing test26 전용 조회ON/배포COMPLETED 확인. 새 DB/index·IAM·네트워크 변경 없음. LC test 코드/설정 배포는 진행 중이며 실제 앱 E2E는 미실행이다. 후속 결과는 아래 추가한다.
+- 최종 Mongo375건(373통과/기존2skip) 성공. 구현22b7dba를 푸시하고 develop PR67 생성·채팅 첨부 완료. Swagger 청크/300회/실패retry 설명도 보완해 추가 검증 후 같은 PR로 전달한다.

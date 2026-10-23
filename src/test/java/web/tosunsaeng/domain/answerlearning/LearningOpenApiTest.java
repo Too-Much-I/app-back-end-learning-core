@@ -65,6 +65,8 @@ class LearningOpenApiTest {
         var api = controllerPaths();
         new LearningOpenApiConfiguration().learningOpenApiCustomizer().customise(api);
         var schemas = api.getComponents().getSchemas();
+        assertThat(schemas.get("LearningSentence").getProperties()).containsKey("chunks");
+        assertThat(schemas.get("LearningSentence").getRequired()).doesNotContain("chunks");
         assertThat(((Schema<?>) schemas.get("LearningSentence").getProperties().get("text")).getDescription()).contains("공백 하나", "정확히 일치");
         assertThat(schemas.get("LearningWord").getProperties().keySet()).containsExactlyInAnyOrder("text", "start", "end");
         assertThat(((Schema<String>) schemas.get("LearningJob").getProperties().get("status")).getEnum())

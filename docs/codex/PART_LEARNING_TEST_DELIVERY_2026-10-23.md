@@ -25,6 +25,7 @@
 - Mongo의 이전 retry 차감 정책 기대2건을 승인된 무차감 정책으로 교체하고 300/301 경계 테스트를 추가했다.
 - Node 배포/마이그레이션211개 통과. 원본 review-2 hash c27b981a1c1ec6f208089a1e3eae02f8f2bcefdaa3196d82fcc35dc70a545b99 유지.
 - test 읽기 전용 ECS 점검 exit0: v3 ready manifest, unit200/lesson360/answer1000, 기존 v2 mediaSource 확인. Billing test26의 전용 조회ON·배포COMPLETED 확인.
+- 최종 Mongo375건(373통과/기존2skip), 실패0. Swagger의 이전 청크 미제공·retry 차감 설명도 새 정책에 맞췄다. PR67에서 CI 확인 중.
 
 ### 확인된 무료 unit ID
 
