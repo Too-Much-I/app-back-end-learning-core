@@ -302,7 +302,7 @@ class ExamGradingServiceTest {
         ReflectionTestUtils.setField(service,"reanswerAdmission",gate);
         ReflectionTestUtils.setField(service,"userOwnedTransactionExecutor",owners);
         when(owners.enabled()).thenReturn(true);
-        when(owners.executeExamCoordination(eq(user),eq(EXAM_ID),any())).thenAnswer(invocation ->
+        when(owners.executeGrading(eq(user),eq(EXAM_ID),any())).thenAnswer(invocation ->
                 ((java.util.function.Supplier<?>)invocation.getArgument(2)).get());
         var session=ExamSession.builder().examId(EXAM_ID).userId(user).mockExamId(GradingKeys.LEGACY_MOCK_EXAM_ID)
                 .status(ExamSessionStatus.COMPLETED).submissionsClosedAt(NOW.minusSeconds(10)).build();
@@ -329,7 +329,7 @@ class ExamGradingServiceTest {
         var owners=org.mockito.Mockito.mock(web.tosunsaeng.domain.usermerge.application.UserOwnedTransactionExecutor.class);
         ReflectionTestUtils.setField(service,"userOwnedTransactionExecutor",owners);
         when(owners.enabled()).thenReturn(true);
-        when(owners.executeExamCoordination(eq("owner"),eq(EXAM_ID),any())).thenAnswer(invocation ->
+        when(owners.executeGrading(eq("owner"),eq(EXAM_ID),any())).thenAnswer(invocation ->
                 ((java.util.function.Supplier<?>)invocation.getArgument(2)).get());
         ExamSession session=ExamSession.builder().examId(EXAM_ID).userId("owner").mockExamId(GradingKeys.LEGACY_MOCK_EXAM_ID)
                 .status(ExamSessionStatus.IN_PROGRESS).build();
@@ -351,7 +351,7 @@ class ExamGradingServiceTest {
         when(owners.enabled()).thenReturn(true);
         when(examSessionRepository.findById(EXAM_ID)).thenReturn(Optional.of(ExamSession.builder()
                 .examId(EXAM_ID).userId("owner").mockExamId(GradingKeys.LEGACY_MOCK_EXAM_ID).build()));
-        when(owners.executeExamCoordination(eq("owner"), eq(EXAM_ID), any())).thenAnswer(invocation ->
+        when(owners.executeGrading(eq("owner"), eq(EXAM_ID), any())).thenAnswer(invocation ->
                 ((java.util.function.Supplier<?>) invocation.getArgument(2)).get());
         service.submitQuestion(EXAM_ID, 1, 0);
         service.submitQuestion(EXAM_ID, 1, 0);
@@ -636,6 +636,21 @@ class ExamGradingServiceTest {
 
         assertEquals(List.of(1), result.getWaitingQuestionNumbers());
         assertTrue(result.getRetriedQuestionNumbers().isEmpty());
+        verify(dispatchService, never()).dispatchQuestion(any());
+    }
+
+    @Test
+    void retrySkipsWriteTransactionForAlreadyCompletedQuestion() {
+        expectedQuestionNumbers = List.of(1, 2);
+        putCompletedQuestions(List.of(1));
+        putQuestion(questionJob(2, 0, GradingJobStatus.PROCESSING, 1, NOW.minusSeconds(10)));
+        var observed = org.mockito.Mockito.spy(service);
+
+        var result = observed.retryExam(EXAM_ID);
+
+        assertEquals(List.of(2), result.getWaitingQuestionNumbers());
+        verify(observed, never()).completeQuestion(EXAM_ID, 1, 0);
+        verify(questionJobRepository, never()).save(any());
         verify(dispatchService, never()).dispatchQuestion(any());
     }
 

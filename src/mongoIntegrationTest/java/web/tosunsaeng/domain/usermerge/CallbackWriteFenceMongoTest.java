@@ -61,6 +61,84 @@ class CallbackWriteFenceMongoTest {
     }
     @AfterEach void close() { client.close(); }
 
+    @Test void gradingEntryAndPersistenceWriteNeitherOwnerNorExamFences() {
+        Document owner = mongo.findById("owner", Document.class, "user_ownership_guards");
+        var lanes = mongo.find(new Query(), Document.class, CallbackWriteFence.COLLECTION);
+        writers.executeGrading("owner", "exam", () -> {
+            mongo.insert(new Document("_id", "read-checked").append("examId", "exam")
+                    .append("userId", "owner"), "exam_results");
+            return null;
+        });
+        assertThat(mongo.findById("owner", Document.class, "user_ownership_guards")).isEqualTo(owner);
+        assertThat(mongo.find(new Query(), Document.class, CallbackWriteFence.COLLECTION)).containsExactlyInAnyOrderElementsOf(lanes);
+        assertThat(mongo.findById("read-checked", Document.class, "exam_results")).isNotNull();
+    }
+
+    @Test void gradingDoesNotConflictWithAnUnrelatedOwnerTouch() throws Exception {
+        var locked = new CountDownLatch(1); var release = new CountDownLatch(1);
+        try (ExecutorService threads = Executors.newSingleThreadExecutor()) {
+            Future<?> writer = threads.submit(() -> tx.executeWithoutResult(s -> {
+                guards.touchActive("owner", NOW);
+                locked.countDown(); await(release);
+            }));
+            await(locked);
+            try {
+                writers.executeGrading("owner", "exam", () -> {
+                    mongo.insert(new Document("_id", "concurrent").append("examId", "exam")
+                            .append("userId", "owner"), "exam_results");
+                    return null;
+                });
+            } finally { release.countDown(); }
+            writer.get(15, TimeUnit.SECONDS);
+            assertThat(mongo.findById("concurrent", Document.class, "exam_results")).isNotNull();
+        } finally { release.countDown(); }
+    }
+
+    @Test void readCheckedGradingStillRejectsSealedExamAndWithdrawnOrMergedOwner() {
+        mongo.insert(new Document("_id", "sealed").append("targetType", "EXAM")
+                .append("aggregateId", "exam").append("callbackFence", "SEALED"), "learning_record_deletion_targets");
+        assertThatThrownBy(() -> writers.executeGrading("owner", "exam", () -> null))
+                .isInstanceOf(web.tosunsaeng.domain.learningrecorddeletion.application.DeletionFailure.class);
+        mongo.remove(new Query(), "learning_record_deletion_targets");
+        mongo.insert(new Document("_id", "owner").append("blockedUntil", java.util.Date.from(NOW.plusSeconds(60))), "withdrawn_user_access_denies");
+        assertThatThrownBy(() -> writers.executeGrading("owner", "exam", () -> null))
+                .isInstanceOf(UserOwnershipGuardException.class);
+        mongo.remove(new Query(), "withdrawn_user_access_denies");
+        tx.executeWithoutResult(s -> guards.markMerged("owner", "target", "event", NOW, NOW));
+        assertThatThrownBy(() -> writers.executeGrading("owner", "exam", () -> null))
+                .isInstanceOf(UserOwnershipGuardException.class);
+    }
+
+    @Test void gradingScopeIsRestoredAfterNestedFailure() {
+        assertThatThrownBy(() -> guards.gradingReadChecks(() -> guards.gradingReadChecks(() -> {
+            throw new IllegalArgumentException("synthetic");
+        }))).isInstanceOf(IllegalArgumentException.class);
+        tx.executeWithoutResult(s -> guards.touchActive("owner", NOW));
+        assertThat(mongo.findById("owner", Document.class, "user_ownership_guards").get("revision")).isEqualTo(1L);
+    }
+
+    @Test void acceptedTradeoffAllowsLateInsertAfterConcurrentDeletion() throws Exception {
+        var checked = new CountDownLatch(1); var deleted = new CountDownLatch(1);
+        try (ExecutorService threads = Executors.newSingleThreadExecutor()) {
+            Future<?> grading = threads.submit(() -> writers.executeGrading("owner", "exam", () -> {
+                assertThat(mongo.findById("exam", ExamSession.class)).isNotNull();
+                checked.countDown(); await(deleted);
+                mongo.insert(new Document("_id", "accepted-late").append("examId", "exam")
+                        .append("userId", "owner"), "exam_results");
+                return null;
+            }));
+            await(checked);
+            try {
+                tx.executeWithoutResult(s -> {
+                    fence.touchOwner("owner", NOW);
+                    mongo.remove(Query.query(Criteria.where("_id").is("exam")), "exam_sessions");
+                });
+            } finally { deleted.countDown(); }
+            grading.get(15, TimeUnit.SECONDS);
+            assertThat(mongo.findById("accepted-late", Document.class, "exam_results")).isNotNull();
+        } finally { deleted.countDown(); }
+    }
+
     @Test void callbackEntryAndPersistenceDoNotUpdateOwnerGuard() {
         Document before = mongo.findById("owner", Document.class, "user_ownership_guards");
         writers.executeCallback("owner", "exam", CallbackWriteFence.Lane.AZURE, () -> {

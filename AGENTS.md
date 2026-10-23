@@ -1,5 +1,11 @@
 # 프로젝트 목적
 
+## 2026-10-23 채점 보호 쓰기 제거 승인
+
+- 사용자 브랜치 생성·수정·운영 배포 요청 및 동시 처리 위험 수용에 따라 모의고사 채점/재요청/콜백의 공용·시험별 보호 문서 쓰기를 읽기 검사로 대체한다. 같은 스레드의 저장 직전 검사와 요약 완료 처리에도 적용한다. 신규 시험 생성·Billing 예약·삭제·통합·탈퇴 자체의 writer는 변경하지 않는다.
+- 상태 확인 후 lifecycle 변경과 겹친 늦은 저장, 삭제 후 기록 재생성 가능성을 수용했다. 권한·소유권·삭제/탈퇴/환불 상태 조회, 실제 Job/결과 Transaction·멱등성·bounded retry와 외부 계약은 유지한다. 자동 재정리를 보장하지 않는다.
+- 이번 변경의 commit/push/PR develop·main 병합 및 기존 workflow 테스트 확인 후 운영 배포를 허용한다. 실DB 정리·기존 fence 삭제·타서비스/IAM 변경은 포함하지 않는다.
+
 ## 2026-10-22 Callback write isolation 전달 승인
 
 - 사용자 구현·운영 배포 요청 및 테스트 선검증 순서의 후속 승인으로 이번 callback CORE/AZURE fence와 lifecycle bridge, 관련 테스트/문서의 커밋·푸시·PR·develop/main 병합과 테스트 후 운영 배포를 허용한다. main의 기존 upload URL guard·이벤트 시각 수정도 develop 전달에 포함한다.
