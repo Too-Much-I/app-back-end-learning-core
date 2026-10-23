@@ -287,7 +287,12 @@ public class ExamGradingService {
 
         for (Integer questionNumber : questionNumbers) {
             if (hasQuestionResult(examId, questionNumber)) {
-                completeQuestion(examId, questionNumber, 0);
+                // Completed result + completed Job needs no write transaction on retry.
+                var completedJob = questionJobRepository.findById(
+                        GradingKeys.questionJobId(examId, questionNumber, 0));
+                if (completedJob.isEmpty() || completedJob.get().getStatus() != GradingJobStatus.COMPLETED) {
+                    completeQuestion(examId, questionNumber, 0);
+                }
                 continue;
             }
 
@@ -1063,7 +1068,7 @@ public class ExamGradingService {
             ExamSession observed = examSessionRepository.findById(examId)
                     .orElseThrow(() -> new ExamsException(ErrorStatus._EXAM_NOT_FOUND));
             try {
-                return userOwnedTransactionExecutor.executeExamCoordination(observed.getUserId(), examId, () -> {
+                return userOwnedTransactionExecutor.executeGrading(observed.getUserId(), examId, () -> {
                     if (Boolean.TRUE.equals(publicMutation.get())) userOwnedTransactionExecutor.requirePublicWrite(observed.getUserId());
                     ExamSession current = examSessionRepository.findById(examId)
                             .orElseThrow(() -> new ExamsException(ErrorStatus._EXAM_NOT_FOUND));

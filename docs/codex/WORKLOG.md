@@ -17775,3 +17775,9 @@
 - 사용자 수정·전달 요청에 따라 최신 develop0436b8e 기반 codex/docs-answer-learning-swagger worktree를 만들었다. 운영은 제외하고 develop PR/기존 테스트 배포 대상으로 진행한다. root 사용자 dirty 및 기존 worktree 보존, 신규 Jira 없음.
 - LearningOpenApiConfiguration과 문서 전용 JSON으로 기존10개 경로에만 설명/typed schema/예시/오류를 보강했다. controller/service/DTO/직렬화/API·AI·S3·Redis/기능flag 불변. words 정합성/시간, 상태, 멱등·업로드·완료 조건 포함. 기능OFF 경로 노출 방지/전체 경로·ref·상태 회귀3건 추가. 문서 예시와 실제 COMMON_200/오류 result 생략 차이도 안내했다.
 - 최초 테스트 컴파일의 raw Schema 참조를 수정한 후 clean test1485건(1484pass/1skip) 성공, diff check 통과. CI/Mongo와 실제 테스트 Swagger 배포 확인은 진행 예정. 실제 앱 채점 E2E 미실행. 실DB/IAM/secret/타서비스 변경 없음. Secret/Token 미기록.
+
+## 2026-10-23 — 모의고사 채점/retry 보호 쓰기 제거
+
+- TMI-25/TMI-128/TMI-125/TMI-193 관련. 사용자 운영 전달 요청과 lifecycle 경합 위험 수용에 따라 gradingReadChecks scope 및 executeGrading 도입. 일반 Job Transaction·콜백 및 저장 hook에서 owner/lane 쓰기 없이 ACTIVE/withdrawn/삭제/소유권 검사 유지. 이미 완료된 문항 Job은 retry 쓰기 생략. 일반 writer·실제 Job 멱등성·공개/AI/S3/Redis 계약 유지.
+- 단위·격리 Mongo 회귀 추가. 충돌 대상 owner를 다른 Transaction이 갱신 중인 상황에서 저장 성공, 상태가 이미 차단된 경우 거절, scope 복원과 승인된 삭제 이후 late insert 재현 검증. 첫 Mongo 실행은 Docker API1.32 호환 오류로 실패, 테스트 프로세스 한정 api.version1.44로 집중 테스트 통과. 전체 회귀·CI·배포는 진행 중.
+- 설정/실DB/타서비스/IAM 변경 없음. 기존 callback fence collection과 lifecycle 경로 유지, 신규 flag 없음. 테스트 서버 확인 후 운영 배포 예정이며 실제 앱 E2E는 별도다. root dirty 보존, Secret/Token 미기록.

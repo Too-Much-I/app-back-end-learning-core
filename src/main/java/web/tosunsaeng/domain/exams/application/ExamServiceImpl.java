@@ -79,6 +79,9 @@ public class ExamServiceImpl implements ExamService {
     private UserOwnedTransactionExecutor userOwnedTransactionExecutor;
 
     @Autowired(required = false)
+    private web.tosunsaeng.domain.usermerge.application.UserOwnershipGuardService gradingAccessChecks;
+
+    @Autowired(required = false)
     private ExamAcceptedWorkPolicy acceptedWorkPolicy;
 
     @Value("${spring.cloud.aws.s3.bucket}")
@@ -421,7 +424,13 @@ public class ExamServiceImpl implements ExamService {
     @Override
     public void updateExamResult(ExamRequestDTO.AiResultReq req) {
         if (deletedCallback(req.getExamId())) return;
-        try { updateVisibleExamResult(req); }
+        try {
+            if (gradingAccessChecks == null) updateVisibleExamResult(req);
+            else gradingAccessChecks.gradingReadChecks(() -> {
+                updateVisibleExamResult(req);
+                return null;
+            });
+        }
         catch (RuntimeException failure) {
             if (!deletedCallback(req.getExamId())) throw failure;
         }
@@ -1130,7 +1139,7 @@ public class ExamServiceImpl implements ExamService {
                     web.tosunsaeng.domain.learningrecorddeletion.domain.DeletionTarget.Type.EXAM, examId)) return null;
             try {
                 ExamSession observed = resolveSession(examId);
-                return userOwnedTransactionExecutor.executeCallback(observed.getUserId(), examId, lane, () -> {
+                return userOwnedTransactionExecutor.executeGrading(observed.getUserId(), examId, () -> {
                     ExamSession current = resolveSession(examId);
                     if (!Objects.equals(current.getUserId(), observed.getUserId())) {
                         throw new CallbackOwnerChangedException();
