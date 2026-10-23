@@ -1,5 +1,17 @@
 # 답변 익히기 API 계약 v1
 
+## 2026-10-23 청크·유료 콘텐츠 접근 보완
+
+- 상세 응답의 `result.lessons[].answer.sentences[].chunks`는 선택적 `[{from:0,to:3},...]`이다. 같은 문장 words의 0-based 인덱스이며 to 포함, 원본 words/타이밍/label은 유지한다. absent/null은 구 데이터·Part1에서 허용한다. 앱이 퍼즐을 구성하며 별도 서버 퍼즐 채점/진도 API는 없다.
+- paid-access 설정 ON이면 각 파트의 명시된 첫 unit 전체는 모든 등급 무료다. 나머지 상세 본문/음성 URL 발급·재발급에만 현재 유료권을 무차감·무캐시 조회한다. 무료권은 제외한다.
+- 부족은 `402 ENTITLEMENT_INSUFFICIENT`(유료 이용권이 필요합니다), 탈퇴는 `401 ACCOUNT_WITHDRAWN`, 일시 확인 불가는 `503 BILLING_TEMPORARILY_UNAVAILABLE`와 Retry-After:1, 서버 간 계약/인증 오류는 `500 COMMON500`이다. 내부 인증401을 사용자 로그인 오류로 전달하지 않는다.
+- 목록·진도·기존 결과·create/upload/submit/retry/completion은 Billing 미호출이다. 별도 세트 입장 기록을 만들지 않으며 본인 인증 기반 직접 채점 요청 가능성은 승인된 위험으로 수용한다. 기존 owner/삭제/탈퇴/요청 유효성은 유지한다.
+- 신규 submission 생성 기본 한도는 하루300회(UTC 날짜, 한국09시 전환)다. 생성 후 미제출도 포함, 같은 ID replay는 무차감, 실패 건의 허용된 retry는 일일 차감에서 제외한다. 기존 건별 retry 조건/상한/기간은 그대로다. 모의고사에는 적용하지 않는다.
+- 이어 풀기는 기존 정렬된 units/lessons.completed로 앱이 첫 미완료 세트를 선택한다. 신규 진도 API/필드는 없다. 새 콘텐츠 버전에서는 목록/상세 캐시를 갱신한다.
+- 새 버전은 manifest의 mediaSource로 기존 미디어를 재사용한다. 앱 URL·요청 형식은 불변이며 이미 발급된 URL의 기존 만료시간은 Billing 조회5초와 별개다.
+
+위 변경의 테스트 서버 실제 적용 상태는 [배포 기록](../codex/PART_LEARNING_TEST_DELIVERY_2026-10-23.md)을 확인한다.
+
 ## 실행 중인 Swagger 문서
 
 - `/swagger-ui/index.html`의 **답변 학습** 태그에서 전체 10개 API를 확인한다.

@@ -37,7 +37,14 @@ app:
     bucket: ${ANSWER_LEARNING_S3_BUCKET:}
     lambda-url: ${ANSWER_LEARNING_LAMBDA_URL:}
     region: ${ANSWER_LEARNING_AWS_REGION:ap-northeast-2}
-    daily-submissions: ${ANSWER_LEARNING_DAILY_SUBMISSIONS:60}
+    daily-submissions: ${ANSWER_LEARNING_DAILY_SUBMISSIONS:300}
+    paid-access-enabled: ${ANSWER_LEARNING_PAID_ACCESS_ENABLED:false}
+    free-units:
+      1: ${ANSWER_LEARNING_FREE_UNIT_1:}
+      2: ${ANSWER_LEARNING_FREE_UNIT_2:}
+      3: ${ANSWER_LEARNING_FREE_UNIT_3:}
+      4: ${ANSWER_LEARNING_FREE_UNIT_4:}
+      5: ${ANSWER_LEARNING_FREE_UNIT_5:}
     poll-ms: ${ANSWER_LEARNING_POLL_MS:1500}
   learning-record-deletion:
     command-enabled: ${LEARNING_RECORD_DELETION_COMMAND_ENABLED:false}

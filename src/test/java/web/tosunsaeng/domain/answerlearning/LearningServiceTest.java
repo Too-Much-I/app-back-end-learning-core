@@ -23,7 +23,7 @@ class LearningServiceTest {
     @Test void snapshotsServerCriteriaAndStartsWithoutAudio() {
         Job job=service.create(OWNER,createRequest());
         assertThat(job.status()).isEqualTo("awaiting_audio"); assertThat(job.result()).isNull();
-        var capture=org.mockito.ArgumentCaptor.forClass(Submission.class); verify(store).create(capture.capture(),eq(60));
+        var capture=org.mockito.ArgumentCaptor.forClass(Submission.class); verify(store).create(capture.capture(),eq(300));
         assertThat(capture.getValue().checklist).isEqualTo(submission().checklist);
         verifyNoInteractions(storage);
     }
@@ -69,8 +69,8 @@ class LearningServiceTest {
     @Test void explicitRetryUsesSameAudioAndIncrementIsCompareAndSet() {
         var s=submission(); s.status="failed"; s.error=new LearningModels.Error("PROCESSING_FAILED","failed",true);
         when(store.owned(OWNER,ID)).thenReturn(s);
-        var next=submission(); next.attempt=2; next.status="queued"; when(store.retry(s,NOW,60)).thenReturn(next);
-        assertThat(service.retry(OWNER,ID).status()).isEqualTo("queued"); verify(store).retry(s,NOW,60); verifyNoInteractions(storage);
+        var next=submission(); next.attempt=2; next.status="queued"; when(store.retry(s,NOW,300)).thenReturn(next);
+        assertThat(service.retry(OWNER,ID).status()).isEqualTo("queued"); verify(store).retry(s,NOW,300); verifyNoInteractions(storage);
     }
     @Test void retryCapAndExpiredReceiptsAreNotResubmitted() {
         var s=submission(); s.status="failed"; s.error=new LearningModels.Error("FAIL","failed",true); s.attempt=3;
