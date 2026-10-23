@@ -25,6 +25,10 @@ public class LearningExceptionAdvice {
                 || e instanceof MethodArgumentTypeMismatchException || e instanceof ServletRequestBindingException) { status=400; code="INVALID_REQUEST"; }
         else { status=503; code="LEARNING_UNAVAILABLE"; }
         String message = switch (code) {
+            case "ENTITLEMENT_INSUFFICIENT" -> "유료 이용권이 필요합니다";
+            case "ACCOUNT_WITHDRAWN" -> "탈퇴 처리된 계정입니다.";
+            case "BILLING_TEMPORARILY_UNAVAILABLE" -> "이용권을 일시적으로 확인할 수 없습니다. 잠시 후 다시 시도해 주세요.";
+            case "COMMON500" -> "서버에서 오류가 발생했습니다.";
             case "CONTENT_VERSION_CHANGED" -> "학습 내용이 변경됐어요. 문제를 다시 열어 주세요.";
             case "CHECKLIST_NOT_READY", "GRADING_NOT_READY" -> "이 문제의 채점을 준비하고 있어요.";
             case "AUDIO_NOT_UPLOADED" -> "녹음 업로드를 확인해 주세요.";
@@ -34,6 +38,8 @@ public class LearningExceptionAdvice {
             case "LEARNING_UNAVAILABLE" -> "학습 정보를 불러오지 못했어요. 잠시 후 다시 시도해 주세요.";
             default -> "학습 요청을 확인해 주세요.";
         };
-        return ResponseEntity.status(status).body(new BaseResponse<>(false,code,message,null));
+        var response=ResponseEntity.status(status);
+        if ("BILLING_TEMPORARILY_UNAVAILABLE".equals(code)) response.header("Retry-After","1");
+        return response.body(new BaseResponse<>(false,code,message,null));
     }
 }

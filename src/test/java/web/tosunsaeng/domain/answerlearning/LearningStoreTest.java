@@ -39,6 +39,13 @@ class LearningStoreTest {
                 .thenThrow(new DuplicateKeyException("duplicate synthetic key"));
         assertThatThrownBy(()->store.create(submission(),2)).hasMessage("LEARNING_RATE_LIMITED");
     }
+    @Test void successfulRetryDoesNotConsumeDailyQuota() {
+        when(mongo.findAndModify(any(Query.class),any(Update.class),any(FindAndModifyOptions.class),eq(Submission.class)))
+                .thenReturn(submission());
+        assertThat(store.retry(submission(),NOW,300)).isNotNull();
+        verify(mongo,never()).findAndModify(any(Query.class),any(Update.class),any(FindAndModifyOptions.class),
+                eq(Document.class),eq("learning_submission_limits"));
+    }
     @Test void completionNeverStoresIntermediateProgressAndRepeatsUseBusinessKey() {
         when(mongo.findAndModify(any(Query.class),any(Update.class),any(FindAndModifyOptions.class),eq(Submission.class))).thenReturn(submission());
         store.complete(OWNER,"lesson","IH","test-v1",ID,NOW);

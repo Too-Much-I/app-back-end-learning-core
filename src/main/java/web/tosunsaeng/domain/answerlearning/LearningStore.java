@@ -84,7 +84,7 @@ public class LearningStore {
                 .set("error", null).set("dispatched", false).set("transportFailures", 0).set("nextRunAt", now)
                 .set("updatedAt", now).set("leaseUntil", Instant.EPOCH).unset("leaseToken"),
                 FindAndModifyOptions.options().returnNew(true), Submission.class);
-            if (next != null) quota(s.userId, dailyLimit, now);
+            // Recovery of an existing failed job is not a new daily submission.
             return next;
         });
     }

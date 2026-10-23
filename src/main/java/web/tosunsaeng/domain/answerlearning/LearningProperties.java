@@ -15,13 +15,19 @@ public class LearningProperties {
     private String bucket = "";
     private String lambdaUrl = "";
     private String region = "ap-northeast-2";
-    private int dailySubmissions = 60;
+    private int dailySubmissions = 300;
+    private boolean paidAccessEnabled;
+    private java.util.Map<Integer, String> freeUnits = new java.util.HashMap<>();
     private long pollMs = 1500;
     public void validate() {
         if (datasetId.isBlank() || contentVersion.isBlank() || bucket.isBlank()
                 || dailySubmissions < 1 || dailySubmissions > 1000 || pollMs < 1000
                 || !"ap-northeast-2".equals(region)) throw new IllegalStateException("Invalid answer learning configuration");
         if (gradingEnabled) validateLambdaUrl();
+        if (paidAccessEnabled && (!freeUnits.keySet().equals(java.util.Set.of(1,2,3,4,5))
+                || freeUnits.values().stream().anyMatch(id -> id == null || id.isBlank())
+                || new java.util.HashSet<>(freeUnits.values()).size() != 5))
+            throw new IllegalStateException("Five explicit free learning units are required");
     }
     public void validateLambdaUrl() {
             URI uri = URI.create(lambdaUrl);

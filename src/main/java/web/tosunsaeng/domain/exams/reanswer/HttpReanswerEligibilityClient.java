@@ -23,6 +23,7 @@ public final class HttpReanswerEligibilityClient implements ReanswerEligibilityC
     private final URI endpoint;
     private final BillingWorkloadTokenIssuer issuer;
     private final HttpClient http;
+    private final BillingWorkloadTokenIssuer.Purpose purpose;
     private final JsonMapper mapper = JsonMapper.builder().enable(StreamReadFeature.STRICT_DUPLICATE_DETECTION)
             .enable(DeserializationFeature.FAIL_ON_TRAILING_TOKENS).build();
 
@@ -31,17 +32,32 @@ public final class HttpReanswerEligibilityClient implements ReanswerEligibilityC
                 .followRedirects(HttpClient.Redirect.NEVER).build());
     }
     HttpReanswerEligibilityClient(URI origin, BillingWorkloadTokenIssuer issuer, HttpClient http) {
-        this.endpoint = origin.resolve("/internal/v1/entitlements/reanswer-eligibility");
+        this(origin, issuer, http, BillingWorkloadTokenIssuer.Purpose.REANSWER_ELIGIBILITY);
+    }
+    public static HttpReanswerEligibilityClient partLearning(URI origin, BillingWorkloadTokenIssuer issuer) {
+        return new HttpReanswerEligibilityClient(origin, issuer, HttpClient.newBuilder()
+                .connectTimeout(Duration.ofSeconds(2)).followRedirects(HttpClient.Redirect.NEVER).build(),
+                BillingWorkloadTokenIssuer.Purpose.PART_LEARNING_ELIGIBILITY);
+    }
+    HttpReanswerEligibilityClient(URI origin, BillingWorkloadTokenIssuer issuer, HttpClient http,
+            BillingWorkloadTokenIssuer.Purpose purpose) {
+        if (purpose != BillingWorkloadTokenIssuer.Purpose.REANSWER_ELIGIBILITY
+                && purpose != BillingWorkloadTokenIssuer.Purpose.PART_LEARNING_ELIGIBILITY)
+            throw new IllegalArgumentException("Unsupported eligibility purpose");
+        this.purpose = purpose;
+        this.endpoint = origin.resolve(paidOnly() ? "/internal/v1/entitlements/part-learning-eligibility"
+                : "/internal/v1/entitlements/reanswer-eligibility");
         this.issuer = issuer;
         this.http = http;
     }
+    private boolean paidOnly() { return purpose == BillingWorkloadTokenIssuer.Purpose.PART_LEARNING_ELIGIBILITY; }
 
     @Override public ReanswerApproval check(String userId) {
         try { if (!UUID.fromString(userId).toString().equals(userId)) throw ReanswerFailures.contract(); }
         catch (RuntimeException invalid) { throw ReanswerFailures.contract(); }
         var request = HttpRequest.newBuilder(endpoint).timeout(Duration.ofSeconds(5))
                 .header("Content-Type", "application/json").header("Accept", "application/json")
-                .header("Authorization", issuer.authorization(BillingWorkloadTokenIssuer.Purpose.REANSWER_ELIGIBILITY))
+                .header("Authorization", issuer.authorization(purpose))
                 .POST(HttpRequest.BodyPublishers.ofString("{\"userId\":\"" + userId + "\"}")).build();
         var future = http.sendAsync(request, ignored -> new LimitedBody());
         HttpResponse<byte[]> response;
@@ -89,13 +105,13 @@ public final class HttpReanswerEligibilityClient implements ReanswerEligibilityC
             if (!text(node,"userId").equals(userId)) throw ReanswerFailures.contract();
             String checked = timestamp(node,"checkedAt");
             String decision = text(node,"decision"), reason = text(node,"reason");
-            if (decision.equals("ALLOWED") && reason.equals("ENTITLEMENT_AVAILABLE")) {
+            if (decision.equals("ALLOWED") && reason.equals(paidOnly() ? "ACTIVE_PAID_ENTITLEMENT" : "ENTITLEMENT_AVAILABLE")) {
                 var proof = new ReanswerApproval(ReanswerApproval.TYPE,ReanswerApproval.REVISION,userId,checked,timestamp(node,"validUntil"));
                 if (!proof.valid()) throw ReanswerFailures.contract();
                 return proof;
             }
             if (!node.get("validUntil").isNull()) throw ReanswerFailures.contract();
-            if (decision.equals("DENIED") && reason.equals("ENTITLEMENT_INSUFFICIENT"))
+            if (decision.equals("DENIED") && reason.equals(paidOnly() ? "PAID_ENTITLEMENT_REQUIRED" : "ENTITLEMENT_INSUFFICIENT"))
                 throw new ExamsException(ErrorStatus._ENTITLEMENT_INSUFFICIENT);
             if (decision.equals("DENIED") && reason.equals("ACCOUNT_WITHDRAWN"))
                 throw new ExamsException(ErrorStatus._ACCOUNT_WITHDRAWN);

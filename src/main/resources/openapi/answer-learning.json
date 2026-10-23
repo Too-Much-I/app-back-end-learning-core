@@ -168,7 +168,7 @@
           "답변 학습"
         ],
         "summary": "학습 세트 상세",
-        "description": "문항·모범답안·문장/단어 타이밍·사진·음성·Part 4 표. words[].text.join(' ') === sentence.text를 정확히 보장; 불일치는503. 단어 위치는 반환 배열 기준이며 chunks는 제공하지 않는다.",
+        "description": "문항·모범답안·문장/단어 타이밍·사진·음성·Part 4 표. words[].text.join(' ') === sentence.text를 정확히 보장; 불일치는503. 선택적 sentences[].chunks는 words 배열의0-based 양끝 포함 경계다. 파트별 첫 세트는 무료이며 유료 세트는 현재 유료권을 조회한다. 부족은402 ENTITLEMENT_INSUFFICIENT, 확인 장애는503, 연동 오류는500이다. 제출에서는 이용권을 다시 조회하지 않는다.",
         "parameters": [
           {
             "in": "path",
@@ -712,7 +712,7 @@
             }
           },
           "429": {
-            "description": "LEARNING_RATE_LIMITED: 일별 생성·재시도 한도",
+            "description": "LEARNING_RATE_LIMITED: 일별 신규 생성300회 한도(UTC 날짜). 같은 ID 재전송과 허용된 실패 재시도는 추가 차감하지 않는다.",
             "content": {
               "application/json": {
                 "schema": {
@@ -1227,7 +1227,7 @@
           "답변 학습"
         ],
         "summary": "실패한 채점 재시도",
-        "description": "failed + error.retryable=true이며 총3회 미만일 때 같은 음성 재시도. 최초 queued 후1일 초과는 만료. failed가 아니면 현재 작업 반환. 새 녹음은 새로운 submissionId로 생성.",
+        "description": "failed + error.retryable=true이며 총3회 미만일 때 같은 음성 재시도. 최초 queued 후1일 초과는 만료. failed가 아니면 현재 작업 반환. 일일 신규 생성 한도에서 재시도는 제외한다. 새 녹음은 새로운 submissionId로 생성.",
         "parameters": [
           {
             "in": "path",
@@ -1714,6 +1714,18 @@
               }
             ]
           },
+          "chunks": {
+            "type": "array",
+            "description": "선택적 청크 경계. words 배열0-based 인덱스, from/to 양끝 포함. 순서대로 중복·빈틈 없이 전체 단어를 덮는다. Part1 등은 생략 가능하며 앱이 퍼즐을 구성한다.",
+            "items": {
+              "type": "object",
+              "properties": {
+                "from": { "type": "integer", "minimum": 0 },
+                "to": { "type": "integer", "minimum": 0 }
+              },
+              "required": ["from", "to"]
+            }
+          },
           "words": {
             "type": "array",
             "items": {
@@ -1729,7 +1741,7 @@
       },
       "LearningAnswer": {
         "type": "object",
-        "description": "선택된 등급의 모범답안. chunks 필드는 제공하지 않는다.",
+        "description": "선택된 등급의 모범답안. 선택적 chunks 경계는 각 sentences 항목에 제공한다.",
         "properties": {
           "id": {
             "type": "string",

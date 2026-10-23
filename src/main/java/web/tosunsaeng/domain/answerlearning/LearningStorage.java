@@ -35,9 +35,12 @@ public class LearningStorage {
         return new UploadUrl(s.id, url.url().toString(), expires, MAX_BYTES);
     }
     public Document media(Document row) {
+        return media(row, LearningMediaSource.current(config));
+    }
+    public Document media(Document row, LearningMediaSource source) {
         String key = row.getString("key");
-        if (!config.getBucket().equals(row.getString("bucket")) || key == null
-                || !key.startsWith("answer-learning/" + config.getDatasetId() + "/" + config.getContentVersion() + "/media/"))
+        if (!config.getBucket().equals(source.bucket()) || !source.bucket().equals(row.getString("bucket")) || key == null
+                || !key.startsWith(source.prefix() + "/media/") || key.contains("/../") || key.contains("/./"))
             throw LearningFailure.unavailable();
         var get = GetObjectRequest.builder().bucket(config.getBucket()).key(key);
         if (row.getString("versionId") != null) get.versionId(row.getString("versionId"));

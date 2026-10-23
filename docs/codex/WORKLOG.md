@@ -17781,3 +17781,13 @@
 - TMI-25/TMI-128/TMI-125/TMI-193 관련. 사용자 운영 전달 요청과 lifecycle 경합 위험 수용에 따라 gradingReadChecks scope 및 executeGrading 도입. 일반 Job Transaction·콜백 및 저장 hook에서 owner/lane 쓰기 없이 ACTIVE/withdrawn/삭제/소유권 검사 유지. 이미 완료된 문항 Job은 retry 쓰기 생략. 일반 writer·실제 Job 멱등성·공개/AI/S3/Redis 계약 유지.
 - 단위·격리 Mongo 회귀 추가. 충돌 대상 owner를 다른 Transaction이 갱신 중인 상황에서 저장 성공, 상태가 이미 차단된 경우 거절, scope 복원과 승인된 삭제 이후 late insert 재현 검증. 첫 Mongo 실행은 Docker API1.32 호환 오류로 실패, 테스트 프로세스 한정 api.version1.44로 집중 테스트 통과. 전체 회귀·CI·배포는 진행 중.
 - 설정/실DB/타서비스/IAM 변경 없음. 기존 callback fence collection과 lifecycle 경로 유지, 신규 flag 없음. 테스트 서버 확인 후 운영 배포 예정이며 실제 앱 E2E는 별도다. root dirty 보존, Secret/Token 미기록.
+
+## 2026-10-23 — 파트별 학습·청크 구현 및 테스트 전달
+
+<!-- codex-turn:01a166fe-5783-74c2-b0ad-33609e3c60a0 -->
+
+- 사용자 승인한 feat/part-learning-access-chunks 브랜치를 최신 develop a40c35e 기반 별도 worktree에 생성했다. 원본 미커밋 문서/코드는 보존했다. 신규 Jira 없음. prod/Billing/Identity 변경 제외.
+- 콘텐츠 전용 POST part-learning-eligibility와 전용 audience, 무료 세트5개, 청크 경계 전달, exact manifest v3→v2 미디어 재사용을 구현했다. 제출/재시도/목록/polling 조회 없음. 무차감·무캐시이며 기존 재답변과 모의고사/AI 계약 유지. 일일 신규300회, 실패 retry는 일일 차감 제외.
+- unit1516건(1515통과/1skip), Node211통과. Mongo 전체 성공 후 최종 코드 재확인 중. 초기 enum switch/mock 및 구 retry 기대 실패를 수정했고 Docker 테스트 프로세스만 API1.44를 사용했다. 동결 review-2 hash 보존, diff check 통과.
+- test DB 읽기 전용 ECS 점검 exit0으로 ready manifest·무료 unit5개 확인. Billing test26 전용 조회ON/배포COMPLETED 확인. 새 DB/index·IAM·네트워크 변경 없음. LC test 코드/설정 배포는 진행 중이며 실제 앱 E2E는 미실행이다. 후속 결과는 아래 추가한다.
+- 최종 Mongo375건(373통과/기존2skip) 성공. 구현22b7dba를 푸시하고 develop PR67 생성·채팅 첨부 완료. Swagger 청크/300회/실패retry 설명도 보완해 추가 검증 후 같은 PR로 전달한다.
