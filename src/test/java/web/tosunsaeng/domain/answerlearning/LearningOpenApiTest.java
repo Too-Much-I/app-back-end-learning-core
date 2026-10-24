@@ -31,11 +31,11 @@ class LearningOpenApiTest {
         return api;
     }
 
-    @Test void allTenControllerOperationsHaveTypedDocumentationWithoutChangingRoutes() throws Exception {
+    @Test void allElevenControllerOperationsHaveTypedDocumentationWithoutChangingRoutes() throws Exception {
         var api = controllerPaths();
         var before = new HashSet<>(api.getPaths().keySet());
         new LearningOpenApiConfiguration().learningOpenApiCustomizer().customise(api);
-        assertThat(api.getPaths().keySet()).containsExactlyInAnyOrderElementsOf(before).hasSize(10);
+        assertThat(api.getPaths().keySet()).containsExactlyInAnyOrderElementsOf(before).hasSize(11);
         api.getPaths().values().forEach(path -> path.readOperations().forEach(operation -> {
             assertThat(operation.getOperationId()).isNotBlank();
             assertThat(operation.getSummary()).isNotBlank();

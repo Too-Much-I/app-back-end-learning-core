@@ -61,6 +61,34 @@ public class LearningCatalog {
         return new Document("part", part).append("level", level).append("units", units.stream()
                 .map(u -> summary(u, lessons, done, media)).toList());
     }
+    /** Resume is progress metadata only: no media issuance or entitlement lookup. */
+    public Document resume(String owner, int part, String requestedLevel) {
+        String level = level(part, requestedLevel);
+        List<Document> units = mongo.find(Query.query(current().and("part").is(part).and("publicationStatus").is("ready"))
+                .with(Sort.by("sortOrder", "_id")).limit(101), Document.class, "learning_units");
+        if (units.isEmpty()) throw LearningFailure.missing();
+        if (units.size() > 100) throw LearningFailure.unavailable();
+        List<String> ids = new ArrayList<>();
+        for (Document unit : units) {
+            List<String> lessons = unit.getList("lessonIds", String.class);
+            if (unit.getString("_id") == null || lessons == null || lessons.isEmpty()
+                    || lessons.stream().anyMatch(Objects::isNull)) throw LearningFailure.unavailable();
+            ids.addAll(lessons);
+        }
+        if (new HashSet<>(ids).size() != ids.size()) throw LearningFailure.unavailable();
+        Map<String, Document> lessons = lessonMap(ids);
+        Set<String> done = completed(owner, level, ids);
+        String next = null;
+        for (Document unit : units) {
+            for (String id : unit.getList("lessonIds", String.class)) {
+                Document lesson = lessons.get(id);
+                if (lesson == null || !unit.getString("_id").equals(lesson.getString("unitId")))
+                    throw LearningFailure.unavailable();
+                if (next == null && !done.contains(id)) next = unit.getString("_id");
+            }
+        }
+        return new Document("unitId", next).append("allCompleted", next == null);
+    }
     private Map<String, Document> lessonMap(List<String> ids) {
         return mongo.find(Query.query(current().and("_id").in(ids)), Document.class, "learning_lessons").stream()
                 .collect(Collectors.toMap(d -> d.getString("_id"), Function.identity()));

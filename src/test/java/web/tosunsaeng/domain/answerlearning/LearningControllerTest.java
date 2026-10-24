@@ -44,6 +44,14 @@ class LearningControllerTest {
                 .andExpect(jsonPath("$.result.part").value(2)).andExpect(jsonPath("$.result.userId").doesNotExist());
         verify(catalog).list(OWNER,2,"IH");
     }
+    @Test void resumeUsesAuthenticatedOwnerAndExistingEnvelope() throws Exception {
+        mvc.perform(get("/api/v1/learning/resume").param("part","3").param("level","IH")).andExpect(status().isUnauthorized());
+        when(catalog.resume(OWNER,3,"IH")).thenReturn(new Document("unitId",null).append("allCompleted",true));
+        mvc.perform(get("/api/v1/learning/resume").header("Authorization","Bearer fixture-token").param("part","3").param("level","IH"))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.code").value("COMMON_200"))
+                .andExpect(jsonPath("$.result.allCompleted").value(true)).andExpect(jsonPath("$.result.userId").doesNotExist());
+        verify(catalog).resume(OWNER,3,"IH");
+    }
     @Test void postedUserIdCannotOverrideAuthenticatedOwnerAndWireShapeStaysStable() throws Exception {
         when(service.create(eq(OWNER),any())).thenReturn(submission().view());
         mvc.perform(post("/api/v1/learning/submissions").header("Authorization","Bearer fixture-token").contentType("application/json")
