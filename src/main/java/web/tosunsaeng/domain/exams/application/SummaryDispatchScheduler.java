@@ -195,7 +195,8 @@ public class SummaryDispatchScheduler {
                 return null;
             }
             try {
-                return userOwnedTransactionExecutor.executeExamCoordination(observed.getUserId(), examId, () -> {
+                // This runs on a separate executor: establish read checks here, not on the caller thread.
+                return userOwnedTransactionExecutor.executeGrading(observed.getUserId(), examId, () -> {
                     ExamSession current = examSessionRepository.findById(examId).orElse(null);
                     if (current == null
                             || !java.util.Objects.equals(current.getUserId(), observed.getUserId())) {

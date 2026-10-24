@@ -17775,3 +17775,9 @@
 - TMI-25/TMI-128/TMI-125/TMI-193 관련. 사용자 운영 전달 요청과 lifecycle 경합 위험 수용에 따라 gradingReadChecks scope 및 executeGrading 도입. 일반 Job Transaction·콜백 및 저장 hook에서 owner/lane 쓰기 없이 ACTIVE/withdrawn/삭제/소유권 검사 유지. 이미 완료된 문항 Job은 retry 쓰기 생략. 일반 writer·실제 Job 멱등성·공개/AI/S3/Redis 계약 유지.
 - 단위·격리 Mongo 회귀 추가. 충돌 대상 owner를 다른 Transaction이 갱신 중인 상황에서 저장 성공, 상태가 이미 차단된 경우 거절, scope 복원과 승인된 삭제 이후 late insert 재현 검증. 첫 Mongo 실행은 Docker API1.32 호환 오류로 실패, 테스트 프로세스 한정 api.version1.44로 집중 테스트 통과. 전체 회귀·CI·배포는 진행 중.
 - 설정/실DB/타서비스/IAM 변경 없음. 기존 callback fence collection과 lifecycle 경로 유지, 신규 flag 없음. 테스트 서버 확인 후 운영 배포 예정이며 실제 앱 E2E는 별도다. root dirty 보존, Secret/Token 미기록.
+
+## 2026-10-24 — 요약 비동기 보호 쓰기 누락 보완
+
+- TMI-25/TMI-125/TMI-128 관련. SummaryDispatchScheduler의 claim/failClaim에서 executeGrading 사용으로 비동기 worker 자체에서 read-check scope를 확립한다. 이전 caller ThreadLocal 비전파 누락을 수정하며 공개/AI/S3/Redis·Job CAS·권한/삭제/환불 조회는 유지한다.
+- 실제 MongoDB 비동기 worker 회귀2개 추가: 정상 claim/dispatch 및 dispatch 실패 저장 모두 보호 owner/lane 문서 불변, Job dispatchAttempt1과 PROCESSING/FAILED 전이 확인. 집중 테스트 성공, 전체 회귀 진행 중. 새 flag/실DB/IAM/타서비스 변경 없음.
+- 사용자 앱에서 기존 건 재요청이 어려움. 기존 인증된 경로 외 복구를 임의 수행하지 않으며 배포와 기존 PENDING 복구 상태를 구분한다. 사용자 dirty 보존, Secret/Token 미기록.

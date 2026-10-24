@@ -1,5 +1,7 @@
 # Learning Core Current State
 
+- 2026-10-24 요약 전송 경계 보완(TMI-25/TMI-125/TMI-128): SummaryDispatchScheduler claim/failClaim 공통 Transaction을 executeGrading으로 변경하여 작업 스레드에서 읽기 검사 scope를 직접 시작한다. 실제 비동기 Mongo 테스트2개로 정상 전송/전송 실패 상태 저장 시 owner/lane 무쓰기와 Job 갱신 확인. 외부 계약/권한 조회/Job CAS 유지. 전체 회귀·테스트 후 운영 전달 진행 중. 기존 PENDING 요약은 앱 재시도 곤란으로 인증된 재처리 수단 확인 필요, 인증우회/DB강제변경 없음.
+
 - 2026-10-23 모의고사 채점/retry 보호 쓰기 제거(TMI-25/TMI-128/TMI-125/TMI-193) 구현. Job·콜백·저장 hook은 상태 조회로 전환하며 완료 Job retry 쓰기 생략. 사용자 승인된 lifecycle late-write 위험은 GRADING_READ_CHECKS_2026_10_23.md 참고. 실제 Job Transaction/멱등성·공개/AI 계약 유지, 설정/DB 변경 없음. 로컬/CI·테스트→운영 배포 확인 진행 중, 아직 배포 완료 아님.
 
 - 2026-10-22 Callback write isolation(TMI-128): CORE/AZURE lane 및 lifecycle bridge 구현, default OFF. 기존 main upload URL·timestamp 수정 포함 test 전달 후 prod 순차 전달 준비. 최종 회귀/CI·배포는 진행 중이며 실앱 E2E 미검증. 상세 `CALLBACK_WRITE_ISOLATION_ROLLOUT.md`; isolation ON 후 lifecycle 없는 코드로 직접 rollback 금지.
