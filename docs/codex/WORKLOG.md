@@ -17791,3 +17791,9 @@
 - unit1516건(1515통과/1skip), Node211통과. Mongo 전체 성공 후 최종 코드 재확인 중. 초기 enum switch/mock 및 구 retry 기대 실패를 수정했고 Docker 테스트 프로세스만 API1.44를 사용했다. 동결 review-2 hash 보존, diff check 통과.
 - test DB 읽기 전용 ECS 점검 exit0으로 ready manifest·무료 unit5개 확인. Billing test26 전용 조회ON/배포COMPLETED 확인. 새 DB/index·IAM·네트워크 변경 없음. LC test 코드/설정 배포는 진행 중이며 실제 앱 E2E는 미실행이다. 후속 결과는 아래 추가한다.
 - 최종 Mongo375건(373통과/기존2skip) 성공. 구현22b7dba를 푸시하고 develop PR67 생성·채팅 첨부 완료. Swagger 청크/300회/실패retry 설명도 보완해 추가 검증 후 같은 PR로 전달한다.
+
+## 2026-10-24 — 요약 비동기 보호 쓰기 누락 보완
+
+- TMI-25/TMI-125/TMI-128 관련. SummaryDispatchScheduler의 claim/failClaim에서 executeGrading 사용으로 비동기 worker 자체에서 read-check scope를 확립한다. 이전 caller ThreadLocal 비전파 누락을 수정하며 공개/AI/S3/Redis·Job CAS·권한/삭제/환불 조회는 유지한다.
+- 실제 MongoDB 비동기 worker 회귀2개 추가: 정상 claim/dispatch 및 dispatch 실패 저장 모두 보호 owner/lane 문서 불변, Job dispatchAttempt1과 PROCESSING/FAILED 전이 확인. 집중 테스트 성공, 전체 회귀 진행 중. 새 flag/실DB/IAM/타서비스 변경 없음.
+- 사용자 앱에서 기존 건 재요청이 어려움. 기존 인증된 경로 외 복구를 임의 수행하지 않으며 배포와 기존 PENDING 복구 상태를 구분한다. 사용자 dirty 보존, Secret/Token 미기록.

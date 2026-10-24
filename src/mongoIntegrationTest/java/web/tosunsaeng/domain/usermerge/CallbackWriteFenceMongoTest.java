@@ -61,6 +61,49 @@ class CallbackWriteFenceMongoTest {
     }
     @AfterEach void close() { client.close(); }
 
+    @Test void asyncSummaryClaimAndFailureUseReadChecksWithoutCallerScope() throws Exception {
+        verifyAsyncSummary(false);
+    }
+
+    @Test void asyncSummaryDispatchFailureAlsoLeavesProtectionDocumentsUnchanged() throws Exception {
+        verifyAsyncSummary(true);
+    }
+
+    private void verifyAsyncSummary(boolean failDispatch) throws Exception {
+        var factory = new MongoRepositoryFactory(mongo);
+        var jobs = factory.getRepository(web.tosunsaeng.domain.exams.domain.repository.SummaryGradingJobRepository.class);
+        var sessions = factory.getRepository(web.tosunsaeng.domain.exams.domain.repository.ExamSessionRepository.class);
+        mongo.createCollection("summary_grading_jobs");
+        mongo.updateFirst(Query.query(Criteria.where("_id").is("exam")),
+                Update.update("status", "IN_PROGRESS").set("mockExamId", "mock_exam_001"), "exam_sessions");
+        writers.executeGrading("owner", "exam", () -> jobs.insert(
+                web.tosunsaeng.domain.exams.domain.entity.SummaryGradingJob.pending(
+                        "summary:exam:v1", "exam", "mock_exam_001", NOW)));
+        var dispatch = org.mockito.Mockito.mock(web.tosunsaeng.domain.exams.application.GradingDispatchService.class);
+        if (failDispatch) org.mockito.Mockito.doThrow(new IllegalStateException("test dispatch failure"))
+                .when(dispatch).dispatchSummary(org.mockito.ArgumentMatchers.any());
+        var before = mongo.findById("owner", Document.class, "user_ownership_guards");
+        var lanes = mongo.find(new Query(), Document.class, CallbackWriteFence.COLLECTION);
+        var future = new java.util.concurrent.atomic.AtomicReference<Future<?>>();
+        try (ExecutorService worker = Executors.newSingleThreadExecutor()) {
+            var scheduler = new web.tosunsaeng.domain.exams.application.SummaryDispatchScheduler(
+                    task -> future.set(worker.submit(task)), jobs, sessions, dispatch,
+                    new web.tosunsaeng.global.config.GradingProperties(Duration.ofMinutes(1), Duration.ofMinutes(3),
+                            3, java.net.URI.create("http://test-ai:8000"), Duration.ofSeconds(3),
+                            Duration.ofSeconds(30), 2, 100), Clock.fixed(NOW, ZoneOffset.UTC));
+            ReflectionTestUtils.setField(scheduler, "userOwnedTransactionExecutor", writers);
+            assertThat(scheduler.schedulePending("summary:exam:v1", 1)).isTrue();
+            future.get().get(15, TimeUnit.SECONDS);
+        }
+        var saved = jobs.findById("summary:exam:v1").orElseThrow();
+        assertThat(saved.getDispatchAttempt()).isEqualTo(1);
+        assertThat(saved.getStatus().name()).isEqualTo(failDispatch ? "FAILED" : "PROCESSING");
+        org.mockito.Mockito.verify(dispatch).dispatchSummary(org.mockito.ArgumentMatchers.any());
+        assertThat(mongo.findById("owner", Document.class, "user_ownership_guards")).isEqualTo(before);
+        assertThat(mongo.find(new Query(), Document.class, CallbackWriteFence.COLLECTION))
+                .containsExactlyInAnyOrderElementsOf(lanes);
+    }
+
     @Test void gradingEntryAndPersistenceWriteNeitherOwnerNorExamFences() {
         Document owner = mongo.findById("owner", Document.class, "user_ownership_guards");
         var lanes = mongo.find(new Query(), Document.class, CallbackWriteFence.COLLECTION);
