@@ -1,5 +1,7 @@
 # Learning Core Current State
 
+- 2026-10-24 테스트 전달 완료: feat/learning-resume-promotion 제품커밋375eba59da7e228c6f869113b7ba63172a097fbb, PR70 develop merge e0b248ede1310890f1084f60f958b85a271930e3. CI40073343086/배포40073604594 모두SUCCESS. public healthUP, resume Swagger/무인증401 확인. 프로모션OFF·문서미노출 유지. 운영/실DB/S3/IAM 변경 없음, 실제 로그인/신청E2E 미실행, 신규 Jira 없음.
+
 - 2026-10-24 사용자 커밋·푸시·테스트 배포 요청으로 feat/learning-resume-promotion 전달 진행. 최신 develop b4d760a 유지 확인, GitHub 인증 정상. CI 후 develop 병합/기존 test workflow만 사용하며 main/운영 및 프로모션 ON/실DB/S3/IAM 변경 제외. 신규 Jira 없음.
 
 - 2026-10-24 Swagger 반영 확인: resume는 OpenAPI JSON에 입력·응답·오류 명세 및 기존 문서 회귀 테스트를 추가했다. promotion은 Controller Operation 설명과 multipart/typed Receipt 자동 생성 방식이며 전용 Swagger 렌더링 테스트는 아직 없다. 프로모션 OFF 시 경로 미노출, 미배포이므로 서버 Swagger에는 아직 반영되지 않았다. 신규 Jira/제품코드/배포 변경 없음.

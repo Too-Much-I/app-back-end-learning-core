@@ -17823,3 +17823,7 @@
 
 - 2026-10-24 사용자 커밋·푸시·테스트 배포 요청으로 feat/learning-resume-promotion 전달 진행. 최신 develop b4d760a 유지 확인, GitHub 인증 정상. CI 후 develop 병합/기존 test workflow만 사용하며 main/운영 및 프로모션 ON/실DB/S3/IAM 변경 제외. 신규 Jira 없음.
 - 기존 단위1533 실패0/skip1·격리Mongo1 통과 증거 확인. 관련 제품/테스트/Swagger/문서만 커밋 대상으로 선정하며 원본 dirty 보존, Secret/Token 미기록. 진행 결과는 후속 append로 기록한다.
+
+- 2026-10-24 테스트 전달 완료: feat/learning-resume-promotion 제품커밋375eba59da7e228c6f869113b7ba63172a097fbb, PR70 develop merge e0b248ede1310890f1084f60f958b85a271930e3. CI40073343086/배포40073604594 모두SUCCESS. public healthUP, resume Swagger/무인증401 확인. 프로모션OFF·문서미노출 유지. 운영/실DB/S3/IAM 변경 없음, 실제 로그인/신청E2E 미실행, 신규 Jira 없음.
+- CI 전체 단위/Mongo/마이그레이션/학습Lambda 통과 후 exact head 조건으로 PR70 병합. 테스트 배포에서도 전체 단위/Mongo/마이그레이션 재검증 통과, ECS service-stability와 health 확인 성공. 이미지 sha256:1c6039f658448c4c488baad1342e9f912f9cb39138007dadaa95a85f6dd0ba90. workflow가 현재 test61 설정을 받아 이미지 교체했으며 main/운영 배포 없음.
+- 배포 후 https://api-test.to-teacher.com/v3/api-docs에 /api/v1/learning/resume 및 LearningResume 스키마 노출, 프로모션 경로 미노출 확인. 직접 무인증 resume GET401·healthUP 확인, 실제 계정으로 진도/성적표 신청은 수행하지 않았다. 로컬 AWS 인증 부재로 직접 ECS readback은 못 했으며 workflow 안정화 성공과 공개 응답을 증거로 사용한다. 결과 문서 커밋은 feature 브랜치에만 보존하고 추가 develop 병합/배포를 만들지 않는다.
