@@ -11,6 +11,28 @@
     }
   ],
   "paths": {
+    "/api/v1/learning/resume": {
+      "get": {
+        "tags": ["답변 학습"],
+        "summary": "이어할 첫 미완료 세트",
+        "description": "기존 완료 진도로 첫 미완료 세트를 반환한다. 일부 완료면 같은 세트, 전체 완료면 다음 세트. 모두 완료일 때만 unitId=null/allCompleted=true. Billing 조회와 콘텐츠 제공은 하지 않는다.",
+        "parameters": [
+          {"in":"query","name":"part","required":true,"schema":{"type":"integer","minimum":1,"maximum":5}},
+          {"in":"query","name":"level","required":true,"schema":{"type":"string","enum":["common","IM3","IH","AL"]},"description":"Part 1 common, Part 2~5 IM3/IH/AL"}
+        ],
+        "responses": {
+          "200":{"description":"성공","content":{"application/json":{"schema":{"type":"object","properties":{
+            "isSuccess":{"type":"boolean"},"code":{"type":"string"},"message":{"type":"string"},
+            "result":{"$ref":"#/components/schemas/LearningResume"}
+          },"required":["isSuccess","code","message","result"]}}}},
+          "400":{"description":"잘못된 part/level"},
+          "401":{"description":"인증 필요"},
+          "403":{"description":"접근 제한"},
+          "404":{"description":"콘텐츠 없음"},
+          "503":{"description":"조회 실패 또는 콘텐츠 정합성 오류"}
+        }
+      }
+    },
     "/api/v1/learning/units": {
       "get": {
         "tags": [
@@ -1535,6 +1557,11 @@
   },
   "components": {
     "schemas": {
+      "LearningResume": {
+        "type":"object",
+        "properties":{"unitId":{"type":"string","nullable":true},"allCompleted":{"type":"boolean"}},
+        "required":["unitId","allCompleted"]
+      },
       "LearningMedia": {
         "type": "object",
         "description": "사진/음성 공통 미디어",

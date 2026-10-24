@@ -1,5 +1,12 @@
 # Learning Core Current State
 
+- 2026-10-24 사용자 커밋·푸시·테스트 배포 요청으로 feat/learning-resume-promotion 전달 진행. 최신 develop b4d760a 유지 확인, GitHub 인증 정상. CI 후 develop 병합/기존 test workflow만 사용하며 main/운영 및 프로모션 ON/실DB/S3/IAM 변경 제외. 신규 Jira 없음.
+
+- 2026-10-24 Swagger 반영 확인: resume는 OpenAPI JSON에 입력·응답·오류 명세 및 기존 문서 회귀 테스트를 추가했다. promotion은 Controller Operation 설명과 multipart/typed Receipt 자동 생성 방식이며 전용 Swagger 렌더링 테스트는 아직 없다. 프로모션 OFF 시 경로 미노출, 미배포이므로 서버 Swagger에는 아직 반영되지 않았다. 신규 Jira/제품코드/배포 변경 없음.
+
+- 2026-10-24 두 API 구현 완료: 최신 develop b4d760a 기반 feat/learning-resume-promotion, 작업 폴더 /private/tmp/lc-learning-resume-promotion. GET /api/v1/learning/resume는 기존 진도 기반 첫미완료 세트, POST /api/v1/promotions/applications는 인증 사용자+서버 단일 프로모션·계좌/성적표 접수. 프로모션 기본 OFF, PDF/JPEG/PNG 1개 최대9MiB(기존 전체10MiB 유지). unit1533건 실패0/기존skip1, 격리 Mongo 동시신청1건 통과, diff검사 통과. 신규 Jira 없음. 원래 dirty 보존, commit/push/배포/실DB 변경 없음. 개인정보 동의·보존/폐기·열람 및 전용 private bucket/collection/접수기간 준비는 활성화 전 필요. API 문서: 작업 폴더 docs/contracts/LEARNING-RESUME-PROMOTION-API-R1.md.
+
+
 - 2026-10-23 파트별 학습·청크: feat/part-learning-access-chunks에서 콘텐츠 전용 paid 조회/전용 audience·무료 세트5개·청크 경계·v3→v2 미디어 재사용·신규300회/실패retry 무차감 구현. 제출 조회·캐시·새 receipt/worker 없음. unit1516건(1515통과/1skip), Node211통과, Mongo 전체 성공 후 최종 재확인 중. test Billing26의 전용 조회ON/COMPLETED 및 test manifest/무료ID 확인. test 전달 진행 중이며 prod 변경 없음. 신규 Jira 없음. 상세 PART_LEARNING_TEST_DELIVERY_2026-10-23.md.
 
 - 2026-10-24 요약 전송 경계 보완(TMI-25/TMI-125/TMI-128): SummaryDispatchScheduler claim/failClaim 공통 Transaction을 executeGrading으로 변경하여 작업 스레드에서 읽기 검사 scope를 직접 시작한다. 실제 비동기 Mongo 테스트2개로 정상 전송/전송 실패 상태 저장 시 owner/lane 무쓰기와 Job 갱신 확인. 외부 계약/권한 조회/Job CAS 유지. 전체 회귀·테스트 후 운영 전달 진행 중. 기존 PENDING 요약은 앱 재시도 곤란으로 인증된 재처리 수단 확인 필요, 인증우회/DB강제변경 없음.

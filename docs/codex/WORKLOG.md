@@ -17797,3 +17797,29 @@
 - TMI-25/TMI-125/TMI-128 관련. SummaryDispatchScheduler의 claim/failClaim에서 executeGrading 사용으로 비동기 worker 자체에서 read-check scope를 확립한다. 이전 caller ThreadLocal 비전파 누락을 수정하며 공개/AI/S3/Redis·Job CAS·권한/삭제/환불 조회는 유지한다.
 - 실제 MongoDB 비동기 worker 회귀2개 추가: 정상 claim/dispatch 및 dispatch 실패 저장 모두 보호 owner/lane 문서 불변, Job dispatchAttempt1과 PROCESSING/FAILED 전이 확인. 집중 테스트 성공, 전체 회귀 진행 중. 새 flag/실DB/IAM/타서비스 변경 없음.
 - 사용자 앱에서 기존 건 재요청이 어려움. 기존 인증된 경로 외 복구를 임의 수행하지 않으며 배포와 기존 PENDING 복구 상태를 구분한다. 사용자 dirty 보존, Secret/Token 미기록.
+
+
+## 2026-10-24 — 단일 feat 브랜치 이어하기·프로모션 API 구현
+
+<!-- codex-turn:01a16ca8-d4fa-7bd2-95c8-335376980ae9 -->
+
+- 사용자 정정에 따라 두 브랜치가 아닌 feat/learning-resume-promotion 하나를 최신 origin/develop b4d760a에서 생성했다. 별도 worktree /private/tmp/lc-learning-resume-promotion 사용, 원본 dirty/AGENTS/과거 기록 보존. 신규 Jira 없음.
+- LearningCatalog/Controller 및 Swagger/테스트에 resume GET 추가. 기존 owner/level/version 완료기록과 sortOrder/_id 기준 첫미완료 세트, 전부완료 null/true, 콘텐츠없음404/정합성오류503. 신규 진도저장/Billing조회/미디어발급 없음.
+- promotion 패키지에 default-OFF multipart 신청 추가. 인증 userId·서버 단일campaign/기간, 은행3자리·계좌문자열/예금주 및 PDF/JPEG/PNG 시그니처/첨부1개 검증. 기존 전체10MiB를 바꾸지 않기 위해 파일9MiB 구현값 채택(기존10MiB는 제안값). 비공개 전용bucket/SSE-S3 opaque key, Mongo 기본_id unique로 사용자·프로모션 중복 방지, 기존 writer fence 내 insert. 결과불명 시 파일 보존, 확인된 중복패자만 정리. 기존 신청 수정/자동지급/관리자API 없음.
+- 기존 공개/AI/S3/Redis 계약 불변. 새 파일 경로만 promotion-reports 사용, 기존 저장소설정/권한/실DB/배포 변경 없음. 제품diff는 두API/Swagger/관련테스트·계약문서만이며 예상밖 변경 없음.
+- ./gradlew clean test 최종1533건 실패0/오류0/기존skip1. 최초 Swagger 경로수 기대 실패를 신규11경로 문서/테스트로 보완. 격리 Mongo 동시신청 테스트1건 통과: 한 건 저장·패자파일만 삭제. Docker API1.32 실패 후 기존 기록대로 테스트프로세스 한정 JAVA_TOOL_OPTIONS=-Dapi.version=1.44로 재실행, 영구Docker 설정 변경 없음. 전체 Mongo suite/실환경E2E 미실행. git diff --check 통과.
+- 활성화 전 미결: 개인정보 동의·보존/폐기·담당자 열람, 기존 탈퇴/삭제와 보존 관계, 전용 private S3/DBcollection/기간 설정. 시그니처 검사는 완전한 파일파싱/악성코드·성적 진위 검증 아님, DB결과불명/S3실패 고아파일 수동정리 가능성 문서화. 커밋/푸시/배포 미수행, Secret/Token 미기록.
+
+## 2026-10-24 — 두 API Swagger 반영 여부 확인
+
+<!-- codex-turn:01a16cbf-f2c8-73b0-a6b0-8f39bdda2162 -->
+
+- 구현 worktree에서 resume OpenAPI 경로/스키마와 promotion Operation/multipart/typed Receipt 선언을 확인했다. resume 문서 회귀는 이전 전체 테스트에서 통과했으며 promotion은 자동 문서 생성 방식이고 별도 Swagger 렌더링 검증은 미실행이다.
+- 프로모션 OFF 시 Controller가 등록되지 않아 Swagger에도 노출되지 않는다. 미배포 상태로 서버 반영과 소스 준비를 구분해 안내했다. 신규 Jira 없음. 제품코드/DB/배포 변경 없이 작업기록만 갱신, diff 검사 수행. Secret/Token 미기록.
+
+## 2026-10-24 — 이어하기·프로모션 테스트 서버 전달
+
+<!-- codex-turn:01a16cc1-47f1-73c0-a607-42d66e7c7acb -->
+
+- 2026-10-24 사용자 커밋·푸시·테스트 배포 요청으로 feat/learning-resume-promotion 전달 진행. 최신 develop b4d760a 유지 확인, GitHub 인증 정상. CI 후 develop 병합/기존 test workflow만 사용하며 main/운영 및 프로모션 ON/실DB/S3/IAM 변경 제외. 신규 Jira 없음.
+- 기존 단위1533 실패0/skip1·격리Mongo1 통과 증거 확인. 관련 제품/테스트/Swagger/문서만 커밋 대상으로 선정하며 원본 dirty 보존, Secret/Token 미기록. 진행 결과는 후속 append로 기록한다.

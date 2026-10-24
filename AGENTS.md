@@ -1,5 +1,10 @@
 # 프로젝트 목적
 
+## 2026-10-24 이어하기·프로모션 테스트 전달 예외
+
+- 사용자 「커밋 푸시해서 테스트 서버에 올려줘」로 feat/learning-resume-promotion의 두 신규 API 및 관련 테스트·문서 커밋/푸시/PR/develop 병합과 기존 테스트 자동배포를 허용한다. CI 통과 후 전달하며 운영 main 배포는 제외한다.
+- 프로모션 기본 OFF 및 개인정보 정책/비공개 저장 준비 gate를 유지한다. 실DB·S3·IAM 변경과 기능 활성화는 이번 전달에 포함하지 않는다. 원래 작업폴더의 미커밋 변경을 포함하지 않는다.
+
 ## 2026-10-23 파트별 학습·청크 테스트 전달 승인
 
 - 사용자 요청으로 feat/part-learning-access-chunks 브랜치의 학습 계획 구현·격리 테스트 및 테스트 서버 기능 ON 배포를 허용한다. 전달에 필요한 commit/push/PR/develop 병합과 기존 test workflow 실행을 포함한다. main/prod, Billing/Identity 저장소와 서비스, 실DB 삭제·index 변경·새 IAM/네트워크 권한 확대는 제외한다.
