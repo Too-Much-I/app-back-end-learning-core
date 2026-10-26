@@ -60,4 +60,16 @@ class LearningStoreTest {
         when(guard.execute(eq(OWNER),any())).thenAnswer(i->((Supplier<?>)i.getArgument(1)).get());
         new LearningStore(mongo,guard).create(submission(),60); verify(guard).execute(eq(OWNER),any());
     }
+    @Test void onlyPartOneExplicitCompletionRefreshesPracticeTime() {
+        store.complete(OWNER,"p1","common","test-v1",null,NOW);
+        var update=org.mockito.ArgumentCaptor.forClass(Update.class);
+        verify(mongo).updateFirst(any(Query.class),update.capture(),eq("learning_completions"));
+        assertThat(update.getValue().getUpdateObject()).isEqualTo(new Document("$max",new Document("lastPracticedAt",java.util.Date.from(NOW))));
+    }
+    @Test void retryDoesNotRewriteOriginalQueueTime() {
+        store.retry(submission(),NOW,300);
+        var update=org.mockito.ArgumentCaptor.forClass(Update.class);
+        verify(mongo).findAndModify(any(Query.class),update.capture(),any(FindAndModifyOptions.class),eq(Submission.class));
+        assertThat(update.getValue().getUpdateObject().get("$set",Document.class)).doesNotContainKeys("queuedAt","lastPracticedAt");
+    }
 }
