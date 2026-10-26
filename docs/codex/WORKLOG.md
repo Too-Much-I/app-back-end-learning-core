@@ -17834,3 +17834,5 @@
 - 최초 clean test의 새 테스트 Instant.toJson 검증 오류1건 수정 후 전체 test1545 실패0/기존skip1. Node 배포88·migration7 통과. 최초 Mongo는 Docker API1.32/서버최소1.40 호환으로 시작 전 실패, 실행 프로세스에만 api.version1.44 적용해 재검증 중. diff 검사 통과. CI/배포 결과는 후속 append 예정.
 - 테스트 배포만 대상, 운영/타서비스/IAM/기능설정/실DB 강제수정 제외. 실제 계정 CTA E2E는 별도이며 Secret/Token 미기록.
 - 최종 로컬 XML: 단위1545 실패/오류0·기존skip1, 격리Mongo380 실패/오류0·skip2. 실제 실행된 Mongo378 통과이며 skip을 실행 통과로 계산하지 않는다. 예상 밖 제품 변경 없음. 최신 develop 기존 테스트 배포 success 확인 후 전달 진행.
+- 전달 완료: 제품 e1b5a7e182c925f41ff321bf7cbda3577b75b7de 커밋/push, PR71 CI40288429705 전 단계 success 후 승인된 develop merge e2d8b6e8ca6cc34d28f50af2f8eb0aa81617924b. 자동 테스트 배포40288936145 completed/success 및 서비스 안정화·workflow health 검사 통과. 실행 중 로컬 AWS credential은 없어 직접 ECS 조회는 하지 않았으며 workflow 성공과 공개 응답 증거로 확인했다.
+- 배포 후 공개healthUP·새 resume 미인증401·Swagger partRequired=false/levelRequired=true·READY/NO_HISTORY/END_OF_PART·위치8필드 및 기존 unitId/allCompleted schema·promotion 경로 유지 확인. 실제 인증 사용자 학습/CTA E2E는 미실행이며 앱에서 part 생략·lessonId 이동을 확인해야 한다. 운영/기능설정/타서비스/IAM/실DB강제변경 없음. 원본 dirty 유지, 예상 밖 제품diff 없음. 기록만 후속 커밋하며 추가 배포 없음.

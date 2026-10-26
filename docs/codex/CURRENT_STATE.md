@@ -1,5 +1,7 @@
 # Learning Core Current State
 
+- 2026-10-26 최근 풀이 이어하기 테스트 배포 완료: 제품 e1b5a7e / PR71 / develop merge e2d8b6e. CI40288429705·배포40288936145 success. 공개healthUP, 새 level-only/part optional 및 READY·NO_HISTORY·END_OF_PART Swagger, 기존 legacy schema·promotion 경로 유지, 미인증401 확인. 운영·기능설정 변경 없음. 실제 로그인 앱의 CTA/학습 이동 E2E는 미실행, 프론트는 part 생략 후 result.lessonId로 이동해야 함. 신규 Jira 없음.
+
 - 로컬 최종 검증: 단위1545 실패/오류0·skip1, 격리Mongo380 실패/오류0·skip2, Node95 통과. GitHub CI 후 develop 머지·테스트배포 진행, 운영 제외.
 
 - 2026-10-26 feat/learning-recent-resume: level-only 단일 CTA 구현. 기존 최초 queuedAt과 Part1 완료 lastPracticedAt으로 최근 풀이 다음 문항/세트 결정, READY/NO_HISTORY/END_OF_PART 및 위치 반환. part 지정 R1 응답 유지, Swagger/계약 보완. 단위1545 실패0/기존skip1, Node 배포88·migration7 통과; 격리Mongo/CI/테스트배포 진행 중. 사용자 Git 예외 승인, 신규 Jira 없음. 운영/설정/실DB 강제 변경 제외.
