@@ -20,6 +20,12 @@ public final class LearningOwnership {
                 mongo.updateFirst(Query.query(Criteria.where("_id").is(row.get("_id")).and("userId").is(source)),
                         Update.update("userId", target), "learning_completions");
             } else {
+                java.util.Date practiced = row.getDate("lastPracticedAt");
+                if (practiced == null && "common".equals(row.getString("level"))) practiced = row.getDate("completedAt");
+                java.util.Date targetPractice = existing.getDate("lastPracticedAt");
+                if (targetPractice == null && "common".equals(existing.getString("level"))) targetPractice = existing.getDate("completedAt");
+                if (targetPractice != null && (practiced == null || targetPractice.after(practiced))) practiced = targetPractice;
+                if (practiced != null) mongo.updateFirst(key, new Update().max("lastPracticedAt", practiced), "learning_completions");
                 if (row.getDate("completedAt").before(existing.getDate("completedAt"))) {
                     mongo.updateFirst(key, new Update().set("completedAt", row.getDate("completedAt"))
                             .set("submissionId", row.get("submissionId")), "learning_completions");

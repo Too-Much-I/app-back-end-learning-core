@@ -28,8 +28,11 @@ public class LearningController {
         return owner;
     }
     private static BaseResponse<Object> ok(Object value) { return BaseResponse.onSuccess(SuccessStatus.OK, value); }
-    @io.swagger.v3.oas.annotations.Operation(summary="파트·레벨별 이어할 첫 미완료 세트 조회")
-    @GetMapping("/resume") public BaseResponse<Object> resume(@RequestParam int part, @RequestParam String level) { return ok(catalog.resume(owner(),part,level)); }
+    @io.swagger.v3.oas.annotations.Operation(summary="난이도별 최근 풀이 다음 문항 조회")
+    @GetMapping("/resume") public BaseResponse<Object> resume(@RequestParam(required=false) Integer part, @RequestParam String level) {
+        String owner = owner();
+        return ok(part == null ? catalog.resumeRecent(owner,level) : catalog.resume(owner,part,level));
+    }
     @GetMapping("/units") public BaseResponse<Object> list(@RequestParam int part, @RequestParam String level) { return ok(catalog.list(owner(),part,level)); }
     @GetMapping("/units/{id}") public BaseResponse<Object> detail(@PathVariable String id, @RequestParam String level) { return ok(catalog.detail(owner(),id,level)); }
     @GetMapping("/media/{id}/url") public BaseResponse<Object> media(@PathVariable String id) { return ok(catalog.media(owner(),id)); }

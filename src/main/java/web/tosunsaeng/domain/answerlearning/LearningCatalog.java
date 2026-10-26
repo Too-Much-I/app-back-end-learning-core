@@ -61,7 +61,10 @@ public class LearningCatalog {
         return new Document("part", part).append("level", level).append("units", units.stream()
                 .map(u -> summary(u, lessons, done, media)).toList());
     }
-    /** Resume is progress metadata only: no media issuance or entitlement lookup. */
+    public Document resumeRecent(String owner, String level) {
+        return new LearningRecentResume(mongo, config).resume(owner, level);
+    }
+    /** Legacy part-scoped resume: preserve its response for existing clients. */
     public Document resume(String owner, int part, String requestedLevel) {
         String level = level(part, requestedLevel);
         List<Document> units = mongo.find(Query.query(current().and("part").is(part).and("publicationStatus").is("ready"))

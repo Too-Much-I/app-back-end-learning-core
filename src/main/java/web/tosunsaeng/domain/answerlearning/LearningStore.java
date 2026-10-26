@@ -120,6 +120,10 @@ public class LearningStore {
                 if (live == null) throw new LearningFailure(409, "COMPLETION_NOT_READY");
             }
             insertCompletion(owner, lesson, level, version, submissionId, now);
+            // Part 1 has no submission. Only an explicit completion request records another practice;
+            // grading workers and replayed spoken completions must never change the CTA ordering.
+            if (submissionId == null) mongo.updateFirst(completionKey(owner, lesson, level, version),
+                    new Update().max("lastPracticedAt", Date.from(now)), "learning_completions");
             return null;
         });
     }

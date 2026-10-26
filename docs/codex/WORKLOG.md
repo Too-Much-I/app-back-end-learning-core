@@ -17823,3 +17823,14 @@
 
 - 2026-10-24 사용자 커밋·푸시·테스트 배포 요청으로 feat/learning-resume-promotion 전달 진행. 최신 develop b4d760a 유지 확인, GitHub 인증 정상. CI 후 develop 병합/기존 test workflow만 사용하며 main/운영 및 프로모션 ON/실DB/S3/IAM 변경 제외. 신규 Jira 없음.
 - 기존 단위1533 실패0/skip1·격리Mongo1 통과 증거 확인. 관련 제품/테스트/Swagger/문서만 커밋 대상으로 선정하며 원본 dirty 보존, Secret/Token 미기록. 진행 결과는 후속 append로 기록한다.
+
+## 2026-10-26 — 최근 풀이 다음 문항 이어하기 구현·테스트 전달
+
+<!-- codex-turn:01a17727-ccbb-79f1-b990-25ce7e73ba8e -->
+
+- 사용자 문항 단위 방향 및 테스트 서버 수정 배포 요청, Git 예외 회신 승인. 최신 origin/develop e0b248e 기반 전용 feat/learning-recent-resume 작업트리 사용, 원본 dirty 보존. 신규 Jira 없음.
+- part 없는 level-only resume에 최근 제출 queuedAt + Part1 명시 완료 lastPracticedAt 조회를 구현. 별도 컬렉션/index/화면 진입 API 없이 기존 자료 재사용, 채점 지연·retry가 순서를 바꾸지 않음. 세트 내부/다음 세트 이동과 NO_HISTORY/END_OF_PART null 위치, Part1 common 공유를 문서화했다. 기존 part 응답·인증/삭제/소유권·AI/모의고사/과금계약 유지.
+- Part1 완료 재호출은 최근 활동으로 $max 갱신하되 최초 completedAt 보존. merge 시 최초 완료/최신 활동 각각 보존. 단위/MockMvc/Swagger 및 Mongo 회귀 추가, 외부 실DB 사용 없음.
+- 최초 clean test의 새 테스트 Instant.toJson 검증 오류1건 수정 후 전체 test1545 실패0/기존skip1. Node 배포88·migration7 통과. 최초 Mongo는 Docker API1.32/서버최소1.40 호환으로 시작 전 실패, 실행 프로세스에만 api.version1.44 적용해 재검증 중. diff 검사 통과. CI/배포 결과는 후속 append 예정.
+- 테스트 배포만 대상, 운영/타서비스/IAM/기능설정/실DB 강제수정 제외. 실제 계정 CTA E2E는 별도이며 Secret/Token 미기록.
+- 최종 로컬 XML: 단위1545 실패/오류0·기존skip1, 격리Mongo380 실패/오류0·skip2. 실제 실행된 Mongo378 통과이며 skip을 실행 통과로 계산하지 않는다. 예상 밖 제품 변경 없음. 최신 develop 기존 테스트 배포 success 확인 후 전달 진행.
