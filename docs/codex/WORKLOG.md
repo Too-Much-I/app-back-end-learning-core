@@ -17908,3 +17908,12 @@
 
 - 사용자 Swagger 수정·재배포 승인. develop037fe345 기반 codex/promotion-multipart-swagger 별도 작업트리에서 문서용 Form schema와 명시 multipart requestBody·자동 query 문서 숨김 적용. 런타임 RequestParam/RequestPart·검증/응답/인증 불변. 관련 Jira 미확인/신규 없음.
 - 실제 Springdoc /v3/api-docs MockMvc 회귀로 query 없음, multipart body required, 필수3필드·email/binary format 검증. clean test 성공(기존1553+신규1), diff 검사 통과. 코드/테스트/계약/승인·작업기록만 변경, 예상 밖 제품 변경 없음. CI 후 develop 병합/test 재배포하며 main/설정/실DB 변경 없음. 실제 앱 업로드 E2E 미실행, 배포 결과 후속 기록.
+- 전달 결과:13e0279 push/PR75·CI40461160317 성공, develop b69cb70f 병합. test40461568268 ECS 안정화/health 성공. 실제 공개OpenAPI query 없음·multipart requestBody required·gifticon/email/report 필수 및 binary 확인. 런타임/운영/설정/실DB 미변경, 실제 UI 전송/iOS E2E 미실행. 신규 Jira 없음.
+
+## 2026-10-27 — 프로모션 최대4회 코드 변경
+
+- 사용자 신청 횟수4회 확정(관련 Jira 없음). Service/Swagger/ServiceTest/MongoTest/계약 수정. 기존 신청 포함 슬롯4개 unique 상한, 마지막 슬롯 경합 검증. clean test 및 격리Mongo2개 성공, diff 검사 통과. 기존 API/파일1개/인증·삭제 보호 유지. 예상 밖 변경 없음, 기존 기록 보존. 응답유실 재신청은 별도 접수 가능하여 계약에 명시. 커밋/푸시/배포·실DB/설정 변경 없음. root WORKLOG에 현재 turn marker와 상세 기록 보관.
+
+## 2026-10-27 — 프로모션 최대4회 테스트 전달 승인
+
+- 사용자 테스트 배포 및 commit/push/PR/develop 병합 예외 승인(관련 Jira 없음). 직전 clean test/격리Mongo2개 성공과 diff 재확인 후 별도 브랜치에서 기존 테스트 workflow로 전달한다. 기존 기록 변경 보존, API/인증/파일 제한 유지, 운영/main·설정·실DB 제외. 배포/검증 결과는 후속 기록한다.

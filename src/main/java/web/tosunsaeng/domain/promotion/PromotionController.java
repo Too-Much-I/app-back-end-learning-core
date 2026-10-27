@@ -18,7 +18,7 @@ public class PromotionController {
     private final CurrentUserProvider users;
     private final PromotionService service;
     public PromotionController(CurrentUserProvider users, PromotionService service) { this.users=users; this.service=service; }
-    @io.swagger.v3.oas.annotations.Operation(summary="현재 접수 중인 프로모션 신청",description="gifticon(희망 기프티콘, 최대 100자), email(수령 이메일, 최대 254자), report 모두 필수. 성적표 PDF/JPEG/PNG/HEIC 1개, 최대 9 MiB. 은행·계좌·예금주 및 사용자·프로모션 ID는 보내지 않습니다.")
+    @io.swagger.v3.oas.annotations.Operation(summary="현재 접수 중인 프로모션 신청",description="사용자당 캠페인별 최대 4회 신청 가능(기존 신청 포함). 5회째부터 409 PROMOTION_ALREADY_APPLIED. gifticon(희망 기프티콘, 최대 100자), email(수령 이메일, 최대 254자), report 모두 필수. 성적표 PDF/JPEG/PNG/HEIC 1개, 최대 9 MiB. 은행·계좌·예금주 및 사용자·프로모션 ID는 보내지 않습니다.")
     @io.swagger.v3.oas.annotations.parameters.RequestBody(required=true,
             content=@Content(mediaType=MediaType.MULTIPART_FORM_DATA_VALUE,
                     schema=@Schema(implementation=PromotionApplicationForm.class)))
