@@ -1,5 +1,13 @@
 # Learning Core Current State
 
+<!-- codex-turn:01a17d9e-8750-76d3-9057-6aaa93ebca62 -->
+
+- 2026-10-27 projection 구현 재개·검증 완료. 목록/구 이어하기 문항 metadata, 최신 이어하기 unit/lesson/완료시각 및 최신 제출 lessonId/updatedAt만 조회. 상세 콘텐츠·필터·정렬·외부 응답 유지. 전체 단위1559/실패0/skip1 및 LearningMongoIntegrationTest 통과. 최초 Docker API 불일치는 실행 프로세스 api.version=1.44로 해결, 제품 의존성 불변. 사용자 이번 변경 Git/PR/test·prod 병렬 배포 승인; 현재 후보 전달 단계로 배포 완료 아님. 캐시·실DB/index·운영 설정 변경 없음.
+
+<!-- codex-turn:01a17d96-9db9-7982-b264-56507c1d2cc5 -->
+
+- 2026-10-27 목록/이어서 하기 projection 초안(codex/learning-list-projection): 제품2파일·테스트2파일 로컬 변경 후 사용자의 설명 우선 요청으로 추가 구현 중지. 미커밋·미배포 보존. 이미 실행한 clean test 성공이나 실행 중 테스트 helper 수정으로 최종 작업트리 재검증은 미완료. 상세/API·권한·순서 불변, DB/index/설정 변경 없음. 사용자 변경안 확인 후 재개 여부 결정.
+
 - 2026-10-27 학습·프로모션 운영 전달 준비(신규 Jira 없음): main45c7f4f 기준 별도 브랜치로 develop b61fd79의 해당 기능 diff만 선별. Git/배포/활성화 사용자 승인, 프로모션11월30일까지. 운영prod23에는 두 기능 설정 없음, 전용 프로모션 버킷 및 LC 역할의 관련권한 부재 확인. 운영 인프라/최소권한·DB·학습채점 연결 준비 전 활성화 보류.
 
 - 2026-10-24 요약 전송 경계 보완(TMI-25/TMI-125/TMI-128): SummaryDispatchScheduler claim/failClaim 공통 Transaction을 executeGrading으로 변경하여 작업 스레드에서 읽기 검사 scope를 직접 시작한다. 실제 비동기 Mongo 테스트2개로 정상 전송/전송 실패 상태 저장 시 owner/lane 무쓰기와 Job 갱신 확인. 외부 계약/권한 조회/Job CAS 유지. 전체 회귀·테스트 후 운영 전달 진행 중. 기존 PENDING 요약은 앱 재시도 곤란으로 인증된 재처리 수단 확인 필요, 인증우회/DB강제변경 없음.

@@ -51,11 +51,13 @@ public class LearningCatalog {
     }
     public Document list(String owner, int part, String requestedLevel) {
         String level = level(part, requestedLevel);
-        List<Document> units = mongo.find(Query.query(current().and("part").is(part).and("publicationStatus").is("ready"))
-                .with(Sort.by("sortOrder", "_id")).limit(101), Document.class, "learning_units");
+        Query unitQuery = Query.query(current().and("part").is(part).and("publicationStatus").is("ready"))
+                .with(Sort.by("sortOrder", "_id")).limit(101);
+        unitQuery.fields().include("_id", "part", "title", "thumbnailMediaId", "lessonIds");
+        List<Document> units = mongo.find(unitQuery, Document.class, "learning_units");
         if (units.size() > 100) throw LearningFailure.unavailable();
         List<String> ids = units.stream().flatMap(u -> u.getList("lessonIds", String.class).stream()).toList();
-        Map<String, Document> lessons = lessonMap(ids);
+        Map<String, Document> lessons = lessonSummaryMap(ids);
         Set<String> done = completed(owner, level, ids);
         Map<String, Document> media = mediaMap(units.stream().map(u -> u.getString("thumbnailMediaId")).filter(Objects::nonNull).toList());
         return new Document("part", part).append("level", level).append("units", units.stream()
@@ -67,8 +69,10 @@ public class LearningCatalog {
     /** Legacy part-scoped resume: preserve its response for existing clients. */
     public Document resume(String owner, int part, String requestedLevel) {
         String level = level(part, requestedLevel);
-        List<Document> units = mongo.find(Query.query(current().and("part").is(part).and("publicationStatus").is("ready"))
-                .with(Sort.by("sortOrder", "_id")).limit(101), Document.class, "learning_units");
+        Query unitQuery = Query.query(current().and("part").is(part).and("publicationStatus").is("ready"))
+                .with(Sort.by("sortOrder", "_id")).limit(101);
+        unitQuery.fields().include("_id", "lessonIds");
+        List<Document> units = mongo.find(unitQuery, Document.class, "learning_units");
         if (units.isEmpty()) throw LearningFailure.missing();
         if (units.size() > 100) throw LearningFailure.unavailable();
         List<String> ids = new ArrayList<>();
@@ -79,7 +83,7 @@ public class LearningCatalog {
             ids.addAll(lessons);
         }
         if (new HashSet<>(ids).size() != ids.size()) throw LearningFailure.unavailable();
-        Map<String, Document> lessons = lessonMap(ids);
+        Map<String, Document> lessons = lessonSummaryMap(ids);
         Set<String> done = completed(owner, level, ids);
         String next = null;
         for (Document unit : units) {
@@ -96,9 +100,18 @@ public class LearningCatalog {
         return mongo.find(Query.query(current().and("_id").in(ids)), Document.class, "learning_lessons").stream()
                 .collect(Collectors.toMap(d -> d.getString("_id"), Function.identity()));
     }
+    /** List/resume metadata only. Detail and grading must keep using the full lesson document. */
+    private Map<String, Document> lessonSummaryMap(List<String> ids) {
+        Query query = Query.query(current().and("_id").in(ids));
+        query.fields().include("_id", "unitId", "questionNumber");
+        return mongo.find(query, Document.class, "learning_lessons").stream()
+                .collect(Collectors.toMap(d -> d.getString("_id"), Function.identity()));
+    }
     private Set<String> completed(String owner, String level, List<String> ids) {
-        return mongo.find(Query.query(Criteria.where("userId").is(owner).and("level").is(level)
-                .and("contentVersion").is(config.getContentVersion()).and("lessonId").in(ids)), Document.class, "learning_completions")
+        Query query = Query.query(Criteria.where("userId").is(owner).and("level").is(level)
+                .and("contentVersion").is(config.getContentVersion()).and("lessonId").in(ids));
+        query.fields().include("lessonId").exclude("_id");
+        return mongo.find(query, Document.class, "learning_completions")
                 .stream().map(d -> d.getString("lessonId")).collect(Collectors.toSet());
     }
     private Document summary(Document u, Map<String, Document> lessons, Set<String> done, Map<String, Document> media) {
