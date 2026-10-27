@@ -1,5 +1,9 @@
 # Learning Core Current State
 
+- 후속 확정: 다음 공개 파트 첫 세트로 이동하며 마지막 Part 5 완료 후 Part 1 첫 세트로 순환한다. 결과 생성 기준·NO_HISTORY·part 호환 유지, 테스트 전달 진행 중. 신규 Jira 없음.
+
+- 2026-10-27 테스트 전달 완료: 제품 3e0e357, PR72 develop 병합 c6db01a. CI40435306577·배포40435675156 success, 공개healthUP 및 bankName/결과 기준 Swagger 확인. 운영·설정 변경 없음. 이후 사용자 다음 파트 첫 세트 요청을 로컬 코드/단위 테스트에 반영했고 미배포. 마지막 파트 경계는 사용자 확인 전 기존 동일 파트 복귀 유지. 신규 Jira 없음.
+
 - 2026-10-27 Notion API 문서 동기화 완료: bankName, 결과 저장 시각 기준, END_OF_PART 해당 파트 첫 세트·NO_HISTORY 첫 공개 파트 첫 세트, 배포 전 안내 반영. 새로고침 후 저장 내용과 코드 블록 유지 확인. 서버는 이전 배포 상태이며 이번 코드·배포 변경 없음. 신규 Jira 없음.
 
 - 2026-10-27 은행명/결과 기반 이어하기 로컬 구현·테스트 완료: bankName 문자열, completed 결과 저장 시각 기준, END_OF_PART 해당 파트 첫 세트·NO_HISTORY 첫 공개 파트 첫 세트 반환. 완료 복구/merge 결과 시각 보존 및 Swagger/계약 갱신. 전체 단위·관련 격리Mongo 성공, 신규 Jira 없음. 미커밋·미배포이며 테스트 서버/Notion은 이전 계약 상태다.
