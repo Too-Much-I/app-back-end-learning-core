@@ -17917,3 +17917,15 @@
 ## 2026-10-27 — 프로모션 최대4회 테스트 전달 승인
 
 - 사용자 테스트 배포 및 commit/push/PR/develop 병합 예외 승인(관련 Jira 없음). 직전 clean test/격리Mongo2개 성공과 diff 재확인 후 별도 브랜치에서 기존 테스트 workflow로 전달한다. 기존 기록 변경 보존, API/인증/파일 제한 유지, 운영/main·설정·실DB 제외. 배포/검증 결과는 후속 기록한다.
+
+## 2026-10-27 — projection 구현 재개 및 병렬 전달 승인
+
+<!-- codex-turn:01a17d9e-8750-76d3-9057-6aaa93ebca62 -->
+
+- 브랜치: codex/learning-list-projection(main6d7fe86 기준). 목표: 사용자 승인 projection 적용 및 이번 변경만 commit/push/test·prod 병렬 배포.
+- 변경 파일: LearningCatalog.java, LearningRecentResume.java, LearningCatalogTest.java, 신규 LearningReadProjectionTest.java, AGENTS.md, CURRENT_STATE.md, WORKLOG.md.
+- 구현: inclusion projection으로 목록·구 이어하기 문항 metadata 및 완료ID, 최신 이어하기 metadata/활동시각만 조회. 상세 문항 full read 유지.120/360개 대용량 fixture와 DB projection 모사로 순서/완료/다음 위치 회귀 검증.
+- 검증: 전체 단위1559/실패0/오류0/skip1. LearningMongoIntegrationTest 성공. 최초 통합 실행은 Docker 최소API1.40와 라이브러리1.32 불일치로 시작 실패, JAVA_TOOL_OPTIONS=-Dapi.version=1.44로 로컬 실행만 보완 후 성공. git diff --check 통과.
+- 유지 계약: API/응답/조회순서·범위/소유권·버전·공개상태 필터 및 상세 데이터 유지. 캐시·DB/index·서버 설정 불변.
+- 결정: 사용자 직접 Git/배포 병렬 승인으로 이번 범위 예외 기록. main/develop 대상 파일 기준 내용 동일 확인, 각 브랜치 후보로 분리해 무관한 이력 전달 방지.
+- 위험/다음: 아직 실운영 latency 개선 미측정, 로그인 장애 해결 주장 없음. 양쪽 PR CI 후 병합·기존 자동 배포 안정화/health 확인 필요. 예상 밖 제품 변경 없음, 원본 dirty 보존.

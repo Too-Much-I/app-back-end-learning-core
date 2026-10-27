@@ -1,5 +1,9 @@
 # Learning Core Current State
 
+<!-- codex-turn:01a17d9e-8750-76d3-9057-6aaa93ebca62 -->
+
+- 2026-10-27 projection 구현 재개·검증 완료. 목록/구 이어하기 문항 metadata, 최신 이어하기 unit/lesson/완료시각 및 최신 제출 lessonId/updatedAt만 조회. 상세 콘텐츠·필터·정렬·외부 응답 유지. 전체 단위1559/실패0/skip1 및 LearningMongoIntegrationTest 통과. 최초 Docker API 불일치는 실행 프로세스 api.version=1.44로 해결, 제품 의존성 불변. 사용자 이번 변경 Git/PR/test·prod 병렬 배포 승인; 현재 후보 전달 단계로 배포 완료 아님. 캐시·실DB/index·운영 설정 변경 없음.
+
 - 2026-10-27 프로모션 최대4회 테스트 전달 진행(관련 Jira 없음): 사용자 Git 예외 승인. 코드·Swagger·회귀·계약/기록만 커밋하여 PR 검증 후 develop/test 전달한다. main/운영·설정·실DB 제외.
 
 - 2026-10-27 프로모션 최대4회 코드 완료(관련 Jira 없음): 기존 캠페인/user 해시를 슬롯1로 유지하고 :2/:3/:4 추가, 5번째409. Service/Swagger/단위·Mongo 테스트/계약 수정, clean test 및 격리Mongo2개 성공. 커밋/배포/실DB 미변경. 응답유실 재신청은 별도 신청 가능, 앱 확인 별도.

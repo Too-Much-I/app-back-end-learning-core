@@ -51,6 +51,8 @@ class LearningCatalogTest {
         if (part==4) assertThat(lesson.get("tableFocus")).isEqualTo(table);
         var queries=org.mockito.ArgumentCaptor.forClass(Query.class); verify(mongo).find(queries.capture(),eq(Document.class),eq("learning_answers"));
         assertThat(queries.getValue().getQueryObject()).containsEntry("level",part==1?"common":"AL").containsEntry("contentVersion","test-v1");
+        verify(mongo).find(queries.capture(),eq(Document.class),eq("learning_lessons"));
+        assertThat(queries.getValue().getFieldsObject()).isEmpty(); // Detail still needs passage/table/full content.
         Document list=catalog.list(OWNER,part,"AL");
         var summary=list.getList("units",Document.class).getFirst();
         assertThat(summary).containsOnlyKeys("id","part","title","thumbnail","lessons");
