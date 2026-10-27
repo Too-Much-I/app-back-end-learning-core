@@ -14,6 +14,21 @@ import static web.tosunsaeng.domain.answerlearning.LearningFixtures.*;
 import static web.tosunsaeng.domain.answerlearning.LearningModels.*;
 
 class LearningStoreTest {
+    @Test void completionBackoffPreservesResultTime() {
+        var s=submission(); s.status="completed";
+        store.finish(s,new Update().inc("transportFailures",1),NOW.plusSeconds(200),60);
+        var update=org.mockito.ArgumentCaptor.forClass(Update.class);
+        verify(mongo).updateFirst(any(Query.class),update.capture(),eq(Submission.class));
+        assertThat(update.getValue().getUpdateObject().get("$set",Document.class)).doesNotContainKey("updatedAt");
+    }
+    @Test void completionRecoveryPreservesResultTime() {
+        when(mongo.updateFirst(any(Query.class),any(Update.class),eq(Submission.class)))
+                .thenReturn(com.mongodb.client.result.UpdateResult.acknowledged(1,1L,null));
+        store.completeClaim(submission(),NOW.plusSeconds(100));
+        var update=org.mockito.ArgumentCaptor.forClass(Update.class);
+        verify(mongo).updateFirst(any(Query.class),update.capture(),eq(Submission.class));
+        assertThat(update.getValue().getUpdateObject().get("$set",Document.class)).doesNotContainKey("updatedAt");
+    }
     MongoTemplate mongo=mock(MongoTemplate.class);
     LearningStore store=new LearningStore(mongo,null);
     @Test void foreignOwnerCannotReadGloballyUniqueId() {

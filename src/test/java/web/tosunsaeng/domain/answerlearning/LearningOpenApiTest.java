@@ -67,7 +67,7 @@ class LearningOpenApiTest {
         var part=operation.getParameters().stream().filter(p->p.getName().equals("part")).findFirst().orElseThrow();
         assertThat(part.getRequired()).isFalse();
         assertThat(part.getDeprecated()).isTrue();
-        assertThat(operation.getDescription()).contains("queuedAt","NO_HISTORY","END_OF_PART","Part 1");
+        assertThat(operation.getDescription()).contains("updatedAt","NO_HISTORY","END_OF_PART","Part 1");
         var schemas=api.getComponents().getSchemas();
         assertThat(schemas.get("LearningResume").getOneOf()).hasSize(2);
         assertThat(schemas.get("LearningRecentResume").getProperties()).containsKeys("part","unitId","lessonId","lessonNumber","questionNumber");

@@ -9,7 +9,7 @@ import java.time.Instant;
 import java.util.*;
 import static web.tosunsaeng.domain.answerlearning.LearningModels.Submission;
 
-/** Read-only CTA projection. Queue acceptance, never worker completion, orders spoken practice. */
+/** Read-only CTA projection ordered by persisted grading results. */
 final class LearningRecentResume {
     private final MongoTemplate mongo;
     private final LearningProperties config;
@@ -59,9 +59,9 @@ final class LearningRecentResume {
         }
         List<String> spoken = positions.stream().filter(p -> p.part()!=1).map(Position::lessonId).toList();
         Submission latest = spoken.isEmpty() ? null : mongo.findOne(Query.query(owned(owner,level)
-                .and("lessonId").in(spoken).and("queuedAt").ne(null))
-                .with(Sort.by(Sort.Order.desc("queuedAt"),Sort.Order.desc("_id"))), Submission.class);
-        Practice practice = latest == null ? null : new Practice(latest.lessonId,latest.queuedAt);
+                .and("lessonId").in(spoken).and("status").is("completed").and("result").ne(null).and("updatedAt").ne(null))
+                .with(Sort.by(Sort.Order.desc("updatedAt"),Sort.Order.desc("_id"))), Submission.class);
+        Practice practice = latest == null ? null : new Practice(latest.lessonId,latest.updatedAt);
         List<String> common = positions.stream().filter(p -> p.part()==1).map(Position::lessonId).toList();
         if (!common.isEmpty()) {
             for (Document row : mongo.find(Query.query(owned(owner,"common").and("lessonId").in(common)),Document.class,"learning_completions")) {
@@ -73,13 +73,13 @@ final class LearningRecentResume {
                         || (candidate.at().equals(practice.at()) && candidate.lessonId().compareTo(practice.lessonId()) > 0)) practice=candidate;
             }
         }
-        if (practice == null) return response("NO_HISTORY",level,null);
+        if (practice == null) return response("NO_HISTORY",level,positions.getFirst());
         for (int i=0;i<positions.size();i++) {
             Position previous=positions.get(i);
             if (!previous.lessonId().equals(practice.lessonId())) continue;
             Position next=i+1<positions.size()?positions.get(i+1):null;
-            // Do not silently choose a different part or wrap around at the end of this part.
-            return next!=null && next.part()==previous.part() ? response("READY",level,next) : response("END_OF_PART",level,null);
+            return next!=null && next.part()==previous.part() ? response("READY",level,next)
+                    : response("END_OF_PART",level,positions.stream().filter(p -> p.part()==previous.part()).findFirst().orElseThrow());
         }
         throw LearningFailure.unavailable();
     }

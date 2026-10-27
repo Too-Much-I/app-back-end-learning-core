@@ -9,9 +9,11 @@ import java.time.Instant;
 public final class LearningOwnership {
     private LearningOwnership() {}
     public static void merge(MongoTemplate mongo, String source, String target, Instant now) {
+        // Completed submissions retain their result time; unfinished uploads retain the old refresh behavior.
+        mongo.updateMulti(Query.query(Criteria.where("userId").is(source).and("status").ne("completed")),
+                new Update().set("updatedAt", now), "learning_submissions");
         mongo.updateMulti(Query.query(Criteria.where("userId").is(source)),
-                new Update().set("userId", target).unset("leaseToken").set("leaseUntil", Instant.EPOCH)
-                        .set("updatedAt", now), "learning_submissions");
+                new Update().set("userId", target).unset("leaseToken").set("leaseUntil", Instant.EPOCH), "learning_submissions");
         // Completion IDs are opaque. Keep the earliest proof when both accounts finished the same lesson.
         for (Document row : mongo.find(Query.query(Criteria.where("userId").is(source)), Document.class, "learning_completions")) {
             Query key = LearningStore.completionKey(target, row.getString("lessonId"), row.getString("level"), row.getString("contentVersion"));

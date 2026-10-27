@@ -1,5 +1,13 @@
 # 난이도별 최근 풀이 이어하기 R2
 
+## 2026-10-27 변경 기준 (아래 종전 R2 설명보다 우선)
+
+- 제출 접수 대신 `status=completed`이고 `result`가 있는 제출의 `updatedAt`(LC 결과 저장 시각)을 비교한다. 채점 대기/실패/무음은 제외하며 늦게 생성된 결과도 최근 풀이가 된다.
+- 후속 completionPending 정리는 updatedAt을 바꾸지 않는다. 기존 데이터의 updatedAt은 마지막 완료 복구 시각일 수도 있으며 과거 정확한 생성시각을 소급 복원하지 않는다. 신규 컬렉션/인덱스/DB 보정은 없다.
+- `END_OF_PART`는 같은 파트의 첫 세트 첫 문항을 반환한다. `NO_HISTORY`는 첫 공개 파트(정상 카탈로그에서는 Part 1)의 첫 세트 첫 문항을 반환한다.
+- 상태 이름은 유지하되 세 상태 모두 유효한 위치를 반환한다. 앱은 READY뿐 아니라 NO_HISTORY/END_OF_PART에서도 CTA를 표시하고 unitId/lessonId로 이동한다.
+- Part 1 명시 완료·현재 버전/사용자/난이도·기존 part 호출 호환은 유지한다. 아래는 변경 전 R2 이력이다.
+
 ## 5줄 결론
 
 - 단일 CTA는 `GET /api/v1/learning/resume?level=IH`, part를 보내지 않는다.

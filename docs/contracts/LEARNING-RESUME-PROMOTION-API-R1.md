@@ -30,7 +30,7 @@ part=1~5, Part 1 권장 level=common(기존 정규화 유지), Part 2~5=IM3/IH/A
 
 | 필드 | 형식 |
 | --- | --- |
-| bankCode | 은행 코드 3자리 숫자 문자열; 실제 은행/계좌 확인은 수동 |
+| bankName | 은행명 문자열, 공백만 불가·제어문자 제외·최대 100자; 앞뒤 공백 제거, 실제 은행/계좌 확인은 수동 |
 | accountNumber | 숫자 문자열 1~32자; 선행 0 보존, 하이픈 제외 |
 | accountHolder | 공백만 불가, 제어문자 제외, 최대 100자 |
 | report | PDF/JPEG/PNG 파일 정확히 1개, 최대 9 MiB |
