@@ -1,5 +1,7 @@
 # Learning Core Current State
 
+- 최종 후속 요청: 파트 종료 코드 END_OF_PART를 반환하지 않고 다음 파트/마지막 순환도 정상 READY로 반환한다. NO_HISTORY는 유지한다. PR73에 함께 반영해 테스트 전달한다. 신규 Jira 없음.
+
 - 후속 확정: 다음 공개 파트 첫 세트로 이동하며 마지막 Part 5 완료 후 Part 1 첫 세트로 순환한다. 결과 생성 기준·NO_HISTORY·part 호환 유지, 테스트 전달 진행 중. 신규 Jira 없음.
 
 - 2026-10-27 테스트 전달 완료: 제품 3e0e357, PR72 develop 병합 c6db01a. CI40435306577·배포40435675156 success, 공개healthUP 및 bankName/결과 기준 Swagger 확인. 운영·설정 변경 없음. 이후 사용자 다음 파트 첫 세트 요청을 로컬 코드/단위 테스트에 반영했고 미배포. 마지막 파트 경계는 사용자 확인 전 기존 동일 파트 복귀 유지. 신규 Jira 없음.

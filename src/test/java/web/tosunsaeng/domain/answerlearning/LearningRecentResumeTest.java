@@ -48,9 +48,9 @@ class LearningRecentResumeTest {
         submitted("z1","completed");
         assertThat(catalog.resumeRecent(OWNER,"IH")).containsEntry("part",5).containsEntry("lessonId","z2");
         submitted("q3","completed");
-        assertThat(catalog.resumeRecent(OWNER,"IH")).containsEntry("status","END_OF_PART").containsEntry("part",5).containsEntry("lessonId","z1").containsEntry("unitNumber",1).containsEntry("lessonNumber",1);
+        assertThat(catalog.resumeRecent(OWNER,"IH")).containsEntry("status","READY").containsEntry("part",5).containsEntry("lessonId","z1").containsEntry("unitNumber",1).containsEntry("lessonNumber",1);
         submitted("z2","completed");
-        assertThat(catalog.resumeRecent(OWNER,"IH")).containsEntry("status","END_OF_PART").containsEntry("part",1).containsEntry("lessonId","c1")
+        assertThat(catalog.resumeRecent(OWNER,"IH")).containsEntry("status","READY").containsEntry("part",1).containsEntry("lessonId","c1")
                 .containsEntry("unitNumber",1).containsEntry("lessonNumber",1);
     }
     @Test void recentCommonPartOneCompletionCompetesWithRequestedLevelOnly() {
@@ -64,7 +64,7 @@ class LearningRecentResumeTest {
         when(mongo.find(any(Query.class),eq(Document.class),eq("learning_completions"))).thenReturn(List.of(
                 new Document("lessonId","c2").append("completedAt",Date.from(NOW)),
                 new Document("lessonId","c1").append("completedAt",Date.from(NOW))));
-        assertThat(catalog.resumeRecent(OWNER,"IH")).containsEntry("status","END_OF_PART")
+        assertThat(catalog.resumeRecent(OWNER,"IH")).containsEntry("status","READY")
                 .containsEntry("part",3).containsEntry("lessonId","q1").containsEntry("unitNumber",1).containsEntry("lessonNumber",1);
     }
     @Test void queryUsesOwnerLevelVersionCurrentLessonsAndSuccessfulResultTime() {
