@@ -1,5 +1,9 @@
 # Learning Core Current State
 
+- 2026-10-27 프로모션 테스트 전달(신규 Jira 없음): 사용자 Git/test 승인 및 Notion 입력 계약 수정 완료. codex/promotion-gift-email-heic에서 CI→develop PR 병합→기존 test 배포 진행. 운영/설정/실DB 불변, iOS 실제 신청 E2E 미실행. 배포 결과는 후속 갱신.
+
+- 2026-10-27 프로모션 변경(관련 Jira 미확인): codex/promotion-gift-email-heic에서 은행3필드를 gifticon/email로 교체하고 report HEIC 지원. 단위1553 실패0/skip1, 격리 프로모션Mongo1 통과. API URL/응답/인증·캠페인1회 제한 유지. 앱 입력 계약 교체 및 iOS E2E 필요. 미커밋/미배포, 기존 데이터 미변경.
+
 - 최종 후속 요청: 파트 종료 코드 END_OF_PART를 반환하지 않고 다음 파트/마지막 순환도 정상 READY로 반환한다. NO_HISTORY는 유지한다. PR73에 함께 반영해 테스트 전달한다. 신규 Jira 없음.
 
 - 후속 확정: 다음 공개 파트 첫 세트로 이동하며 마지막 Part 5 완료 후 Part 1 첫 세트로 순환한다. 결과 생성 기준·NO_HISTORY·part 호환 유지, 테스트 전달 진행 중. 신규 Jira 없음.

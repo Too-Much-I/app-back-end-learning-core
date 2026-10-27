@@ -28,19 +28,26 @@ class PromotionServiceTest {
         service=new PromotionService(mongo,storage,config,guards,Clock.fixed(now,ZoneOffset.UTC));
     }
     MockMultipartFile report() { return new MockMultipartFile("report","untrusted.pdf","text/plain","%PDF-1.7\nfixture".getBytes()); }
-    PromotionService.Receipt apply() { return service.apply(OWNER," 국민은행 ","001234","Fixture",report()); }
-    @Test void bankNameRejectsBlankControlAndOversizeWithoutUpload() {
-        for (String name: new String[]{null,"","  ","은행\n명","가".repeat(101)})
-            assertThatThrownBy(() -> service.apply(OWNER,name,"001234","Fixture",report())).isInstanceOf(PromotionFailure.class);
+    PromotionService.Receipt apply() { return service.apply(OWNER," 커피 교환권 "," fixture+gift@example.com ",report()); }
+    @Test void gifticonRejectsBlankControlAndOversizeWithoutUpload() {
+        for (String name: new String[]{null,"","  ","커피\n쿠폰","가".repeat(101)})
+            assertThatThrownBy(() -> service.apply(OWNER,name,"fixture@example.com",report())).isInstanceOf(PromotionFailure.class);
         verifyNoInteractions(storage);
     }
-    @Test void persistsOwnerAndCampaignAndPreservesLeadingZeros() {
+    @Test void emailRejectsMalformedControlAndOversizeWithoutUpload() {
+        for (String email: new String[]{null,"","  ","not-email","a@","a@localhost","a b@example.com",
+                "a..b@example.com","a@-example.com","a@example.com\n","a".repeat(65)+"@example.com","a".repeat(255)})
+            assertThatThrownBy(() -> service.apply(OWNER,"커피",email,report())).isInstanceOf(PromotionFailure.class);
+        verifyNoInteractions(storage);
+        verify(mongo,never()).insert(any(Document.class),anyString());
+    }
+    @Test void persistsOwnerCampaignGiftAndEmailWithoutBankFields() {
         var receipt=apply(); var rows=org.mockito.ArgumentCaptor.forClass(Document.class);
         verify(mongo).insert(rows.capture(),eq(PromotionService.COLLECTION));
         assertThat(rows.getValue()).containsEntry("userId",OWNER).containsEntry("promotionId","score-test")
-                .containsEntry("accountNumber","001234").containsEntry("applicationId",receipt.applicationId())
-                .containsEntry("reportType","application/pdf").containsEntry("bankName","국민은행")
-                .doesNotContainKeys("originalFilename","bankCode");
+                .containsEntry("email","fixture+gift@example.com").containsEntry("applicationId",receipt.applicationId())
+                .containsEntry("reportType","application/pdf").containsEntry("gifticon","커피 교환권")
+                .doesNotContainKeys("originalFilename","bankCode","bankName","accountNumber","accountHolder");
         verify(storage).put(eq("promotion-reports/"+receipt.applicationId()),any(),eq("application/pdf"));
         verify(guards).execute(eq(OWNER),any());
     }
@@ -58,13 +65,12 @@ class PromotionServiceTest {
         assertThatThrownBy(this::apply).isInstanceOfSatisfying(PromotionFailure.class,f -> assertThat(f.getMessage()).isEqualTo("PROMOTION_UNAVAILABLE"));
         verify(storage,never()).delete(anyString());
     }
-    @Test void receptionBoundariesAndInvalidAccount() {
+    @Test void receptionBoundaries() {
         config.setClosesAt(now);
         assertThatThrownBy(this::apply).isInstanceOfSatisfying(PromotionFailure.class,f -> assertThat(f.code).isEqualTo("PROMOTION_CLOSED"));
         config.setClosesAt(now.plusSeconds(60)); config.setOpensAt(now.plusSeconds(1));
         assertThatThrownBy(this::apply).isInstanceOf(PromotionFailure.class);
         config.setOpensAt(now);
-        assertThatThrownBy(() -> service.apply(OWNER,"국민은행","12-34","Fixture",report())).isInstanceOf(PromotionFailure.class);
         verifyNoInteractions(storage);
     }
     @Test void fileTypesSizesAndSpoofing() {
@@ -82,5 +88,44 @@ class PromotionServiceTest {
         verify(mongo,never()).insert(any(Document.class),anyString());
         config.validate(); config.setClosesAt(null);
         assertThatThrownBy(config::validate).isInstanceOf(IllegalStateException.class);
+    }
+
+    static byte[] ftyp(String major, String... compatible) {
+        var bytes=java.nio.ByteBuffer.allocate(16+compatible.length*4);
+        bytes.putInt(bytes.capacity()).put("ftyp".getBytes(java.nio.charset.StandardCharsets.US_ASCII));
+        bytes.put(major.getBytes(java.nio.charset.StandardCharsets.US_ASCII)).putInt(0);
+        for (String brand:compatible) bytes.put(brand.getBytes(java.nio.charset.StandardCharsets.US_ASCII));
+        return bytes.array();
+    }
+    @Test void heicUsesMajorOrCompatibleBrandsAndStoresOriginalBytes() {
+        for (String brand:new String[]{"heic","heix","heim","heis"}) {
+            assertThat(PromotionService.fileType(ftyp(brand))).isEqualTo("image/heic");
+            assertThat(PromotionService.fileType(ftyp("mif1",brand))).isEqualTo("image/heic");
+        }
+        byte[] bytes=ftyp("mif1","heic");
+        var receipt=service.apply(OWNER,"커피","fixture@example.com",
+                new MockMultipartFile("report","untrusted.bin","application/octet-stream",bytes));
+        verify(storage).put(eq("promotion-reports/"+receipt.applicationId()),eq(bytes),eq("image/heic"));
+        var row=org.mockito.ArgumentCaptor.forClass(Document.class);
+        verify(mongo).insert(row.capture(),eq(PromotionService.COLLECTION));
+        assertThat(row.getValue()).containsEntry("reportType","image/heic");
+        var extended=java.nio.ByteBuffer.allocate(24).putInt(1).put("ftyp".getBytes())
+                .putLong(24).put("heic".getBytes()).putInt(0).array();
+        assertThat(PromotionService.fileType(extended)).isEqualTo("image/heic");
+    }
+    @Test void malformedAndUnrelatedContainersAreRejected() {
+        byte[] oversized=ftyp("heic"); java.nio.ByteBuffer.wrap(oversized).putInt(1000);
+        byte[] zeroSize=ftyp("heic"); java.nio.ByteBuffer.wrap(zeroSize).putInt(0);
+        byte[] minorOnly=ftyp("mif1"); System.arraycopy("heic".getBytes(),0,minorOnly,12,4);
+        byte[] trailing=java.util.Arrays.copyOf(ftyp("mif1"),20); System.arraycopy("heic".getBytes(),0,trailing,16,4);
+        byte[] misaligned=java.util.Arrays.copyOf(ftyp("heic"),17); java.nio.ByteBuffer.wrap(misaligned).putInt(17);
+        for (byte[] bytes:new byte[][]{ftyp("avif"),ftyp("mp42"),ftyp("mif1"),ftyp("hevc"),
+                oversized,zeroSize,minorOnly,trailing,misaligned,java.util.Arrays.copyOf(ftyp("heic"),12)})
+            assertThatThrownBy(() -> PromotionService.fileType(bytes)).isInstanceOfSatisfying(PromotionFailure.class,
+                    f -> assertThat(f.status).isEqualTo(415));
+        assertThatThrownBy(() -> service.apply(OWNER,"커피","fixture@example.com",
+                new MockMultipartFile("report","spoof.heic","image/heic","not heic".getBytes())))
+                .isInstanceOf(PromotionFailure.class);
+        verifyNoInteractions(storage);
     }
 }

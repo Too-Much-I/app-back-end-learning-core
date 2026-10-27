@@ -53,7 +53,7 @@ class PromotionMongoTest {
         service=new PromotionService(mongo,storage,config,guards,clock);
     }
     String apply() {
-        try { service.apply(OWNER,"004","001234","Fixture",new MockMultipartFile("report","%PDF-fixture".getBytes())); return "saved"; }
+        try { service.apply(OWNER,"커피 교환권","fixture@example.com",new MockMultipartFile("report","%PDF-fixture".getBytes())); return "saved"; }
         catch (PromotionFailure f) { return f.code; }
     }
     @Test void concurrentUploadsProduceOneApplicationAndOnlyDeleteLosingFile() throws Exception {
@@ -69,6 +69,7 @@ class PromotionMongoTest {
         var key=org.mockito.ArgumentCaptor.forClass(String.class);
         verify(storage).delete(key.capture());
         assertThat(key.getValue()).isNotEqualTo(row.getString("reportKey"));
-        assertThat(row).containsEntry("accountNumber","001234");
+        assertThat(row).containsEntry("gifticon","커피 교환권").containsEntry("email","fixture@example.com")
+                .doesNotContainKeys("bankName","accountNumber","accountHolder");
     }
 }

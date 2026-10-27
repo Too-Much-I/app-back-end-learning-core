@@ -38,30 +38,55 @@ class PromotionControllerTest {
     }
     @Test void authIsRequiredAndReceiptDoesNotExposePrivateFields() throws Exception {
         mvc.perform(request()).andExpect(status().isUnauthorized());
-        when(service.apply(eq(PromotionServiceTest.OWNER),eq("국민은행"),eq("001234"),eq("Fixture"),any()))
+        when(service.apply(eq(PromotionServiceTest.OWNER),eq("커피"),eq("fixture@example.com"),any()))
                 .thenReturn(new PromotionService.Receipt("receipt"));
-        mvc.perform(request().header("Authorization","Bearer fixture-token").param("bankName","국민은행")
-                .param("accountNumber","001234").param("accountHolder","Fixture"))
+        mvc.perform(request().header("Authorization","Bearer fixture-token").param("gifticon","커피")
+                .param("email","fixture@example.com"))
                 .andExpect(status().isOk()).andExpect(jsonPath("$.code").value("COMMON_200"))
                 .andExpect(jsonPath("$.result.applicationId").value("receipt"))
-                .andExpect(jsonPath("$.result.userId").doesNotExist()).andExpect(jsonPath("$.result.accountNumber").doesNotExist());
-        verify(service).apply(eq(PromotionServiceTest.OWNER),eq("국민은행"),eq("001234"),eq("Fixture"),any());
+                .andExpect(jsonPath("$.result.userId").doesNotExist()).andExpect(jsonPath("$.result.email").doesNotExist())
+                .andExpect(jsonPath("$.result.gifticon").doesNotExist()).andExpect(jsonPath("$.result.accountNumber").doesNotExist());
+        verify(service).apply(eq(PromotionServiceTest.OWNER),eq("커피"),eq("fixture@example.com"),any());
     }
     @Test void missingFieldsSpoofedIdsAndMultipleReportsAreRejected() throws Exception {
         mvc.perform(request().header("Authorization","Bearer fixture-token")).andExpect(status().isBadRequest());
-        mvc.perform(request().header("Authorization","Bearer fixture-token").param("bankName","국민은행")
-                .param("accountNumber","001234").param("accountHolder","Fixture").param("userId","spoof"))
+        mvc.perform(request().header("Authorization","Bearer fixture-token").param("gifticon","커피")
+                .param("email","fixture@example.com").param("userId","spoof"))
                 .andExpect(status().isBadRequest());
         mvc.perform(request().file(new MockMultipartFile("report",new byte[]{1})).header("Authorization","Bearer fixture-token")
-                .param("bankName","국민은행").param("accountNumber","001234").param("accountHolder","Fixture"))
+                .param("gifticon","커피").param("email","fixture@example.com"))
                 .andExpect(status().isBadRequest());
         verifyNoInteractions(service);
     }
     @Test void errorsNeverEchoProviderOrFormData() throws Exception {
-        when(service.apply(anyString(),anyString(),anyString(),anyString(),any())).thenThrow(new RuntimeException("private provider details"));
-        mvc.perform(request().header("Authorization","Bearer fixture-token").param("bankName","국민은행")
-                .param("accountNumber","001234").param("accountHolder","Fixture"))
+        when(service.apply(anyString(),anyString(),anyString(),any())).thenThrow(new RuntimeException("private provider details"));
+        mvc.perform(request().header("Authorization","Bearer fixture-token").param("gifticon","커피")
+                .param("email","fixture@example.com"))
                 .andExpect(status().isServiceUnavailable()).andExpect(jsonPath("$.code").value("PROMOTION_UNAVAILABLE"))
                 .andExpect(content().string(org.hamcrest.Matchers.not(org.hamcrest.Matchers.containsString("private"))));
+    }
+    @Test void removedBankFieldsAndDuplicateNewFieldsAreRejected() throws Exception {
+        for (String extra:new String[]{"bankName","bankCode","accountNumber","accountHolder","promotionId"})
+            mvc.perform(request().header("Authorization","Bearer fixture-token").param("gifticon","커피")
+                    .param("email","fixture@example.com").param(extra,"unwanted"))
+                    .andExpect(status().isBadRequest());
+        for (String field:new String[]{"gifticon","email"}) {
+            mvc.perform(request().header("Authorization","Bearer fixture-token").param(field,"only-one-field"))
+                    .andExpect(status().isBadRequest());
+            mvc.perform(request().header("Authorization","Bearer fixture-token").param("gifticon","커피")
+                    .param("email","fixture@example.com").param(field,"duplicate"))
+                    .andExpect(status().isBadRequest());
+        }
+        mvc.perform(request().header("Authorization","Bearer fixture-token").param("bankName","old")
+                .param("accountNumber","1234").param("accountHolder","old"))
+                .andExpect(status().isBadRequest());
+        verifyNoInteractions(service);
+    }
+    @Test void heicMultipartIsForwardedWithoutRequiringBankFields() throws Exception {
+        when(service.apply(anyString(),anyString(),anyString(),any())).thenReturn(new PromotionService.Receipt("receipt"));
+        mvc.perform(multipart("/api/v1/promotions/applications")
+                .file(new MockMultipartFile("report","fixture.heic","image/heic",PromotionServiceTest.ftyp("heic")))
+                .header("Authorization","Bearer fixture-token").param("gifticon","커피").param("email","fixture@example.com"))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.result.applicationId").value("receipt"));
     }
 }
