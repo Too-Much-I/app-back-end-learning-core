@@ -1,5 +1,7 @@
 # Learning Core Current State
 
+- 2026-10-27 프로모션 Swagger: codex/promotion-multipart-swagger에서 gifticon/email/report를 명시 multipart requestBody로 문서화. runtime 불변, 실제 /v3/api-docs 회귀 포함 clean test 성공. 사용자 승인으로 CI→develop→test 전달 진행. 운영/설정/실DB 제외. 신규 Jira 없음.
+
 - 2026-10-27 프로모션 테스트 전달(신규 Jira 없음): 사용자 Git/test 승인 및 Notion 입력 계약 수정 완료. codex/promotion-gift-email-heic에서 CI→develop PR 병합→기존 test 배포 진행. 운영/설정/실DB 불변, iOS 실제 신청 E2E 미실행. 배포 결과는 후속 갱신.
 
 - 2026-10-27 프로모션 변경(관련 Jira 미확인): codex/promotion-gift-email-heic에서 은행3필드를 gifticon/email로 교체하고 report HEIC 지원. 단위1553 실패0/skip1, 격리 프로모션Mongo1 통과. API URL/응답/인증·캠페인1회 제한 유지. 앱 입력 계약 교체 및 iOS E2E 필요. 미커밋/미배포, 기존 데이터 미변경.

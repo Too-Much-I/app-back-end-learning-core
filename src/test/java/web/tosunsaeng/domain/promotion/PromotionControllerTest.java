@@ -22,6 +22,10 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @WebMvcTest(controllers=PromotionController.class,properties={"app.auth.mode=jwt","app.auth.identity.issuer=https://identity.example.test",
         "app.auth.identity.jwk-set-uri=https://identity.example.test/jwks","app.auth.identity.audience=test","app.promotion.enabled=true"})
 @Import({SecurityConfig.class,SecurityErrorResponseHandler.class,PromotionExceptionAdvice.class,JwtCurrentUserProvider.class})
+@org.springframework.boot.autoconfigure.ImportAutoConfiguration({
+        org.springdoc.core.configuration.SpringDocConfiguration.class,
+        org.springdoc.core.properties.SpringDocConfigProperties.class,
+        org.springdoc.webmvc.core.configuration.SpringDocWebMvcConfiguration.class})
 @ContextConfiguration(classes=PromotionControllerTest.Slice.class)
 class PromotionControllerTest {
     @Configuration @Import(PromotionController.class) static class Slice {}
@@ -88,5 +92,18 @@ class PromotionControllerTest {
                 .file(new MockMultipartFile("report","fixture.heic","image/heic",PromotionServiceTest.ftyp("heic")))
                 .header("Authorization","Bearer fixture-token").param("gifticon","커피").param("email","fixture@example.com"))
                 .andExpect(status().isOk()).andExpect(jsonPath("$.result.applicationId").value("receipt"));
+    }
+    @Test void openApiDocumentsAllFieldsInMultipartBodyAndNoQueryParameters() throws Exception {
+        mvc.perform(get("/v3/api-docs")).andExpect(status().isOk())
+                .andExpect(jsonPath("$.paths['/api/v1/promotions/applications'].post.parameters").doesNotExist())
+                .andExpect(jsonPath("$.paths['/api/v1/promotions/applications'].post.requestBody.required").value(true))
+                .andExpect(jsonPath("$.paths['/api/v1/promotions/applications'].post.requestBody.content['multipart/form-data'].schema['$ref']")
+                        .value("#/components/schemas/PromotionApplicationForm"))
+                .andExpect(jsonPath("$.components.schemas.PromotionApplicationForm.required",
+                        org.hamcrest.Matchers.containsInAnyOrder("gifticon","email","report")))
+                .andExpect(jsonPath("$.components.schemas.PromotionApplicationForm.properties",org.hamcrest.Matchers.aMapWithSize(3)))
+                .andExpect(jsonPath("$.components.schemas.PromotionApplicationForm.properties.gifticon.type").value("string"))
+                .andExpect(jsonPath("$.components.schemas.PromotionApplicationForm.properties.email.format").value("email"))
+                .andExpect(jsonPath("$.components.schemas.PromotionApplicationForm.properties.report.format").value("binary"));
     }
 }
