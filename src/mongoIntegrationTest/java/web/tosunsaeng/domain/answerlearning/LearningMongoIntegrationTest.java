@@ -128,10 +128,12 @@ class LearningMongoIntegrationTest {
                 .set("result",new Document("fixture",true)).set("updatedAt",NOW.plusSeconds(300)),Submission.class);
         assertThat(resume.resume(OWNER,"IH")).containsEntry("part",3).containsEntry("lessonId","q3b");
         mongo.updateFirst(Query.query(Criteria.where("_id").is(first.id)),new Update().set("lessonId","q3b"),Submission.class);
-        assertThat(resume.resume(OWNER,"IH")).containsEntry("status","END_OF_PART").containsEntry("lessonId","q3a");
+        assertThat(resume.resume(OWNER,"IH")).containsEntry("status","READY").containsEntry("lessonId","q5a");
         LearningOwnership.merge(mongo,OWNER,"merged",NOW.plusSeconds(1000));
         assertThat(store.find(first.id).updatedAt).isEqualTo(NOW.plusSeconds(300));
-        assertThat(resume.resume("merged","IH")).containsEntry("status","END_OF_PART").containsEntry("lessonId","q3a");
+        assertThat(resume.resume("merged","IH")).containsEntry("status","READY").containsEntry("lessonId","q5a");
+        mongo.updateFirst(Query.query(Criteria.where("_id").is(first.id)),new Update().set("lessonId","q5b"),Submission.class);
+        assertThat(resume.resume("merged","IH")).containsEntry("status","READY").containsEntry("lessonId","q3a");
     }
     @Test void partOneRepracticeAndMergeKeepLatestActivityButEarliestCompletion() {
         store.complete(OWNER,"p1","common","fixture-v1",null,NOW);

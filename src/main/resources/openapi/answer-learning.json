@@ -15,7 +15,7 @@
       "get": {
         "tags": ["답변 학습"],
         "summary": "난이도별 최근 풀이 다음 문항",
-        "description": "단일 CTA는 part 없이 level=IM3/IH/AL만 보낸다. 현재 콘텐츠 버전의 completed+result가 있는 문항 중 결과 저장 시각(updatedAt)이 최신인 문항의 다음 위치를 반환한다. 채점 대기/실패/무음은 제외하며 늦게 생성된 결과도 최근 풀이가 된다. Part 1은 명시 완료 요청 시각을 모든 난이도에 반영한다. 세트 끝이면 같은 파트 다음 세트 첫 문항, 파트 끝이면 END_OF_PART와 해당 파트 첫 세트 첫 문항을 반환한다. NO_HISTORY는 첫 공개 파트(정상 카탈로그의 Part 1) 첫 세트 첫 문항이다. 세 상태 모두 위치를 반환하므로 CTA를 표시할 수 있다. 이미 푼 다음 문항은 건너뛰지 않는다. Billing 조회/본문/음성 URL 제공 없음. 기존 part 호출은 종전 unitId/allCompleted 응답을 유지한다.",
+        "description": "단일 CTA는 part 없이 level=IM3/IH/AL만 보낸다. 현재 콘텐츠 버전의 completed+result가 있는 문항 중 결과 저장 시각(updatedAt)이 최신인 문항의 다음 위치를 반환한다. 채점 대기/실패/무음은 제외하며 늦게 생성된 결과도 최근 풀이가 된다. Part 1은 명시 완료 요청 시각을 모든 난이도에 반영한다. 세트 끝이면 같은 파트 다음 세트 첫 문항, 파트 끝이면 다음 공개 파트 첫 세트 첫 문항을 정상 READY로 반환한다. 마지막 Part 5 완료 후에도 READY로 첫 공개 파트(정상 카탈로그의 Part 1) 첫 세트 첫 문항으로 순환한다. NO_HISTORY도 첫 공개 파트 첫 세트 첫 문항이다. READY/NO_HISTORY 모두 위치를 반환하므로 CTA를 표시할 수 있다. 이미 푼 다음 문항은 건너뛰지 않는다. Billing 조회/본문/음성 URL 제공 없음. 기존 part 호출은 종전 unitId/allCompleted 응답을 유지한다.",
         "parameters": [
           {"in":"query","name":"part","required":false,"deprecated":true,"schema":{"type":"integer","minimum":1,"maximum":5},"description":"기존 파트별 세트 조회 호환용. 단일 이어하기 CTA에서는 보내지 않는다."},
           {"in":"query","name":"level","required":true,"schema":{"type":"string","enum":["common","IM3","IH","AL"]},"description":"part 생략 시 IM3/IH/AL 필수. common은 기존 part=1 호출 전용."}
@@ -1563,7 +1563,7 @@
       "LearningRecentResume": {
         "type":"object",
         "properties":{
-          "status":{"type":"string","enum":["READY","NO_HISTORY","END_OF_PART"]},
+          "status":{"type":"string","enum":["READY","NO_HISTORY"]},
           "level":{"type":"string","enum":["IM3","IH","AL"]},
           "part":{"type":"integer","nullable":true},
           "unitId":{"type":"string","nullable":true},

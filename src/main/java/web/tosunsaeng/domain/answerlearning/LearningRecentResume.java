@@ -78,8 +78,7 @@ final class LearningRecentResume {
             Position previous=positions.get(i);
             if (!previous.lessonId().equals(practice.lessonId())) continue;
             Position next=i+1<positions.size()?positions.get(i+1):null;
-            return next!=null && next.part()==previous.part() ? response("READY",level,next)
-                    : response("END_OF_PART",level,positions.stream().filter(p -> p.part()==previous.part()).findFirst().orElseThrow());
+            return response("READY",level,next!=null ? next : positions.getFirst());
         }
         throw LearningFailure.unavailable();
     }
