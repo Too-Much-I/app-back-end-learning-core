@@ -25,8 +25,10 @@ final class LearningRecentResume {
 
     Document resume(String owner, String level) {
         if (!Set.of("IM3","IH","AL").contains(level == null ? "" : level)) throw LearningFailure.bad();
-        List<Document> units = mongo.find(Query.query(current().and("publicationStatus").is("ready").and("part").in(1,2,3,4,5))
-                .with(Sort.by("part","sortOrder","_id")).limit(501), Document.class, "learning_units");
+        Query unitQuery = Query.query(current().and("publicationStatus").is("ready").and("part").in(1,2,3,4,5))
+                .with(Sort.by("part","sortOrder","_id")).limit(501);
+        unitQuery.fields().include("_id", "part", "lessonIds");
+        List<Document> units = mongo.find(unitQuery, Document.class, "learning_units");
         if (units.isEmpty()) throw LearningFailure.missing();
         if (units.size() > 500) throw LearningFailure.unavailable();
         List<String> ids = new ArrayList<>();
@@ -41,7 +43,9 @@ final class LearningRecentResume {
         }
         if (new HashSet<>(ids).size() != ids.size()) throw LearningFailure.unavailable();
         Map<String,Document> lessons = new HashMap<>();
-        for (Document lesson : mongo.find(Query.query(current().and("_id").in(ids)),Document.class,"learning_lessons")) {
+        Query lessonQuery = Query.query(current().and("_id").in(ids));
+        lessonQuery.fields().include("_id", "unitId", "part", "questionNumber");
+        for (Document lesson : mongo.find(lessonQuery,Document.class,"learning_lessons")) {
             if (lessons.put(lesson.getString("_id"),lesson) != null) throw LearningFailure.unavailable();
         }
         List<Position> positions = new ArrayList<>();
@@ -58,13 +62,17 @@ final class LearningRecentResume {
             }
         }
         List<String> spoken = positions.stream().filter(p -> p.part()!=1).map(Position::lessonId).toList();
-        Submission latest = spoken.isEmpty() ? null : mongo.findOne(Query.query(owned(owner,level)
+        Query latestQuery = Query.query(owned(owner,level)
                 .and("lessonId").in(spoken).and("status").is("completed").and("result").ne(null).and("updatedAt").ne(null))
-                .with(Sort.by(Sort.Order.desc("updatedAt"),Sort.Order.desc("_id"))), Submission.class);
+                .with(Sort.by(Sort.Order.desc("updatedAt"),Sort.Order.desc("_id")));
+        latestQuery.fields().include("lessonId", "updatedAt").exclude("_id");
+        Submission latest = spoken.isEmpty() ? null : mongo.findOne(latestQuery, Submission.class);
         Practice practice = latest == null ? null : new Practice(latest.lessonId,latest.updatedAt);
         List<String> common = positions.stream().filter(p -> p.part()==1).map(Position::lessonId).toList();
         if (!common.isEmpty()) {
-            for (Document row : mongo.find(Query.query(owned(owner,"common").and("lessonId").in(common)),Document.class,"learning_completions")) {
+            Query completionQuery = Query.query(owned(owner,"common").and("lessonId").in(common));
+            completionQuery.fields().include("lessonId", "lastPracticedAt", "completedAt").exclude("_id");
+            for (Document row : mongo.find(completionQuery,Document.class,"learning_completions")) {
                 Date date = row.getDate("lastPracticedAt");
                 if (date == null) date = row.getDate("completedAt"); // Existing Part 1 first-completion evidence.
                 if (date == null) throw LearningFailure.unavailable();
