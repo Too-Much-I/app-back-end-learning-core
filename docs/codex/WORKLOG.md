@@ -17888,3 +17888,16 @@
 - 후속 회신으로 마지막 Part 5 완료 후 Part 1 첫 세트 순환 확정. 다음 공개 파트 이동·마지막 순환의 코드/단위/격리Mongo 테스트·Swagger/계약을 보완해 테스트 배포에 전달한다. 기존 결과 기준·NO_HISTORY·part 지정 호환·권한/과금 검사는 유지한다. 신규 Jira 없음.
 
 - 최종 사용자 요청으로 END_OF_PART 대신 정상 READY로 다음 위치를 반환하도록 보완. 파트 경계/마지막 순환 테스트와 Swagger enum·계약 동기화. 앞선 후속 커밋 b67897b/PR73은 아직 미병합이며 이 수정과 함께 전달한다. 신규 Jira 없음.
+
+## 2026-10-27 — 프로모션 입력 교체·HEIC 구현
+
+- 사용자 요청: 은행명/계좌번호/예금주 제거, 필수 gifticon/email/report로 교체, HEIC 허용. 관련 Jira 미확인. develop65c814b 기반 codex/promotion-gift-email-heic, root 사용자 dirty 변경 보존.
+- Controller/Service·단위2파일/Mongo1파일·계약/Swagger 갱신. 구 필드/추가·중복 입력 거절, 신규 문서는 은행정보 미저장. 기존 문서/중복 정책 유지. HEIC ftyp 구조/brand 검사 후 원본 image/heic 저장,9MiB·기존PDF/JPEG/PNG 유지. 전체 이미지 디코딩/메일발송/자동지급 없음.
+- clean test1553 실패0/오류0/기존skip1, 프로모션 격리Mongo1 통과. Docker API1.32 초기 실패는 테스트프로세스 -Dapi.version=1.44로 해결. diff 검사 통과. 실제 iOS E2E/앱 새필드 반영/수집 동의 문구 별도. 커밋/푸시/배포/실DB/설정 변경 없음. 예상 밖 제품 변경 없음. turn marker는 원본 작업폴더 WORKLOG의 동명 기록에 보존했다.
+
+## 2026-10-27 — 프로모션 Notion 동기화·테스트 배포 전달
+
+<!-- codex-turn:01a17bec-ef87-7683-9a53-fcb9da2ea4cd -->
+
+- 사용자 Notion 수정 후 커밋·푸시·테스트 배포 승인. Notion 403dcc5dbaeb804787bfdb6b40b11cb7 프로모션 부분을 gifticon/email/report 및 HEIC·은행정보 제거 규격으로 수정했다. connector404로 로그인된 Chrome 문서 편집 사용. 이어하기·기존 응답/인증/중복 정책 보존. 신규 Jira 없음.
+- 기존 로컬 단위1553 실패0/skip1, 격리Mongo1 통과. develop65c814b 기준 scoped commit/PR·CI 후 develop 병합·test workflow로 전달한다. main/운영·설정/실DB/IAM/타서비스 변경 없음. 실제 인증 iOS 신청 E2E 미실행. 전달 결과는 후속 기록한다.
