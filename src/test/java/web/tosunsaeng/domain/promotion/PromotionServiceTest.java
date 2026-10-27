@@ -51,10 +51,37 @@ class PromotionServiceTest {
         verify(storage).put(eq("promotion-reports/"+receipt.applicationId()),any(),eq("application/pdf"));
         verify(guards).execute(eq(OWNER),any());
     }
-    @Test void duplicatePrecheckDoesNotUpload() {
+    @Test void fourOccupiedSlotsRejectWithoutUpload() {
         when(mongo.exists(any(Query.class),eq(PromotionService.COLLECTION))).thenReturn(true);
         assertThatThrownBy(this::apply).isInstanceOfSatisfying(PromotionFailure.class,f -> assertThat(f.code).isEqualTo("PROMOTION_ALREADY_APPLIED"));
         verifyNoInteractions(storage);
+    }
+    @Test void existingApplicationUsesSecondSlotAndKeepsLegacyKey() {
+        when(mongo.exists(any(Query.class),eq(PromotionService.COLLECTION))).thenReturn(true,false);
+        apply();
+        var row=org.mockito.ArgumentCaptor.forClass(Document.class);
+        verify(mongo).insert(row.capture(),eq(PromotionService.COLLECTION));
+        String legacy=PromotionService.applicationKey("score-test",OWNER);
+        assertThat(PromotionService.slotKey(legacy,1)).isEqualTo(legacy);
+        assertThat(row.getValue().getString("_id")).isEqualTo(legacy+":2");
+    }
+    @Test void occupiedSlotRaceContinuesWithoutUploadingAgain() {
+        when(mongo.insert(any(Document.class),eq(PromotionService.COLLECTION)))
+                .thenThrow(new DuplicateKeyException("fixture")).thenAnswer(i -> i.getArgument(0));
+        when(mongo.findById(anyString(),eq(Document.class),eq(PromotionService.COLLECTION)))
+                .thenReturn(new Document("applicationId","winner"));
+        assertThat(apply().applicationId()).isNotBlank();
+        verify(storage,times(1)).put(anyString(),any(),anyString());
+        verify(storage,never()).delete(anyString());
+        verify(guards,times(2)).execute(eq(OWNER),any());
+    }
+    @Test void ambiguousDuplicateDoesNotAdvanceOrDelete() {
+        when(mongo.insert(any(Document.class),eq(PromotionService.COLLECTION)))
+                .thenThrow(new DuplicateKeyException("fixture"));
+        assertThatThrownBy(this::apply).isInstanceOfSatisfying(PromotionFailure.class,
+                f -> assertThat(f.code).isEqualTo("PROMOTION_UNAVAILABLE"));
+        verify(mongo,times(1)).insert(any(Document.class),eq(PromotionService.COLLECTION));
+        verify(storage,never()).delete(anyString());
     }
     @Test void raceLosingObjectIsCleanedButUnknownCommitIsNot() {
         when(mongo.insert(any(Document.class),eq(PromotionService.COLLECTION))).thenThrow(new DuplicateKeyException("fixture"));

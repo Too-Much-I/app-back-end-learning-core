@@ -15,6 +15,7 @@ import web.tosunsaeng.domain.usermerge.application.UserOwnedTransactionExecutor;
 
 public class PromotionService {
     static final String COLLECTION = "promotion_applications";
+    static final int MAX_APPLICATIONS = 4;
     // Below the existing 10 MiB multipart request cap, leaving room for form overhead.
     static final int MAX_BYTES = 9 * 1024 * 1024;
     private static final java.util.regex.Pattern EMAIL = java.util.regex.Pattern.compile(
@@ -47,9 +48,12 @@ public class PromotionService {
         gifticon = gifticon.strip();
         email = email.strip();
         if (!EMAIL.matcher(email).matches() || email.indexOf('@') > 64) throw PromotionFailure.invalid();
-        String id = applicationKey(config.getCampaignId(), owner);
-        if (mongo.exists(org.springframework.data.mongodb.core.query.Query.query(
-                org.springframework.data.mongodb.core.query.Criteria.where("_id").is(id)), COLLECTION))
+        String baseId = applicationKey(config.getCampaignId(), owner);
+        int firstSlot = 1;
+        while (firstSlot <= MAX_APPLICATIONS && mongo.exists(org.springframework.data.mongodb.core.query.Query.query(
+                org.springframework.data.mongodb.core.query.Criteria.where("_id").is(slotKey(baseId, firstSlot))), COLLECTION))
+            firstSlot++;
+        if (firstSlot > MAX_APPLICATIONS)
             throw new PromotionFailure(409,"PROMOTION_ALREADY_APPLIED");
         byte[] bytes = read(report);
         String type = fileType(bytes);
@@ -57,31 +61,41 @@ public class PromotionService {
         String key = "promotion-reports/" + receipt;
         try { storage.put(key, bytes, type); }
         catch (RuntimeException e) { throw PromotionFailure.unavailable(); }
-        Document row = new Document("_id",id).append("applicationId",receipt)
+        Document row = new Document("applicationId",receipt)
                 .append("promotionId",config.getCampaignId()).append("userId",owner)
                 .append("gifticon",gifticon).append("email",email)
                 .append("reportKey",key).append("reportBucket",config.getBucket()).append("reportType",type)
                 .append("reportBytes",bytes.length).append("createdAt",Date.from(now));
-        try {
-            guards.execute(owner, () -> mongo.insert(row,COLLECTION));
-        } catch (DuplicateKeyException e) {
-            // Read the winner before cleanup: a prior unknown commit may reference this object.
-            Document winner = mongo.findById(id,Document.class,COLLECTION);
-            if (winner != null && receipt.equals(winner.getString("applicationId"))) return new Receipt(receipt);
-            if (winner != null) {
+        for (int slot = firstSlot; slot <= MAX_APPLICATIONS; slot++) {
+            String id = slotKey(baseId, slot);
+            row.put("_id", id);
+            try {
+                guards.execute(owner, () -> mongo.insert(row,COLLECTION));
+                return new Receipt(receipt);
+            } catch (DuplicateKeyException e) {
+                // Read the winner before cleanup: a prior unknown commit may reference this object.
+                Document winner = mongo.findById(id,Document.class,COLLECTION);
+                if (winner != null && receipt.equals(winner.getString("applicationId"))) return new Receipt(receipt);
+                if (winner != null) {
+                    // A fresh transaction for the next slot; never reuse an aborted transaction.
+                    continue;
+                }
+                throw PromotionFailure.unavailable();
+            } catch (web.tosunsaeng.domain.usermerge.application.UserOwnershipGuardException
+                    | web.tosunsaeng.domain.learningrecorddeletion.application.DeletionFailure e) {
                 try { storage.delete(key); } catch (RuntimeException ignored) { /* private orphan: manual cleanup */ }
-                throw new PromotionFailure(409,"PROMOTION_ALREADY_APPLIED");
+                throw e;
+            } catch (RuntimeException e) {
+                // Unknown commit is not proof of failure. Never delete a possibly referenced report.
+                throw PromotionFailure.unavailable();
             }
-            throw PromotionFailure.unavailable();
-        } catch (web.tosunsaeng.domain.usermerge.application.UserOwnershipGuardException
-                | web.tosunsaeng.domain.learningrecorddeletion.application.DeletionFailure e) {
-            try { storage.delete(key); } catch (RuntimeException ignored) { /* private orphan: manual cleanup */ }
-            throw e;
-        } catch (RuntimeException e) {
-            // Unknown commit is not proof of failure. Never delete a possibly referenced report.
-            throw PromotionFailure.unavailable();
         }
-        return new Receipt(receipt);
+        try { storage.delete(key); } catch (RuntimeException ignored) { /* private orphan: manual cleanup */ }
+        throw new PromotionFailure(409,"PROMOTION_ALREADY_APPLIED");
+    }
+    // Slot one preserves existing records. Four deterministic _ids enforce the cap without a counter/index migration.
+    static String slotKey(String baseId, int slot) {
+        return slot == 1 ? baseId : baseId + ":" + slot;
     }
     static String applicationKey(String campaign, String owner) {
         try { return HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256")

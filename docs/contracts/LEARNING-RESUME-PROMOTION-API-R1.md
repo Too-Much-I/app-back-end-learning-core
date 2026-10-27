@@ -41,7 +41,7 @@ Swagger도 세 필드를 `requestBody.content.multipart/form-data`로 표시한�
 2026-10-27 사용자 요청으로 은행명/계좌번호/예금주를 제거했다. 새 신청에는 저장하지 않으며
 구 필드를 보내면 400이다. 앱을 새 계약에 맞춰 배포해야 한다. 기프티콘은 상품명 자유 입력이며
 상품 목록/자동 지급/이메일 발송·소유 확인은 포함하지 않는다. 이메일 대소문자는 보존한다.
-기존 신청 문서는 마이그레이션/삭제하지 않으며 기존 신청자의 재신청 409 정책도 유지한다.
+기존 신청 문서는 마이그레이션/삭제하지 않으며 기존 신청 1회도 새 상한에 포함한다.
 
 추가 userId/promotionId 및 중복 필드/첨부는 받지 않는다.
 9 MiB는 기존 multipart 전체 10 MiB 제한 안에 메타정보가 들어가도록 정한 구현값이다.
@@ -51,19 +51,20 @@ HEIC는 첫 ISO-BMFF ftyp box의 길이/정렬 및 HEVC 정지 이미지 brand(h
 major 또는 compatible brand를 허용하며 generic mif1만 있는 HEIF, AVIF, 동영상은 지원 대상으로 보지 않는다.
 원본을 image/heic로 저장하며 JPEG 변환/브라우저 미리보기는 제공하지 않는다. 실제 iOS 파일 선택·업로드는 앱 E2E 확인 대상이다.
 성공 HTTP 200, `result={"applicationId":"접수 UUID"}`. 이메일/기프티콘/파일 URL/userId는 반환하지 않는다.
-캠페인별 사용자 한 번, 수정 API 없음. 기존 신청이 있으면 409를 반환하고 덮어쓰지 않는다.
+캠페인별 사용자 최대 4회, 수정 API 없음. 각 신청을 별도 저장하며 5회째부터 409를 반환한다.
 
 | HTTP | code | 의미 |
 | --- | --- | --- |
 | 400 | PROMOTION_INVALID_REQUEST | 입력/첨부 수 오류 |
 | 409 | PROMOTION_CLOSED | opensAt 포함~closesAt 미포함 접수기간 밖 |
-| 409 | PROMOTION_ALREADY_APPLIED | 이미 접수됨 |
+| 409 | PROMOTION_ALREADY_APPLIED | 해당 캠페인에서 이미 4회 접수됨 |
 | 413 | PROMOTION_REPORT_TOO_LARGE | 크기 초과 |
 | 415 | PROMOTION_REPORT_UNSUPPORTED | 파일 시그니처 불일치 |
 | 503 | PROMOTION_UNAVAILABLE | 저장 등 일시 실패/결과 불명 |
 
 기존 인증 401 및 삭제/owner 제한을 유지한다. 기능 OFF 시 route 미등록.
-응답 유실 후 재신청은 이미 저장됐으면 409다. 멱등키·수정·상태조회·관리자 API는 이번에 추가하지 않는다.
+응답 유실 후 재신청도 새 신청으로 접수될 수 있다(총 4회 이내). 앱은 자동 재전송을 피하고 결과 불명 시 접수 여부를 확인해야 한다.
+멱등키·수정·상태조회·관리자 API는 이번에 추가하지 않는다.
 
 ## 저장과 활성화 전 확인
 
@@ -71,7 +72,8 @@ major 또는 compatible brand를 허용하며 generic mif1만 있는 HEIF, AVIF,
   환경변수 바인딩은 APP_PROMOTION_ENABLED / APP_PROMOTION_CAMPAIGNID / APP_PROMOTION_BUCKET /
   APP_PROMOTION_OPENSAT / APP_PROMOTION_CLOSESAT 사용 가능하다. 시각은 UTC ISO-8601.
 - `promotion_applications` 컬렉션을 배포 전에 준비한다. 자동 생성/실DB 변경 없음.
-  `_id=SHA256(campaignId + LF + userId)`로 Mongo 기본 unique 인덱스를 재사용한다.
+  첫 신청은 `_id=SHA256(campaignId + LF + userId)`를 유지하고 2~4회는 같은 해시에 `:2`/`:3`/`:4`를 붙인다.
+  Mongo 기본 unique 인덱스로 동시 요청도 최대 4개만 저장한다. 별도 카운터/인덱스 마이그레이션은 없다.
   기존 데이터가 있다면 이 식별 규칙과 일치해야 하며 임의 재작성하지 않는다.
 - 지정 bucket은 **전용 비공개**, Block Public Access/최소 IAM/암호화/제한 열람을 운영에서 확인한다.
   기존 음성 S3 bucket을 자동 재사용하지 않는다. 업로드는 SSE-S3, opaque key이며 원본 filename을 저장하지 않는다.

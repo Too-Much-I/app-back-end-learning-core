@@ -1,5 +1,11 @@
 # Learning Core Current State
 
+- 2026-10-27 프로모션 최대4회 테스트 전달 진행(관련 Jira 없음): 사용자 Git 예외 승인. 코드·Swagger·회귀·계약/기록만 커밋하여 PR 검증 후 develop/test 전달한다. main/운영·설정·실DB 제외.
+
+- 2026-10-27 프로모션 최대4회 코드 완료(관련 Jira 없음): 기존 캠페인/user 해시를 슬롯1로 유지하고 :2/:3/:4 추가, 5번째409. Service/Swagger/단위·Mongo 테스트/계약 수정, clean test 및 격리Mongo2개 성공. 커밋/배포/실DB 미변경. 응답유실 재신청은 별도 신청 가능, 앱 확인 별도.
+
+- 2026-10-27 전달 결과: PR75/13e0279, develop b69cb70f, CI40461160317 성공 및 test40461568268 ECS/health 통과. 공개OpenAPI multipart body 필수3필드/query 없음 확인. 운영/설정/실DB 불변. 신규 Jira 없음, 실제 앱 E2E 별도.
+
 - 2026-10-27 프로모션 Swagger: codex/promotion-multipart-swagger에서 gifticon/email/report를 명시 multipart requestBody로 문서화. runtime 불변, 실제 /v3/api-docs 회귀 포함 clean test 성공. 사용자 승인으로 CI→develop→test 전달 진행. 운영/설정/실DB 제외. 신규 Jira 없음.
 
 - 2026-10-27 프로모션 테스트 전달(신규 Jira 없음): 사용자 Git/test 승인 및 Notion 입력 계약 수정 완료. codex/promotion-gift-email-heic에서 CI→develop PR 병합→기존 test 배포 진행. 운영/설정/실DB 불변, iOS 실제 신청 E2E 미실행. 배포 결과는 후속 갱신.

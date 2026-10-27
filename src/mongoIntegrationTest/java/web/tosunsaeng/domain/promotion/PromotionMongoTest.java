@@ -56,7 +56,20 @@ class PromotionMongoTest {
         try { service.apply(OWNER,"커피 교환권","fixture@example.com",new MockMultipartFile("report","%PDF-fixture".getBytes())); return "saved"; }
         catch (PromotionFailure f) { return f.code; }
     }
-    @Test void concurrentUploadsProduceOneApplicationAndOnlyDeleteLosingFile() throws Exception {
+    @Test void existingApplicationCountsTowardFourAndFifthDoesNotUpload() {
+        String legacy=PromotionService.applicationKey("fixture",OWNER);
+        mongo.insert(new Document("_id",legacy).append("applicationId","legacy")
+                .append("promotionId","fixture").append("userId",OWNER),PromotionService.COLLECTION);
+        for (int i=0;i<3;i++) assertThat(apply()).isEqualTo("saved");
+        assertThat(apply()).isEqualTo("PROMOTION_ALREADY_APPLIED");
+        assertThat(mongo.count(new Query(),PromotionService.COLLECTION)).isEqualTo(4);
+        verify(storage,times(3)).put(anyString(),any(),anyString());
+        assertThat(mongo.findById(legacy,Document.class,PromotionService.COLLECTION).getString("applicationId"))
+                .isEqualTo("legacy");
+    }
+    @Test void concurrentFourthApplicationsOnlySaveOneAndDeleteLosingFile() throws Exception {
+        for (int i=0;i<3;i++) assertThat(apply()).isEqualTo("saved");
+        clearInvocations(storage);
         var gate=new CyclicBarrier(2);
         doAnswer(i -> { gate.await(10,TimeUnit.SECONDS); return null; }).when(storage).put(anyString(),any(),anyString());
         try (var pool=Executors.newFixedThreadPool(2)) {
@@ -64,8 +77,9 @@ class PromotionMongoTest {
             assertThat(List.of(a.get(20,TimeUnit.SECONDS),b.get(20,TimeUnit.SECONDS)))
                     .containsExactlyInAnyOrder("saved","PROMOTION_ALREADY_APPLIED");
         }
-        assertThat(mongo.count(new Query(),PromotionService.COLLECTION)).isEqualTo(1);
-        Document row=mongo.findAll(Document.class,PromotionService.COLLECTION).getFirst();
+        assertThat(mongo.count(new Query(),PromotionService.COLLECTION)).isEqualTo(4);
+        Document row=mongo.findById(PromotionService.slotKey(PromotionService.applicationKey("fixture",OWNER),4),
+                Document.class,PromotionService.COLLECTION);
         var key=org.mockito.ArgumentCaptor.forClass(String.class);
         verify(storage).delete(key.capture());
         assertThat(key.getValue()).isNotEqualTo(row.getString("reportKey"));
