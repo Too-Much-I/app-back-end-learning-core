@@ -27,7 +27,7 @@ public class PromotionService {
     }
     public record Receipt(String applicationId) {}
 
-    public Receipt apply(String owner, String bankCode, String accountNumber, String accountHolder, MultipartFile report) {
+    public Receipt apply(String owner, String bankName, String accountNumber, String accountHolder, MultipartFile report) {
         try { if (!UUID.fromString(owner).toString().equals(owner)) throw PromotionFailure.invalid(); }
         catch (IllegalArgumentException | NullPointerException e) { throw PromotionFailure.invalid(); }
         guards.requirePublicWrite(owner);
@@ -35,7 +35,8 @@ public class PromotionService {
         var now = clock.instant();
         if (now.isBefore(config.getOpensAt()) || !now.isBefore(config.getClosesAt()))
             throw new PromotionFailure(409,"PROMOTION_CLOSED");
-        if (bankCode == null || !bankCode.matches("[0-9]{3}") || accountNumber == null
+        if (bankName == null || bankName.isBlank() || bankName.length() > 100
+                || bankName.chars().anyMatch(Character::isISOControl) || accountNumber == null
                 || !accountNumber.matches("[0-9]{1,32}") || accountHolder == null
                 || accountHolder.isBlank() || accountHolder.length() > 100
                 || accountHolder.chars().anyMatch(Character::isISOControl)) throw PromotionFailure.invalid();
@@ -51,7 +52,7 @@ public class PromotionService {
         catch (RuntimeException e) { throw PromotionFailure.unavailable(); }
         Document row = new Document("_id",id).append("applicationId",receipt)
                 .append("promotionId",config.getCampaignId()).append("userId",owner)
-                .append("bankCode",bankCode).append("accountNumber",accountNumber).append("accountHolder",accountHolder.trim())
+                .append("bankName",bankName.trim()).append("accountNumber",accountNumber).append("accountHolder",accountHolder.trim())
                 .append("reportKey",key).append("reportBucket",config.getBucket()).append("reportType",type)
                 .append("reportBytes",bytes.length).append("createdAt",Date.from(now));
         try {

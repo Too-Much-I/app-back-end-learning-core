@@ -91,7 +91,7 @@ class LearningMongoIntegrationTest {
         assertThat(mongo.count(new Query(),"learning_completions")).isEqualTo(1);
         store.complete(OWNER,"lesson","AL","v1",null,NOW); assertThat(mongo.count(new Query(),"learning_completions")).isEqualTo(2);
     }
-    @Test void resumeUsesActualAcceptanceAcrossPartsNotCreationRetryOrWorkerTime() {
+    @Test void resumeUsesSuccessfulResultTimeAndWrapsWithinPart() {
         for (String c:List.of("learning_units","learning_lessons")) mongo.dropCollection(c);
         var config=new LearningProperties(); config.setDatasetId("fixture"); config.setContentVersion("fixture-v1");
         for (int part:List.of(3,5)) {
@@ -107,19 +107,31 @@ class LearningMongoIntegrationTest {
         var first=fixture(); first.lessonId="q3a"; first.queuedAt=null; store.create(first,300);
         assertThat(resume.resume(OWNER,"IH")).containsEntry("status","NO_HISTORY");
         store.queue(first,first.audio,NOW);
-        assertThat(resume.resume(OWNER,"IH")).containsEntry("part",3).containsEntry("lessonId","q3b");
+        assertThat(resume.resume(OWNER,"IH")).containsEntry("status","NO_HISTORY").containsEntry("lessonId","q3a");
         var second=fixture(); second.lessonId="q5a"; second.queuedAt=null; store.create(second,300); store.queue(second,second.audio,NOW.plusSeconds(1));
         mongo.updateFirst(Query.query(Criteria.where("_id").is(first.id)),new Update().set("status","failed")
                 .set("error",new Document("retryable",true)).set("updatedAt",NOW.plusSeconds(100)),Submission.class);
         store.retry(store.find(first.id),NOW.plusSeconds(101),300);
         assertThat(store.find(first.id).queuedAt).isEqualTo(NOW);
         assertThat(store.queue(first,first.audio,NOW.plusSeconds(102))).isNull();
+        assertThat(resume.resume(OWNER,"IH")).containsEntry("status","NO_HISTORY");
+        mongo.updateFirst(Query.query(Criteria.where("_id").is(second.id)),new Update().set("status","completed")
+                .set("result",new Document("fixture",true)).set("updatedAt",NOW.plusSeconds(103)),Submission.class);
         assertThat(resume.resume(OWNER,"IH")).containsEntry("part",5).containsEntry("lessonId","q5b");
         var foreign=fixture(); foreign.userId="other"; foreign.lessonId="q3a"; foreign.queuedAt=NOW.plusSeconds(200); mongo.insert(foreign);
         var level=fixture(); level.level="AL"; level.lessonId="q3a"; level.queuedAt=NOW.plusSeconds(200); mongo.insert(level);
         var version=fixture(); version.contentVersion="old"; version.lessonId="q3a"; version.queuedAt=NOW.plusSeconds(200); mongo.insert(version);
         assertThat(resume.resume(OWNER,"IH")).containsEntry("part",5);
         assertThat(resume.resume(OWNER,"AL")).containsEntry("part",3);
+        // Earlier submission completing later becomes latest; pending/failed rows never win.
+        mongo.updateFirst(Query.query(Criteria.where("_id").is(first.id)),new Update().set("status","completed")
+                .set("result",new Document("fixture",true)).set("updatedAt",NOW.plusSeconds(300)),Submission.class);
+        assertThat(resume.resume(OWNER,"IH")).containsEntry("part",3).containsEntry("lessonId","q3b");
+        mongo.updateFirst(Query.query(Criteria.where("_id").is(first.id)),new Update().set("lessonId","q3b"),Submission.class);
+        assertThat(resume.resume(OWNER,"IH")).containsEntry("status","END_OF_PART").containsEntry("lessonId","q3a");
+        LearningOwnership.merge(mongo,OWNER,"merged",NOW.plusSeconds(1000));
+        assertThat(store.find(first.id).updatedAt).isEqualTo(NOW.plusSeconds(300));
+        assertThat(resume.resume("merged","IH")).containsEntry("status","END_OF_PART").containsEntry("lessonId","q3a");
     }
     @Test void partOneRepracticeAndMergeKeepLatestActivityButEarliestCompletion() {
         store.complete(OWNER,"p1","common","fixture-v1",null,NOW);

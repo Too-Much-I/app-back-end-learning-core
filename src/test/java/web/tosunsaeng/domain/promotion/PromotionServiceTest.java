@@ -28,13 +28,19 @@ class PromotionServiceTest {
         service=new PromotionService(mongo,storage,config,guards,Clock.fixed(now,ZoneOffset.UTC));
     }
     MockMultipartFile report() { return new MockMultipartFile("report","untrusted.pdf","text/plain","%PDF-1.7\nfixture".getBytes()); }
-    PromotionService.Receipt apply() { return service.apply(OWNER,"004","001234","Fixture",report()); }
+    PromotionService.Receipt apply() { return service.apply(OWNER," 국민은행 ","001234","Fixture",report()); }
+    @Test void bankNameRejectsBlankControlAndOversizeWithoutUpload() {
+        for (String name: new String[]{null,"","  ","은행\n명","가".repeat(101)})
+            assertThatThrownBy(() -> service.apply(OWNER,name,"001234","Fixture",report())).isInstanceOf(PromotionFailure.class);
+        verifyNoInteractions(storage);
+    }
     @Test void persistsOwnerAndCampaignAndPreservesLeadingZeros() {
         var receipt=apply(); var rows=org.mockito.ArgumentCaptor.forClass(Document.class);
         verify(mongo).insert(rows.capture(),eq(PromotionService.COLLECTION));
         assertThat(rows.getValue()).containsEntry("userId",OWNER).containsEntry("promotionId","score-test")
                 .containsEntry("accountNumber","001234").containsEntry("applicationId",receipt.applicationId())
-                .containsEntry("reportType","application/pdf").doesNotContainKeys("originalFilename");
+                .containsEntry("reportType","application/pdf").containsEntry("bankName","국민은행")
+                .doesNotContainKeys("originalFilename","bankCode");
         verify(storage).put(eq("promotion-reports/"+receipt.applicationId()),any(),eq("application/pdf"));
         verify(guards).execute(eq(OWNER),any());
     }
@@ -58,7 +64,7 @@ class PromotionServiceTest {
         config.setClosesAt(now.plusSeconds(60)); config.setOpensAt(now.plusSeconds(1));
         assertThatThrownBy(this::apply).isInstanceOf(PromotionFailure.class);
         config.setOpensAt(now);
-        assertThatThrownBy(() -> service.apply(OWNER,"004","12-34","Fixture",report())).isInstanceOf(PromotionFailure.class);
+        assertThatThrownBy(() -> service.apply(OWNER,"국민은행","12-34","Fixture",report())).isInstanceOf(PromotionFailure.class);
         verifyNoInteractions(storage);
     }
     @Test void fileTypesSizesAndSpoofing() {

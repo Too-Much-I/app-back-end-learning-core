@@ -1,5 +1,17 @@
 # Learning Core Current State
 
+- 2026-10-27 Notion API 문서 동기화 완료: bankName, 결과 저장 시각 기준, END_OF_PART 해당 파트 첫 세트·NO_HISTORY 첫 공개 파트 첫 세트, 배포 전 안내 반영. 새로고침 후 저장 내용과 코드 블록 유지 확인. 서버는 이전 배포 상태이며 이번 코드·배포 변경 없음. 신규 Jira 없음.
+
+- 2026-10-27 은행명/결과 기반 이어하기 로컬 구현·테스트 완료: bankName 문자열, completed 결과 저장 시각 기준, END_OF_PART 해당 파트 첫 세트·NO_HISTORY 첫 공개 파트 첫 세트 반환. 완료 복구/merge 결과 시각 보존 및 Swagger/계약 갱신. 전체 단위·관련 격리Mongo 성공, 신규 Jira 없음. 미커밋·미배포이며 테스트 서버/Notion은 이전 계약 상태다.
+
+- 2026-10-27 사용자 변경 요청 검토: 프로모션 은행명 문자열 및 이어하기 결과 생성 기준 전환. 현재 bankCode 3자리 제한·queuedAt 조회 확인. NO_HISTORY/END_OF_PART의 첫 문항이 Part1인지 해당 파트인지 확인 대기, 제품 변경·배포 없음. 신규 Jira 없음.
+
+- 2026-10-26 test 공개 Swagger 재확인: /api/v1/learning/resume 및 /api/v1/promotions/applications 노출 확인. 기존 테스트 ON/배포 기록 유지, 실제 인증 앱 CTA·파일 제출 E2E 미실행. 이번은 읽기 확인만 수행, 신규 Jira 없음.
+
+- 2026-10-26 Notion 두 API 형식 보완 완료: 이어하기·프로모션 요청/응답을 실제 코드 블록으로 교정하고 JSON 들여쓰기 및 중복 제거 확인. API 의미·제품 코드·배포 불변, 신규 Jira 없음.
+
+- 2026-10-26 Notion 학습 이어하기/프로모션 페이지의 이어하기 항목을 R2로 갱신했다. level-only 요청·최근 접수 기준·문항 위치·상태별 CTA·기존 part 호환 반영, 프로모션 보존. 제품/배포 변경 없음, 신규 Jira 없음.
+
 - 2026-10-26 최근 풀이 이어하기 테스트 배포 완료: 제품 e1b5a7e / PR71 / develop merge e2d8b6e. CI40288429705·배포40288936145 success. 공개healthUP, 새 level-only/part optional 및 READY·NO_HISTORY·END_OF_PART Swagger, 기존 legacy schema·promotion 경로 유지, 미인증401 확인. 운영·기능설정 변경 없음. 실제 로그인 앱의 CTA/학습 이동 E2E는 미실행, 프론트는 part 생략 후 result.lessonId로 이동해야 함. 신규 Jira 없음.
 
 - 로컬 최종 검증: 단위1545 실패/오류0·skip1, 격리Mongo380 실패/오류0·skip2, Node95 통과. GitHub CI 후 develop 머지·테스트배포 진행, 운영 제외.

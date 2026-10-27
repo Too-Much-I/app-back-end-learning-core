@@ -17836,3 +17836,46 @@
 - 최종 로컬 XML: 단위1545 실패/오류0·기존skip1, 격리Mongo380 실패/오류0·skip2. 실제 실행된 Mongo378 통과이며 skip을 실행 통과로 계산하지 않는다. 예상 밖 제품 변경 없음. 최신 develop 기존 테스트 배포 success 확인 후 전달 진행.
 - 전달 완료: 제품 e1b5a7e182c925f41ff321bf7cbda3577b75b7de 커밋/push, PR71 CI40288429705 전 단계 success 후 승인된 develop merge e2d8b6e8ca6cc34d28f50af2f8eb0aa81617924b. 자동 테스트 배포40288936145 completed/success 및 서비스 안정화·workflow health 검사 통과. 실행 중 로컬 AWS credential은 없어 직접 ECS 조회는 하지 않았으며 workflow 성공과 공개 응답 증거로 확인했다.
 - 배포 후 공개healthUP·새 resume 미인증401·Swagger partRequired=false/levelRequired=true·READY/NO_HISTORY/END_OF_PART·위치8필드 및 기존 unitId/allCompleted schema·promotion 경로 유지 확인. 실제 인증 사용자 학습/CTA E2E는 미실행이며 앱에서 part 생략·lessonId 이동을 확인해야 한다. 운영/기능설정/타서비스/IAM/실DB강제변경 없음. 원본 dirty 유지, 예상 밖 제품diff 없음. 기록만 후속 커밋하며 추가 배포 없음.
+
+## 2026-10-26 — Notion 최근 풀이 이어하기 계약 갱신
+
+<!-- codex-turn:01a17743-ef0b-75a2-9d08-eefbd2d4a5a1 -->
+
+- 사용자 지정 Notion 403dcc5dbaeb804787bfdb6b40b11cb7의 이어하기 항목만 R2 계약 기준으로 수정했다. connector 접근404 후 기존 로그인 브라우저 사용. level-only 요청, READY 위치 응답, NO_HISTORY/END_OF_PART, 최초 queuedAt·Part1 활동, 기존 part 호환과 오류 안내 반영.
+- 기존 상세 토글 구조·프로모션 내용 보존, 수정 후 UI 본문/스크린샷 확인. 실제 앱 CTA E2E 미실행 안내 유지. 신규 Jira 없음. 제품 코드·DB·설정·배포·commit/push 변경 없음, Secret/Token 미기록.
+
+## 2026-10-26 — Notion 두 API 코드 블록 형식 보완
+
+<!-- codex-turn:01a17749-ed84-7cc1-8311-5537c6010fb5 -->
+
+- 사용자 지적에 따라 이어하기·프로모션의 요청 및 응답 예시를 실제 코드 블록으로 교정했다. 응답은 JSON 언어와 들여쓰기 적용, 코드 밖 중복 예시 제거. 기존 설명·정책·API 의미 보존.
+- 브라우저 편집 중 중복 삽입은 최종 정리했으며 UI 본문과 코드 블록을 재확인하고 두 화면 증거 저장. 신규 Jira 없음. 제품 코드·DB·서버·배포·Git 전달 변경 없음. Secret/Token 미기록.
+
+## 2026-10-26 — 테스트 두 API 활성 상태 재확인
+
+<!-- codex-turn:01a1774d-c329-72d0-9079-ef52a19cdfbc -->
+
+- 사용자 테스트 ON 확인 요청에 공개 test /v3/api-docs를 읽어 resume 및 promotions/applications 두 경로 노출을 확인했다. 최초 sandbox DNS 실패 후 승인된 네트워크 읽기로 확인 성공. 기존 배포 기록과 함께 활성 상태 안내, 실제 인증 앱 이동·파일 제출 E2E는 미실행으로 구분했다.
+- 신규 Jira 없음. 코드·DB·설정·배포 변경 없음. Secret/Token 미기록.
+
+## 2026-10-27 — 은행명·결과 기반 이어하기 변경 요청 확인
+
+<!-- codex-turn:01a17afe-5996-7120-9293-141573f4250d -->
+
+- 사용자 은행명 문자열 수신, NO_HISTORY/END_OF_PART 첫 문항 반환, 제출 접수 대신 결과 생성 기준 요청을 확인했다. 현재 PromotionService bankCode 숫자3자리 검증과 LearningRecentResume queuedAt 조회를 정적으로 확인했다.
+- 첫 문항 대상이 전체 Part1인지 기존 해당 파트인지 사용자 확인 대기. 기존 미커밋 기록 보존, 제품 코드·DB·배포 변경 없음. 신규 Jira 없음. Secret/Token 미기록.
+
+## 2026-10-27 — 은행명 및 결과 기반 이어하기 구현
+
+<!-- codex-turn:01a17aff-ae47-7740-ab15-6f461e6adb54 -->
+
+- 사용자 해당 파트 첫 세트 회신 반영: END_OF_PART는 해당 파트 첫 문항, NO_HISTORY는 첫 공개 파트 첫 문항으로 위치 반환. 후자는 이전 파트가 없어 Part1 시작 기준으로 안내했다. 기존 상태 값과 part 지정 호환은 유지한다.
+- bankCode 대신 bankName 문자열 수신·저장, trim/공백·제어문자·100자 제한. 기존 신청 데이터는 변환하지 않는다. 프론트 multipart 필드 변경 필요. 결과 completed+result 및 updatedAt 순서 사용, 완료 복구/backoff·계정 merge가 완료 결과 시각을 변경하지 않도록 보완했다. 과거 updatedAt은 기존 복구/merge 시각일 수 있어 소급 복원하지 않는다.
+- 관련 Swagger/계약·단위/MockMvc/Mongo 회귀 보완. 전체 gradlew test 및 격리 LearningMongoIntegrationTest·promotion Mongo 통과, diff 검사 통과. Docker API 설정은 테스트 프로세스 한정. 기존 미커밋 기록 유지. 신규 Jira 없음. 커밋·푸시·배포·기능설정·실DB·Notion 변경 없음. Secret/Token 미기록.
+
+## 2026-10-27 — Notion 은행명·결과 기반 이어하기 동기화
+
+<!-- codex-turn:01a17b04-aafb-79f0-a97f-b9e3cd9e28e0 -->
+
+- 사용자 요청으로 Notion 403dcc5dbaeb804787bfdb6b40b11cb7의 bankName 및 결과 생성 기준, NO_HISTORY/END_OF_PART 첫 세트 위치·CTA 규칙과 미배포 안내를 수정했다. 기존 요청/응답 코드 블록·part 호환·다른 프로모션 규칙 유지. 편집 중 중복 문단을 정리하고 새로고침 후 저장 내용을 확인했다.
+- 신규 Jira 없음. 이번 제품 코드·DB·설정·커밋·푸시·배포 변경 없음. 기존 미커밋 구현 유지. Secret/Token 미기록.

@@ -26,30 +26,31 @@ class LearningRecentResumeTest {
         when(mongo.find(any(Query.class),eq(Document.class),eq("learning_lessons"))).thenReturn(lessons);
     }
     void submitted(String lesson,String status) {
-        Submission s=submission(); s.lessonId=lesson; s.status=status; s.queuedAt=NOW; s.updatedAt=NOW.plusSeconds(100);
+        Submission s=submission(); s.lessonId=lesson; s.status=status; s.queuedAt=NOW.minusSeconds(100); s.updatedAt=NOW;
+        s.result=new Document("fixture",true);
         when(mongo.findOne(any(Query.class),eq(Submission.class))).thenReturn(s);
     }
-    @Test void noHistoryDoesNotChooseAnArbitraryPart() {
-        assertThat(catalog.resumeRecent(OWNER,"IH")).containsEntry("status","NO_HISTORY").containsEntry("part",null).containsEntry("lessonId",null);
+    @Test void noHistoryReturnsFirstPublishedPartFirstLesson() {
+        assertThat(catalog.resumeRecent(OWNER,"IH")).containsEntry("status","NO_HISTORY").containsEntry("part",1).containsEntry("lessonId","c1");
         verifyNoInteractions(storage,access);
     }
     @Test void nextLessonInSameSetAndNextSetFirstLesson() {
-        submitted("q1","queued");
+        submitted("q1","completed");
         assertThat(catalog.resumeRecent(OWNER,"IH")).containsEntry("status","READY").containsEntry("part",3)
                 .containsEntry("unitId","a").containsEntry("unitNumber",1).containsEntry("lessonId","q2")
                 .containsEntry("lessonNumber",2).containsEntry("questionNumber",6);
-        submitted("q2","failed");
+        submitted("q2","completed");
         assertThat(catalog.resumeRecent(OWNER,"IH")).containsEntry("unitId","b").containsEntry("unitNumber",2)
                 .containsEntry("lessonId","q3").containsEntry("lessonNumber",1);
         verifyNoInteractions(storage,access);
     }
-    @Test void latestPartWinsAndEndDoesNotSwitchPartOrWrap() {
-        submitted("z1","grading");
+    @Test void latestPartWinsAndEndWrapsWithinThatPart() {
+        submitted("z1","completed");
         assertThat(catalog.resumeRecent(OWNER,"IH")).containsEntry("part",5).containsEntry("lessonId","z2");
         submitted("q3","completed");
-        assertThat(catalog.resumeRecent(OWNER,"IH")).containsEntry("status","END_OF_PART").containsEntry("lessonId",null);
-        submitted("z2","no_speech");
-        assertThat(catalog.resumeRecent(OWNER,"IH")).containsEntry("status","END_OF_PART");
+        assertThat(catalog.resumeRecent(OWNER,"IH")).containsEntry("status","END_OF_PART").containsEntry("part",3).containsEntry("lessonId","q1").containsEntry("unitNumber",1);
+        submitted("z2","completed");
+        assertThat(catalog.resumeRecent(OWNER,"IH")).containsEntry("status","END_OF_PART").containsEntry("part",5).containsEntry("lessonId","z1");
     }
     @Test void recentCommonPartOneCompletionCompetesWithRequestedLevelOnly() {
         submitted("z1","completed");
@@ -64,15 +65,16 @@ class LearningRecentResumeTest {
                 new Document("lessonId","c1").append("completedAt",Date.from(NOW))));
         assertThat(catalog.resumeRecent(OWNER,"IH")).containsEntry("status","END_OF_PART");
     }
-    @Test void queryUsesOwnerLevelVersionCurrentLessonsAndFirstQueueTimeNotWorkerTime() {
+    @Test void queryUsesOwnerLevelVersionCurrentLessonsAndSuccessfulResultTime() {
         catalog.resumeRecent(OWNER,"IH");
         var query=org.mockito.ArgumentCaptor.forClass(Query.class);
         verify(mongo).findOne(query.capture(),eq(Submission.class));
         assertThat(query.getValue().getQueryObject()).containsEntry("userId",OWNER).containsEntry("level","IH")
-                .containsEntry("contentVersion","test-v1").containsEntry("queuedAt",new Document("$ne",null));
+                .containsEntry("contentVersion","test-v1").containsEntry("status","completed")
+                .containsEntry("result",new Document("$ne",null)).containsEntry("updatedAt",new Document("$ne",null));
         assertThat(query.getValue().getQueryObject().get("lessonId",Document.class).getList("$in",String.class))
                 .containsExactly("q1","q2","q3","z1","z2");
-        assertThat(query.getValue().getSortObject()).isEqualTo(new Document("queuedAt",-1).append("_id",-1));
+        assertThat(query.getValue().getSortObject()).isEqualTo(new Document("updatedAt",-1).append("_id",-1));
         verify(mongo).find(query.capture(),eq(Document.class),eq("learning_completions"));
         assertThat(query.getValue().getQueryObject()).containsEntry("userId",OWNER).containsEntry("level","common");
     }
