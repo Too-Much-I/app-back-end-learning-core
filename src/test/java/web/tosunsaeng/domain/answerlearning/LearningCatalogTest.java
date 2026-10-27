@@ -16,6 +16,7 @@ class LearningCatalogTest {
     void partsProjectOnlySelectedAnswerAndKeepSetOrdering(int part) {
         var mongo=mock(MongoTemplate.class); var storage=mock(LearningStorage.class);
         var catalog=new LearningCatalog(mongo,config(),storage);
+        when(mongo.findOne(any(Query.class),eq(Document.class),eq("learning_datasets"))).thenReturn(new Document("status","ready"));
         List<String> ids=part==3 || part==4 ? List.of("q1","q2","q3") : List.of("q1");
         Document unit=new Document("_id","unit").append("part",part).append("title","연습 제목").append("publicationStatus","ready")
                 .append("lessonIds",ids).append("thumbnailMediaId",part==2 ? "photo" : null);
@@ -55,6 +56,10 @@ class LearningCatalogTest {
         assertThat(summary).containsOnlyKeys("id","part","title","thumbnail","lessons");
         assertThat(summary.getList("lessons",Document.class).getFirst().getBoolean("completed")).isTrue();
         Document sourceSentence = answers.getFirst().getList("sentences", Document.class).getFirst();
+        sourceSentence.put("chunks",List.of(new Document("from",0).append("to",1)));
+        Document withChunks=catalog.detail(OWNER,"unit","AL").getList("lessons",Document.class).getFirst()
+                .get("answer",Document.class).getList("sentences",Document.class).getFirst();
+        assertThat(withChunks.get("chunks")).isEqualTo(sourceSentence.get("chunks"));
         assertThat(answer.getList("sentences", Document.class).getFirst().get("words"))
                 .isEqualTo(sourceSentence.get("words"));
         sourceSentence.put("text", "Example  sentence.");

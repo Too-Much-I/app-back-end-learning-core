@@ -85,6 +85,16 @@ class LearningQuotaTransactionTest {
         assertThat(service.create(OWNER, request).id()).isEqualTo(request.submissionId());
         assertThat(count()).isEqualTo(1);
     }
+    @Test void defaultQuotaAllows300NewSubmissionsAndRejects301() {
+        int limit=new LearningProperties().getDailySubmissions();
+        assertThat(limit).isEqualTo(300);
+        for(int i=0;i<300;i++) store.create(fixture(),limit);
+        assertThat(count()).isEqualTo(300);
+        var denied=fixture();
+        assertThatThrownBy(() -> store.create(denied,limit)).hasMessage("LEARNING_RATE_LIMITED");
+        assertThat(store.find(denied.id)).isNull();
+        assertThat(count()).isEqualTo(300);
+    }
     @Test void quotaRejectionRollsBackNewSubmission() {
         store.create(fixture(), 1); var denied = fixture();
         assertThatThrownBy(() -> store.create(denied, 1)).hasMessage("LEARNING_RATE_LIMITED");
@@ -101,25 +111,25 @@ class LearningQuotaTransactionTest {
         assertThat(count()).isEqualTo(2);
         assertThat(mongo.count(new Query(), Submission.class)).isEqualTo(2);
     }
-    @Test void concurrentRetryChargesOnlyTheWinningAttemptTransition() throws Exception {
+    @Test void concurrentRetryTransitionsOnceWithoutDailyCharge() throws Exception {
         var s = fixture(); s.status = "failed"; s.error = new LearningModels.Error("MODEL_FAILED", "fixture", true);
         store.create(s, 2);
         var replies = race(() -> store.retry(s, NOW, 2));
         assertThat(replies.stream().filter(Objects::nonNull).count()).isEqualTo(1);
         assertThat(store.find(s.id).attempt).isEqualTo(2);
         assertThat(store.find(s.id).status).isEqualTo("queued");
-        assertThat(count()).isEqualTo(2);
+        assertThat(count()).isEqualTo(1);
         assertThat(store.retry(s, NOW, 2)).isNull();
-        assertThat(count()).isEqualTo(2);
+        assertThat(count()).isEqualTo(1);
     }
-    @Test void quotaRejectionRollsBackAttemptAndKeepsRetryableFailure() {
+    @Test void exhaustedDailyQuotaStillAllowsExistingRetryableFailure() {
         var s = fixture(); s.status = "failed"; s.error = new LearningModels.Error("MODEL_FAILED", "fixture", true);
         store.create(s, 1);
-        assertThatThrownBy(() -> store.retry(s, NOW, 1)).hasMessage("LEARNING_RATE_LIMITED");
+        assertThat(store.retry(s, NOW, 1)).isNotNull();
         var kept = store.find(s.id);
-        assertThat(kept.attempt).isEqualTo(1);
-        assertThat(kept.status).isEqualTo("failed");
-        assertThat(kept.error.retryable()).isTrue();
+        assertThat(kept.attempt).isEqualTo(2);
+        assertThat(kept.status).isEqualTo("queued");
+        assertThat(kept.error).isNull();
         assertThat(count()).isEqualTo(1);
     }
 }

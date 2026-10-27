@@ -17781,3 +17781,9 @@
 - TMI-25/TMI-125/TMI-128 관련. SummaryDispatchScheduler의 claim/failClaim에서 executeGrading 사용으로 비동기 worker 자체에서 read-check scope를 확립한다. 이전 caller ThreadLocal 비전파 누락을 수정하며 공개/AI/S3/Redis·Job CAS·권한/삭제/환불 조회는 유지한다.
 - 실제 MongoDB 비동기 worker 회귀2개 추가: 정상 claim/dispatch 및 dispatch 실패 저장 모두 보호 owner/lane 문서 불변, Job dispatchAttempt1과 PROCESSING/FAILED 전이 확인. 집중 테스트 성공, 전체 회귀 진행 중. 새 flag/실DB/IAM/타서비스 변경 없음.
 - 사용자 앱에서 기존 건 재요청이 어려움. 기존 인증된 경로 외 복구를 임의 수행하지 않으며 배포와 기존 PENDING 복구 상태를 구분한다. 사용자 dirty 보존, Secret/Token 미기록.
+
+## 2026-10-27 — 학습·프로모션 운영 전달 준비
+
+- 신규 Jira 없음. 사용자 운영 배포/ON 및 Git 예외 승인, 프로모션 종료11월30일(KST)로 확정. main45c7f4f 기준으로 develop b61fd79의 학습/프로모션/공유 eligibility 연결과 문서·테스트만 선별했다. 기존 모의고사 guard/요약 코드는 동일하여 변경하지 않는다. develop 직접 PR77은 이력 충돌로 대체 예정이다.
+- AWS 읽기 확인: LC prod23 실행1/1·배포완료, 학습/프로모션 설정 없음. 프로모션 버킷은 test만 존재. LC prod task 역할은 ProductionRuntimeS3/ProductionDeletionS3만 존재, managed policy 없음. 학습 Lambda는 staging intake/worker만 확인돼 운영 준비 및 최소 IAM 승인 필요. Secret 값·사용자 자료 조회 없음.
+- 운영 배포/기능ON/DB 변경은 미실행. 별도 PR의 CI 및 운영 리소스 준비 후 전달한다. 전체 테스트와 diff 범위를 검증하고 기존 사용자 변경을 보존한다.

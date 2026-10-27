@@ -14,8 +14,14 @@ public class LearningCatalog {
     private final MongoTemplate mongo;
     private final LearningProperties config;
     private final LearningStorage storage;
+    private final LearningPaidAccess access;
     public LearningCatalog(MongoTemplate mongo, LearningProperties config, LearningStorage storage) {
-        this.mongo = mongo; this.config = config; this.storage = storage;
+        this(mongo,config,storage,null);
+    }
+    public LearningCatalog(MongoTemplate mongo, LearningProperties config, LearningStorage storage, LearningPaidAccess access) {
+        this.mongo = mongo; this.config = config; this.storage = storage; this.access=access;
+        if (config.isPaidAccessEnabled() && access==null)
+            throw new IllegalStateException("Learning paid access client is required");
     }
     private Criteria current() { return Criteria.where("datasetId").is(config.getDatasetId()).and("contentVersion").is(config.getContentVersion()); }
     private Document require(String collection, String id) {
@@ -55,6 +61,37 @@ public class LearningCatalog {
         return new Document("part", part).append("level", level).append("units", units.stream()
                 .map(u -> summary(u, lessons, done, media)).toList());
     }
+    public Document resumeRecent(String owner, String level) {
+        return new LearningRecentResume(mongo, config).resume(owner, level);
+    }
+    /** Legacy part-scoped resume: preserve its response for existing clients. */
+    public Document resume(String owner, int part, String requestedLevel) {
+        String level = level(part, requestedLevel);
+        List<Document> units = mongo.find(Query.query(current().and("part").is(part).and("publicationStatus").is("ready"))
+                .with(Sort.by("sortOrder", "_id")).limit(101), Document.class, "learning_units");
+        if (units.isEmpty()) throw LearningFailure.missing();
+        if (units.size() > 100) throw LearningFailure.unavailable();
+        List<String> ids = new ArrayList<>();
+        for (Document unit : units) {
+            List<String> lessons = unit.getList("lessonIds", String.class);
+            if (unit.getString("_id") == null || lessons == null || lessons.isEmpty()
+                    || lessons.stream().anyMatch(Objects::isNull)) throw LearningFailure.unavailable();
+            ids.addAll(lessons);
+        }
+        if (new HashSet<>(ids).size() != ids.size()) throw LearningFailure.unavailable();
+        Map<String, Document> lessons = lessonMap(ids);
+        Set<String> done = completed(owner, level, ids);
+        String next = null;
+        for (Document unit : units) {
+            for (String id : unit.getList("lessonIds", String.class)) {
+                Document lesson = lessons.get(id);
+                if (lesson == null || !unit.getString("_id").equals(lesson.getString("unitId")))
+                    throw LearningFailure.unavailable();
+                if (next == null && !done.contains(id)) next = unit.getString("_id");
+            }
+        }
+        return new Document("unitId", next).append("allCompleted", next == null);
+    }
     private Map<String, Document> lessonMap(List<String> ids) {
         return mongo.find(Query.query(current().and("_id").in(ids)), Document.class, "learning_lessons").stream()
                 .collect(Collectors.toMap(d -> d.getString("_id"), Function.identity()));
@@ -76,6 +113,7 @@ public class LearningCatalog {
     public Document detail(String owner, String id, String requestedLevel) {
         Document u = unit(id);
         String level = level(u.getInteger("part"), requestedLevel);
+        Runnable authorize=authorize(owner,u);
         List<String> ids = u.getList("lessonIds", String.class);
         Map<String, Document> lessons = lessonMap(ids);
         Map<String, Document> answers = mongo.find(Query.query(current().and("lessonId").in(ids).and("level").is(level)),
@@ -100,13 +138,15 @@ public class LearningCatalog {
             answer.put("id", a.getString("sourceAnswerId"));
             if (a.getString("fullAudioMediaId") != null) answer.put("fullAudio", resolve(a.getString("fullAudioMediaId"), media));
             answer.put("sentences", a.getList("sentences", Document.class).stream().map(s -> {
-                Document sentence = pick(s, "text", "translation", "label", "words");
+                Document sentence = pick(s, "text", "translation", "label", "words", "chunks");
                 sentence.put("audio", resolve(s.getString("audioMediaId"), media)); return sentence;
             }).toList());
             if (answer.get("durationSeconds") == null) answer.remove("durationSeconds");
             wire.put("answer", answer); result.add(wire);
         }
-        return new Document("unit", summary(u, lessons, completed(owner, level, ids), media)).append("lessons", result);
+        Document response=new Document("unit", summary(u, lessons, completed(owner, level, ids), media)).append("lessons", result);
+        authorize.run();
+        return response;
     }
     /** Validate without normalizing or re-tokenizing: clients reference the original word positions. */
     static void validateWords(Document answer) {
@@ -125,26 +165,95 @@ public class LearningCatalog {
                 texts.add(token);
             }
             if (!String.join(" ", texts).equals(text)) throw LearningFailure.unavailable();
+            validateChunks(sentence, words.size());
         }
     }
+    static void validateChunks(Document sentence,int wordCount) {
+        Object value=sentence.get("chunks");
+        if (value==null) return;
+        if (!(value instanceof List<?> chunks) || chunks.isEmpty()) throw LearningFailure.unavailable();
+        int next=0;
+        for (Object item:chunks) {
+            if (!(item instanceof Document chunk) || !(chunk.get("from") instanceof Integer from)
+                    || !(chunk.get("to") instanceof Integer to) || from!=next || to<from || to>=wordCount)
+                throw LearningFailure.unavailable();
+            next=to+1;
+        }
+        if (next!=wordCount) throw LearningFailure.unavailable();
+    }
     private Map<String, Document> mediaMap(Collection<String> ids) {
-        return mongo.find(Query.query(current().and("_id").in(ids).and("accessScope").is("authenticated-learning")), Document.class, "learning_media")
-                .stream().collect(Collectors.toMap(d -> d.getString("_id"), Function.identity()));
+        LearningMediaSource source=mediaSource();
+        return mongo.find(Query.query(Criteria.where("datasetId").is(source.datasetId()).and("contentVersion").is(source.contentVersion())
+                        .and("_id").in(ids).and("accessScope").is("authenticated-learning")), Document.class, "learning_media")
+                .stream().map(row -> new Document(row).append("_resolvedMediaSource",source))
+                .collect(Collectors.toMap(d -> d.getString("_id"), Function.identity()));
     }
     private Document resolve(String id, Map<String, Document> media) {
         if (id == null) return null;
         Document row = media.get(id);
         if (row == null) throw LearningFailure.unavailable();
-        return storage.media(row);
+        LearningMediaSource source=row.get("_resolvedMediaSource",LearningMediaSource.class);
+        return source.equals(LearningMediaSource.current(config)) ? storage.media(row) : storage.media(row,source);
     }
     public Document media(String id) {
+        if (config.isPaidAccessEnabled()) throw LearningFailure.missing();
+        return media(null,id);
+    }
+    public Document media(String owner, String id) {
+        Runnable authorize=authorizeMedia(owner,id);
         Map<String, Document> rows = mediaMap(List.of(id));
         if (!rows.containsKey(id)) throw LearningFailure.missing();
-        return resolve(id, rows);
+        Document response=resolve(id, rows);
+        authorize.run();
+        return response;
     }
     public void validateDataset() {
-        if (!mongo.exists(Query.query(current().and("status").is("ready")), "learning_datasets"))
-            throw new IllegalStateException("The configured learning dataset is not ready");
+        mediaSource();
+        if (config.isPaidAccessEnabled()) {
+            config.validate();
+            config.getFreeUnits().forEach((part,id) -> {
+                if (!part.equals(unit(id).getInteger("part")))
+                    throw new IllegalStateException("Free learning unit part mismatch");
+            });
+        }
+    }
+    private LearningMediaSource mediaSource() {
+        Document manifest=mongo.findOne(Query.query(current().and("status").is("ready")),Document.class,"learning_datasets");
+        if (manifest==null) throw LearningFailure.unavailable();
+        if (!manifest.containsKey("mediaSource")) {
+            if ("reuse-published-media".equals(manifest.getString("mediaPolicy"))) throw LearningFailure.unavailable();
+            return LearningMediaSource.current(config);
+        }
+        if (!"reuse-published-media".equals(manifest.getString("mediaPolicy"))
+                || !(manifest.get("mediaSource") instanceof Document source)) throw LearningFailure.unavailable();
+        LearningMediaSource resolved=LearningMediaSource.parse(source,config);
+        if (!mongo.exists(Query.query(Criteria.where("datasetId").is(resolved.datasetId())
+                .and("contentVersion").is(resolved.contentVersion()).and("status").is("ready")),"learning_datasets"))
+            throw LearningFailure.unavailable();
+        return resolved;
+    }
+    private Runnable authorize(String owner, Document unit) {
+        if (!config.isPaidAccessEnabled()) return () -> {};
+        if (unit.getString("_id").equals(config.getFreeUnits().get(unit.getInteger("part")))) return () -> {};
+        return access.prepare(owner);
+    }
+    private Runnable authorizeMedia(String owner,String id) {
+        if (!config.isPaidAccessEnabled()) return () -> {};
+        // Listing thumbnails remain public to authenticated learners.
+        if (mongo.exists(Query.query(current().and("publicationStatus").is("ready").and("thumbnailMediaId").is(id)),
+                "learning_units")) return () -> {};
+        List<Document> lessons=mongo.find(Query.query(current().and("photoMediaId").is(id)),Document.class,"learning_lessons");
+        Set<String> units=lessons.stream().map(l -> l.getString("unitId")).collect(Collectors.toSet());
+        List<Document> answers=mongo.find(Query.query(new Criteria().andOperator(current(),
+                new Criteria().orOperator(Criteria.where("fullAudioMediaId").is(id),Criteria.where("sentences.audioMediaId").is(id)))),
+                Document.class,"learning_answers");
+        for (Document answer:answers) units.add(lesson(answer.getString("lessonId")).getString("unitId"));
+        if (units.isEmpty()) throw LearningFailure.missing();
+        List<Document> owners=units.stream().map(this::unit).toList();
+        // A shared file is free only when a current ready free unit actually references it.
+        if (owners.stream().anyMatch(u -> u.getString("_id").equals(config.getFreeUnits().get(u.getInteger("part")))))
+            return () -> {};
+        return access.prepare(owner);
     }
     public Document checklist(Document lesson) {
         List<Document> rows = mongo.find(Query.query(current().and("lessonId").is(lesson.getString("_id")).and("status").is("prepared"))

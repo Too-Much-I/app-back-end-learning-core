@@ -14,6 +14,21 @@ import static web.tosunsaeng.domain.answerlearning.LearningFixtures.*;
 import static web.tosunsaeng.domain.answerlearning.LearningModels.*;
 
 class LearningStoreTest {
+    @Test void completionBackoffPreservesResultTime() {
+        var s=submission(); s.status="completed";
+        store.finish(s,new Update().inc("transportFailures",1),NOW.plusSeconds(200),60);
+        var update=org.mockito.ArgumentCaptor.forClass(Update.class);
+        verify(mongo).updateFirst(any(Query.class),update.capture(),eq(Submission.class));
+        assertThat(update.getValue().getUpdateObject().get("$set",Document.class)).doesNotContainKey("updatedAt");
+    }
+    @Test void completionRecoveryPreservesResultTime() {
+        when(mongo.updateFirst(any(Query.class),any(Update.class),eq(Submission.class)))
+                .thenReturn(com.mongodb.client.result.UpdateResult.acknowledged(1,1L,null));
+        store.completeClaim(submission(),NOW.plusSeconds(100));
+        var update=org.mockito.ArgumentCaptor.forClass(Update.class);
+        verify(mongo).updateFirst(any(Query.class),update.capture(),eq(Submission.class));
+        assertThat(update.getValue().getUpdateObject().get("$set",Document.class)).doesNotContainKey("updatedAt");
+    }
     MongoTemplate mongo=mock(MongoTemplate.class);
     LearningStore store=new LearningStore(mongo,null);
     @Test void foreignOwnerCannotReadGloballyUniqueId() {
@@ -39,6 +54,13 @@ class LearningStoreTest {
                 .thenThrow(new DuplicateKeyException("duplicate synthetic key"));
         assertThatThrownBy(()->store.create(submission(),2)).hasMessage("LEARNING_RATE_LIMITED");
     }
+    @Test void successfulRetryDoesNotConsumeDailyQuota() {
+        when(mongo.findAndModify(any(Query.class),any(Update.class),any(FindAndModifyOptions.class),eq(Submission.class)))
+                .thenReturn(submission());
+        assertThat(store.retry(submission(),NOW,300)).isNotNull();
+        verify(mongo,never()).findAndModify(any(Query.class),any(Update.class),any(FindAndModifyOptions.class),
+                eq(Document.class),eq("learning_submission_limits"));
+    }
     @Test void completionNeverStoresIntermediateProgressAndRepeatsUseBusinessKey() {
         when(mongo.findAndModify(any(Query.class),any(Update.class),any(FindAndModifyOptions.class),eq(Submission.class))).thenReturn(submission());
         store.complete(OWNER,"lesson","IH","test-v1",ID,NOW);
@@ -52,5 +74,17 @@ class LearningStoreTest {
         var guard=mock(UserOwnedTransactionExecutor.class);
         when(guard.execute(eq(OWNER),any())).thenAnswer(i->((Supplier<?>)i.getArgument(1)).get());
         new LearningStore(mongo,guard).create(submission(),60); verify(guard).execute(eq(OWNER),any());
+    }
+    @Test void onlyPartOneExplicitCompletionRefreshesPracticeTime() {
+        store.complete(OWNER,"p1","common","test-v1",null,NOW);
+        var update=org.mockito.ArgumentCaptor.forClass(Update.class);
+        verify(mongo).updateFirst(any(Query.class),update.capture(),eq("learning_completions"));
+        assertThat(update.getValue().getUpdateObject()).isEqualTo(new Document("$max",new Document("lastPracticedAt",java.util.Date.from(NOW))));
+    }
+    @Test void retryDoesNotRewriteOriginalQueueTime() {
+        store.retry(submission(),NOW,300);
+        var update=org.mockito.ArgumentCaptor.forClass(Update.class);
+        verify(mongo).findAndModify(any(Query.class),update.capture(),any(FindAndModifyOptions.class),eq(Submission.class));
+        assertThat(update.getValue().getUpdateObject().get("$set",Document.class)).doesNotContainKeys("queuedAt","lastPracticedAt");
     }
 }
