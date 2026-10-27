@@ -17901,3 +17901,10 @@
 
 - 사용자 Notion 수정 후 커밋·푸시·테스트 배포 승인. Notion 403dcc5dbaeb804787bfdb6b40b11cb7 프로모션 부분을 gifticon/email/report 및 HEIC·은행정보 제거 규격으로 수정했다. connector404로 로그인된 Chrome 문서 편집 사용. 이어하기·기존 응답/인증/중복 정책 보존. 신규 Jira 없음.
 - 기존 로컬 단위1553 실패0/skip1, 격리Mongo1 통과. develop65c814b 기준 scoped commit/PR·CI 후 develop 병합·test workflow로 전달한다. main/운영·설정/실DB/IAM/타서비스 변경 없음. 실제 인증 iOS 신청 E2E 미실행. 전달 결과는 후속 기록한다.
+
+## 2026-10-27 — 프로모션 multipart Swagger 보완·테스트 전달
+
+<!-- codex-turn:01a17c08-1d56-7a73-be32-de990945f272 -->
+
+- 사용자 Swagger 수정·재배포 승인. develop037fe345 기반 codex/promotion-multipart-swagger 별도 작업트리에서 문서용 Form schema와 명시 multipart requestBody·자동 query 문서 숨김 적용. 런타임 RequestParam/RequestPart·검증/응답/인증 불변. 관련 Jira 미확인/신규 없음.
+- 실제 Springdoc /v3/api-docs MockMvc 회귀로 query 없음, multipart body required, 필수3필드·email/binary format 검증. clean test 성공(기존1553+신규1), diff 검사 통과. 코드/테스트/계약/승인·작업기록만 변경, 예상 밖 제품 변경 없음. CI 후 develop 병합/test 재배포하며 main/설정/실DB 변경 없음. 실제 앱 업로드 E2E 미실행, 배포 결과 후속 기록.

@@ -28,6 +28,10 @@ part=1~5, Part 1 권장 level=common(기존 정규화 유지), Part 2~5=IM3/IH/A
 
 `POST /api/v1/promotions/applications`, multipart/form-data:
 
+Swagger도 세 필드를 `requestBody.content.multipart/form-data`로 표시한다. 문자열 query parameter는 문서에서 제거했다.
+앱/Swagger 모두 FormData 본문으로 전송하며 JSON 본문이나 URL 쿼리에 이메일을 넣지 않는다.
+이는 문서 명시 보완이며 기존 Spring multipart 바인딩/인증/검증·응답 동작은 변경하지 않는다.
+
 | 필드 | 형식 |
 | --- | --- |
 | gifticon | 필수 희망 기프티콘 상품명 문자열, 공백만 불가·제어문자 제외·최대 100자, 앞뒤 공백 제거 |
