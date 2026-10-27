@@ -17787,3 +17787,29 @@
 - 신규 Jira 없음. 사용자 운영 배포/ON 및 Git 예외 승인, 프로모션 종료11월30일(KST)로 확정. main45c7f4f 기준으로 develop b61fd79의 학습/프로모션/공유 eligibility 연결과 문서·테스트만 선별했다. 기존 모의고사 guard/요약 코드는 동일하여 변경하지 않는다. develop 직접 PR77은 이력 충돌로 대체 예정이다.
 - AWS 읽기 확인: LC prod23 실행1/1·배포완료, 학습/프로모션 설정 없음. 프로모션 버킷은 test만 존재. LC prod task 역할은 ProductionRuntimeS3/ProductionDeletionS3만 존재, managed policy 없음. 학습 Lambda는 staging intake/worker만 확인돼 운영 준비 및 최소 IAM 승인 필요. Secret 값·사용자 자료 조회 없음.
 - 운영 배포/기능ON/DB 변경은 미실행. 별도 PR의 CI 및 운영 리소스 준비 후 전달한다. 전체 테스트와 diff 범위를 검증하고 기존 사용자 변경을 보존한다.
+
+
+## 2026-10-27 — 학습 목록 projection 변경안, 사용자 요청으로 구현 중지
+
+<!-- codex-turn:01a17d96-9db9-7982-b264-56507c1d2cc5 -->
+
+- 목표: 목록/이어서 하기에서 대용량 학습 문서 전체 조회를 필요한 필드 조회로 줄이기. 사용자가 설명 우선 요청하여 추가 구현·검증을 중지했다.
+- 브랜치/작업폴더: codex/learning-list-projection, /private/tmp/lc-learning-list-projection-20261027, 운영 main6d7fe86 기준. 원본 LC 사용자 변경 보존.
+- 로컬 선행 변경: LearningCatalog.java, LearningRecentResume.java, LearningCatalogTest.java, 신규 LearningReadProjectionTest.java. 목록과 상세 조회 분리, lesson/unit/completion 및 최신 submission 조회 projection 초안과120/360문항 테스트 작성. 변경은 미커밋 상태로 보존, 폐기/전달하지 않음.
+- 제안: Mongo inclusion projection으로 목록은 문항ID/unitId/questionNumber, 최신 이어하기는 part 추가 및 순서·검증 필드 유지. 최신 제출은 lessonId/updatedAt만 읽되 완료/result 존재 필터와 정렬 유지. 상세 본문·표·정답 조회는 유지. 조회 개수 자체/외부 응답/순서·소유권·권한·버전 필터는 변경하지 않는다.
+- 테스트: 이미 시작한 ./gradlew clean test는 BUILD SUCCESSFUL. 실행 도중 테스트 helper 변경이 있었으므로 최종 작업트리의 재검증 완료로 간주하지 않는다. Docker 사용 가능 확인만 수행, Mongo 통합 테스트 미실행. git diff --check 수행.
+- 계약/결정: API·DB/index·운영 설정 불변, commit/push/배포 없음. 별도 기록 문서만 추가 갱신. 예상 밖 제품 변경 없음.
+- 위험: DB 전송량 감소는 예상되지만 실제 지연 개선과 로그인 제보 인과관계는 미측정. projection은 Mongo 내부 문서 읽기 자체를 모두 없애는 보장이 아니다.
+- 다음/배포 전: 사용자 변경안 확인 후 재개 여부 결정. 승인 전 추가 구현 없음; 재개 시 최종 전체·격리 Mongo 테스트 및 성능 비교, 별도 배포 승인 필요.
+
+## 2026-10-27 — projection 구현 재개 및 병렬 전달 승인
+
+<!-- codex-turn:01a17d9e-8750-76d3-9057-6aaa93ebca62 -->
+
+- 브랜치: codex/learning-list-projection(main6d7fe86 기준). 목표: 사용자 승인 projection 적용 및 이번 변경만 commit/push/test·prod 병렬 배포.
+- 변경 파일: LearningCatalog.java, LearningRecentResume.java, LearningCatalogTest.java, 신규 LearningReadProjectionTest.java, AGENTS.md, CURRENT_STATE.md, WORKLOG.md.
+- 구현: inclusion projection으로 목록·구 이어하기 문항 metadata 및 완료ID, 최신 이어하기 metadata/활동시각만 조회. 상세 문항 full read 유지.120/360개 대용량 fixture와 DB projection 모사로 순서/완료/다음 위치 회귀 검증.
+- 검증: 전체 단위1559/실패0/오류0/skip1. LearningMongoIntegrationTest 성공. 최초 통합 실행은 Docker 최소API1.40와 라이브러리1.32 불일치로 시작 실패, JAVA_TOOL_OPTIONS=-Dapi.version=1.44로 로컬 실행만 보완 후 성공. git diff --check 통과.
+- 유지 계약: API/응답/조회순서·범위/소유권·버전·공개상태 필터 및 상세 데이터 유지. 캐시·DB/index·서버 설정 불변.
+- 결정: 사용자 직접 Git/배포 병렬 승인으로 이번 범위 예외 기록. main/develop 대상 파일 기준 내용 동일 확인, 각 브랜치 후보로 분리해 무관한 이력 전달 방지.
+- 위험/다음: 아직 실운영 latency 개선 미측정, 로그인 장애 해결 주장 없음. 양쪽 PR CI 후 병합·기존 자동 배포 안정화/health 확인 필요. 예상 밖 제품 변경 없음, 원본 dirty 보존.
