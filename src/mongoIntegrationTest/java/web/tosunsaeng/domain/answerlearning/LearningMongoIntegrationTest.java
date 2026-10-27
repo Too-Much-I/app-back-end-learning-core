@@ -91,6 +91,66 @@ class LearningMongoIntegrationTest {
         assertThat(mongo.count(new Query(),"learning_completions")).isEqualTo(1);
         store.complete(OWNER,"lesson","AL","v1",null,NOW); assertThat(mongo.count(new Query(),"learning_completions")).isEqualTo(2);
     }
+    @Test void resumeUsesSuccessfulResultTimeAndWrapsWithinPart() {
+        for (String c:List.of("learning_units","learning_lessons")) mongo.dropCollection(c);
+        var config=new LearningProperties(); config.setDatasetId("fixture"); config.setContentVersion("fixture-v1");
+        for (int part:List.of(3,5)) {
+            String unit="u"+part;
+            mongo.insert(new Document("_id",unit).append("datasetId","fixture").append("contentVersion","fixture-v1")
+                    .append("publicationStatus","ready").append("part",part).append("sortOrder",1)
+                    .append("lessonIds",List.of("q"+part+"a","q"+part+"b")),"learning_units");
+            for (String suffix:List.of("a","b")) mongo.insert(new Document("_id","q"+part+suffix).append("unitId",unit)
+                    .append("datasetId","fixture").append("contentVersion","fixture-v1").append("part",part)
+                    .append("questionNumber",suffix.equals("a")?1:2),"learning_lessons");
+        }
+        var resume=new LearningRecentResume(mongo,config);
+        var first=fixture(); first.lessonId="q3a"; first.queuedAt=null; store.create(first,300);
+        assertThat(resume.resume(OWNER,"IH")).containsEntry("status","NO_HISTORY");
+        store.queue(first,first.audio,NOW);
+        assertThat(resume.resume(OWNER,"IH")).containsEntry("status","NO_HISTORY").containsEntry("lessonId","q3a");
+        var second=fixture(); second.lessonId="q5a"; second.queuedAt=null; store.create(second,300); store.queue(second,second.audio,NOW.plusSeconds(1));
+        mongo.updateFirst(Query.query(Criteria.where("_id").is(first.id)),new Update().set("status","failed")
+                .set("error",new Document("retryable",true)).set("updatedAt",NOW.plusSeconds(100)),Submission.class);
+        store.retry(store.find(first.id),NOW.plusSeconds(101),300);
+        assertThat(store.find(first.id).queuedAt).isEqualTo(NOW);
+        assertThat(store.queue(first,first.audio,NOW.plusSeconds(102))).isNull();
+        assertThat(resume.resume(OWNER,"IH")).containsEntry("status","NO_HISTORY");
+        mongo.updateFirst(Query.query(Criteria.where("_id").is(second.id)),new Update().set("status","completed")
+                .set("result",new Document("fixture",true)).set("updatedAt",NOW.plusSeconds(103)),Submission.class);
+        assertThat(resume.resume(OWNER,"IH")).containsEntry("part",5).containsEntry("lessonId","q5b");
+        var foreign=fixture(); foreign.userId="other"; foreign.lessonId="q3a"; foreign.queuedAt=NOW.plusSeconds(200); mongo.insert(foreign);
+        var level=fixture(); level.level="AL"; level.lessonId="q3a"; level.queuedAt=NOW.plusSeconds(200); mongo.insert(level);
+        var version=fixture(); version.contentVersion="old"; version.lessonId="q3a"; version.queuedAt=NOW.plusSeconds(200); mongo.insert(version);
+        assertThat(resume.resume(OWNER,"IH")).containsEntry("part",5);
+        assertThat(resume.resume(OWNER,"AL")).containsEntry("part",3);
+        // Earlier submission completing later becomes latest; pending/failed rows never win.
+        mongo.updateFirst(Query.query(Criteria.where("_id").is(first.id)),new Update().set("status","completed")
+                .set("result",new Document("fixture",true)).set("updatedAt",NOW.plusSeconds(300)),Submission.class);
+        assertThat(resume.resume(OWNER,"IH")).containsEntry("part",3).containsEntry("lessonId","q3b");
+        mongo.updateFirst(Query.query(Criteria.where("_id").is(first.id)),new Update().set("lessonId","q3b"),Submission.class);
+        assertThat(resume.resume(OWNER,"IH")).containsEntry("status","READY").containsEntry("lessonId","q5a");
+        LearningOwnership.merge(mongo,OWNER,"merged",NOW.plusSeconds(1000));
+        assertThat(store.find(first.id).updatedAt).isEqualTo(NOW.plusSeconds(300));
+        assertThat(resume.resume("merged","IH")).containsEntry("status","READY").containsEntry("lessonId","q5a");
+        mongo.updateFirst(Query.query(Criteria.where("_id").is(first.id)),new Update().set("lessonId","q5b"),Submission.class);
+        assertThat(resume.resume("merged","IH")).containsEntry("status","READY").containsEntry("lessonId","q3a");
+    }
+    @Test void partOneRepracticeAndMergeKeepLatestActivityButEarliestCompletion() {
+        store.complete(OWNER,"p1","common","fixture-v1",null,NOW);
+        store.complete(OWNER,"p1","common","fixture-v1",null,NOW.plusSeconds(10));
+        store.complete(OWNER,"p1","common","fixture-v1",null,NOW.plusSeconds(5));
+        Document source=mongo.findOne(LearningStore.completionKey(OWNER,"p1","common","fixture-v1"),Document.class,"learning_completions");
+        assertThat(source.getDate("completedAt").toInstant()).isEqualTo(NOW);
+        assertThat(source.getDate("lastPracticedAt").toInstant()).isEqualTo(NOW.plusSeconds(10));
+        // Target has an older-schema completion but a later actual activity.
+        mongo.insert(new Document("_id","target-completion").append("userId","target").append("lessonId","p1")
+                .append("level","common").append("contentVersion","fixture-v1").append("completedAt",Date.from(NOW.plusSeconds(20))),"learning_completions");
+        LearningOwnership.merge(mongo,OWNER,"target",NOW.plusSeconds(30));
+        Document merged=mongo.findOne(LearningStore.completionKey("target","p1","common","fixture-v1"),Document.class,"learning_completions");
+        assertThat(merged.getDate("completedAt").toInstant()).isEqualTo(NOW);
+        assertThat(merged.getDate("lastPracticedAt").toInstant()).isEqualTo(NOW.plusSeconds(20));
+        assertThat(mongo.count(Query.query(Criteria.where("userId").is(OWNER)),"learning_completions")).isZero();
+    }
     @Test void blockedPagesDoNotStarveOtherOwnersAndAreRevisitedAfterUnblocking() {
         var blocked = new AtomicBoolean(true);
         var guards = mock(UserOwnedTransactionExecutor.class);

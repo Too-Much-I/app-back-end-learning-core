@@ -84,7 +84,7 @@ public class LearningStore {
                 .set("error", null).set("dispatched", false).set("transportFailures", 0).set("nextRunAt", now)
                 .set("updatedAt", now).set("leaseUntil", Instant.EPOCH).unset("leaseToken"),
                 FindAndModifyOptions.options().returnNew(true), Submission.class);
-            if (next != null) quota(s.userId, dailyLimit, now);
+            // Recovery of an existing failed job is not a new daily submission.
             return next;
         });
     }
@@ -105,8 +105,10 @@ public class LearningStore {
                 FindAndModifyOptions.options().returnNew(true), Submission.class));
     }
     public void finish(Submission s, Update update, Instant now, long delay) {
+        // A retry of completion bookkeeping must not reorder already persisted results.
+        if (!"completed".equals(s.status)) update.set("updatedAt", now);
         write(s.userId, () -> mongo.updateFirst(Query.query(Criteria.where("_id").is(s.id).and("userId").is(s.userId).and("attempt").is(s.attempt)
-                .and("leaseToken").is(s.leaseToken).and("leaseUntil").gt(now)), update.set("updatedAt", now).set("leaseUntil", Instant.EPOCH)
+                .and("leaseToken").is(s.leaseToken).and("leaseUntil").gt(now)), update.set("leaseUntil", Instant.EPOCH)
                 .set("nextRunAt", now.plusSeconds(delay)).unset("leaseToken"), Submission.class));
     }
     /** A live submission and the completion row commit together under the same owner guard. */
@@ -120,6 +122,10 @@ public class LearningStore {
                 if (live == null) throw new LearningFailure(409, "COMPLETION_NOT_READY");
             }
             insertCompletion(owner, lesson, level, version, submissionId, now);
+            // Part 1 has no submission. Only an explicit completion request records another practice;
+            // grading workers and replayed spoken completions must never change the CTA ordering.
+            if (submissionId == null) mongo.updateFirst(completionKey(owner, lesson, level, version),
+                    new Update().max("lastPracticedAt", Date.from(now)), "learning_completions");
             return null;
         });
     }
@@ -128,8 +134,8 @@ public class LearningStore {
             var changed = mongo.updateFirst(Query.query(Criteria.where("_id").is(s.id).and("userId").is(s.userId)
                     .and("attempt").is(s.attempt).and("leaseToken").is(s.leaseToken).and("leaseUntil").gt(now)
                     .and("status").is("completed").and("completionPending").is(true).and("result").ne(null)),
-                    new Update().set("completionPending", false).unset("leaseToken").set("leaseUntil", Instant.EPOCH)
-                            .set("updatedAt", now), Submission.class);
+                    // Preserve the result persistence time used by the recent-resume projection.
+                    new Update().set("completionPending", false).unset("leaseToken").set("leaseUntil", Instant.EPOCH), Submission.class);
             if (changed.getMatchedCount() == 1) insertCompletion(s.userId, s.lessonId, s.level, s.contentVersion, s.id, now);
             return null;
         });

@@ -14,6 +14,33 @@ import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
 
 class HttpReanswerEligibilityClientTest {
+    @Test void partLearningUsesPaidOnlyReasonsAndDedicatedPathAndPurpose() {
+        var http=mock(HttpClient.class);
+        var issuer=mock(BillingWorkloadTokenIssuer.class);
+        var purpose=BillingWorkloadTokenIssuer.Purpose.PART_LEARNING_ELIGIBILITY;
+        when(issuer.authorization(purpose)).thenReturn("Bearer fixture");
+        var caller=new HttpReanswerEligibilityClient(URI.create("https://billing.invalid"),issuer,http,purpose);
+        assertTrue(caller.decode(200,headers(),decision("ALLOWED","ACTIVE_PAID_ENTITLEMENT",UNTIL)
+                .getBytes(StandardCharsets.UTF_8),USER).valid());
+        assertThrows(IllegalStateException.class,() -> caller.decode(200,headers(),
+                decision("ALLOWED","ENTITLEMENT_AVAILABLE",UNTIL).getBytes(StandardCharsets.UTF_8),USER));
+        assertEquals(ErrorStatus._ENTITLEMENT_INSUFFICIENT,assertThrows(ExamsException.class,
+                () -> caller.decode(200,headers(),decision("DENIED","PAID_ENTITLEMENT_REQUIRED",null)
+                        .getBytes(StandardCharsets.UTF_8),USER)).getCode());
+        var response=mock(HttpResponse.class);
+        when(response.statusCode()).thenReturn(200); when(response.headers()).thenReturn(headers());
+        when(response.body()).thenReturn(decision("ALLOWED","ACTIVE_PAID_ENTITLEMENT",UNTIL).getBytes(StandardCharsets.UTF_8));
+        when(http.<byte[]>sendAsync(any(HttpRequest.class),any()))
+                .thenReturn(java.util.concurrent.CompletableFuture.completedFuture(response));
+        caller.check(USER);
+        var request=org.mockito.ArgumentCaptor.forClass(HttpRequest.class);
+        verify(http,times(1)).sendAsync(request.capture(),any());
+        assertEquals("/internal/v1/entitlements/part-learning-eligibility",request.getValue().uri().getPath());
+        assertEquals("POST",request.getValue().method());
+        assertTrue(request.getValue().headers().firstValue("Idempotency-Key").isEmpty());
+        verify(issuer).authorization(purpose);
+        verify(issuer,never()).authorization(BillingWorkloadTokenIssuer.Purpose.REANSWER_ELIGIBILITY);
+    }
     static final String USER="11111111-1111-4111-8111-111111111111";
     static final String CHECKED="2026-10-21T08:00:00.123456789Z";
     static final String UNTIL="2026-10-21T08:00:05.123456789Z";

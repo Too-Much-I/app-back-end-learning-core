@@ -26,7 +26,28 @@ public class LearningConfiguration {
         if (writer == null || !writer.enabled()) throw new IllegalStateException("Answer learning requires the user-owned transaction fence");
         LearningStore store = new LearningStore(mongo, writer, deletion.getIfAvailable()); store.indexes(); return store;
     }
-    @Bean public LearningCatalog learningCatalog(MongoTemplate mongo, LearningProperties p, LearningStorage storage) { LearningCatalog catalog = new LearningCatalog(mongo,p,storage); catalog.validateDataset(); return catalog; }
+    @Bean
+    @ConditionalOnProperty(prefix="app.answer-learning",name="paid-access-enabled",havingValue="true")
+    public LearningPaidAccess learningPaidAccess(LearningProperties p,
+            web.tosunsaeng.domain.exams.billing.WorkloadJwtProperties jwt,
+            web.tosunsaeng.domain.exams.billing.BillingSagaProperties saga,
+            web.tosunsaeng.domain.exams.billing.BillingWorkloadTokenIssuer issuer,
+            Clock clock, ObjectProvider<io.sentry.IHub> hubs) {
+        if (!jwt.isSenderEnabled()) throw new IllegalStateException("Learning paid access requires workload sender");
+        java.net.URI origin=java.net.URI.create(saga.getBaseUrl());
+        if (!"https".equals(origin.getScheme()) || origin.getHost()==null || origin.getUserInfo()!=null
+                || origin.getQuery()!=null || origin.getFragment()!=null
+                || !(origin.getPath().isEmpty() || origin.getPath().equals("/")))
+            throw new IllegalStateException("Learning paid access requires a Billing HTTPS origin");
+        return new LearningPaidAccess(
+                web.tosunsaeng.domain.exams.reanswer.HttpReanswerEligibilityClient.partLearning(origin,issuer),
+                clock, failure -> hubs.ifAvailable(hub -> hub.captureException(failure)));
+    }
+    @Bean public LearningCatalog learningCatalog(MongoTemplate mongo, LearningProperties p, LearningStorage storage,
+            ObjectProvider<LearningPaidAccess> access) {
+        LearningCatalog catalog = new LearningCatalog(mongo,p,storage,access.getIfAvailable());
+        catalog.validateDataset(); return catalog;
+    }
     @Bean public LearningService learningService(LearningCatalog catalog, LearningStore store, LearningStorage storage, LearningProperties p, Clock clock) {
         return new LearningService(catalog,store,storage,p,clock);
     }

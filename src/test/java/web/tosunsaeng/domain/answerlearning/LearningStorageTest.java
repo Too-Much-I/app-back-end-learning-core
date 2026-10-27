@@ -18,6 +18,18 @@ import static org.mockito.ArgumentMatchers.*;
 import static web.tosunsaeng.domain.answerlearning.LearningFixtures.*;
 
 class LearningStorageTest {
+    @Test void reusedMediaCanOnlyUseTheValidatedSourcePrefixAndBucket() {
+        var source=new LearningMediaSource("old-dataset","old-v1","test-learning-bucket","answer-learning/old-dataset/old-v1");
+        var row=new Document("_id","audio").append("bucket","test-learning-bucket")
+                .append("key","answer-learning/old-dataset/old-v1/media/audio.mp3");
+        assertThat(storage.media(row,source).getString("url")).contains("old-dataset/old-v1/media/audio.mp3");
+        assertThatThrownBy(() -> storage.media(row)).hasMessage("LEARNING_UNAVAILABLE");
+        row.put("key","answer-learning/old-dataset/other/media/audio.mp3");
+        assertThatThrownBy(() -> storage.media(row,source)).hasMessage("LEARNING_UNAVAILABLE");
+        assertThatThrownBy(() -> LearningMediaSource.parse(new Document("datasetId","../other")
+                .append("contentVersion","v1").append("bucket","test-learning-bucket"),config()))
+                .hasMessage("LEARNING_UNAVAILABLE");
+    }
     S3Client s3=mock(S3Client.class);
     S3Presigner signer=S3Presigner.builder().region(Region.AP_NORTHEAST_2)
             .credentialsProvider(StaticCredentialsProvider.create(AwsBasicCredentials.create("test-access","test-secret"))).build();
