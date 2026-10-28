@@ -22,7 +22,7 @@ public final class LearningPaidAccess {
     public Runnable prepare(String owner) {
         long started=nanoTime.getAsLong();
         try {
-            var proof=client.check(owner);
+            var proof=LearningRequestTiming.billing(() -> client.check(owner));
             Instant received=clock.instant();
             if (proof==null || !proof.valid() || !owner.equals(proof.userId())
                     || Instant.parse(proof.checkedAt()).isAfter(received)) throw contract();
