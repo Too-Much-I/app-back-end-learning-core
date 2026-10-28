@@ -47,8 +47,10 @@ class BillingWorkloadTokenIssuerTest {
                     case EXAM_DELETION_EVENTS -> "exam-deletion-events";
                     case REANSWER_ELIGIBILITY -> "reanswer-eligibility";
                     case PART_LEARNING_ELIGIBILITY -> "part-learning-eligibility";
+                    case PROMOTION_ELIGIBILITY -> "promotion-eligibility";
+                    case MARKETING_PUSH_ELIGIBILITY -> "marketing-push-eligibility";
                 };
-                assertEquals(java.util.List.of("tosunsaeng-billing:"+target+":test"),c.getAudience());
+                assertEquals(java.util.List.of((purpose == BillingWorkloadTokenIssuer.Purpose.MARKETING_PUSH_ELIGIBILITY ? "tosunsaeng-identity:" : "tosunsaeng-billing:")+target+":test"),c.getAudience());
                 // Aud must be a JSON string on the wire, not merely a single-item parser list.
                 var json=new com.fasterxml.jackson.databind.ObjectMapper().readTree(jwt.getPayload().toBytes());
                 assertTrue(json.get("aud").isTextual());
