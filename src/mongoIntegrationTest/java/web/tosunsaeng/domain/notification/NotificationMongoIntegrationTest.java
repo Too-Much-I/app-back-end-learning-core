@@ -40,7 +40,7 @@ class NotificationMongoIntegrationTest {
     @BeforeEach void setup() {
         mongo = new MongoTemplate(factory);
         for (String c : List.of("notification_devices", "exam_submission_receipts", "daily_exam_reminder_deliveries", "daily_reminder_suppressions",
-                "notification_control", "user_ownership_guards", "exam_sessions", "withdrawn_user_access_denies", "learning_record_deletion_operations")) {
+                "notification_control", "user_ownership_guards", "exam_sessions", "withdrawn_user_access_denies", "learning_record_deletion_operations", "promotion_applications")) {
             if (!mongo.collectionExists(c)) mongo.createCollection(c); mongo.remove(new Query(), c);
         }
         for (var spec : NotificationStartupValidator.INDEXES) {
@@ -66,6 +66,108 @@ class NotificationMongoIntegrationTest {
     }
     void accepted(String id, int q, int retry) { tx.run(() -> { tracker.accepted(id, q, retry, List.of(1, 2), clock.instant()); return null; }); }
     Document delivery(String device) { return mongo.findById(NotificationStore.deliveryId(OWNER, ReminderPolicy.day(NOW), device), Document.class, NotificationStore.DELIVERIES); }
+
+    PromotionPushWorker promotion(PromotionEligibilityClient eligibility, boolean dry, NotificationTransactions transactions) {
+        var config = new PromotionPushProperties(); config.setEnabled(true); config.setDryRun(dry);
+        var campaign = new web.tosunsaeng.domain.promotion.PromotionProperties();
+        campaign.setEnabled(true); campaign.setCampaignId("fixture-campaign");
+        campaign.setOpensAt(Instant.parse("2026-10-01T00:00:00Z"));
+        campaign.setClosesAt(Instant.parse("2026-11-01T00:00:00Z"));
+        return new PromotionPushWorker(store, transactions, config, campaign, eligibility, gateway, clock, new SimpleMeterRegistry());
+    }
+    PromotionEligibilityClient promotionEligibility() {
+        clock.at(Instant.parse("2026-10-28T03:00:00Z"));
+        var eligibility=org.mockito.Mockito.mock(PromotionEligibilityClient.class);
+        org.mockito.Mockito.when(eligibility.eligible(org.mockito.ArgumentMatchers.anyString())).thenReturn(true);
+        return eligibility;
+    }
+    Document promotionMarker() {
+        return mongo.findById(PromotionPushPolicy.marker("fixture-campaign", OWNER, clock.instant()), Document.class, NotificationStore.CONTROL);
+    }
+    @Test void promotionDeduplicatesAcrossDevicesWorkersAndRestart() throws Exception {
+        var eligibility=promotionEligibility(); String a=register(OWNER), b=register(OWNER);
+        var first=promotion(eligibility,false,tx);var second=promotion(eligibility,false,tx);
+        try(var pool=Executors.newFixedThreadPool(2)) {
+            var x=pool.submit(()->first.process(a));var y=pool.submit(()->second.process(b));x.get();y.get();
+        }
+        promotion(eligibility,false,tx).process(register(OWNER));
+        assertThat(gateway.calls.get()).isEqualTo(1);
+        assertThat(promotionMarker().getString("status")).isEqualTo("ACCEPTED");
+        assertThat(promotionMarker().keySet()).doesNotContain("userId","pushToken","tokenHash");
+        assertThat(mongo.count(new Query(),NotificationStore.DELIVERIES)).isZero();
+    }
+    @Test void promotionRechecksConsentBeforeSendAndNeverResendsSkippedMarker() {
+        var eligibility=promotionEligibility();String id=register(OWNER);
+        org.mockito.Mockito.when(eligibility.eligible(OWNER)).thenReturn(true,false,true);
+        promotion(eligibility,false,tx).process(id);
+        promotion(eligibility,false,tx).process(id);
+        assertThat(gateway.calls.get()).isZero();
+        assertThat(promotionMarker().getString("status")).isEqualTo("SKIPPED");
+    }
+    @Test void promotionReadsDeviceAfterRemoteRecheck() {
+        var eligibility=promotionEligibility();String id=register(OWNER);AtomicInteger checks=new AtomicInteger();
+        org.mockito.Mockito.when(eligibility.eligible(OWNER)).thenAnswer(invocation->{
+            if(checks.incrementAndGet()==2)tx.run(()->{store.register(TARGET,"MEMBER",id,PROOF,"IOS",
+                    "fixture-new-owner-token-123456","AUTHORIZED",clock.instant());return null;});
+            return true;
+        });
+        promotion(eligibility,false,tx).process(id);
+        assertThat(gateway.calls.get()).isZero();
+        assertThat(promotionMarker().getString("status")).isEqualTo("SKIPPED");
+    }
+    @Test void promotionIncludesThreeApplicationsButExcludesFourthBeforeSend() {
+        var eligibility=promotionEligibility();String id=register(OWNER);
+        for(int i=0;i<3;i++)mongo.insert(new Document("_id","application-"+i).append("promotionId","fixture-campaign").append("userId",OWNER),"promotion_applications");
+        AtomicInteger checks=new AtomicInteger();
+        org.mockito.Mockito.when(eligibility.eligible(OWNER)).thenAnswer(invocation->{
+            if(checks.incrementAndGet()==2)mongo.insert(new Document("_id","application-4").append("promotionId","fixture-campaign").append("userId",OWNER),"promotion_applications");
+            return true;
+        });
+        promotion(eligibility,false,tx).process(id);
+        assertThat(checks.get()).isEqualTo(2);assertThat(gateway.calls.get()).isZero();
+        assertThat(promotionMarker().getString("status")).isEqualTo("SKIPPED");
+    }
+    @Test void promotionDryRunAndIneligibleDoNotClaimOrSend() {
+        var eligibility=promotionEligibility();String id=register(OWNER);
+        promotion(eligibility,true,tx).process(id);
+        assertThat(promotionMarker()).isNull();assertThat(gateway.calls.get()).isZero();
+        org.mockito.Mockito.when(eligibility.eligible(OWNER)).thenReturn(false);
+        promotion(eligibility,false,tx).process(id);
+        assertThat(promotionMarker()).isNull();assertThat(gateway.calls.get()).isZero();
+    }
+    @Test void promotionUnknownCommitNeverSendsAndUnknownDeliveryNeverRetries() {
+        var eligibility=promotionEligibility();String id=register(OWNER);
+        var uncertain=new NotificationTransactions(factory){
+            @Override public <T>T run(java.util.function.Supplier<T> command){
+                super.run(command);var e=new com.mongodb.MongoException(91,"fixture unknown commit");
+                e.addLabel(com.mongodb.MongoException.UNKNOWN_TRANSACTION_COMMIT_RESULT_LABEL);throw e;
+            }
+        };
+        assertThatThrownBy(()->promotion(eligibility,false,uncertain).process(id)).isInstanceOf(RuntimeException.class);
+        promotion(eligibility,false,tx).process(id);assertThat(gateway.calls.get()).isZero();
+        clock.at(clock.instant().plus(Duration.ofDays(1)));
+        gateway.result=PushGateway.Result.unknown();promotion(eligibility,false,tx).process(id);
+        promotion(eligibility,false,tx).process(id);assertThat(gateway.calls.get()).isEqualTo(1);
+        assertThat(promotionMarker().getString("status")).isEqualTo("UNKNOWN");
+    }
+    @Test void promotionWindowClosingDuringRecheckSkipsSend() {
+        var eligibility=promotionEligibility();String id=register(OWNER);AtomicInteger checks=new AtomicInteger();
+        org.mockito.Mockito.when(eligibility.eligible(OWNER)).thenAnswer(invocation->{
+            if(checks.incrementAndGet()==2)clock.at(Instant.parse("2026-10-28T03:15:00Z"));return true;
+        });
+        promotion(eligibility,false,tx).process(id);assertThat(gateway.calls.get()).isZero();
+    }
+    @Test void promotionWithdrawnGuestAndFourApplicationsNeverQueryOrSend() {
+        var eligibility=promotionEligibility();var promotion=promotion(eligibility,false,tx);
+        promotion.process(register(OWNER,"GUEST","AUTHORIZED"));
+        String id=register(OWNER);
+        for(int i=0;i<4;i++)mongo.insert(new Document("_id","cap-"+i).append("promotionId","fixture-campaign").append("userId",OWNER),"promotion_applications");
+        promotion.process(id);
+        mongo.remove(new Query(),"promotion_applications");
+        mongo.insert(new Document("_id",OWNER).append("userId",OWNER).append("blockedUntil",Date.from(clock.instant().plusSeconds(3600))),"withdrawn_user_access_denies");
+        promotion.process(id);
+        assertThat(gateway.calls.get()).isZero();org.mockito.Mockito.verify(eligibility,org.mockito.Mockito.never()).eligible(org.mockito.ArgumentMatchers.anyString());
+    }
 
     @Test void neverStartedAndPartialIncludedButAllInitialSubmissionsExcludedWithoutGrading() {
         register(OWNER); worker.tick(); assertThat(gateway.calls.get()).isEqualTo(1);

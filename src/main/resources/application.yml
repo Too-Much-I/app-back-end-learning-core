@@ -24,6 +24,12 @@ spring:
       max-request-size: 10MB
 
 app:
+  promotion-push:
+    enabled: ${PROMOTION_PUSH_ENABLED:false}
+    dry-run: ${PROMOTION_PUSH_DRY_RUN:true}
+    billing-endpoint: ${PROMOTION_PUSH_BILLING_ENDPOINT:}
+    identity-endpoint: ${PROMOTION_PUSH_IDENTITY_ENDPOINT:}
+    batch-size: ${PROMOTION_PUSH_BATCH_SIZE:20}
   callback-write-fences:
     lifecycle-enabled: ${CALLBACK_WRITE_FENCES_LIFECYCLE_ENABLED:false}
     isolation-enabled: ${CALLBACK_WRITE_FENCES_ISOLATION_ENABLED:false}

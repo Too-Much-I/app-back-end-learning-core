@@ -1,5 +1,8 @@
 # Learning Core Current State
 
+<!-- codex-turn:01a1818c-aad2-7f11-8d0a-3f9bf68525b9 -->
+- 2026-10-28 TMI-224 운영 main 기반 전용 브랜치 전달 준비. clean test1566/실패0/오류0/skip1, 알림 Mongo23 통과. 사용자 이번 작업 commit/push/main 병합/운영 배포 승인. 실제 프로모션은 dry-run 유지, 새 운영 신뢰 등록은 별도 적용 전 확인. 운영 배포/인증 연결·실수신 검증 아직 미완료.
+
 <!-- codex-turn:01a17d9e-8750-76d3-9057-6aaa93ebca62 -->
 
 - 2026-10-27 projection 구현 재개·검증 완료. 목록/구 이어하기 문항 metadata, 최신 이어하기 unit/lesson/완료시각 및 최신 제출 lessonId/updatedAt만 조회. 상세 콘텐츠·필터·정렬·외부 응답 유지. 전체 단위1559/실패0/skip1 및 LearningMongoIntegrationTest 통과. 최초 Docker API 불일치는 실행 프로세스 api.version=1.44로 해결, 제품 의존성 불변. 사용자 이번 변경 Git/PR/test·prod 병렬 배포 승인; 현재 후보 전달 단계로 배포 완료 아님. 캐시·실DB/index·운영 설정 변경 없음.

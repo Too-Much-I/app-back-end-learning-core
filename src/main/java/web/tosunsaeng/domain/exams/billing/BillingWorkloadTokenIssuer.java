@@ -19,7 +19,7 @@ import java.util.UUID;
 
 /** No network access, no token cache, no authentication fallback. */
 public final class BillingWorkloadTokenIssuer {
-    public enum Purpose { RESERVATIONS, ATTEMPT_GROUP_EVENTS, EXAM_DELETION_EVENTS, REANSWER_ELIGIBILITY, PART_LEARNING_ELIGIBILITY }
+    public enum Purpose { RESERVATIONS, ATTEMPT_GROUP_EVENTS, EXAM_DELETION_EVENTS, REANSWER_ELIGIBILITY, PART_LEARNING_ELIGIBILITY, PROMOTION_ELIGIBILITY, MARKETING_PUSH_ELIGIBILITY }
     private final String environment;
     private final RSAKey key;
     private final Clock clock;
@@ -91,11 +91,13 @@ public final class BillingWorkloadTokenIssuer {
             case EXAM_DELETION_EVENTS -> "exam-deletion-events";
             case REANSWER_ELIGIBILITY -> "reanswer-eligibility";
             case PART_LEARNING_ELIGIBILITY -> "part-learning-eligibility";
+            case PROMOTION_ELIGIBILITY -> "promotion-eligibility";
+            case MARKETING_PUSH_ELIGIBILITY -> "marketing-push-eligibility";
         };
         SignedJWT jwt = new SignedJWT(new JWSHeader.Builder(JWSAlgorithm.RS256)
                 .type(JOSEObjectType.JWT).keyID(key.getKeyID()).build(), new JWTClaimsSet.Builder()
                 .issuer("urn:tosunsaeng:workload:learning-core:" + environment)
-                .subject("learning-core-service").audience("tosunsaeng-billing:" + target + ":" + environment)
+                .subject("learning-core-service").audience((purpose == Purpose.MARKETING_PUSH_ELIGIBILITY ? "tosunsaeng-identity:" : "tosunsaeng-billing:") + target + ":" + environment)
                 .issueTime(Date.from(java.time.Instant.ofEpochSecond(now)))
                 .notBeforeTime(Date.from(java.time.Instant.ofEpochSecond(now)))
                 .expirationTime(Date.from(java.time.Instant.ofEpochSecond(Math.addExact(now, 60))))
