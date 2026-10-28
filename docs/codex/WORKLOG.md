@@ -17929,3 +17929,31 @@
 - 유지 계약: API/응답/조회순서·범위/소유권·버전·공개상태 필터 및 상세 데이터 유지. 캐시·DB/index·서버 설정 불변.
 - 결정: 사용자 직접 Git/배포 병렬 승인으로 이번 범위 예외 기록. main/develop 대상 파일 기준 내용 동일 확인, 각 브랜치 후보로 분리해 무관한 이력 전달 방지.
 - 위험/다음: 아직 실운영 latency 개선 미측정, 로그인 장애 해결 주장 없음. 양쪽 PR CI 후 병합·기존 자동 배포 안정화/health 확인 필요. 예상 밖 제품 변경 없음, 원본 dirty 보존.
+
+<!-- codex-turn:01a18102-8164-73c3-91a2-884a4c8cf9ae -->
+### 2026-10-28 TMI-224 기존 프론트 푸시 계약 반영
+
+- Jira: TMI-224. 브랜치: codex/TMI-224-promotion-push. 목표: 사용자가 승인한 기존 클릭 route·수신거부 메뉴를 서버 payload에 적용.
+- 이번 변경 파일: PromotionPushPolicy.java, PromotionPushProperties.java, PromotionPushConfiguration.java, 신규 PromotionPushPayloadTest.java, docs/contracts/TMI-224-promotion-push-frontend.md, WORKLOG.md, CURRENT_STATE.md.
+- 구현: type=CASHBACK_EVENT, route=CASHBACK_EVENT_HOME, 수신거부 문구=설정 > 알림 > 이벤트·혜택 알림. 설정의 기본값으로 연결. 실제 gateway 구성과 테스트가 content 생성 코드를 공유한다.
+- 검증: ./gradlew clean test 성공, 총1563/실패0/오류0/skip1. 신규 payload 테스트2개 및 기존21시 알림 payload 회귀 포함. git diff --check 통과. 외부 서버/FCM 호출 없음.
+- 유지 계약: 기존 공개 API·21시 알림·defaultOFF/dryRun 유지. 프론트 코드 변경 없음. 제목/본문에 승인된 광고·수신거부 안내 유지.
+- 결정: Jira 원문 조회 후 기존 앱 develop934d4b8a 근거 계약 재사용. Jira 수정/댓글/상태변경 없음.
+- 위험/배포 전: 기존 진행 중인 적격 HTTP 본문 timeout, 최신 기기 재확인, 리소스 close 및 signer readiness 보완과 Identity/Billing 인증·worker 중복/실패 테스트가 남아 있어 전체 기능 배포 완료 아님. 실제 설치 앱 클릭/철회 E2E도 미확인.
+- diff 범위: 기존 TMI-224 AGENTS/서명 issuer/FCM/worker/eligibility 변경은 앞선 작업 그대로이며 이번 변경과 구분한다. 이번 예상 밖 변경 없음. 원본 저장소 사용자 변경 보존.
+- 다음: 미완료 서버 연동 검증 후 승인된 test-only 전달. 이번 턴 commit/push/배포·실제 발송 설정 변경 없음.
+- Jira 댓글 초안(미등록): 기존 앱 route·수신거부 메뉴를 푸시 기본 payload에 반영하고 관련 계약/회귀 테스트 추가. LC 전체 테스트1563, 실패0, skip1. 서버 간 연동/worker 검증 및 테스트 배포는 미완료.
+
+<!-- codex-turn:01a18108-44e3-7273-a3ba-4da4b8dba857 -->
+### 2026-10-28 TMI-224 안전성 검증 및 테스트 전달 준비
+
+- Jira: TMI-224. 브랜치: codex/TMI-224-promotion-push. 목표: 사용자 승인에 따른 남은 보완·검증 후 test-only 전달.
+- 변경 파일: domain/notification/Promotion*, FcmPushGateway, BillingWorkloadTokenIssuer, application.yml, 알림·issuer 단위/격리Mongo 테스트, AGENTS 및 계약/기록 문서.
+- 구현: 프로모션 전용 scheduler/worker, 본문 포함3초 timeout·16KiB strict 두 서비스 조회, 실제 발송 직전 최신 기기/동의 재확인, 계정·캠페인·일자 Tx marker와 기본OFF/dryRun을 구현했다. 기존21시/공개 API 불변.
+- 테스트: LC clean test1566/실패0/오류0/skip1. 격리 NotificationMongoIntegrationTest 기존+신규 경합23개 최종 재검증 중(초기 탈퇴 fixture blockedUntil 누락을 실제 스키마에 맞게 수정). git diff --check 통과.
+- 유지 계약/결정: 수목KST12시, 비전액환불 구매·광고동의·신청0~3회·활성회원/기기 조건. 기존21시·사용자 API·운영 환경 불변. 새 key/DB collection/index 생성 없음. 공개키 및 test 인증 연결은 실환경에서 별도 검증한다.
+- 위험: 단위/격리 테스트와 실제 서비스 인증·FCM 수신은 별개다. 마지막 재확인 이후 철회와 외부 전송은 원자적이지 않고, marker 후 crash/unknown은 중복방지 우선으로 당일 누락 가능하다.
+- diff: 앞선 TMI-224 미커밋 구현 포함, 무관한 원본 사용자 변경 제외. 예상 밖 범위 변경 없음.
+- 다음: CI/PR/develop 테스트 배포·서비스간 인증/설정 확인. 현재 기록 시점 commit/push/배포 전. 운영 제외.
+- Jira 댓글 초안(미등록): 프로모션 전용 scheduler/worker, 본문 포함3초 timeout·16KiB strict 두 서비스 조회, 실제 발송 직전 최신 기기/동의 재확인, 계정·캠페인·일자 Tx marker와 기본OFF/dryRun을 구현했다. 기존21시/공개 API 불변. LC clean test1566/실패0/오류0/skip1. 격리 NotificationMongoIntegrationTest 기존+신규 경합23개 최종 재검증 중(초기 탈퇴 fixture blockedUntil 누락을 실제 스키마에 맞게 수정). 테스트 환경 실제 연결·단말 E2E는 전달 후 확인 필요.
+- 후속 검증 결과: NotificationMongoIntegrationTest23개 모두 통과. 최초 실패는 컴파일 완료3초 뒤 저장한 fixture 수정 전 class를 실행한 결과였고, 재컴파일/재실행으로 최종 확인했다. 제품 차단 조건을 완화하지 않았다.

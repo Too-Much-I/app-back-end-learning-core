@@ -1,5 +1,14 @@
 # Learning Core Current State
 
+- 2026-10-28 TMI-224 최종 격리 NotificationMongoIntegrationTest23개 모두 성공. 아래 재검증 중 기록의 후속 결과다. LC 전체1566/실패0/skip1 및 diff check 성공, 테스트 전달 진행.
+
+<!-- codex-turn:01a18108-44e3-7273-a3ba-4da4b8dba857 -->
+- 2026-10-28 Jira TMI-224 / codex/TMI-224-promotion-push: 프로모션 전용 scheduler/worker, 본문 포함3초 timeout·16KiB strict 두 서비스 조회, 실제 발송 직전 최신 기기/동의 재확인, 계정·캠페인·일자 Tx marker와 기본OFF/dryRun을 구현했다. 기존21시/공개 API 불변. LC clean test1566/실패0/오류0/skip1. 격리 NotificationMongoIntegrationTest 기존+신규 경합23개 최종 재검증 중(초기 탈퇴 fixture blockedUntil 누락을 실제 스키마에 맞게 수정). 테스트 전달 준비, 아직 배포/실수신 완료 아님. 운영 불변.
+
+<!-- codex-turn:01a18102-8164-73c3-91a2-884a4c8cf9ae -->
+- 2026-10-28 Jira TMI-224 / codex/TMI-224-promotion-push: 기존 앱 CASHBACK_EVENT_HOME route 및 CASHBACK_EVENT type, 수신거부 메뉴 ‘설정 > 알림 > 이벤트·혜택 알림’을 서버 기본 payload에 반영. content 생성 경로 공유·payload 회귀 및 프론트 계약 문서 추가. clean test 총1563/실패0/오류0/skip1, diff check 통과. 기본OFF/dryRun 및 기존21시 알림 유지. 기존 진행 중인 적격조회/worker 구현은 아직 최종 검증·커밋·푸시·테스트배포 전이다.
+- 배포 전 잔여: 적격 HTTP 본문 read timeout 보강, 재조회 후 기기 최신 상태 검사, gateway/client 종료 lifecycle, signer readiness, Identity/Billing 보안·대상/동의/중복/장애 검증 및 테스트 환경 인증 연결. 실제 발송은 켜지 않음.
+
 <!-- codex-turn:01a17d9e-8750-76d3-9057-6aaa93ebca62 -->
 
 - 2026-10-27 projection 구현 재개·검증 완료. 목록/구 이어하기 문항 metadata, 최신 이어하기 unit/lesson/완료시각 및 최신 제출 lessonId/updatedAt만 조회. 상세 콘텐츠·필터·정렬·외부 응답 유지. 전체 단위1559/실패0/skip1 및 LearningMongoIntegrationTest 통과. 최초 Docker API 불일치는 실행 프로세스 api.version=1.44로 해결, 제품 의존성 불변. 사용자 이번 변경 Git/PR/test·prod 병렬 배포 승인; 현재 후보 전달 단계로 배포 완료 아님. 캐시·실DB/index·운영 설정 변경 없음.
