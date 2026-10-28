@@ -25,6 +25,11 @@ public class FcmPushGateway implements PushGateway, AutoCloseable {
     private final PrivateKey key;
     private String accessToken;
     private Instant tokenExpires = Instant.EPOCH;
+    private Content content;
+    public record Content(String title,String body,String type,String route) {}
+    public FcmPushGateway(String project,String credentialFile,Clock clock,Content content){
+        this(project,credentialFile,clock); this.content=java.util.Objects.requireNonNull(content);
+    }
     public FcmPushGateway(String project, String credentialFile, Clock clock) {
         this.clock = clock; this.project = project;
         this.sendEndpoint = "https://fcm.googleapis.com/v1/projects/" + project + "/messages:send";
@@ -83,7 +88,8 @@ public class FcmPushGateway implements PushGateway, AutoCloseable {
             if (accessToken == null || !tokenExpires.isAfter(clock.instant())) return new Result(Status.FAILED, false, true, 0);
             HttpPost post = new HttpPost(sendEndpoint);
             post.setHeader("Authorization", "Bearer " + accessToken); post.setHeader("Content-Type", "application/json; charset=UTF-8");
-            post.setEntity(new StringEntity(JSON.writeValueAsString(payload(token, notificationId, expiresAt, ttl)), StandardCharsets.UTF_8));
+            post.setEntity(new StringEntity(JSON.writeValueAsString(content == null ? payload(token, notificationId, expiresAt, ttl)
+                    : payload(token,notificationId,expiresAt,ttl,content)), StandardCharsets.UTF_8));
             try (var response = http.execute(post)) {
                 int status = response.getStatusLine().getStatusCode();
                 byte[] body = response.getEntity() == null ? new byte[0] : response.getEntity().getContent().readNBytes(16385);
@@ -93,11 +99,14 @@ public class FcmPushGateway implements PushGateway, AutoCloseable {
         } catch (Exception e) { return Result.unknown(); }
     }
     static Map<String, Object> payload(String token, String id, Instant expiry, long ttl) {
+        return payload(token,id,expiry,ttl,new Content("오늘의 모의고사","오늘 모의고사로 영어 연습을 이어가 볼까요?",ReminderPolicy.TYPE,"MOCK_EXAM_HOME"));
+    }
+    static Map<String,Object> payload(String token,String id,Instant expiry,long ttl,Content content){
         return Map.of("message", Map.of("token", token,
-                "notification", Map.of("title", "오늘의 모의고사", "body", "오늘 모의고사로 영어 연습을 이어가 볼까요?"),
-                "data", Map.of("notificationId", id, "type", ReminderPolicy.TYPE, "route", "MOCK_EXAM_HOME"),
-                "android", Map.of("ttl", ttl + "s", "collapse_key", ReminderPolicy.TYPE),
-                "apns", Map.of("headers", Map.of("apns-expiration", Long.toString(expiry.getEpochSecond()), "apns-collapse-id", ReminderPolicy.TYPE))));
+                "notification", Map.of("title",content.title(),"body",content.body()),
+                "data",Map.of("notificationId",id,"type",content.type(),"route",content.route()),
+                "android",Map.of("ttl",ttl+"s","collapse_key",content.type()),
+                "apns",Map.of("headers",Map.of("apns-expiration",Long.toString(expiry.getEpochSecond()),"apns-collapse-id",content.type()))));
     }
     static Result classify(int status, byte[] body, String retryAfter, Instant now) {
         if (status >= 200 && status < 300) return new Result(Status.ACCEPTED, false, false, 0);
