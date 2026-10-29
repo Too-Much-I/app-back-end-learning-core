@@ -8,7 +8,7 @@ import org.slf4j.LoggerFactory;
 public final class MongoFailureDiagnostics {
     private static final Logger log = LoggerFactory.getLogger(MongoFailureDiagnostics.class);
 
-    public enum Boundary { HTTP, USER_OWNED, NOTIFICATION }
+    public enum Boundary { HTTP, USER_OWNED, NOTIFICATION, CHALLENGE }
     public enum Outcome { PROPAGATED, RETRYING, EXHAUSTED, NON_RETRYABLE, UNKNOWN_COMMIT }
 
     private MongoFailureDiagnostics() {}

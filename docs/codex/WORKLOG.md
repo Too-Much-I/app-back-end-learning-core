@@ -17957,3 +17957,12 @@
 - 다음: CI/PR/develop 테스트 배포·서비스간 인증/설정 확인. 현재 기록 시점 commit/push/배포 전. 운영 제외.
 - Jira 댓글 초안(미등록): 프로모션 전용 scheduler/worker, 본문 포함3초 timeout·16KiB strict 두 서비스 조회, 실제 발송 직전 최신 기기/동의 재확인, 계정·캠페인·일자 Tx marker와 기본OFF/dryRun을 구현했다. 기존21시/공개 API 불변. LC clean test1566/실패0/오류0/skip1. 격리 NotificationMongoIntegrationTest 기존+신규 경합23개 최종 재검증 중(초기 탈퇴 fixture blockedUntil 누락을 실제 스키마에 맞게 수정). 테스트 환경 실제 연결·단말 E2E는 전달 후 확인 필요.
 - 후속 검증 결과: NotificationMongoIntegrationTest23개 모두 통과. 최초 실패는 컴파일 완료3초 뒤 저장한 fixture 수정 전 class를 실행한 결과였고, 재컴파일/재실행으로 최종 확인했다. 제품 차단 조건을 완화하지 않았다.
+
+<!-- codex-turn:01a18601-25c3-7d60-ad06-39087a870db2 -->
+### 2026-10-29 챌린지 안전 진단 test 전달
+
+- 브랜치: codex/challenge-error-diagnostics-test. 목표: 로그 관측 보강 test/prod 병렬 배포. 사용자 이번 범위 commit/push/양쪽PR 병합·기존workflow 승인. 지정 Jira 없음.
+- 변경 파일: ChallengeFailureDiagnostics/Test 신규, ChallengeService/ExceptionAdvice/Transactions, MongoFailureDiagnostics, AGENTS 및 기록2개. main97b467e의 제품 diff만 이식하여 develop 기존 변경 보존.
+- 구현/계약: 원인 폐기 전 START_RECOVERY·5xx HTTP_FAILURE의 타입/제한 앱프레임, CHALLENGE Mongo코드/시도/결과·고정 label 여부 기록. requestId MDC 유지, 원문 메시지/Throwable/토큰/ID 미출력. 공개 API·재시도·unknown commit·winner복구·DB·설정 불변.
+- 검증: 동일 제품 diff main 기반 clean1577/실패0/skip1, 격리ChallengeMongo38, deployment88 통과. develop 전체 테스트/CI 별도 수행. 초기 Mongo Docker API호환 문제는 실행옵션 api.version1.44로 해결. git diff --check 수행.
+- 위험/다음: 과거 사건 원인은 확정 불가. 양쪽 CI 완료 후 병렬 배포·health 확인. 운영 오류 강제 재현/데이터 변경 없음. 예상 밖 변경 없음.
