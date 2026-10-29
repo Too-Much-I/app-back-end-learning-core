@@ -1,5 +1,8 @@
 # Learning Core Current State
 
+<!-- codex-turn:01a18601-25c3-7d60-ad06-39087a870db2 -->
+- 2026-10-29 챌린지 오류 관측 보강: START_RECOVERY에서 원인이 폐기되기 전 예외 타입/제한된 앱 프레임, HTTP_FAILURE에서5xx, CHALLENGE 트랜잭션에서 Mongo 코드·고정 label 여부·시도/결과를 기록. 기존 requestId MDC 사용, 원문 메시지/Throwable/사용자ID 미출력. API·재시도·복구 의미 불변. clean test1577/실패0/skip1, deployment88 통과. 격리 Mongo 재검증 및 사용자 승인 test/prod 병렬 전달 진행.
+
 <!-- codex-turn:01a1818c-aad2-7f11-8d0a-3f9bf68525b9 -->
 - 2026-10-28 TMI-224 운영 main 기반 전용 브랜치 전달 준비. clean test1566/실패0/오류0/skip1, 알림 Mongo23 통과. 사용자 이번 작업 commit/push/main 병합/운영 배포 승인. 실제 프로모션은 dry-run 유지, 새 운영 신뢰 등록은 별도 적용 전 확인. 운영 배포/인증 연결·실수신 검증 아직 미완료.
 

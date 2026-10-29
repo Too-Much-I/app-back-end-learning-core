@@ -97,6 +97,7 @@ public class ChallengeService {
         } catch (RuntimeException failure) {
             if (failure instanceof web.tosunsaeng.domain.learningrecorddeletion.application.DeletionFailure) throw failure;
             if (failure instanceof ChallengeFailure) throw failure;
+            ChallengeFailureDiagnostics.record(failure, ChallengeFailureDiagnostics.Stage.START_RECOVERY);
             Attempt winner = store.question(owner, date, q);
             if (winner != null) {
                 winner = expire(winner);

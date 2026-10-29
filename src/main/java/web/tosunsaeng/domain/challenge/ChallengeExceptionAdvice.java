@@ -27,6 +27,8 @@ public class ChallengeExceptionAdvice {
                 || exception instanceof HttpMediaTypeNotSupportedException)
             error = internal ? ChallengeCallback.invalid() : ChallengeFailure.badRequest();
         else error = ChallengeFailure.internal();
+        if (error.status >= 500)
+            ChallengeFailureDiagnostics.record(exception, ChallengeFailureDiagnostics.Stage.HTTP_FAILURE);
         Object response = internal ? Map.of("code", error.code) : new BaseResponse<>(false, error.code, message(error.code), error.result);
         return ResponseEntity.status(error.status).body(response);
     }

@@ -17824,3 +17824,13 @@
 - 검증: clean test1566/실패0/오류0/skip1, 알림 Mongo23 통과. 실제 운영 DB/FCM 테스트 없음. LC 초기 Mongo 환경 탐지 실패는 Docker29 API버전1.44 실행 옵션으로 해결, 제품 변경 없음.
 - 위험/다음: 테스트 환경에서도 인증된 적격조회·단말E2E 미확인 상태를 숨기지 않음. 실제 발송OFF로 코드/인증/dry-run 단계만 진행. 테스트키 재사용 금지, 시간 강제 변경 없음. 검증 후 PR·배포 결과 추기. 예상 밖 제품 변경 없음, 기존 사용자 작업 보존.
 - Jira 댓글 초안(미등록): 운영 main 기반 TMI-224 분리 전달 준비, dry-run/서비스별 테스트 수행. 실적격응답·단말E2E와 실제 발송 전환은 별도.
+
+<!-- codex-turn:01a18601-25c3-7d60-ad06-39087a870db2 -->
+### 2026-10-29 챌린지 오류 안전 로그 보강
+
+- 브랜치: codex/challenge-error-diagnostics. 목표: Sentry 도전 생성500의 내부 예외 관측 공백 보완. 이번 작업 지정 Jira 없음. 사용자 이번 변경만 commit/push/PR main·develop 병합·기존 test/prod 병렬 배포 승인.
+- 변경 파일: ChallengeFailureDiagnostics(신규), ChallengeFailureDiagnosticsTest(신규), ChallengeService, ChallengeExceptionAdvice, ChallengeTransactions, MongoFailureDiagnostics, AGENTS.md와 기록2개.
+- 구현: 원인 폐기 전 START_RECOVERY,5xx HTTP_FAILURE의 타입 chain(최대8)/앱 frame(원인당3), 기존 Mongo 진단 allowlist에 CHALLENGE 경계와 retry outcome 추가. 기존 requestId MDC 사용. 원문 Throwable/메시지·본문·토큰·ID·provider document 미출력. 공개 ChallengeFailure는 원인 미보유 유지.
+- 검증: clean test1577/실패0/오류0/skip1, deployment Node88 통과. 초기 격리 Mongo 실행은 Docker API1.32/최소1.40 호환 오류로 실패하여 JAVA_TOOL_OPTIONS api.version1.44로 재실행. 결과 후속 기록. git diff --check 수행.
+- 계약/결정: 기존 응답/상태/재시도 상한·unknown commit 재실행 금지·winner 복구·DB/IAM/기능 설정 유지. 새 Sentry 전송/개인정보 정제 변경 없음. 예상 밖 제품 변경 없음, 기존 사용자 checkout 보존.
+- 위험/다음: 과거 사건 원인 복구 불가, 재발 시 로그로 판별 가능. START_RECOVERY는 복구 시도 전 기록이므로 실패 응답 확정 의미 아님. 양쪽 CI/배포·health 검증 필요. 실제 운영 오류 강제 재현 없음.
