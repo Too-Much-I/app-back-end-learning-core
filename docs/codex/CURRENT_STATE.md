@@ -1,5 +1,8 @@
 # Learning Core Current State
 
+<!-- codex-turn:01a18601-25c3-7d60-ad06-39087a870db2 -->
+- 2026-10-29 챌린지 로그 보강 test 전달: main 기반97b467e의 코드/테스트/승인만 develop에 이식. START_RECOVERY 원인 타입·앱 프레임, HTTP_FAILURE 5xx, Mongo 재시도 진단. API·재시도·설정·DB 불변. main 기반 clean1577/실패0/skip1·격리Mongo38·deployment88 통과; develop CI 후 사용자 승인대로 prod/test 병렬 배포.
+
 - 2026-10-28 TMI-224 최종 격리 NotificationMongoIntegrationTest23개 모두 성공. 아래 재검증 중 기록의 후속 결과다. LC 전체1566/실패0/skip1 및 diff check 성공, 테스트 전달 진행.
 
 <!-- codex-turn:01a18108-44e3-7273-a3ba-4da4b8dba857 -->

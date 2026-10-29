@@ -37,7 +37,16 @@ public class ChallengeTransactions {
                 });
             } catch (RuntimeException failure) {
                 // Unknown commit MUST NOT rerun writes. Callers recover from durable receipts outside this transaction.
-                if (unknown(failure) || i == 2 || !retryable(failure)) throw failure;
+                boolean unknownCommit = unknown(failure);
+                boolean retry = !unknownCommit && i < 2 && retryable(failure);
+                var outcome = unknownCommit
+                        ? web.tosunsaeng.global.exception.MongoFailureDiagnostics.Outcome.UNKNOWN_COMMIT
+                        : retry ? web.tosunsaeng.global.exception.MongoFailureDiagnostics.Outcome.RETRYING
+                        : i == 2 ? web.tosunsaeng.global.exception.MongoFailureDiagnostics.Outcome.EXHAUSTED
+                        : web.tosunsaeng.global.exception.MongoFailureDiagnostics.Outcome.NON_RETRYABLE;
+                web.tosunsaeng.global.exception.MongoFailureDiagnostics.record(failure,
+                        web.tosunsaeng.global.exception.MongoFailureDiagnostics.Boundary.CHALLENGE, i + 1, outcome);
+                if (!retry) throw failure;
             }
         }
     }
